@@ -28,6 +28,12 @@ export function ThemeToggle({ theme, setTheme }: ThemeToggleProps) {
     { value: 'system', label: 'System', icon: <Monitor size={14} /> },
   ];
 
+  const handleSelect = (value: Theme) => {
+    console.log('Theme selected:', value);
+    setTheme(value);
+    setOpen(false);
+  };
+
   return (
     <div ref={ref} className="relative">
       <button
@@ -39,17 +45,18 @@ export function ThemeToggle({ theme, setTheme }: ThemeToggleProps) {
         {icon}
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 bg-white dark:bg-gray-800 border rounded-lg shadow-lg py-1 min-w-[140px] z-50">
+        <div className="absolute right-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl py-1 min-w-[140px] z-[100]">
           {options.map((opt) => (
             <button
               key={opt.value}
-              onClick={() => { setTheme(opt.value); setOpen(false); }}
-              className={`w-full flex items-center gap-2 px-3 py-1.5 text-sm transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                theme === opt.value ? 'text-blue-500 font-medium' : 'text-gray-700 dark:text-gray-300'
+              onClick={() => handleSelect(opt.value)}
+              className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                theme === opt.value ? 'text-blue-600 dark:text-blue-400 font-semibold bg-gray-50 dark:bg-gray-750' : 'text-gray-900 dark:text-gray-100'
               }`}
             >
               {opt.icon}
               {opt.label}
+              {theme === opt.value && <span className="ml-auto text-blue-500">✓</span>}
             </button>
           ))}
         </div>
