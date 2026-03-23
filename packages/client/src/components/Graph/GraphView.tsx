@@ -90,6 +90,13 @@ export function GraphView({ graphData, loading, activeNotePath, mode, onNoteSele
     const width = canvas.width / window.devicePixelRatio;
     const height = canvas.height / window.devicePixelRatio;
 
+    // Pin active node at center so others orbit around it
+    const activeNode = activeNotePath ? nodes.find(n => n.path === activeNotePath) : null;
+    if (activeNode) {
+      activeNode.fx = width / 2;
+      activeNode.fy = height / 2;
+    }
+
     const simulation = d3.forceSimulation(nodes)
       .force('link', d3.forceLink<SimNode, SimLink>(links).id(d => d.id).distance(120))
       .force('charge', d3.forceManyBody().strength(-300))
@@ -134,14 +141,14 @@ export function GraphView({ graphData, loading, activeNotePath, mode, onNoteSele
         ctx.beginPath();
         ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
         ctx.fillStyle = isActive
-          ? '#6d28d9'
+          ? '#25D366'
           : isHovered
             ? '#7c3aed'
             : isDark ? '#a78bfa' : '#7c3aed';
         ctx.fill();
 
         if (isHovered || isActive) {
-          ctx.strokeStyle = isDark ? '#c4b5fd' : '#6d28d9';
+          ctx.strokeStyle = isActive ? '#128C7E' : isDark ? '#c4b5fd' : '#6d28d9';
           ctx.lineWidth = 2;
           ctx.stroke();
         }
@@ -160,19 +167,8 @@ export function GraphView({ graphData, loading, activeNotePath, mode, onNoteSele
 
     simulation.on('tick', draw);
 
-    // Auto-center on active node after simulation settles
-    simulation.on('end', () => {
-      if (activeNotePath) {
-        const activeNode = nodes.find(n => n.path === activeNotePath);
-        if (activeNode && activeNode.x != null && activeNode.y != null) {
-          const centerX = width / 2;
-          const centerY = height / 2;
-          const t = d3.zoomIdentity.translate(centerX - activeNode.x, centerY - activeNode.y);
-          transformRef.current = t;
-          draw();
-        }
-      }
-    });
+    // Reset zoom to identity so the pinned center node is visible
+    transformRef.current = d3.zoomIdentity;
 
     // Zoom + pan
     const d3Canvas = d3.select(canvas);
