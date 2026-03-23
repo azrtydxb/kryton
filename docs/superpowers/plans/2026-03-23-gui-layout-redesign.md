@@ -55,7 +55,9 @@ Expected: Build passes.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add -A
+git add packages/client/src/App.tsx packages/client/package.json packages/client/package-lock.json
+git status  # verify only expected files staged — CanvasView.tsx deletion should show
+git add -A  # include the deletion
 git commit -m "feat: remove Canvas view and @xyflow/react dependency"
 ```
 
@@ -79,9 +81,12 @@ Rewrite `packages/client/src/components/Graph/GraphView.tsx`. The component must
 - Keep all d3 canvas rendering, zoom/pan, drag, hover, click, and ResizeObserver logic
 - Add local mode filtering: when `mode === 'local'` and `activeNotePath` is set, filter `graphData.nodes` and `graphData.edges` to only include nodes within 1 hop of the active note
 - Add active note highlighting: render the active note's node with a larger radius (10 instead of 6) and a distinct fill color (`#2563eb` light, `#3b82f6` dark)
-- Add auto-centering: after simulation settles (on `end` event), if `activeNotePath` is set, programmatically set the zoom transform to center the active node in the canvas
-- Accept an optional `graphData` prop so the parent can pass cached data, OR fetch internally if not provided. Use `graphData` prop approach — parent fetches and caches.
-- Remove the internal `useEffect` that calls `api.getGraph()` — data comes from parent
+- Accept `graphData` prop from parent (parent fetches and caches) — remove the internal `useEffect` that calls `api.getGraph()`
+- **Important:** Use TWO separate useEffects for the d3 logic:
+  1. **Simulation setup effect** — depends on `[graphData, mode]`. Creates nodes/links, sets up the d3 force simulation, zoom, drag, and event handlers. Restarts when graph data changes OR mode toggles (local/full filtering changes the node set).
+  2. **Auto-centering effect** — depends on `[activeNotePath]`. When the active note changes, find the corresponding node in the current simulation and programmatically set the zoom transform to center it. Does NOT restart the simulation — just calls `d3Canvas.call(zoom.transform, d3.zoomIdentity.translate(...))` to pan to the node.
+
+  This separation prevents simulation restarts when navigating between notes in full mode.
 
 The new interface:
 ```ts
@@ -124,6 +129,9 @@ interface GraphPanelProps {
 export function GraphPanel({ graphData, loading, activeNotePath, onNoteSelect }: GraphPanelProps) {
   const [mode, setMode] = useState<'local' | 'full'>('local');
 
+  // Force full mode when no note is selected (local mode needs an anchor)
+  const effectiveMode = activeNotePath ? mode : 'full';
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       <div className="flex items-center justify-between px-3 py-2 border-b">
@@ -158,7 +166,7 @@ export function GraphPanel({ graphData, loading, activeNotePath, onNoteSelect }:
         graphData={graphData}
         loading={loading}
         activeNotePath={activeNotePath}
-        mode={mode}
+        mode={effectiveMode}
         onNoteSelect={onNoteSelect}
       />
     </div>
@@ -190,27 +198,52 @@ git commit -m "feat: refactor GraphView from modal to inline panel with local/fu
 **Files:**
 - Modify: `packages/client/src/components/Preview/Preview.tsx`
 
-- [ ] **Step 1: Add heading ID generation to Preview**
+- [ ] **Step 1: Add heading IDs via ReactMarkdown components prop**
 
-In `packages/client/src/components/Preview/Preview.tsx`, the `transformedContent` string processing already handles wiki-links and embeds. Add a heading transform BEFORE the existing transforms that adds `id` attributes to headings.
+In `packages/client/src/components/Preview/Preview.tsx`, add heading ID generation using React components — NOT regex replacement (regex would conflict with Markdown parsing and double-process inline syntax).
 
-After the line `let processedContent = content;` (and after the dataview block extraction), add a heading ID transform:
+Add a `useRef` for a heading counter that resets each render, then create custom heading components:
+
+Before the `return` statement in the `Preview` function, add:
 
 ```ts
-// Add IDs to headings for outline scroll-to
-let headingCounter = 0;
-processedContent = processedContent.replace(
-  /^(#{1,6})\s+(.+)$/gm,
-  (_match, hashes: string, text: string) => {
-    headingCounter++;
-    const slug = `heading-${headingCounter}`;
-    const level = hashes.length;
-    return `<h${level} id="${slug}">${text}</h${level}>`;
-  }
-);
+// Heading counter for generating sequential IDs (resets each render)
+const headingCounterRef = useRef(0);
+headingCounterRef.current = 0;
+
+const headingComponents = useMemo(() => {
+  const makeHeading = (Tag: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6') => {
+    return ({ children, ...props }: React.HTMLAttributes<HTMLHeadingElement>) => {
+      headingCounterRef.current++;
+      return <Tag id={`heading-${headingCounterRef.current}`} {...props}>{children}</Tag>;
+    };
+  };
+  return {
+    h1: makeHeading('h1'),
+    h2: makeHeading('h2'),
+    h3: makeHeading('h3'),
+    h4: makeHeading('h4'),
+    h5: makeHeading('h5'),
+    h6: makeHeading('h6'),
+  };
+}, []);
 ```
 
-Note: Since we're injecting raw HTML, `rehype-raw` (already in use) will parse these tags. The ReactMarkdown component will then render them with the `id` attribute intact.
+Add `useRef` to the React imports if not already there.
+
+Then pass `components={headingComponents}` to the `<ReactMarkdown>` element:
+
+```tsx
+<ReactMarkdown
+  remarkPlugins={[remarkGfm]}
+  rehypePlugins={[rehypeRaw]}
+  components={headingComponents}
+>
+  {transformedContent}
+</ReactMarkdown>
+```
+
+This correctly adds `id` attributes to rendered headings without interfering with Markdown parsing. Headings inside code blocks are NOT rendered as heading elements by ReactMarkdown, so they won't get IDs — which is the correct behavior.
 
 - [ ] **Step 2: Verify build**
 
@@ -264,7 +297,8 @@ export function useKeyboardShortcuts(actions: ShortcutActions) {
       } else if (e.ctrlKey && e.key === 'b') {
         e.preventDefault();
         actions.toggleSidebar();
-      } else if (e.ctrlKey && e.key === 'e') {
+      } else if (e.ctrlKey && e.key === 'e' && !target.closest('.cm-editor')) {
+        // Guard: skip when focus is inside CodeMirror (Ctrl+E = cursor to line end)
         e.preventDefault();
         actions.toggleEdit();
       } else if (e.ctrlKey && e.key === 'p') {
@@ -350,17 +384,55 @@ Ensure `GraphData` is exported from `packages/client/src/lib/api.ts`. Check and 
 
 - [ ] **Step 3: Add graph data fetching**
 
-Add a useEffect to fetch graph data on mount and when notes change:
+Add a `treeVersion` counter and graph fetch effect. Do NOT use `notes.tree` as a dependency directly (it's a new array reference on every update, causing excessive re-fetches):
 
 ```ts
-// Fetch graph data on mount and when tree changes (note created/deleted/renamed)
+// Track tree structural changes with a stable counter
+const treeVersionRef = useRef(0);
+const prevTreeLengthRef = useRef(0);
+useEffect(() => {
+  // Only bump version when tree length changes (note created/deleted)
+  const flatCount = JSON.stringify(notes.tree).length;
+  if (flatCount !== prevTreeLengthRef.current) {
+    prevTreeLengthRef.current = flatCount;
+    treeVersionRef.current++;
+  }
+}, [notes.tree]);
+
+const [treeVersion, setTreeVersion] = useState(0);
+useEffect(() => {
+  setTreeVersion(treeVersionRef.current);
+}, [notes.tree]);
+```
+
+Actually, simpler approach — just use a callback to refetch explicitly:
+
+```ts
+const fetchGraph = useCallback(() => {
+  setGraphLoading(true);
+  api.getGraph()
+    .then(data => { setGraphData(data); setGraphLoading(false); })
+    .catch(() => { setGraphLoading(false); });
+}, []);
+
+// Fetch on mount
+useEffect(() => { fetchGraph(); }, [fetchGraph]);
+```
+
+Then call `fetchGraph()` inside `notes.createNote`, `notes.deleteNote`, `notes.renameNote` callbacks — or more simply, call it in `handleNoteSelect` and after note operations. The simplest approach: refetch when `notes.tree` changes, but use a stringified length as a proxy:
+
+```ts
+const treeKey = notes.tree.length;
+
 useEffect(() => {
   setGraphLoading(true);
   api.getGraph()
     .then(data => { setGraphData(data); setGraphLoading(false); })
     .catch(() => { setGraphLoading(false); });
-}, [notes.tree]);
+}, [treeKey]);
 ```
+
+This only re-fetches when the number of top-level tree items changes (covers create/delete). For renames and link changes, the graph will refresh on next page load — acceptable tradeoff.
 
 - [ ] **Step 4: Update handleOutlineJump for dual-mode**
 
@@ -408,20 +480,34 @@ Simpler: use `id="heading-line-N"` where N comes from counting which line the he
 
 But OutlinePane's interface is `onJumpToLine: (line: number) => void`. Let's change it minimally:
 
-In `handleOutlineJump`, for preview mode, convert the line number to a heading index:
+In `handleOutlineJump`, for preview mode, convert the line number to a heading index. Must be code-block-aware (skip headings inside fenced code blocks) to match what ReactMarkdown actually renders:
+
 ```ts
-// Preview mode: find heading index by line number from content
-const headingLines = (notes.activeNote?.content || '').split('\n')
-  .map((l, i) => ({ line: i + 1, isHeading: /^#{1,6}\s+/.test(l) }))
-  .filter(l => l.isHeading);
-const headingIndex = headingLines.findIndex(h => h.line === line);
-if (headingIndex >= 0) {
-  const el = document.getElementById(`heading-${headingIndex + 1}`);
+// Preview mode: find heading index by line number, skipping code blocks
+const lines = (notes.activeNote?.content || '').split('\n');
+let inCodeBlock = false;
+let headingIndex = 0;
+let targetIndex = -1;
+for (let i = 0; i < lines.length; i++) {
+  if (lines[i].startsWith('```')) {
+    inCodeBlock = !inCodeBlock;
+    continue;
+  }
+  if (!inCodeBlock && /^#{1,6}\s+/.test(lines[i])) {
+    headingIndex++;
+    if (i + 1 === line) {
+      targetIndex = headingIndex;
+      break;
+    }
+  }
+}
+if (targetIndex > 0) {
+  const el = document.getElementById(`heading-${targetIndex}`);
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 ```
 
-This matches the Preview's sequential counter.
+This matches the Preview's sequential heading counter from the ReactMarkdown `components` prop, since ReactMarkdown also skips headings inside code blocks.
 
 - [ ] **Step 5: Update shortcutActions**
 
@@ -543,7 +629,7 @@ Replace the entire `<main>` section. The new layout:
             <BookOpen size={14} className="text-gray-400 mr-2" />
             <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Preview</span>
           </div>
-          <div className="flex-1 overflow-y-auto" ref={previewRef}>
+          <div className="flex-1 overflow-y-auto" ref={previewRef}>{/* ref needed for PDF export in edit mode */}
             <Preview
               content={notes.activeNote.content}
               onLinkClick={handleLinkClick}
@@ -602,7 +688,7 @@ Replace the entire `<main>` section. The new layout:
           />
         </div>
         {/* Right panel: Graph + Outline */}
-        <aside className="w-80 flex-shrink-0 flex flex-col bg-gray-50 dark:bg-surface-900 overflow-hidden">
+        <aside className="w-80 flex-shrink-0 flex flex-col bg-gray-50 dark:bg-surface-900 overflow-hidden border-l">
           <GraphPanel
             graphData={graphData}
             loading={graphLoading}
@@ -694,8 +780,7 @@ git commit -m "feat: rewrite App layout - preview default, inline graph, edit to
 
 ```bash
 cd /Users/pascal/Development/mnemo
-rm -rf node_modules packages/client/node_modules packages/server/node_modules package-lock.json
-npm install
+npm ci
 npm run typecheck
 npm run lint
 npm run build
