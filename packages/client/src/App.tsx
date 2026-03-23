@@ -4,7 +4,7 @@ import { useTheme } from './hooks/useTheme';
 import { useNotes } from './hooks/useNotes';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { AuthProvider, useAuth } from './hooks/useAuth';
-import { api, GraphData } from './lib/api';
+import { api, shareApi, GraphData } from './lib/api';
 import { exportNoteToPdf } from './lib/exportPdf';
 import { Sidebar } from './components/Sidebar/Sidebar';
 import { Editor, EditorCursorState } from './components/Editor/Editor';
@@ -21,9 +21,11 @@ import { OutlinePane } from './components/Outline/OutlinePane';
 import { StatusBar } from './components/StatusBar/StatusBar';
 import { QuickSwitcher } from './components/QuickSwitcher/QuickSwitcher';
 import { ResizeHandle } from './components/Layout/ResizeHandle';
+import { ShareDialog } from './components/Sharing/ShareDialog';
+import { AccessRequestsModal } from './components/Sharing/AccessRequestsModal';
 import LoginPage from './pages/LoginPage';
 import AdminPage from './pages/AdminPage';
-import { PanelLeft, BookOpen, X, Menu, Star, FileDown, Pencil } from 'lucide-react';
+import { PanelLeft, BookOpen, X, Menu, Star, FileDown, Pencil, Share2 } from 'lucide-react';
 
 export default function App() {
   return (
@@ -53,6 +55,10 @@ function AppContent() {
     line: 1, col: 1, vimMode: '-- NORMAL --', wordCount: 0,
   });
   const [starredPaths, setStarredPaths] = useState<Set<string>>(new Set());
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [shareTarget, setShareTarget] = useState<{ path: string; isFolder: boolean } | null>(null);
+  const [showAccessRequests, setShowAccessRequests] = useState(false);
+  const [sharedNotes, setSharedNotes] = useState<{ id: string; ownerUserId: string; ownerName: string; path: string; isFolder: boolean; permission: string }[]>([]);
   const editorViewRef = useRef<EditorView>(undefined);
   const searchInputRef = useRef<HTMLInputElement>(undefined);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -71,6 +77,11 @@ function AppContent() {
     }).catch(() => {
       // settings endpoint might fail, ignore
     });
+  }, []);
+
+  // Fetch shared notes on mount
+  useEffect(() => {
+    shareApi.withMe().then(data => setSharedNotes(data.shares || data || [])).catch(() => {});
   }, []);
 
   // Fetch graph data whenever the note tree changes
@@ -102,7 +113,12 @@ function AppContent() {
   }, [notes.activeNote, toggleStar]);
 
   const handleNoteSelect = useCallback((path: string) => {
-    notes.openNote(path);
+    if (path.startsWith('shared:')) {
+      // Parse shared:{ownerUserId}:{notePath} — shared note viewer is a follow-up
+      // For now, navigation doesn't crash
+    } else {
+      notes.openNote(path);
+    }
     setEditing(false);
     setMobileMenuOpen(false);
   }, [notes]);
@@ -296,7 +312,7 @@ function AppContent() {
             API
           </a>
           <ThemeToggle theme={themeCtx.theme} setTheme={themeCtx.setTheme} />
-          <UserMenu onAdminClick={() => setShowAdmin(true)} />
+          <UserMenu onAdminClick={() => setShowAdmin(true)} onAccessRequestsClick={() => setShowAccessRequests(true)} />
         </div>
       </header>
 
@@ -359,6 +375,8 @@ function AppContent() {
             onCreateFromTemplate={handleCreateFromTemplate}
             starredPaths={starredPaths}
             onToggleStar={toggleStar}
+            sharedNotes={sharedNotes}
+            onShare={(path, isFolder) => { setShareTarget({ path, isFolder }); setShowShareDialog(true); }}
           />
         </aside>
 
@@ -383,6 +401,13 @@ function AppContent() {
                         title="Done editing (Ctrl+E)"
                       >
                         <X size={14} />
+                      </button>
+                      <button
+                        onClick={() => { setShareTarget({ path: notes.activeNote!.path, isFolder: false }); setShowShareDialog(true); }}
+                        className="p-1 rounded text-gray-400 hover:text-violet-500 transition-colors"
+                        title="Share note"
+                      >
+                        <Share2 size={14} />
                       </button>
                       <button
                         onClick={toggleActiveNoteStar}
@@ -466,6 +491,13 @@ function AppContent() {
                       title="Edit note (Ctrl+E)"
                     >
                       <Pencil size={14} />
+                    </button>
+                    <button
+                      onClick={() => { setShareTarget({ path: notes.activeNote!.path, isFolder: false }); setShowShareDialog(true); }}
+                      className="p-1 rounded text-gray-400 hover:text-violet-500 transition-colors"
+                      title="Share note"
+                    >
+                      <Share2 size={14} />
                     </button>
                     <button
                       onClick={toggleActiveNoteStar}
@@ -599,6 +631,16 @@ function AppContent() {
 
       {/* Admin panel */}
       {showAdmin && <AdminPage onClose={() => setShowAdmin(false)} />}
+
+      {/* Share dialog */}
+      {showShareDialog && shareTarget && (
+        <ShareDialog notePath={shareTarget.path} isFolder={shareTarget.isFolder} onClose={() => setShowShareDialog(false)} />
+      )}
+
+      {/* Access requests modal */}
+      {showAccessRequests && (
+        <AccessRequestsModal onClose={() => setShowAccessRequests(false)} />
+      )}
     </div>
   );
 }

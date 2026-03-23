@@ -1,13 +1,14 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { LogOut, Shield } from 'lucide-react';
+import { LogOut, Shield, Bell } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
 interface UserMenuProps {
   onAdminClick: () => void;
+  onAccessRequestsClick: () => void;
 }
 
-export function UserMenu({ onAdminClick }: UserMenuProps) {
+export function UserMenu({ onAdminClick, onAccessRequestsClick }: UserMenuProps) {
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
@@ -113,6 +114,13 @@ export function UserMenu({ onAdminClick }: UserMenuProps) {
               Admin Panel
             </button>
           )}
+          <button
+            onClick={() => { onAccessRequestsClick(); setOpen(false); }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-100 hover:bg-gray-700 transition-colors"
+          >
+            <Bell size={14} />
+            Access Requests
+          </button>
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-100 hover:bg-gray-700 transition-colors"

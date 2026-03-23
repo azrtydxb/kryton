@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, FileText, X } from 'lucide-react';
+import { Search, FileText, X, Share2 } from 'lucide-react';
 import { api, SearchResult } from '../../lib/api';
 
 interface SearchBarProps {
@@ -45,7 +45,10 @@ export function SearchBar({ onSelect, inputRef: externalRef }: SearchBarProps) {
     debounceRef.current = setTimeout(() => doSearch(value), 200);
   }, [doSearch]);
 
-  const handleSelect = useCallback((path: string) => {
+  const handleSelect = useCallback((result: SearchResult) => {
+    const path = result.isShared && result.ownerUserId
+      ? `shared:${result.ownerUserId}:${result.path}`
+      : result.path;
     onSelect(path);
     setQuery('');
     setResults([]);
@@ -64,7 +67,7 @@ export function SearchBar({ onSelect, inputRef: externalRef }: SearchBarProps) {
       setSelectedIndex(i => Math.max(i - 1, 0));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      handleSelect(results[selectedIndex].path);
+      handleSelect(results[selectedIndex]);
     } else if (e.key === 'Escape') {
       setOpen(false);
     }
@@ -157,7 +160,7 @@ export function SearchBar({ onSelect, inputRef: externalRef }: SearchBarProps) {
           {results.map((result, idx) => (
             <button
               key={result.path}
-              onClick={() => handleSelect(result.path)}
+              onClick={() => handleSelect(result)}
               onMouseEnter={() => setSelectedIndex(idx)}
               className={`w-full text-left px-3 py-2 flex items-start gap-2 transition-colors ${
                 idx === selectedIndex
@@ -165,7 +168,11 @@ export function SearchBar({ onSelect, inputRef: externalRef }: SearchBarProps) {
                   : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
               }`}
             >
-              <FileText size={15} className="text-gray-400 mt-0.5 flex-shrink-0" />
+              {result.isShared ? (
+                <Share2 size={15} className="text-orange-400 mt-0.5 flex-shrink-0" />
+              ) : (
+                <FileText size={15} className="text-gray-400 mt-0.5 flex-shrink-0" />
+              )}
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-medium truncate">{result.title}</div>
                 <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{result.path}</div>
