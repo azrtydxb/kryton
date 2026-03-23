@@ -222,7 +222,7 @@ export default function App() {
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-white dark:bg-surface-950">
       {/* Header */}
-      <header className="h-13 flex-shrink-0 flex items-center justify-between px-3 border-b bg-gray-50/80 dark:bg-surface-900/80 backdrop-blur-sm">
+      <header className="h-14 flex-shrink-0 flex items-center justify-between px-3 border-b bg-gray-50/80 dark:bg-surface-900/80 backdrop-blur-sm">
         <div className="flex items-center gap-1">
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -240,7 +240,7 @@ export default function App() {
             <PanelLeft size={18} />
           </button>
           <div className="flex items-center ml-1">
-            <img src="/logo.png" alt="Mnemo" className="h-7" />
+            <img src="/logo.png" alt="Mnemo" className="h-11 w-auto" />
           </div>
         </div>
 
