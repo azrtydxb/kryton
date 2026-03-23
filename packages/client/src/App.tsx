@@ -3,6 +3,7 @@ import { EditorView } from '@codemirror/view';
 import { useTheme } from './hooks/useTheme';
 import { useNotes } from './hooks/useNotes';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { AuthProvider, useAuth } from './hooks/useAuth';
 import { api, GraphData } from './lib/api';
 import { exportNoteToPdf } from './lib/exportPdf';
 import { Sidebar } from './components/Sidebar/Sidebar';
@@ -12,6 +13,7 @@ import { Preview } from './components/Preview/Preview';
 import { SearchBar } from './components/Search/SearchBar';
 import { GraphPanel } from './components/Graph/GraphPanel';
 import { ThemeToggle } from './components/Layout/ThemeToggle';
+import { UserMenu } from './components/Layout/UserMenu';
 import { BacklinksPanel } from './components/Backlinks/BacklinksPanel';
 import { OutgoingLinksPanel } from './components/OutgoingLinks/OutgoingLinksPanel';
 import { TemplatePicker } from './components/Templates/TemplatePicker';
@@ -19,12 +21,23 @@ import { OutlinePane } from './components/Outline/OutlinePane';
 import { StatusBar } from './components/StatusBar/StatusBar';
 import { QuickSwitcher } from './components/QuickSwitcher/QuickSwitcher';
 import { ResizeHandle } from './components/Layout/ResizeHandle';
+import LoginPage from './pages/LoginPage';
 import { PanelLeft, BookOpen, X, Menu, Star, FileDown, Pencil } from 'lucide-react';
 
 export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  );
+}
+
+function AppContent() {
+  const { user, loading } = useAuth();
   const themeCtx = useTheme();
   const notes = useNotes();
   const [editing, setEditing] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(256);
   const [rightPanelWidth, setRightPanelWidth] = useState(320);
   const [graphHeight, setGraphHeight] = useState<number | null>(null); // null = flex-1 (auto)
@@ -238,6 +251,18 @@ export default function App() {
     });
   }, []);
 
+  if (loading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-surface-950">
+        <div className="text-gray-400">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginPage />;
+  }
+
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-white dark:bg-surface-950">
       {/* Header */}
@@ -270,6 +295,7 @@ export default function App() {
             API
           </a>
           <ThemeToggle theme={themeCtx.theme} setTheme={themeCtx.setTheme} />
+          <UserMenu onAdminClick={() => setShowAdmin(true)} />
         </div>
       </header>
 
@@ -568,6 +594,16 @@ export default function App() {
           onSelect={handleNoteSelect}
           onClose={() => setShowQuickSwitcher(false)}
         />
+      )}
+
+      {/* Admin panel placeholder */}
+      {showAdmin && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center" onClick={() => setShowAdmin(false)}>
+          <div className="bg-surface-900 rounded-xl p-8 text-white" onClick={e => e.stopPropagation()}>
+            Admin panel coming soon...
+            <button onClick={() => setShowAdmin(false)} className="btn-ghost mt-4">Close</button>
+          </div>
+        </div>
       )}
     </div>
   );
