@@ -13,6 +13,7 @@ export function ThemeToggle({ theme, setTheme }: ThemeToggleProps) {
   const [open, setOpen] = useState(false);
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Update dropdown position when opening
   useEffect(() => {
@@ -31,8 +32,8 @@ export function ThemeToggle({ theme, setTheme }: ThemeToggleProps) {
     const handler = (e: MouseEvent) => {
       const target = e.target as Node;
       if (
-        buttonRef.current &&
-        !buttonRef.current.contains(target)
+        buttonRef.current && !buttonRef.current.contains(target) &&
+        dropdownRef.current && !dropdownRef.current.contains(target)
       ) {
         setOpen(false);
       }
@@ -77,6 +78,7 @@ export function ThemeToggle({ theme, setTheme }: ThemeToggleProps) {
       </button>
       {open && createPortal(
         <div
+          ref={dropdownRef}
           style={{
             position: 'fixed',
             top: dropdownPos.top,

@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, FileText, X } from 'lucide-react';
 import { api, SearchResult } from '../../lib/api';
 
@@ -15,7 +16,9 @@ export function SearchBar({ onSelect, inputRef: externalRef }: SearchBarProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
 
   const doSearch = useCallback(async (q: string) => {
     if (q.trim().length === 0) {
@@ -67,10 +70,22 @@ export function SearchBar({ onSelect, inputRef: externalRef }: SearchBarProps) {
     }
   }, [open, results, selectedIndex, handleSelect]);
 
+  // Update dropdown position when open
+  useEffect(() => {
+    if (open && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      setDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+    }
+  }, [open]);
+
   // Close dropdown on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        containerRef.current && !containerRef.current.contains(target) &&
+        dropdownRef.current && !dropdownRef.current.contains(target)
+      ) {
         setOpen(false);
       }
     };
@@ -121,8 +136,18 @@ export function SearchBar({ onSelect, inputRef: externalRef }: SearchBarProps) {
         )}
       </div>
 
-      {open && (
-        <div className="absolute top-full mt-1 left-0 right-0 bg-white dark:bg-gray-800 border rounded-lg shadow-lg overflow-hidden z-50 max-h-80 overflow-y-auto">
+      {open && createPortal(
+        <div
+          ref={dropdownRef}
+          style={{
+            position: 'fixed',
+            top: dropdownPos.top,
+            left: dropdownPos.left,
+            width: dropdownPos.width,
+            zIndex: 99999,
+          }}
+          className="bg-white dark:bg-gray-800 border rounded-lg shadow-lg overflow-hidden max-h-80 overflow-y-auto"
+        >
           {loading && (
             <div className="px-3 py-2 text-sm text-gray-500">Searching...</div>
           )}
@@ -161,7 +186,8 @@ export function SearchBar({ onSelect, inputRef: externalRef }: SearchBarProps) {
               </div>
             </button>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

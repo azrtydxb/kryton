@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { FileNode } from '../../lib/api';
 import { FileText, Folder, FolderOpen, ChevronRight, Plus, FolderPlus, MoreHorizontal, Pencil, Trash2, Calendar, LayoutTemplate, Star } from 'lucide-react';
 import { TagPane } from '../Tags/TagPane';
@@ -115,6 +116,22 @@ export function Sidebar({
     e.preventDefault();
     setContextMenu({ x: e.clientX, y: e.clientY, node });
   }, []);
+
+  // Close context menu on outside click (needed since it's portaled)
+  useEffect(() => {
+    if (!contextMenu) return;
+    const handler = () => {
+      setContextMenu(null);
+    };
+    // Use setTimeout to avoid the current right-click event from immediately closing it
+    const id = setTimeout(() => {
+      document.addEventListener('mousedown', handler);
+    }, 0);
+    return () => {
+      clearTimeout(id);
+      document.removeEventListener('mousedown', handler);
+    };
+  }, [contextMenu]);
 
   // Collect starred notes that exist in the tree
   const starredNotes: FileNode[] = [];
@@ -331,11 +348,11 @@ export function Sidebar({
       {/* Tag Pane */}
       <TagPane onNoteSelect={onSelect} />
 
-      {/* Context menu */}
-      {contextMenu && (
+      {/* Context menu - portaled to body to escape sidebar's stacking context */}
+      {contextMenu && createPortal(
         <div
-          className="fixed bg-white dark:bg-gray-800 border rounded-lg shadow-lg py-1 min-w-[160px] z-50"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
+          className="fixed bg-white dark:bg-gray-800 border rounded-lg shadow-lg py-1 min-w-[160px]"
+          style={{ left: contextMenu.x, top: contextMenu.y, zIndex: 99999 }}
           onClick={(e) => e.stopPropagation()}
         >
           {contextMenu.node.type === 'folder' && (
@@ -388,7 +405,8 @@ export function Sidebar({
           >
             <Trash2 size={14} /> Delete
           </button>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
