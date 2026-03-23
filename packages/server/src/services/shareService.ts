@@ -76,7 +76,7 @@ export async function getSharedNotesForUser(
 
   const result = await repo
     .createQueryBuilder("s")
-    .leftJoin(User, "u", "u.id = s.ownerUserId")
+    .leftJoin(User, "u", "u.id::text = s.ownerUserId")
     .addSelect("u.name", "ownerName")
     .addSelect("u.email", "ownerEmail")
     .where("s.sharedWithUserId = :userId", { userId })
