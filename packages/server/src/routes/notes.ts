@@ -7,6 +7,173 @@ import {
   renameNote,
 } from "../services/noteService";
 
+/**
+ * @swagger
+ * /notes:
+ *   get:
+ *     summary: List all notes
+ *     description: Returns a tree structure of all notes in the notes directory.
+ *     tags: [Notes]
+ *     responses:
+ *       200:
+ *         description: File tree of notes
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *       500:
+ *         description: Failed to scan notes directory
+ */
+/**
+ * @swagger
+ * /notes/{path}:
+ *   get:
+ *     summary: Get note content
+ *     description: Retrieves the content of a single note by its path. Automatically appends .md if not present.
+ *     tags: [Notes]
+ *     parameters:
+ *       - in: path
+ *         name: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Relative path to the note (e.g., "Projects/Mnemo Roadmap")
+ *     responses:
+ *       200:
+ *         description: Note content
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 path:
+ *                   type: string
+ *                   example: Projects/Mnemo Roadmap.md
+ *                 content:
+ *                   type: string
+ *                   example: "# Mnemo Roadmap\n..."
+ *       400:
+ *         description: Path is required or invalid
+ *       404:
+ *         description: Note not found
+ *       500:
+ *         description: Failed to read note
+ */
+/**
+ * @swagger
+ * /notes:
+ *   post:
+ *     summary: Create a new note
+ *     description: Creates a new markdown note at the specified path.
+ *     tags: [Notes]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - path
+ *             properties:
+ *               path:
+ *                 type: string
+ *                 description: Relative path for the new note
+ *                 example: Ideas/New Idea
+ *               content:
+ *                 type: string
+ *                 description: Markdown content of the note
+ *                 example: "# New Idea\n\nSome content here."
+ *     responses:
+ *       201:
+ *         description: Note created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 path:
+ *                   type: string
+ *                   example: Ideas/New Idea.md
+ *                 message:
+ *                   type: string
+ *                   example: Note created
+ *       400:
+ *         description: Path is required or invalid
+ *       500:
+ *         description: Failed to create note
+ */
+/**
+ * @swagger
+ * /notes/{path}:
+ *   put:
+ *     summary: Update a note
+ *     description: Updates the content of an existing note.
+ *     tags: [Notes]
+ *     parameters:
+ *       - in: path
+ *         name: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Relative path to the note
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - content
+ *             properties:
+ *               content:
+ *                 type: string
+ *                 description: New markdown content
+ *     responses:
+ *       200:
+ *         description: Note updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 path:
+ *                   type: string
+ *                 message:
+ *                   type: string
+ *                   example: Note updated
+ *       400:
+ *         description: Path or content is required
+ *       500:
+ *         description: Failed to update note
+ *   delete:
+ *     summary: Delete a note
+ *     description: Deletes a note by its path.
+ *     tags: [Notes]
+ *     parameters:
+ *       - in: path
+ *         name: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Relative path to the note
+ *     responses:
+ *       200:
+ *         description: Note deleted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Note deleted
+ *       400:
+ *         description: Path is required or invalid
+ *       404:
+ *         description: Note not found
+ *       500:
+ *         description: Failed to delete note
+ */
 export function createNotesRouter(notesDir: string): Router {
   const router = Router();
 
@@ -142,6 +309,55 @@ export function createNotesRouter(notesDir: string): Router {
   return router;
 }
 
+/**
+ * @swagger
+ * /notes-rename/{path}:
+ *   post:
+ *     summary: Rename a note
+ *     description: Renames a note from one path to another.
+ *     tags: [Notes]
+ *     parameters:
+ *       - in: path
+ *         name: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Current relative path of the note
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - newPath
+ *             properties:
+ *               newPath:
+ *                 type: string
+ *                 description: New path for the note
+ *                 example: Projects/Renamed Note
+ *     responses:
+ *       200:
+ *         description: Note renamed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 oldPath:
+ *                   type: string
+ *                 newPath:
+ *                   type: string
+ *                 message:
+ *                   type: string
+ *                   example: Note renamed
+ *       400:
+ *         description: Path or newPath is required
+ *       404:
+ *         description: Note not found
+ *       500:
+ *         description: Failed to rename note
+ */
 /**
  * Separate router for the rename endpoint, mounted at /api/notes-rename
  * to avoid conflict with the wildcard routes.

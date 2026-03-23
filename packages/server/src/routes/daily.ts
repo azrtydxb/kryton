@@ -34,6 +34,42 @@ function applyTemplateVars(
   return result;
 }
 
+/**
+ * @swagger
+ * /daily:
+ *   post:
+ *     summary: Create or get today's daily note
+ *     description: Creates a daily note for today using the configured template. If the note already exists, returns the existing note.
+ *     tags: [Daily]
+ *     responses:
+ *       200:
+ *         description: Existing daily note returned
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 path:
+ *                   type: string
+ *                   example: Daily/2026-03-23.md
+ *                 content:
+ *                   type: string
+ *                   example: "# Daily Note — 2026-03-23\n..."
+ *       201:
+ *         description: New daily note created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 path:
+ *                   type: string
+ *                   example: Daily/2026-03-23.md
+ *                 content:
+ *                   type: string
+ *       500:
+ *         description: Failed to create daily note
+ */
 export function createDailyRouter(notesDir: string): Router {
   const router = Router();
 

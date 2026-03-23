@@ -2,6 +2,76 @@ import { Router, Request, Response } from "express";
 import * as fs from "fs/promises";
 import * as path from "path";
 
+/**
+ * @swagger
+ * /folders:
+ *   post:
+ *     summary: Create a folder
+ *     description: Creates a new folder in the notes directory.
+ *     tags: [Folders]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - path
+ *             properties:
+ *               path:
+ *                 type: string
+ *                 description: Relative path of the folder to create
+ *                 example: Projects/NewFolder
+ *     responses:
+ *       201:
+ *         description: Folder created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 path:
+ *                   type: string
+ *                 message:
+ *                   type: string
+ *                   example: Folder created
+ *       400:
+ *         description: Path is required or invalid
+ *       500:
+ *         description: Failed to create folder
+ */
+/**
+ * @swagger
+ * /folders/{path}:
+ *   delete:
+ *     summary: Delete an empty folder
+ *     description: Deletes a folder only if it is empty.
+ *     tags: [Folders]
+ *     parameters:
+ *       - in: path
+ *         name: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Relative path of the folder to delete
+ *     responses:
+ *       200:
+ *         description: Folder deleted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Folder deleted
+ *       400:
+ *         description: Path is required, invalid, or folder is not empty
+ *       404:
+ *         description: Folder not found
+ *       500:
+ *         description: Failed to delete folder
+ */
 export function createFoldersRouter(notesDir: string): Router {
   const router = Router();
 
@@ -77,6 +147,55 @@ export function createFoldersRouter(notesDir: string): Router {
   return router;
 }
 
+/**
+ * @swagger
+ * /folders-rename/{path}:
+ *   post:
+ *     summary: Rename a folder
+ *     description: Renames a folder from one path to another.
+ *     tags: [Folders]
+ *     parameters:
+ *       - in: path
+ *         name: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Current relative path of the folder
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - newPath
+ *             properties:
+ *               newPath:
+ *                 type: string
+ *                 description: New path for the folder
+ *                 example: Projects/RenamedFolder
+ *     responses:
+ *       200:
+ *         description: Folder renamed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 oldPath:
+ *                   type: string
+ *                 newPath:
+ *                   type: string
+ *                 message:
+ *                   type: string
+ *                   example: Folder renamed
+ *       400:
+ *         description: Path or newPath is required or invalid
+ *       404:
+ *         description: Folder not found
+ *       500:
+ *         description: Failed to rename folder
+ */
 /**
  * Separate router for folder rename to avoid wildcard conflicts.
  */

@@ -1,6 +1,66 @@
 import { Router, Request, Response } from "express";
 import { getAllTags, getNotesByTag } from "../services/searchService";
 
+/**
+ * @swagger
+ * /tags:
+ *   get:
+ *     summary: Get all tags
+ *     description: Returns all tags found across notes with their occurrence counts.
+ *     tags: [Tags]
+ *     responses:
+ *       200:
+ *         description: List of tags with counts
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   tag:
+ *                     type: string
+ *                     example: project
+ *                   count:
+ *                     type: integer
+ *                     example: 3
+ *       500:
+ *         description: Failed to fetch tags
+ */
+/**
+ * @swagger
+ * /tags/{tag}/notes:
+ *   get:
+ *     summary: Get notes by tag
+ *     description: Returns all notes that contain the specified tag.
+ *     tags: [Tags]
+ *     parameters:
+ *       - in: path
+ *         name: tag
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The tag to filter by (without the # prefix)
+ *         example: project
+ *     responses:
+ *       200:
+ *         description: List of notes with the specified tag
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   path:
+ *                     type: string
+ *                     example: Projects/Mnemo Roadmap.md
+ *                   title:
+ *                     type: string
+ *                     example: Mnemo Roadmap
+ *       500:
+ *         description: Failed to fetch notes by tag
+ */
 export function createTagsRouter(): Router {
   const router = Router();
 

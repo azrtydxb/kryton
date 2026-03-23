@@ -2,6 +2,76 @@ import { Router, Request, Response } from "express";
 import { AppDataSource } from "../data-source";
 import { Settings } from "../entities/Settings";
 
+/**
+ * @swagger
+ * /settings:
+ *   get:
+ *     summary: Get all settings
+ *     description: Returns all application settings as a key-value object.
+ *     tags: [Settings]
+ *     responses:
+ *       200:
+ *         description: Settings as key-value pairs
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               additionalProperties:
+ *                 type: string
+ *               example:
+ *                 dailyNoteTemplate: "# Daily Note — {{date}}"
+ *                 theme: dark
+ *       500:
+ *         description: Failed to fetch settings
+ */
+/**
+ * @swagger
+ * /settings/{key}:
+ *   put:
+ *     summary: Update a setting
+ *     description: Creates or updates a setting by key.
+ *     tags: [Settings]
+ *     parameters:
+ *       - in: path
+ *         name: key
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The setting key
+ *         example: theme
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - value
+ *             properties:
+ *               value:
+ *                 type: string
+ *                 description: The setting value
+ *                 example: dark
+ *     responses:
+ *       200:
+ *         description: Setting updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 key:
+ *                   type: string
+ *                 value:
+ *                   type: string
+ *                 message:
+ *                   type: string
+ *                   example: Setting updated
+ *       400:
+ *         description: Value is required
+ *       500:
+ *         description: Failed to update setting
+ */
 export function createSettingsRouter(): Router {
   const router = Router();
 

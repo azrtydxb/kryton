@@ -1,6 +1,45 @@
 import { Router, Request, Response } from "express";
 import { search } from "../services/searchService";
 
+/**
+ * @swagger
+ * /search:
+ *   get:
+ *     summary: Search notes
+ *     description: Performs a full-text search across all notes.
+ *     tags: [Search]
+ *     parameters:
+ *       - in: query
+ *         name: q
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Search query string
+ *         example: knowledge management
+ *     responses:
+ *       200:
+ *         description: Search results
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   path:
+ *                     type: string
+ *                     example: Ideas/Knowledge Management.md
+ *                   title:
+ *                     type: string
+ *                     example: Knowledge Management
+ *                   snippet:
+ *                     type: string
+ *                     example: "...notes on building a second brain..."
+ *       400:
+ *         description: Query parameter 'q' is required
+ *       500:
+ *         description: Search failed
+ */
 export function createSearchRouter(): Router {
   const router = Router();
 

@@ -1,9 +1,11 @@
 import "reflect-metadata";
 import express, { Request, Response } from "express";
 import cors from "cors";
+import swaggerUi from "swagger-ui-express";
 import * as path from "path";
 import * as fs from "fs/promises";
 import { AppDataSource } from "./data-source";
+import { swaggerSpec } from "./swagger";
 import { createNotesRouter, createNotesRenameRouter } from "./routes/notes";
 import { createFoldersRouter, createFoldersRenameRouter } from "./routes/folders";
 import { createSearchRouter } from "./routes/search";
@@ -211,6 +213,13 @@ async function main(): Promise<void> {
   app.use(cors());
   app.use(express.json());
 
+  // Swagger API docs
+  app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+    customCss: '.swagger-ui .topbar { display: none }',
+    customSiteTitle: 'Mnemo API Docs',
+  }));
+  app.get('/api/docs.json', (_req, res) => res.json(swaggerSpec));
+
   // Routes
   app.use("/api/notes", createNotesRouter(NOTES_DIR));
   app.use("/api/notes-rename", createNotesRenameRouter(NOTES_DIR));
@@ -225,6 +234,32 @@ async function main(): Promise<void> {
   app.use("/api/templates", createTemplatesRouter(NOTES_DIR));
   app.use("/api/canvas", createCanvasRouter(NOTES_DIR));
 
+  /**
+   * @swagger
+   * /files/{path}:
+   *   get:
+   *     summary: Serve an image file from the notes directory
+   *     tags: [Files]
+   *     parameters:
+   *       - in: path
+   *         name: path
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Relative path to the image file within the notes directory
+   *     responses:
+   *       200:
+   *         description: The image file
+   *         content:
+   *           image/*:
+   *             schema:
+   *               type: string
+   *               format: binary
+   *       403:
+   *         description: File type not allowed
+   *       404:
+   *         description: File not found
+   */
   // Serve image files from notes directory
   app.get("/api/files/{*path}", async (req: Request, res: Response) => {
     const filePath = decodeURIComponent(Array.isArray(req.params.path) ? req.params.path.join("/") : req.params.path as string);
@@ -251,6 +286,27 @@ async function main(): Promise<void> {
     }
   });
 
+  /**
+   * @swagger
+   * /health:
+   *   get:
+   *     summary: Health check
+   *     tags: [Health]
+   *     responses:
+   *       200:
+   *         description: Server is healthy
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 status:
+   *                   type: string
+   *                   example: ok
+   *                 notesDir:
+   *                   type: string
+   *                   example: /path/to/notes
+   */
   // Health check
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok", notesDir: NOTES_DIR });

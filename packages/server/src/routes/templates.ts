@@ -2,6 +2,68 @@ import { Router, Request, Response } from "express";
 import * as path from "path";
 import * as fs from "fs/promises";
 
+/**
+ * @swagger
+ * /templates:
+ *   get:
+ *     summary: List all templates
+ *     description: Returns a list of all markdown templates available in the Templates directory.
+ *     tags: [Templates]
+ *     responses:
+ *       200:
+ *         description: List of templates
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   name:
+ *                     type: string
+ *                     example: Meeting Notes
+ *                   path:
+ *                     type: string
+ *                     example: Templates/Meeting Notes.md
+ *       500:
+ *         description: Failed to list templates
+ */
+/**
+ * @swagger
+ * /templates/{name}:
+ *   get:
+ *     summary: Get template content
+ *     description: Returns the content of a specific template by name.
+ *     tags: [Templates]
+ *     parameters:
+ *       - in: path
+ *         name: name
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Template name (without .md extension)
+ *         example: Meeting Notes
+ *     responses:
+ *       200:
+ *         description: Template content
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 name:
+ *                   type: string
+ *                   example: Meeting Notes
+ *                 content:
+ *                   type: string
+ *                   example: "# {{title}}\n\n## Date\n{{date}}"
+ *       400:
+ *         description: Invalid template name
+ *       404:
+ *         description: Template not found
+ *       500:
+ *         description: Failed to read template
+ */
 export function createTemplatesRouter(notesDir: string): Router {
   const router = Router();
 

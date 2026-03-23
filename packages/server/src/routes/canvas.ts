@@ -14,6 +14,184 @@ function safePath(baseDir: string, name: string): string {
   return resolved;
 }
 
+/**
+ * @swagger
+ * /canvas:
+ *   get:
+ *     summary: List all canvas files
+ *     description: Returns a list of all canvas file names (without the .canvas extension).
+ *     tags: [Canvas]
+ *     responses:
+ *       200:
+ *         description: List of canvas file names
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: string
+ *               example: ["my-diagram", "project-plan"]
+ *       500:
+ *         description: Failed to list canvas files
+ *   post:
+ *     summary: Create a new canvas file
+ *     description: Creates a new canvas file with optional initial content (nodes and edges).
+ *     tags: [Canvas]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 description: Name for the canvas file
+ *                 example: my-diagram
+ *               content:
+ *                 type: object
+ *                 description: Initial canvas content with nodes and edges
+ *                 properties:
+ *                   nodes:
+ *                     type: array
+ *                     items:
+ *                       type: object
+ *                   edges:
+ *                     type: array
+ *                     items:
+ *                       type: object
+ *     responses:
+ *       201:
+ *         description: Canvas file created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 name:
+ *                   type: string
+ *                   example: my-diagram.canvas
+ *                 message:
+ *                   type: string
+ *                   example: Canvas file created
+ *       400:
+ *         description: Name is required or invalid path
+ *       409:
+ *         description: Canvas file already exists
+ *       500:
+ *         description: Failed to create canvas file
+ */
+/**
+ * @swagger
+ * /canvas/{name}:
+ *   get:
+ *     summary: Get a canvas file
+ *     description: Returns the JSON content of a canvas file.
+ *     tags: [Canvas]
+ *     parameters:
+ *       - in: path
+ *         name: name
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Canvas file name (without .canvas extension)
+ *         example: my-diagram
+ *     responses:
+ *       200:
+ *         description: Canvas file content
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 nodes:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                 edges:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *       400:
+ *         description: Name is required or invalid path
+ *       404:
+ *         description: Canvas file not found
+ *       500:
+ *         description: Failed to read canvas file
+ *   put:
+ *     summary: Update a canvas file
+ *     description: Replaces the content of a canvas file with the provided JSON body.
+ *     tags: [Canvas]
+ *     parameters:
+ *       - in: path
+ *         name: name
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Canvas file name (without .canvas extension)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               nodes:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *               edges:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *     responses:
+ *       200:
+ *         description: Canvas file updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 name:
+ *                   type: string
+ *                 message:
+ *                   type: string
+ *                   example: Canvas file updated
+ *       400:
+ *         description: Name or content is required
+ *       500:
+ *         description: Failed to update canvas file
+ *   delete:
+ *     summary: Delete a canvas file
+ *     description: Deletes a canvas file by name.
+ *     tags: [Canvas]
+ *     parameters:
+ *       - in: path
+ *         name: name
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Canvas file name (without .canvas extension)
+ *     responses:
+ *       200:
+ *         description: Canvas file deleted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Canvas file deleted
+ *       400:
+ *         description: Name is required or invalid path
+ *       404:
+ *         description: Canvas file not found
+ *       500:
+ *         description: Failed to delete canvas file
+ */
 export function createCanvasRouter(notesDir: string): Router {
   const router = Router();
   const canvasDir = path.join(notesDir, "Canvas");
