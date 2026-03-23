@@ -154,12 +154,18 @@ export function Editor({ content, onChange, darkMode, allNotes, onCursorStateCha
     viewRef.current = view;
     if (externalViewRef) externalViewRef.current = view;
 
+    // Start in insert mode so beginners can type immediately
+    const cm = getCM(view) as { processKey?: (key: string) => void };
+    if (cm?.processKey) {
+      cm.processKey('i');
+    }
+
     // Fire initial cursor state
     if (onCursorStateChangeRef.current) {
       onCursorStateChangeRef.current({
         line: 1,
         col: 1,
-        vimMode: '-- NORMAL --',
+        vimMode: '-- INSERT --',
         wordCount: countWords(content),
       });
     }

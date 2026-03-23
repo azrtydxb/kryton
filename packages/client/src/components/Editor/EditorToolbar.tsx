@@ -1,10 +1,12 @@
 import { useCallback } from 'react';
 import { EditorView } from '@codemirror/view';
+import { undo, redo } from '@codemirror/commands';
 import {
   Bold, Italic, Strikethrough, Code, Link, Image,
   Heading1, Heading2, Heading3,
   List, ListOrdered, CheckSquare,
   Quote, Minus, Table,
+  Undo2, Redo2,
 } from 'lucide-react';
 
 interface EditorToolbarProps {
@@ -104,8 +106,25 @@ export function EditorToolbar({ viewRef }: EditorToolbarProps) {
     view.focus();
   }, [viewRef]);
 
+  const handleUndo = useCallback(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    undo(view);
+    view.focus();
+  }, [viewRef]);
+
+  const handleRedo = useCallback(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    redo(view);
+    view.focus();
+  }, [viewRef]);
+
   return (
     <div className="flex items-center gap-0.5 px-2 py-1 border-b border-gray-700/50 bg-surface-900/80 flex-shrink-0 flex-wrap">
+      <ToolbarButton icon={Undo2} title="Undo (Ctrl+Z)" onClick={handleUndo} />
+      <ToolbarButton icon={Redo2} title="Redo (Ctrl+Shift+Z)" onClick={handleRedo} />
+      <ToolbarSep />
       <ToolbarButton icon={Heading1} title="Heading 1" onClick={() => insertAtLineStart('# ')} />
       <ToolbarButton icon={Heading2} title="Heading 2" onClick={() => insertAtLineStart('## ')} />
       <ToolbarButton icon={Heading3} title="Heading 3" onClick={() => insertAtLineStart('### ')} />
