@@ -85,8 +85,8 @@
 - Add an "Edit" / "Done" toggle button
 
 **Layout changes:**
-- When `editing === false`: render Preview (full width in main area) + right panel (GraphPanel + OutlinePane)
-- When `editing === true`: render Editor (left half) + Preview (right half), no right panel
+- When `editing === false`: render Preview (full width in main area) with outgoing links and backlinks below it + right panel (GraphPanel + OutlinePane)
+- When `editing === true`: render Editor (left half) with outgoing links and backlinks below the editor + Preview (right half), no right panel. This matches the current split-mode behavior where backlinks/outgoing are siblings of the editor column.
 
 ### GraphView → GraphPanel
 
@@ -107,17 +107,24 @@ A thin wrapper around the refactored GraphView that adds:
 
 ### OutlinePane
 
-- No changes to the component itself
 - Moves from a conditional right sidebar into the right panel, below the graph
+- **Behavior change in preview mode:** In the current code, `handleOutlineJump` dispatches cursor movement to the CodeMirror editor. In preview (default) mode, there is no editor mounted. The outline must support two modes:
+  - **Edit mode:** Jump to line in the editor (current behavior via `editorViewRef`)
+  - **Preview mode:** Scroll to the corresponding heading in the preview pane. Implement by adding `id` attributes to rendered headings in the Preview component (e.g., `id="heading-{slug}"`), then `onJumpToLine` in preview mode calls `document.getElementById` and `scrollIntoView`
+- This requires a small change to `OutlinePane` or `handleOutlineJump` to accept a mode-aware callback, and a small change to `Preview` to add heading IDs
 
-### CanvasView
+### CanvasView — Full Removal
 
 - Delete `packages/client/src/components/Canvas/CanvasView.tsx`
 - Remove import and usage from App.tsx
+- Remove `@xyflow/react` from `packages/client/package.json` (unused after Canvas deletion)
+- Remove `LayoutDashboard` icon import from App.tsx (only used for Canvas button)
+- **Follow-up cleanup (out of scope for this spec):** Server-side canvas routes (`packages/server/src/routes/canvas.ts`) and client API methods (`getCanvasList`, `getCanvas`, `saveCanvas`, `createCanvas`, `deleteCanvas` in `packages/client/src/lib/api.ts`, and `CanvasData` type) will be dead code. These can be cleaned up in a separate pass.
 
 ### Keyboard Shortcuts
 
 - Remove `toggleOutline` shortcut (outline is always visible)
+- Add `Ctrl+E` shortcut to toggle edit mode (Edit/Done)
 - Keep other shortcuts unchanged
 
 ---
@@ -135,6 +142,25 @@ A thin wrapper around the refactored GraphView that adds:
 **Highlighting:**
 - The active note's node is visually distinct (larger, different color)
 - When clicking a node, navigate to that note — the graph re-centers on the new active note in local mode
+- Centering on the active note requires programmatically setting the d3 zoom transform after the simulation settles (new logic, not just a prop)
+
+**Data fetching:**
+- Graph data is fetched once on mount and cached
+- When the active note changes, re-filter the cached data for local mode (no re-fetch)
+- Graph re-fetches when a note is created, deleted, or renamed (to pick up new links)
+
+---
+
+## Edge Cases
+
+**No note selected:**
+- Center area shows the existing empty state placeholder ("No note selected")
+- Right panel shows the graph in full mode (no anchor for local mode) with outline empty
+- Edit button is disabled / hidden when no note is selected
+
+**No graph data (empty vault):**
+- Graph panel shows "No notes yet" message (existing behavior)
+- Outline shows "No headings" or is empty
 
 ---
 
@@ -144,15 +170,16 @@ A thin wrapper around the refactored GraphView that adds:
 - `packages/client/src/components/Graph/GraphView.tsx` — refactor from modal to inline panel
 - Create: `packages/client/src/components/Graph/GraphPanel.tsx` — wrapper with header and local/full toggle
 - Delete: `packages/client/src/components/Canvas/CanvasView.tsx`
-- `packages/client/src/hooks/useKeyboardShortcuts.ts` — remove outline toggle
+- `packages/client/src/hooks/useKeyboardShortcuts.ts` — remove outline toggle, add Ctrl+E for edit toggle
+- `packages/client/src/components/Preview/Preview.tsx` — add `id` attributes to rendered headings for outline scroll-to
+- `packages/client/src/components/Outline/OutlinePane.tsx` — minor: accept mode-aware jump callback
+- `packages/client/package.json` — remove `@xyflow/react`
 
 ## Files NOT Modified
 
 - `packages/client/src/components/Editor/Editor.tsx`
-- `packages/client/src/components/Preview/Preview.tsx`
 - `packages/client/src/components/Sidebar/Sidebar.tsx`
 - `packages/client/src/components/Search/SearchBar.tsx`
-- `packages/client/src/components/Outline/OutlinePane.tsx`
 - `packages/client/src/components/Backlinks/BacklinksPanel.tsx`
 - `packages/client/src/components/OutgoingLinks/OutgoingLinksPanel.tsx`
-- Server code (no API changes needed)
+- Server code (no API changes needed — canvas route cleanup is a follow-up)
