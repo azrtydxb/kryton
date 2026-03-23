@@ -36,8 +36,11 @@
 | sharedWithUserId | UUID | FK → User, CASCADE delete |
 | permission | TEXT | `read` or `readwrite` |
 | createdAt | TIMESTAMP | Auto-set |
+| updatedAt | TIMESTAMP | Auto-set |
 
 Unique constraint on `(ownerUserId, path, sharedWithUserId)`.
+
+**Cascade cleanup:** NoteShare uses `@ManyToOne(() => User, { onDelete: 'CASCADE' })` for both FKs. However, following the existing pattern (admin.ts uses explicit deletes), the admin user-delete handler must also explicitly delete NoteShare rows where `ownerUserId = deletedId OR sharedWithUserId = deletedId`, and AccessRequest rows where `requesterUserId = deletedId OR ownerUserId = deletedId`.
 
 ### AccessRequest
 
@@ -50,7 +53,7 @@ Unique constraint on `(ownerUserId, path, sharedWithUserId)`.
 | status | TEXT | `pending`, `approved`, `denied` |
 | createdAt | TIMESTAMP | Auto-set |
 
-Unique constraint on `(requesterUserId, ownerUserId, notePath)` — one request per note per user.
+Unique constraint on `(requesterUserId, ownerUserId, notePath)` — one request per note per user. If a request was previously denied and the user requests again, update the existing row's status back to `pending`.
 
 ---
 
@@ -99,6 +102,38 @@ All require `authMiddleware`.
 | GET | `/api/access-requests/mine` | List my outgoing requests (and their status). |
 | PUT | `/api/access-requests/:id` | Approve or deny. Body: `{ action: "approve" | "deny", permission?: "read" | "readwrite" }`. On approve, creates NoteShare. Only the owner can action. |
 
+### User Search — for Share Dialog
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/users/search?email=...` | Search users by exact email match. Returns `{ id, name, email }`. Requires auth. Only exact match for privacy — no prefix/fuzzy search. |
+
+This endpoint is needed for the ShareDialog to find users to share with.
+
+---
+
+## Security
+
+### Path Traversal on Shared Routes
+
+The shared note route `/api/notes/shared/{ownerUserId}/{path}` takes `ownerUserId` from the URL (untrusted). Security requirements:
+1. **UUID validation** on `ownerUserId` — reuse `getUserNotesDir()` which validates UUID format
+2. **Path traversal check** — resolved path must stay within `notes/{ownerUserId}/` (same defense as regular note routes)
+3. **Permission check BEFORE filesystem access** — verify NoteShare exists before reading/writing any file
+4. Order of operations: validate UUID → check NoteShare permission → resolve path → verify no traversal → access file
+
+### SQL Wildcard Escaping for Folder Shares
+
+When searching shared notes via folder shares, the LIKE pattern for folder path prefix matching must escape `%` and `_` wildcards in the folder path to prevent malicious share paths from matching unintended rows:
+```ts
+const escapedPath = folderPath.replace(/%/g, '\\%').replace(/_/g, '\\_');
+// Use: s.notePath LIKE :prefix with prefix = `${escapedPath}%`
+```
+
+### Backlink Access Filtering
+
+Backlinks from shared notes should only be shown if the viewer has access to the linking note. If user A's note links to user B's note, user B only sees the backlink if A's note is shared with B.
+
 ---
 
 ## Route Changes for Shared Note Access
@@ -129,13 +164,29 @@ The existing `/api/notes/{path}` routes remain unchanged (user's own notes).
 
 `getFullGraph(userId)` changes:
 1. Get own nodes and edges (current behavior)
-2. Get shared notes (from NoteShare) and their edges
+2. Get shared notes (from NoteShare) and their edges from the owner's GraphEdge rows
 3. **Filter links:** Only include edges where BOTH source and target are accessible to the viewer (own note or shared note). Remove edges where one end is inaccessible.
-4. Return nodes with a `shared` flag so the client renders them differently
+4. Return nodes with a `shared` flag and `ownerUserId` so the client renders them differently
+
+**Node ID namespacing:** Shared nodes use `{ownerUserId}:{notePath}` as their ID to avoid collision with the viewer's own notes at the same path. Own nodes keep the current `notePath` format. The client must handle both formats in click handlers.
+
+**Write-through clarification:** Search and graph for shared notes always query the **owner's** SearchIndex/GraphEdge rows. No duplicate index entries are created for recipients. When a readwrite recipient edits a shared note, the re-indexing updates the owner's rows.
 
 ### backlinks.ts
 
 When showing backlinks for a note, include backlinks from shared notes (where the shared note links to the current note).
+
+---
+
+## Note Rename/Delete Cascade
+
+When the owner renames or deletes a shared note:
+
+**Rename:** Update the `path` column in all NoteShare rows matching the old path. For folder shares, update the folder path. For individual shares of files within a renamed folder, update the path prefix.
+
+**Delete:** Delete NoteShare rows for that exact path. For folder shares that covered the deleted file, the share remains (it still covers other files in the folder).
+
+This logic belongs in `noteService.ts` `renameNote()` and `deleteNote()` functions — they already handle SearchIndex and GraphEdge updates.
 
 ---
 
@@ -210,6 +261,7 @@ The graph API response includes a `shared` flag per node. GraphView checks this 
 - `packages/server/src/entities/AccessRequest.ts`
 - `packages/server/src/services/shareService.ts`
 - `packages/server/src/routes/shares.ts`
+- `packages/server/src/routes/users.ts` — user search endpoint
 
 ### Client
 - `packages/client/src/components/Sharing/ShareDialog.tsx`
@@ -224,7 +276,8 @@ The graph API response includes a `shared` flag per node. GraphView checks this 
 - `packages/server/src/services/graphService.ts` — include shared nodes, filter links by access
 - `packages/server/src/routes/backlinks.ts` — include shared note backlinks
 - `packages/server/src/routes/graph.ts` — pass share context
-- `packages/server/src/index.ts` — mount shares route
+- `packages/server/src/index.ts` — mount shares and users routes
+- `packages/server/src/services/noteService.ts` — cascade NoteShare on rename/delete
 - `packages/server/src/routes/admin.ts` — clean up NoteShare/AccessRequest on user delete
 
 ### Client
