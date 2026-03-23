@@ -465,6 +465,64 @@ export function createAdminRouter(): Router {
     }
   });
 
+  /**
+   * @swagger
+   * /admin/users/{id}/reset-password:
+   *   post:
+   *     summary: Reset a user's password (admin only)
+   *     tags: [Admin]
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [newPassword]
+   *             properties:
+   *               newPassword:
+   *                 type: string
+   *     responses:
+   *       200:
+   *         description: Password reset
+   */
+  router.post("/users/:id/reset-password", async (req: Request, res: Response) => {
+    try {
+      const userId = req.params.id as string;
+      const { newPassword } = req.body as { newPassword: string };
+
+      if (!newPassword || newPassword.length < 8 || newPassword.length > 72) {
+        res.status(400).json({ error: "Password must be 8-72 characters" });
+        return;
+      }
+
+      const userRepo = AppDataSource.getRepository(User);
+      const user = await userRepo.findOneBy({ id: userId });
+      if (!user) {
+        res.status(404).json({ error: "User not found" });
+        return;
+      }
+
+      const bcrypt = await import("bcrypt");
+      user.passwordHash = await bcrypt.hash(newPassword, 12);
+      await userRepo.save(user);
+
+      // Invalidate all refresh tokens so user must log in with new password
+      const { deleteAllUserRefreshTokens } = await import("../services/tokenService");
+      await deleteAllUserRefreshTokens(userId);
+
+      res.json({ ok: true });
+    } catch (err) {
+      console.error("Error resetting password:", err);
+      res.status(500).json({ error: "Failed to reset password" });
+    }
+  });
+
   // POST /invites — create invite code
   router.post("/invites", async (req: Request, res: Response) => {
     try {

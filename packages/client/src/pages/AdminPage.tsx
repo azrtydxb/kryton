@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { request } from '../lib/api';
-import { X, Users, Ticket, Settings, Trash2, ShieldCheck, ShieldOff, UserX, UserCheck, Plus, Copy, Check } from 'lucide-react';
+import { X, Users, Ticket, Settings, Trash2, ShieldCheck, ShieldOff, UserX, UserCheck, Plus, Copy, Check, Key } from 'lucide-react';
 
 interface AdminUser {
   id: string;
@@ -87,6 +87,8 @@ function UsersSection({ currentUserId }: { currentUserId: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [resetPwUser, setResetPwUser] = useState<string | null>(null);
+  const [resetPwValue, setResetPwValue] = useState('');
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -229,13 +231,38 @@ function UsersSection({ currentUserId }: { currentUserId: string }) {
                             </button>
                           </div>
                         ) : (
-                          <button
-                            onClick={() => setConfirmDelete(u.id)}
-                            className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors"
-                            title="Delete user"
-                          >
-                            <Trash2 size={15} />
-                          </button>
+                          <div className="flex items-center gap-1">
+                            {resetPwUser === u.id ? (
+                              <form onSubmit={async (e) => {
+                                e.preventDefault();
+                                try {
+                                  await request('/admin/users/' + u.id + '/reset-password', { method: 'POST', body: JSON.stringify({ newPassword: resetPwValue }) });
+                                  setResetPwUser(null); setResetPwValue('');
+                                } catch (err) { setError(err instanceof Error ? err.message : 'Reset failed'); }
+                              }} className="flex items-center gap-1">
+                                <input type="password" value={resetPwValue} onChange={e => setResetPwValue(e.target.value)}
+                                  placeholder="New password" minLength={8} required
+                                  className="w-24 bg-surface-800 border border-gray-700/50 rounded px-1.5 py-0.5 text-xs text-gray-100" />
+                                <button type="submit" className="text-xs text-green-400 hover:text-green-300">Set</button>
+                                <button type="button" onClick={() => setResetPwUser(null)} className="text-xs text-gray-400">✕</button>
+                              </form>
+                            ) : (
+                              <button
+                                onClick={() => { setResetPwUser(u.id); setResetPwValue(''); }}
+                                className="p-1.5 rounded-lg text-yellow-400 hover:bg-yellow-500/10 transition-colors"
+                                title="Reset password"
+                              >
+                                <Key size={15} />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => setConfirmDelete(u.id)}
+                              className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors"
+                              title="Delete user"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
                         )}
                       </div>
                     )}

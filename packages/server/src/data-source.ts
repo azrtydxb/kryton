@@ -7,6 +7,7 @@ import { NoteShare } from "./entities/NoteShare";
 import { RefreshToken } from "./entities/RefreshToken";
 import { SearchIndex } from "./entities/SearchIndex";
 import { Settings } from "./entities/Settings";
+import { PasswordResetToken } from "./entities/PasswordResetToken";
 import { User } from "./entities/User";
 
 const DATABASE_URL =
@@ -18,5 +19,5 @@ export const AppDataSource = new DataSource({
   url: DATABASE_URL,
   synchronize: true,
   logging: false,
-  entities: [AccessRequest, AuthProvider, GraphEdge, InviteCode, NoteShare, RefreshToken, SearchIndex, Settings, User],
+  entities: [AccessRequest, AuthProvider, GraphEdge, InviteCode, NoteShare, PasswordResetToken, RefreshToken, SearchIndex, Settings, User],
 });

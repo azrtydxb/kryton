@@ -267,6 +267,7 @@ export function createAuthRouter(notesDir: string): Router {
         registrationMode,
         googleEnabled: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
         githubEnabled: !!(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET),
+        smtpEnabled: !!process.env.SMTP_HOST,
       });
     } catch (err) {
       console.error("Error fetching auth config:", err);
@@ -547,6 +548,159 @@ export function createAuthRouter(notesDir: string): Router {
     } catch (err) {
       console.error("Error changing password:", err);
       res.status(500).json({ error: "Failed to change password" });
+    }
+  });
+
+  // --------------- Forgot/Reset Password ---------------
+
+  /**
+   * @swagger
+   * /auth/forgot-password:
+   *   post:
+   *     summary: Request a password reset
+   *     tags: [Auth]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [email]
+   *             properties:
+   *               email:
+   *                 type: string
+   *     responses:
+   *       200:
+   *         description: If email exists and SMTP is configured, a reset link is sent
+   */
+  router.post("/forgot-password", async (req: Request, res: Response) => {
+    try {
+      const { email } = req.body;
+      // Always return 200 to prevent email enumeration
+      if (!email) { res.json({ ok: true }); return; }
+
+      const smtpHost = process.env.SMTP_HOST;
+      if (!smtpHost) {
+        // SMTP not configured — silently succeed (admin can reset manually)
+        res.json({ ok: true, message: "If SMTP is not configured, ask an admin to reset your password." });
+        return;
+      }
+
+      const userRepo = AppDataSource.getRepository(User);
+      const user = await userRepo.findOneBy({ email });
+      if (!user || user.disabled) { res.json({ ok: true }); return; }
+
+      // Generate reset token
+      const crypto = await import("crypto");
+      const raw = crypto.randomBytes(32).toString("hex");
+      const hash = crypto.createHash("sha256").update(raw).digest("hex");
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+      const { PasswordResetToken } = await import("../entities/PasswordResetToken");
+      const resetRepo = AppDataSource.getRepository(PasswordResetToken);
+      // Delete any existing tokens for this user
+      await resetRepo.delete({ userId: user.id });
+      const token = resetRepo.create({ userId: user.id, tokenHash: hash, expiresAt });
+      const saved = await resetRepo.save(token);
+
+      const resetUrl = `${process.env.APP_URL || "http://localhost:5173"}/reset-password?token=${saved.id}:${raw}`;
+
+      // Send email via nodemailer
+      try {
+        const nodemailer = await import("nodemailer");
+        const transporter = nodemailer.createTransport({
+          host: process.env.SMTP_HOST,
+          port: parseInt(process.env.SMTP_PORT || "587", 10),
+          secure: process.env.SMTP_SECURE === "true",
+          auth: {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS,
+          },
+        });
+
+        await transporter.sendMail({
+          from: process.env.SMTP_FROM || `"Mnemo" <noreply@${process.env.SMTP_HOST}>`,
+          to: user.email,
+          subject: "Mnemo — Password Reset",
+          text: `You requested a password reset.\n\nClick here to reset your password:\n${resetUrl}\n\nThis link expires in 1 hour.\n\nIf you didn't request this, ignore this email.`,
+          html: `<p>You requested a password reset.</p><p><a href="${resetUrl}">Click here to reset your password</a></p><p>This link expires in 1 hour.</p><p>If you didn't request this, ignore this email.</p>`,
+        });
+      } catch (emailErr) {
+        console.error("Failed to send reset email:", emailErr);
+      }
+
+      res.json({ ok: true });
+    } catch (err) {
+      console.error("Error in forgot-password:", err);
+      res.json({ ok: true }); // Don't leak errors
+    }
+  });
+
+  /**
+   * @swagger
+   * /auth/reset-password:
+   *   post:
+   *     summary: Reset password using a token
+   *     tags: [Auth]
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [token, newPassword]
+   *             properties:
+   *               token:
+   *                 type: string
+   *               newPassword:
+   *                 type: string
+   *     responses:
+   *       200:
+   *         description: Password reset successfully
+   *       400:
+   *         description: Invalid or expired token
+   */
+  router.post("/reset-password", async (req: Request, res: Response) => {
+    try {
+      const { token, newPassword } = req.body;
+      if (!token || !newPassword) { res.status(400).json({ error: "Token and new password are required" }); return; }
+      if (newPassword.length < 8 || newPassword.length > 72) { res.status(400).json({ error: "Password must be 8-72 characters" }); return; }
+
+      const parts = token.split(":");
+      if (parts.length !== 2) { res.status(400).json({ error: "Invalid token format" }); return; }
+      const [tokenId, rawToken] = parts;
+
+      const crypto = await import("crypto");
+      const { PasswordResetToken } = await import("../entities/PasswordResetToken");
+      const resetRepo = AppDataSource.getRepository(PasswordResetToken);
+      const record = await resetRepo.findOneBy({ id: tokenId });
+
+      if (!record || record.expiresAt < new Date()) {
+        if (record) await resetRepo.delete(record.id);
+        res.status(400).json({ error: "Invalid or expired reset token" });
+        return;
+      }
+
+      const hash = crypto.createHash("sha256").update(rawToken).digest("hex");
+      if (hash !== record.tokenHash) { res.status(400).json({ error: "Invalid reset token" }); return; }
+
+      // Reset the password
+      const userRepo = AppDataSource.getRepository(User);
+      const user = await userRepo.findOneBy({ id: record.userId });
+      if (!user) { res.status(400).json({ error: "User not found" }); return; }
+
+      user.passwordHash = await bcrypt.hash(newPassword, 12);
+      await userRepo.save(user);
+
+      // Clean up token and invalidate sessions
+      await resetRepo.delete(record.id);
+      const { deleteAllUserRefreshTokens } = await import("../services/tokenService");
+      await deleteAllUserRefreshTokens(user.id);
+
+      res.json({ ok: true });
+    } catch (err) {
+      console.error("Error in reset-password:", err);
+      res.status(500).json({ error: "Failed to reset password" });
     }
   });
 

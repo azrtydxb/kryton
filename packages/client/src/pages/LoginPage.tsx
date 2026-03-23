@@ -25,14 +25,18 @@ export default function LoginPage() {
   const [regPassword, setRegPassword] = useState('');
   const [inviteCode, setInviteCode] = useState('');
 
+  const [smtpEnabled, setSmtpEnabled] = useState(false);
+  const [forgotMode, setForgotMode] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotSent, setForgotSent] = useState(false);
+
   useEffect(() => {
-    authApi.config().then((cfg: { registrationMode: string; googleEnabled?: boolean; githubEnabled?: boolean }) => {
+    authApi.config().then((cfg: { registrationMode: string; googleEnabled?: boolean; githubEnabled?: boolean; smtpEnabled?: boolean }) => {
       setRegistrationMode(cfg.registrationMode);
       setGoogleEnabled(cfg.googleEnabled ?? false);
       setGithubEnabled(cfg.githubEnabled ?? false);
-    }).catch(() => {
-      // default to open if config fails
-    });
+      setSmtpEnabled(cfg.smtpEnabled ?? false);
+    }).catch(() => {});
   }, []);
 
   const handleSignIn = async (e: FormEvent) => {
@@ -160,7 +164,46 @@ export default function LoginPage() {
               >
                 {loading ? 'Signing in...' : 'Sign In'}
               </button>
+              {smtpEnabled && (
+                <button type="button" onClick={() => { setForgotMode(true); setForgotSent(false); setError(''); }}
+                  className="w-full text-center text-xs text-violet-400 hover:text-violet-300 mt-2">
+                  Forgot password?
+                </button>
+              )}
+              {!smtpEnabled && (
+                <p className="text-center text-xs text-gray-500 mt-2">
+                  Forgot password? Contact your admin.
+                </p>
+              )}
             </form>
+          )}
+
+          {/* Forgot password form */}
+          {tab === 'signin' && forgotMode && (
+            <div className="mt-4 p-4 border border-gray-700/50 rounded-lg">
+              <h4 className="text-sm font-medium text-gray-200 mb-2">Reset Password</h4>
+              {forgotSent ? (
+                <p className="text-xs text-green-400">If an account exists with that email, a reset link has been sent.</p>
+              ) : (
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  try {
+                    await fetch('/api/auth/forgot-password', {
+                      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                      body: JSON.stringify({ email: forgotEmail }),
+                    });
+                    setForgotSent(true);
+                  } catch { setForgotSent(true); }
+                }} className="space-y-2">
+                  <input type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} required
+                    placeholder="Enter your email" className="w-full bg-surface-950 border border-gray-700/50 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500/50" />
+                  <div className="flex gap-2">
+                    <button type="submit" className="flex-1 bg-violet-500 text-white rounded-lg py-2 text-xs font-medium hover:bg-violet-600">Send Reset Link</button>
+                    <button type="button" onClick={() => setForgotMode(false)} className="text-xs text-gray-400 hover:text-gray-200">Cancel</button>
+                  </div>
+                </form>
+              )}
+            </div>
           )}
 
           {/* Register form */}
