@@ -18,4 +18,8 @@ export class GraphEdge {
   @Index()
   @Column("text")
   toNoteId: string;
+
+  @Index()
+  @Column("text")
+  userId: string;
 }

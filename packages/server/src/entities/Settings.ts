@@ -1,10 +1,18 @@
-import { Entity, PrimaryColumn, Column } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, Index, Unique } from "typeorm";
 
 @Entity()
+@Unique(["key", "userId"])
 export class Settings {
-  @PrimaryColumn("text")
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
+
+  @Column("text")
   key: string;
 
   @Column("text")
   value: string;
+
+  @Index()
+  @Column("text", { nullable: true })
+  userId: string | null;
 }

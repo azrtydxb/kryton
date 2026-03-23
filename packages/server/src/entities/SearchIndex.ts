@@ -1,9 +1,13 @@
-import { Entity, PrimaryColumn, Column } from "typeorm";
+import { Entity, PrimaryColumn, Column, Index } from "typeorm";
 
 @Entity()
 export class SearchIndex {
   @PrimaryColumn("text")
   notePath: string;
+
+  @Index()
+  @PrimaryColumn("text")
+  userId: string;
 
   @Column("text")
   title: string;
