@@ -18,7 +18,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  // Schedule auto-refresh 14 minutes after last token
+  // Use a ref to avoid self-referencing useCallback
+  const scheduleRefreshRef = useRef<() => void>(() => {});
+
   const scheduleRefresh = useCallback(() => {
     if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
     refreshTimerRef.current = setTimeout(async () => {
@@ -26,13 +28,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (result) {
         setAccessToken(result.accessToken);
         setUser(result.user);
-        scheduleRefresh();
+        scheduleRefreshRef.current();
       } else {
         setAccessToken(null);
         setUser(null);
       }
     }, 14 * 60 * 1000); // 14 minutes
   }, []);
+
+  useEffect(() => {
+    scheduleRefreshRef.current = scheduleRefresh;
+  }, [scheduleRefresh]);
 
   // On mount: try refresh to restore session
   useEffect(() => {
@@ -92,6 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   return useContext(AuthContext);
 }
