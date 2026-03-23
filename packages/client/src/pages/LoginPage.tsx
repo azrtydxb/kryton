@@ -12,6 +12,9 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [registrationMode, setRegistrationMode] = useState<string>('open');
 
+  const [googleEnabled, setGoogleEnabled] = useState(false);
+  const [githubEnabled, setGithubEnabled] = useState(false);
+
   // Sign in fields
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -23,8 +26,10 @@ export default function LoginPage() {
   const [inviteCode, setInviteCode] = useState('');
 
   useEffect(() => {
-    authApi.config().then((cfg) => {
+    authApi.config().then((cfg: { registrationMode: string; googleEnabled?: boolean; githubEnabled?: boolean }) => {
       setRegistrationMode(cfg.registrationMode);
+      setGoogleEnabled(cfg.googleEnabled ?? false);
+      setGithubEnabled(cfg.githubEnabled ?? false);
     }).catch(() => {
       // default to open if config fails
     });
@@ -230,18 +235,18 @@ export default function LoginPage() {
           )}
 
           {/* OAuth divider */}
-          <div className="relative my-6">
+          {(googleEnabled || githubEnabled) && <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-gray-700/50" />
             </div>
             <div className="relative flex justify-center text-xs">
               <span className="bg-surface-900 px-3 text-gray-500">or continue with</span>
             </div>
-          </div>
+          </div>}
 
-          {/* OAuth buttons */}
-          <div className="space-y-3">
-            <button
+          {/* OAuth buttons — only show if providers are configured */}
+          {(googleEnabled || githubEnabled) && <div className="space-y-3">
+            {googleEnabled && <button
               type="button"
               onClick={handleOAuthGoogle}
               className="flex w-full items-center justify-center gap-3 rounded-lg border border-gray-700/50 bg-surface-950 px-4 py-2.5 text-sm font-medium text-gray-300 hover:bg-surface-800 transition-colors"
@@ -265,8 +270,8 @@ export default function LoginPage() {
                 />
               </svg>
               Sign in with Google
-            </button>
-            <button
+            </button>}
+            {githubEnabled && <button
               type="button"
               onClick={handleOAuthGithub}
               className="flex w-full items-center justify-center gap-3 rounded-lg border border-gray-700/50 bg-surface-950 px-4 py-2.5 text-sm font-medium text-gray-300 hover:bg-surface-800 transition-colors"
@@ -279,8 +284,8 @@ export default function LoginPage() {
                 />
               </svg>
               Sign in with GitHub
-            </button>
-          </div>
+            </button>}
+          </div>}
         </div>
       </div>
     </div>

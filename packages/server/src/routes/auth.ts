@@ -263,7 +263,11 @@ export function createAuthRouter(notesDir: string): Router {
       const settingsRepo = AppDataSource.getRepository(Settings);
       const row = await settingsRepo.findOneBy({ key: "registration_mode" });
       const registrationMode = row?.value ?? "open";
-      res.json({ registrationMode });
+      res.json({
+        registrationMode,
+        googleEnabled: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
+        githubEnabled: !!(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET),
+      });
     } catch (err) {
       console.error("Error fetching auth config:", err);
       res.status(500).json({ error: "Failed to fetch auth config" });
