@@ -138,7 +138,7 @@ export async function getNotesByTag(
 }
 
 export interface SearchResult {
-  notePath: string;
+  path: string;
   title: string;
   snippet: string;
   tags: string[];
@@ -162,7 +162,7 @@ export async function search(query: string): Promise<SearchResult[]> {
   return results.map((r) => {
     const snippet = createSnippet(r.content, query);
     return {
-      notePath: r.notePath,
+      path: r.notePath,
       title: r.title,
       snippet,
       tags: r.tags,
