@@ -77,6 +77,7 @@ function DataviewBlock({ query, onLinkClick }: { query: string; onLinkClick: (na
 
   useEffect(() => {
     if (!parsed) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- guard before async work
       setError('Invalid dataview query');
       setLoading(false);
       return;

@@ -46,6 +46,7 @@ export function QuickSwitcher({ notes, onSelect, onClose }: QuickSwitcherProps) 
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting derived state on query change
     setSelectedIndex(0);
   }, [query]);
 

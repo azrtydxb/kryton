@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { ChevronRight, ArrowDownRight, AlertCircle } from 'lucide-react';
 import { FileNode } from '../../lib/api';
 
@@ -67,10 +67,7 @@ export function OutgoingLinksPanel({ content, allNotes, onNoteSelect, onCreateNo
     });
   }, [content, notePathMap]);
 
-  const [brokenCount, setBrokenCount] = useState(0);
-  useEffect(() => {
-    setBrokenCount(outgoingLinks.filter(l => !l.exists).length);
-  }, [outgoingLinks]);
+  const brokenCount = useMemo(() => outgoingLinks.filter(l => !l.exists).length, [outgoingLinks]);
 
   if (outgoingLinks.length === 0) return null;
 
