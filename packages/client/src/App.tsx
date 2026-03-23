@@ -259,16 +259,6 @@ export default function App() {
         </div>
 
         <div className="flex items-center gap-0.5">
-          {notes.activeNote && (
-            <button
-              onClick={() => setEditing(!editing)}
-              className={`btn-ghost p-2 ${editing ? 'text-violet-500' : ''}`}
-              aria-label={editing ? 'Done editing' : 'Edit note'}
-              title={editing ? 'Done editing (Ctrl+E)' : 'Edit note (Ctrl+E)'}
-            >
-              {editing ? <X size={18} /> : <Pencil size={18} />}
-            </button>
-          )}
           <ThemeToggle theme={themeCtx.theme} setTheme={themeCtx.setTheme} />
         </div>
       </header>
@@ -351,6 +341,13 @@ export default function App() {
                     </span>
                     <div className="flex items-center gap-2">
                       <button
+                        onClick={() => setEditing(false)}
+                        className="p-1 rounded text-violet-500 hover:text-violet-400 transition-colors"
+                        title="Done editing (Ctrl+E)"
+                      >
+                        <X size={14} />
+                      </button>
+                      <button
                         onClick={toggleActiveNoteStar}
                         className={`p-1 rounded transition-colors ${
                           isActiveNoteStarred
@@ -425,6 +422,13 @@ export default function App() {
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setEditing(true)}
+                      className="p-1 rounded text-gray-400 hover:text-violet-500 transition-colors"
+                      title="Edit note (Ctrl+E)"
+                    >
+                      <Pencil size={14} />
+                    </button>
                     <button
                       onClick={toggleActiveNoteStar}
                       className={`p-1 rounded transition-colors ${
