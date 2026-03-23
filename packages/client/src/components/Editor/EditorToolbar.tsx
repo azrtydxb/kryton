@@ -147,20 +147,20 @@ export function EditorToolbar({ viewRef, vimEnabled, onVimToggle }: EditorToolba
       <ToolbarButton icon={Minus} title="Horizontal rule" onClick={() => insertText('\n---\n')} />
       <ToolbarButton icon={Table} title="Table" onClick={insertTable} />
       <div className="flex-1" />
-      <div className="flex items-center gap-1.5">
-        <span className="text-xs text-gray-500">Vim</span>
-        <button
-          onClick={() => onVimToggle(!vimEnabled)}
-          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-            vimEnabled ? 'bg-violet-500' : 'bg-gray-600'
-          }`}
-          title={vimEnabled ? 'Vim mode enabled — click to disable' : 'Vim mode disabled — click to enable'}
-        >
-          <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-            vimEnabled ? 'translate-x-4.5' : 'translate-x-0.5'
-          }`} />
-        </button>
-      </div>
+      <button
+        onClick={() => onVimToggle(!vimEnabled)}
+        className={`relative inline-flex h-6 w-14 items-center rounded-full transition-colors cursor-pointer ${
+          vimEnabled ? 'bg-violet-500' : 'bg-gray-600'
+        }`}
+        title={vimEnabled ? 'Vim mode enabled — click to disable' : 'Vim mode disabled — click to enable'}
+      >
+        <span className={`absolute text-[10px] font-bold text-white transition-opacity ${
+          vimEnabled ? 'left-1.5 opacity-100' : 'left-1.5 opacity-0'
+        }`}>VIM</span>
+        <span className={`inline-block h-4.5 w-4.5 rounded-full bg-white shadow transition-all ${
+          vimEnabled ? 'translate-x-8.5' : 'translate-x-0.5'
+        }`} />
+      </button>
     </div>
   );
 }
