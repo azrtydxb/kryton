@@ -17,6 +17,8 @@ interface SimNode extends d3.SimulationNodeDatum {
   id: string;
   title: string;
   path: string;
+  shared?: boolean;
+  ownerUserId?: string;
 }
 
 interface SimLink extends d3.SimulationLinkDatum<SimNode> {
@@ -34,7 +36,11 @@ export function GraphView({ graphData, loading, activeNotePath, mode, onNoteSele
   const zoomRef = useRef<d3.ZoomBehavior<HTMLCanvasElement, unknown> | null>(null);
 
   const handleNodeClick = useCallback((node: SimNode) => {
-    onNoteSelect(node.path);
+    if (node.shared && node.ownerUserId) {
+      onNoteSelect(`shared:${node.ownerUserId}:${node.path}`);
+    } else {
+      onNoteSelect(node.path);
+    }
   }, [onNoteSelect]);
 
   // Simulation setup
@@ -141,6 +147,7 @@ export function GraphView({ graphData, loading, activeNotePath, mode, onNoteSele
         const isHovered = hoveredNodeRef.current === node;
         const isActive = node.path === activeNotePath;
         const isStarred = starredPaths?.has(node.path) ?? false;
+        const isShared = node.shared === true;
         const radius = isActive ? 10 : isHovered ? 8 : 6;
 
         if (isStarred && !isActive) {
@@ -168,13 +175,19 @@ export function GraphView({ graphData, loading, activeNotePath, mode, onNoteSele
           ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
           ctx.fillStyle = isActive
             ? '#25D366'
-            : isHovered
-              ? '#7c3aed'
-              : isDark ? '#a78bfa' : '#7c3aed';
+            : isShared
+              ? '#f97316'
+              : isHovered
+                ? '#7c3aed'
+                : isDark ? '#a78bfa' : '#7c3aed';
           ctx.fill();
 
-          if (isHovered || isActive) {
-            ctx.strokeStyle = isActive ? '#128C7E' : isDark ? '#c4b5fd' : '#6d28d9';
+          if (isHovered || isActive || isShared) {
+            ctx.strokeStyle = isActive
+              ? '#128C7E'
+              : isShared
+                ? '#ea580c'
+                : isDark ? '#c4b5fd' : '#6d28d9';
             ctx.lineWidth = 2;
             ctx.stroke();
           }
