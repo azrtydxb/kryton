@@ -65,10 +65,22 @@ export interface CanvasData {
 
 const BASE = '/api';
 
+let _accessToken: string | null = null;
+export function setAccessToken(token: string | null) { _accessToken = token; }
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'X-Requested-With': 'XMLHttpRequest',
+    ...(options?.headers as Record<string, string>),
+  };
+  if (_accessToken) {
+    headers['Authorization'] = 'Bearer ' + _accessToken;
+  }
   const res = await fetch(`${BASE}${url}`, {
-    headers: { 'Content-Type': 'application/json' },
     ...options,
+    credentials: 'include',
+    headers,
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
@@ -132,4 +144,43 @@ export const api = {
     request<void>('/canvas', { method: 'POST', body: JSON.stringify({ name }) }),
   deleteCanvas: (name: string) =>
     request<void>(`/canvas/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+};
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  avatarUrl: string | null;
+}
+
+export const authApi = {
+  config: (): Promise<{ registrationMode: string }> =>
+    fetch('/api/auth/config').then(r => r.json()),
+  login: (email: string, password: string) =>
+    request<{ user: AuthUser; accessToken: string }>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    }),
+  register: (data: { email: string; password: string; name: string; inviteCode?: string }) =>
+    request<{ user: AuthUser; accessToken: string }>('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  refresh: async (): Promise<{ user: AuthUser; accessToken: string } | null> => {
+    const res = await fetch('/api/auth/refresh', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    });
+    if (!res.ok) return null;
+    return res.json();
+  },
+  logout: () =>
+    fetch('/api/auth/logout', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    }),
+  me: () => request<AuthUser>('/auth/me'),
 };
