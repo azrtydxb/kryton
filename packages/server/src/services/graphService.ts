@@ -39,12 +39,13 @@ function noteIdFromPath(notePath: string): string {
  */
 export async function updateGraphCache(
   notePath: string,
-  content: string
+  content: string,
+  userId: string
 ): Promise<void> {
   const repo = AppDataSource.getRepository(GraphEdge);
 
-  // Remove existing edges from this note
-  await repo.delete({ fromPath: notePath });
+  // Remove existing edges from this note for this user
+  await repo.delete({ fromPath: notePath, userId });
 
   const links = parseLinks(content);
   if (links.length === 0) return;
@@ -56,6 +57,7 @@ export async function updateGraphCache(
     edge.toPath = toPath;
     edge.fromNoteId = noteIdFromPath(notePath);
     edge.toNoteId = noteIdFromPath(toPath);
+    edge.userId = userId;
     return edge;
   });
 
@@ -65,11 +67,11 @@ export async function updateGraphCache(
 /**
  * Remove all graph edges that reference the given note path (as source or target).
  */
-export async function removeFromGraph(notePath: string): Promise<void> {
+export async function removeFromGraph(notePath: string, userId: string): Promise<void> {
   const repo = AppDataSource.getRepository(GraphEdge);
-  await repo.delete({ fromPath: notePath });
+  await repo.delete({ fromPath: notePath, userId });
   // We also remove edges pointing TO this note
-  await repo.delete({ toPath: notePath });
+  await repo.delete({ toPath: notePath, userId });
 }
 
 /**
@@ -77,7 +79,8 @@ export async function removeFromGraph(notePath: string): Promise<void> {
  */
 export async function renameInGraph(
   oldPath: string,
-  newPath: string
+  newPath: string,
+  userId: string
 ): Promise<void> {
   const repo = AppDataSource.getRepository(GraphEdge);
   const oldNoteId = noteIdFromPath(oldPath);
@@ -88,7 +91,7 @@ export async function renameInGraph(
     .createQueryBuilder()
     .update(GraphEdge)
     .set({ fromPath: newPath, fromNoteId: newNoteId })
-    .where("fromPath = :oldPath", { oldPath })
+    .where("fromPath = :oldPath AND userId = :userId", { oldPath, userId })
     .execute();
 
   // Update edges pointing to the old path
@@ -96,7 +99,7 @@ export async function renameInGraph(
     .createQueryBuilder()
     .update(GraphEdge)
     .set({ toPath: newPath, toNoteId: newNoteId })
-    .where("toPath = :oldPath", { oldPath })
+    .where("toPath = :oldPath AND userId = :userId", { oldPath, userId })
     .execute();
 
   // Also update edges that reference the old note id without .md
@@ -104,7 +107,7 @@ export async function renameInGraph(
     .createQueryBuilder()
     .update(GraphEdge)
     .set({ toNoteId: newNoteId })
-    .where("toNoteId = :oldNoteId", { oldNoteId })
+    .where("toNoteId = :oldNoteId AND userId = :userId", { oldNoteId, userId })
     .execute();
 }
 
@@ -126,12 +129,13 @@ export interface GraphData {
  * Get all notes that link TO the given note (backlinks).
  */
 export async function getBacklinks(
-  notePath: string
+  notePath: string,
+  userId: string
 ): Promise<{ path: string; title: string }[]> {
   const repo = AppDataSource.getRepository(GraphEdge);
   const noteId = noteIdFromPath(notePath);
 
-  const edges = await repo.find({ where: { toNoteId: noteId } });
+  const edges = await repo.find({ where: { toNoteId: noteId, userId } });
   if (edges.length === 0) return [];
 
   const { SearchIndex } = await import("../entities/SearchIndex");
@@ -139,7 +143,7 @@ export async function getBacklinks(
 
   const backlinks: { path: string; title: string }[] = [];
   for (const edge of edges) {
-    const note = await searchRepo.findOneBy({ notePath: edge.fromPath });
+    const note = await searchRepo.findOneBy({ notePath: edge.fromPath, userId });
     if (note) {
       backlinks.push({ path: note.notePath, title: note.title });
     }
@@ -154,14 +158,14 @@ export async function getBacklinks(
   });
 }
 
-export async function getFullGraph(): Promise<GraphData> {
+export async function getFullGraph(userId: string): Promise<GraphData> {
   const edgeRepo = AppDataSource.getRepository(GraphEdge);
   const { SearchIndex } = await import("../entities/SearchIndex");
   const searchRepo = AppDataSource.getRepository(SearchIndex);
 
   const [allNotes, allEdges] = await Promise.all([
-    searchRepo.find(),
-    edgeRepo.find(),
+    searchRepo.find({ where: { userId } }),
+    edgeRepo.find({ where: { userId } }),
   ]);
 
   const nodes: GraphNode[] = allNotes.map((note) => ({

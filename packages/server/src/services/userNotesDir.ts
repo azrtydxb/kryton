@@ -1,5 +1,7 @@
 import * as path from "path";
 import * as fs from "fs/promises";
+import { indexNote } from "./searchService";
+import { updateGraphCache } from "./graphService";
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -167,11 +169,8 @@ export async function getUserNotesDir(
 
 /**
  * Provision a brand-new user directory with the default sample notes.
- * Writes all SAMPLE_NOTES into notes/{userId}/.
- *
- * TODO: After searchService and graphService are updated with userId
- * parameters (Task 3), call indexNote() and updateGraphCache() here
- * so that newly-provisioned notes are immediately searchable.
+ * Writes all SAMPLE_NOTES into notes/{userId}/ and indexes them for
+ * search and graph so they are immediately available.
  */
 export async function provisionUserNotes(
   baseDir: string,
@@ -193,6 +192,9 @@ export async function provisionUserNotes(
     const fullPath = path.join(userDir, relativePath);
     await fs.mkdir(path.dirname(fullPath), { recursive: true });
     await fs.writeFile(fullPath, content, "utf-8");
+    // Index each note for search and graph
+    await indexNote(relativePath, content, userId);
+    await updateGraphCache(relativePath, content, userId);
   }
 }
 

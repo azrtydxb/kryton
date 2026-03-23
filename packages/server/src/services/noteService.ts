@@ -89,7 +89,8 @@ export async function readNote(notesDir: string, notePath: string): Promise<Note
 export async function writeNote(
   notesDir: string,
   notePath: string,
-  content: string
+  content: string,
+  userId: string
 ): Promise<void> {
   const fullPath = path.join(notesDir, notePath);
 
@@ -109,15 +110,15 @@ export async function writeNote(
 
   // Update indexes
   await Promise.all([
-    indexNote(notePath, content),
-    updateGraphCache(notePath, content),
+    indexNote(notePath, content, userId),
+    updateGraphCache(notePath, content, userId),
   ]);
 }
 
 /**
  * Delete a note from disk and clean up indexes.
  */
-export async function deleteNote(notesDir: string, notePath: string): Promise<void> {
+export async function deleteNote(notesDir: string, notePath: string, userId: string): Promise<void> {
   const fullPath = path.join(notesDir, notePath);
 
   // Security check
@@ -131,8 +132,8 @@ export async function deleteNote(notesDir: string, notePath: string): Promise<vo
 
   // Clean up indexes
   await Promise.all([
-    removeFromIndex(notePath),
-    removeFromGraph(notePath),
+    removeFromIndex(notePath, userId),
+    removeFromGraph(notePath, userId),
   ]);
 }
 
@@ -142,7 +143,8 @@ export async function deleteNote(notesDir: string, notePath: string): Promise<vo
 export async function renameNote(
   notesDir: string,
   oldPath: string,
-  newPath: string
+  newPath: string,
+  userId: string
 ): Promise<void> {
   const oldFullPath = path.join(notesDir, oldPath);
   const newFullPath = path.join(notesDir, newPath);
@@ -167,26 +169,26 @@ export async function renameNote(
 
   // Update indexes
   await Promise.all([
-    renameInIndex(oldPath, newPath),
-    renameInGraph(oldPath, newPath),
+    renameInIndex(oldPath, newPath, userId),
+    renameInGraph(oldPath, newPath, userId),
   ]);
 }
 
 /**
- * Index all existing notes in the notes directory.
- * Called on startup to populate search and graph caches.
+ * Index all existing notes in a user's notes directory.
+ * Called on startup or provisioning to populate search and graph caches.
  */
-export async function indexAllNotes(notesDir: string): Promise<void> {
-  const tree = await scanDirectory(notesDir);
+export async function indexUserNotes(userNotesDir: string, userId: string): Promise<void> {
+  const tree = await scanDirectory(userNotesDir);
 
   async function processNodes(nodes: FileTreeNode[]): Promise<void> {
     for (const node of nodes) {
       if (node.type === "file") {
         try {
-          const fullPath = path.join(notesDir, node.path);
+          const fullPath = path.join(userNotesDir, node.path);
           const content = await fs.readFile(fullPath, "utf-8");
-          await indexNote(node.path, content);
-          await updateGraphCache(node.path, content);
+          await indexNote(node.path, content, userId);
+          await updateGraphCache(node.path, content, userId);
         } catch (err) {
           console.error(`Failed to index ${node.path}:`, err);
         }

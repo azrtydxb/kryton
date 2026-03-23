@@ -1,5 +1,6 @@
 import { AppDataSource } from "../data-source";
 import { SearchIndex } from "../entities/SearchIndex";
+import { Brackets } from "typeorm";
 
 /**
  * Strip markdown formatting to produce plain text for indexing.
@@ -61,7 +62,8 @@ export function extractTitle(content: string, filePath: string): string {
  */
 export async function indexNote(
   notePath: string,
-  content: string
+  content: string,
+  userId: string
 ): Promise<void> {
   const repo = AppDataSource.getRepository(SearchIndex);
   const title = extractTitle(content, notePath);
@@ -70,6 +72,7 @@ export async function indexNote(
 
   const entry = new SearchIndex();
   entry.notePath = notePath;
+  entry.userId = userId;
   entry.title = title;
   entry.content = plainContent;
   entry.tags = tags;
@@ -81,9 +84,9 @@ export async function indexNote(
 /**
  * Remove a note from the search index.
  */
-export async function removeFromIndex(notePath: string): Promise<void> {
+export async function removeFromIndex(notePath: string, userId: string): Promise<void> {
   const repo = AppDataSource.getRepository(SearchIndex);
-  await repo.delete({ notePath });
+  await repo.delete({ notePath, userId });
 }
 
 /**
@@ -91,12 +94,13 @@ export async function removeFromIndex(notePath: string): Promise<void> {
  */
 export async function renameInIndex(
   oldPath: string,
-  newPath: string
+  newPath: string,
+  userId: string
 ): Promise<void> {
   const repo = AppDataSource.getRepository(SearchIndex);
-  const entry = await repo.findOneBy({ notePath: oldPath });
+  const entry = await repo.findOneBy({ notePath: oldPath, userId });
   if (entry) {
-    await repo.delete({ notePath: oldPath });
+    await repo.delete({ notePath: oldPath, userId });
     entry.notePath = newPath;
     await repo.save(entry);
   }
@@ -105,9 +109,9 @@ export async function renameInIndex(
 /**
  * Get all tags across all notes with their counts.
  */
-export async function getAllTags(): Promise<{ tag: string; count: number }[]> {
+export async function getAllTags(userId: string): Promise<{ tag: string; count: number }[]> {
   const repo = AppDataSource.getRepository(SearchIndex);
-  const allNotes = await repo.find();
+  const allNotes = await repo.find({ where: { userId } });
 
   const tagCounts = new Map<string, number>();
   for (const note of allNotes) {
@@ -127,10 +131,11 @@ export async function getAllTags(): Promise<{ tag: string; count: number }[]> {
  * Get all note paths that have a given tag.
  */
 export async function getNotesByTag(
-  tag: string
+  tag: string,
+  userId: string
 ): Promise<{ notePath: string; title: string }[]> {
   const repo = AppDataSource.getRepository(SearchIndex);
-  const allNotes = await repo.find();
+  const allNotes = await repo.find({ where: { userId } });
 
   return allNotes
     .filter((note) => note.tags.includes(tag))
@@ -148,14 +153,17 @@ export interface SearchResult {
 /**
  * Search notes by query, matching against title and content using ILIKE.
  */
-export async function search(query: string): Promise<SearchResult[]> {
+export async function search(query: string, userId: string): Promise<SearchResult[]> {
   const repo = AppDataSource.getRepository(SearchIndex);
   const pattern = `%${query}%`;
 
   const results = await repo
     .createQueryBuilder("s")
-    .where("s.title ILIKE :pattern", { pattern })
-    .orWhere("s.content ILIKE :pattern", { pattern })
+    .where("s.userId = :userId", { userId })
+    .andWhere(new Brackets(qb => {
+      qb.where("s.title ILIKE :pattern", { pattern })
+        .orWhere("s.content ILIKE :pattern", { pattern });
+    }))
     .orderBy("s.modifiedAt", "DESC")
     .getMany();
 

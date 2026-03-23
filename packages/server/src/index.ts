@@ -20,7 +20,8 @@ import { createTagsRouter } from "./routes/tags";
 import { createDailyRouter } from "./routes/daily";
 import { createTemplatesRouter } from "./routes/templates";
 import { createCanvasRouter } from "./routes/canvas";
-import { indexAllNotes } from "./services/noteService";
+// indexUserNotes is called per-user during provisioning, not at startup
+// import { indexUserNotes } from "./services/noteService";
 
 const PORT = parseInt(process.env.PORT || "3001", 10);
 const NOTES_DIR = path.resolve(
@@ -205,10 +206,9 @@ async function main(): Promise<void> {
   // Create notes directory and sample notes if needed
   await createSampleNotes();
 
-  // Index all existing notes on startup
-  console.log("Indexing notes...");
-  await indexAllNotes(NOTES_DIR);
-  console.log("Indexing complete.");
+  // Note: per-user indexing is now handled during provisioning and login.
+  // The old global indexAllNotes() call has been removed.
+  console.log("Startup complete — per-user notes are indexed on demand.");
 
   // Create Express app
   const app = express();
