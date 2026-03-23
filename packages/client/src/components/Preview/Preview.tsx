@@ -248,8 +248,15 @@ export function Preview({ content, onLinkClick, allNotes, onCreateNote }: Previe
     processedContent = processedContent.replace(dvMatch[0], `<div data-dataview-id="${id}"></div>`);
   }
 
+  // Protect inline code from wiki-link replacement
+  const codeBlocks: string[] = [];
+  processedContent = processedContent.replace(/`([^`]+)`/g, (_match, _code: string) => {
+    codeBlocks.push(_match);
+    return `\x00CODE${codeBlocks.length - 1}\x00`;
+  });
+
   // Transform content: handle embeds and wiki-links
-  const transformedContent = processedContent
+  let transformedContent = processedContent
     // Image embeds: ![[image.png]] → <img>
     .replace(
       /!\[\[([^\]]+\.(png|jpg|jpeg|gif|svg|webp|bmp))\]\]/gi,
@@ -275,10 +282,16 @@ export function Preview({ content, onLinkClick, allNotes, onCreateNote }: Previe
       (_, linkText: string) => {
         const isBroken = allNotes && !existingNotes.has(linkText.toLowerCase());
         const classes = isBroken ? 'wiki-link wiki-link-broken' : 'wiki-link';
-        const title = isBroken ? `Note "${linkText}" not found — click to create` : linkText;
-        return `<a class="${classes}" data-wiki-target="${linkText}" data-broken="${isBroken ? 'true' : 'false'}" href="#" title="${title}">${linkText}</a>`;
+        const escapedText = linkText.replace(/"/g, '&quot;');
+        const title = isBroken ? `Note &quot;${escapedText}&quot; not found — click to create` : escapedText;
+        return `<a class="${classes}" data-wiki-target="${escapedText}" data-broken="${isBroken ? 'true' : 'false'}" href="#" title="${title}">${linkText}</a>`;
       }
     );
+
+  // Restore inline code blocks
+  transformedContent = transformedContent.replace(/\x00CODE(\d+)\x00/g, (_match, idx: string) => {
+    return codeBlocks[parseInt(idx, 10)];
+  });
 
   const handleClick = useCallback((e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
