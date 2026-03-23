@@ -17,6 +17,11 @@
 - Search with folder shares escapes SQL wildcards (`%`, `_`) in LIKE patterns
 - Graph node IDs use `{ownerUserId}:{notePath}` namespace for shared nodes to avoid collisions
 - Backlinks only show if viewer has access to the linking note
+- Prevent self-sharing (`sharedWithUserId != req.user.id`)
+- Mount shared note routes at `/api/notes/shared` as a SEPARATE mount BEFORE the general `/api/notes` wildcard router to avoid route conflicts
+- Access request routes are mounted at `/api/access-requests` (separate from `/api/shares`)
+- Folder share permission check uses `POSITION(path IN :requestedPath) = 1` (not LIKE on column) to avoid SQL wildcard issues in stored paths
+- Update client-side `GraphData` and `SearchResult` TypeScript interfaces with new shared fields
 
 ---
 
@@ -77,8 +82,8 @@ Create `packages/server/src/services/shareService.ts` with:
 **`hasAccess(ownerUserId, path, requestingUserId)`** → `{ canRead, canWrite }`:
 1. Query NoteShare where `ownerUserId`, `sharedWithUserId = requestingUserId`
 2. Check exact path match (`path = :path AND isFolder = false`)
-3. Check folder shares — walk up parent dirs: for path `a/b/c.md`, check shares for `a/b/`, `a/`, etc. Use `isFolder = true AND :path LIKE path || '%'`
-4. Escape SQL wildcards in folder paths (`%` → `\%`, `_` → `\_`)
+3. Check folder shares — use `POSITION` instead of LIKE to avoid SQL wildcard issues: `isFolder = true AND POSITION(path IN :requestedPath) = 1` (checks if the requested path starts with the shared folder path). This is safe regardless of wildcards in stored paths.
+4. No LIKE escaping needed with the POSITION approach
 5. Return highest permission found
 
 **`getSharedNotesForUser(userId)`** → array of shares with owner info:
@@ -108,20 +113,20 @@ git add -A && git commit -m "feat: add shareService with permission checks"
 
 - [ ] **Step 1: Create shares.ts**
 
-Create `packages/server/src/routes/shares.ts` exporting `createSharesRouter()`:
+Create `packages/server/src/routes/shares.ts` exporting `createSharesRouter()` AND `createAccessRequestsRouter()` (two separate routers in one file):
 
-**Share endpoints:**
-- `POST /` — create share. Validate: requester is the file/folder owner (ownerUserId = req.user.id). Body: `{ path, isFolder, sharedWithUserId, permission }`. Return created share.
-- `GET /` — list shares created by me. Query NoteShare where `ownerUserId = req.user.id`.
+**Share endpoints (mounted at `/api/shares`):**
+- `POST /` — create share. Validate: ownerUserId = req.user.id, **sharedWithUserId != req.user.id** (no self-sharing). Body: `{ path, isFolder, sharedWithUserId, permission }`.
+- `GET /` — list shares created by me.
 - `GET /with-me` — list shares with me. Call `getSharedNotesForUser(req.user.id)`.
-- `PUT /:id` — update permission. Verify ownerUserId = req.user.id. Body: `{ permission }`.
+- `PUT /:id` — update permission. Verify ownerUserId = req.user.id.
 - `DELETE /:id` — revoke. Verify ownerUserId = req.user.id.
 
-**Access request endpoints:**
-- `POST /access-requests` — create request. Body: `{ ownerUserId, notePath }`. If denied request exists for same combo, update status to `pending` instead of creating new.
-- `GET /access-requests` — list pending requests where `ownerUserId = req.user.id`.
-- `GET /access-requests/mine` — list my outgoing requests.
-- `PUT /access-requests/:id` — approve/deny. Verify ownerUserId = req.user.id. Body: `{ action, permission? }`. On approve, create NoteShare.
+**Access request endpoints (mounted at `/api/access-requests` — separate router):**
+- `POST /` — create request. Body: `{ ownerUserId, notePath }`. If denied request exists for same combo, update status to `pending`.
+- `GET /` — list pending requests where `ownerUserId = req.user.id`.
+- `GET /mine` — list my outgoing requests.
+- `PUT /:id` — approve/deny. Verify ownerUserId = req.user.id. Body: `{ action, permission? }`. On approve, create NoteShare.
 
 Add `@swagger` annotations to all endpoints.
 
@@ -165,15 +170,20 @@ Add a new router factory `createSharedNotesRouter(notesDir)` in notes.ts (or a s
 
 - [ ] **Step 2: Mount routes in index.ts**
 
-Add to index.ts:
+Add to index.ts. **IMPORTANT: mount shared note routes BEFORE the general `/api/notes` wildcard router to avoid route conflicts:**
 ```ts
-import { createSharesRouter } from "./routes/shares";
+import { createSharesRouter, createAccessRequestsRouter } from "./routes/shares";
 import { createUsersRouter } from "./routes/users";
 
+// Mount BEFORE the general /api/notes router:
+app.use("/api/notes/shared", authMiddleware, createSharedNotesRouter(NOTES_DIR));
+
+// Then the existing notes router (with wildcard {*path}):
+// app.use("/api/notes", authMiddleware, createNotesRouter(NOTES_DIR)); // already exists
+
 app.use("/api/shares", authMiddleware, createSharesRouter());
-app.use("/api/access-requests", authMiddleware, createAccessRequestsRouter()); // or combined in shares
+app.use("/api/access-requests", authMiddleware, createAccessRequestsRouter());
 app.use("/api/users", authMiddleware, createUsersRouter());
-app.use("/api/notes", authMiddleware, createSharedNotesRouter(NOTES_DIR)); // shared routes
 ```
 
 - [ ] **Step 3: Verify and commit**
@@ -315,7 +325,26 @@ export const sharedNoteApi = {
 };
 ```
 
-- [ ] **Step 2: Verify and commit**
+- [ ] **Step 2: Update TypeScript interfaces**
+
+Update the `GraphData` interface in api.ts to include shared fields on nodes:
+```ts
+// nodes: { id, title, path, shared?: boolean, ownerUserId?: string }[]
+```
+
+Update the `SearchResult` interface to include shared fields:
+```ts
+export interface SearchResult {
+  path: string;
+  title: string;
+  snippet: string;
+  tags: string[];
+  isShared?: boolean;
+  ownerUserId?: string;
+}
+```
+
+- [ ] **Step 3: Verify and commit**
 
 ```bash
 cd /Users/pascal/Development/mnemo && npm run typecheck && npm run build
@@ -336,11 +365,14 @@ Modal component with props: `{ notePath: string; isFolder: boolean; onClose: () 
 Content:
 - Email search field → calls `shareApi.searchUser(email)` on submit
 - Found user display (name, email) with permission picker (read / read-write)
-- "Share" button → calls `shareApi.create(...)`
+- **"Share entire folder" checkbox** (when the target is a folder) — sets `isFolder: true`
+- "Share" button → calls `shareApi.create(...)` with the appropriate `isFolder` flag
 - Current shares list (fetch from `shareApi.list()`, filter by path) with revoke buttons
 - Error/success messages
 
 Use `createPortal` to body. Dark themed matching existing modals.
+
+**Also in Task 11:** Add a "Share..." option to the right-click context menu in the Sidebar (alongside existing Rename/Delete). This opens the ShareDialog for the clicked file/folder.
 
 - [ ] **Step 2: Verify and commit**
 
@@ -401,6 +433,7 @@ git add -A && git commit -m "feat: add Shared section to sidebar"
 
 **Files:**
 - Modify: `packages/client/src/components/Graph/GraphView.tsx`
+- Modify: `packages/client/src/components/Graph/GraphPanel.tsx`
 
 - [ ] **Step 1: Update graph rendering**
 
@@ -413,6 +446,8 @@ The graph API now returns nodes with `shared: boolean` flag. Update the draw fun
 Priority: active (green) > starred (yellow star) > shared (orange) > normal (purple)
 
 Update click handler: shared node IDs use `{ownerUserId}:{notePath}` format — parse this to navigate to the shared note route.
+
+Also update `GraphPanel.tsx` to pass the shared data through to GraphView if the graph API response includes shared flags per node.
 
 - [ ] **Step 2: Verify and commit**
 
