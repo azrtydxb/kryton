@@ -128,6 +128,11 @@ export function useNotes(userId?: string) {
     };
   }, []);
 
+  // Set content without auto-saving (for cancel/revert)
+  const setActiveNoteContent = useCallback((content: string) => {
+    setActiveNote(prev => prev ? { ...prev, content } : null);
+  }, []);
+
   return {
     tree,
     activeNote,
@@ -136,6 +141,7 @@ export function useNotes(userId?: string) {
     error,
     openNote,
     updateContent,
+    setActiveNoteContent,
     createNote,
     deleteNote,
     renameNote,

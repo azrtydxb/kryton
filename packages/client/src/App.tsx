@@ -40,6 +40,8 @@ function AppContent() {
   const themeCtx = useTheme();
   const notes = useNotes(user?.id);
   const [editing, setEditing] = useState(false);
+  const [editContent, setEditContent] = useState<string | null>(null); // buffered content during edit
+  const [originalContent, setOriginalContent] = useState<string | null>(null); // snapshot before edit
   const [showAdmin, setShowAdmin] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(256);
   const [rightPanelWidth, setRightPanelWidth] = useState(320);
@@ -121,6 +123,8 @@ function AppContent() {
       notes.openNote(path);
     }
     setEditing(false);
+    setEditContent(null);
+    setOriginalContent(null);
     setMobileMenuOpen(false);
   }, [notes]);
 
@@ -241,15 +245,40 @@ function AppContent() {
     }
   }, [notes.activeNote]);
 
+  const enterEditMode = useCallback(() => {
+    if (!notes.activeNote) return;
+    setOriginalContent(notes.activeNote.content);
+    setEditContent(notes.activeNote.content);
+    setEditing(true);
+  }, [notes.activeNote]);
+
+  const saveEdit = useCallback(async () => {
+    if (!notes.activeNote || editContent === null) return;
+    notes.updateContent(editContent);
+    setEditing(false);
+    setEditContent(null);
+    setOriginalContent(null);
+  }, [notes, editContent]);
+
+  const cancelEdit = useCallback(() => {
+    if (originalContent !== null && notes.activeNote) {
+      // Revert to original — don't save
+      notes.setActiveNoteContent(originalContent);
+    }
+    setEditing(false);
+    setEditContent(null);
+    setOriginalContent(null);
+  }, [originalContent, notes]);
+
   const shortcutActions = useMemo(() => ({
     toggleSidebar: () => setSidebarOpen(prev => !prev),
-    toggleEdit: () => { if (notes.activeNote) setEditing(prev => !prev); },
+    toggleEdit: () => { if (editing) cancelEdit(); else enterEditMode(); },
     openQuickSwitcher: () => setShowQuickSwitcher(true),
     focusSearch: () => searchInputRef.current?.focus(),
     createNote: handleNewNote,
     renameNote: handleRenameNote,
     toggleStar: toggleActiveNoteStar,
-  }), [handleNewNote, handleRenameNote, toggleActiveNoteStar, notes.activeNote]);
+  }), [handleNewNote, handleRenameNote, toggleActiveNoteStar, notes.activeNote, editing, cancelEdit, enterEditMode]);
 
   useKeyboardShortcuts(shortcutActions);
 
@@ -397,18 +426,18 @@ function AppContent() {
                     </span>
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => setEditing(false)}
-                        className="p-1 rounded text-violet-500 hover:text-violet-400 transition-colors"
-                        title="Done editing (Ctrl+E)"
+                        onClick={saveEdit}
+                        className="px-2 py-0.5 rounded text-xs font-medium bg-violet-500 text-white hover:bg-violet-600 transition-colors"
+                        title="Save changes"
                       >
-                        <X size={14} />
+                        Save
                       </button>
                       <button
-                        onClick={() => { setShareTarget({ path: notes.activeNote!.path, isFolder: false }); setShowShareDialog(true); }}
-                        className="p-1 rounded text-gray-400 hover:text-violet-500 transition-colors"
-                        title="Share note"
+                        onClick={cancelEdit}
+                        className="px-2 py-0.5 rounded text-xs font-medium text-gray-400 hover:text-gray-200 hover:bg-gray-700/50 transition-colors"
+                        title="Cancel editing (discard changes)"
                       >
-                        <Share2 size={14} />
+                        Cancel
                       </button>
                       <button
                         onClick={toggleActiveNoteStar}
@@ -428,19 +457,19 @@ function AppContent() {
                       >
                         <FileDown size={14} />
                       </button>
-                      {notes.saving && (
-                        <span className="text-xs text-gray-400">Saving...</span>
+                      {editContent !== originalContent && (
+                        <span className="text-xs text-yellow-500">Unsaved</span>
                       )}
-                      {!notes.saving && (
-                        <span className="text-xs text-green-500">Saved</span>
+                      {editContent === originalContent && (
+                        <span className="text-xs text-gray-500">No changes</span>
                       )}
                     </div>
                   </div>
                   <EditorToolbar viewRef={editorViewRef} />
                   <div className="flex-1 overflow-hidden">
                     <Editor
-                      content={notes.activeNote.content}
-                      onChange={notes.updateContent}
+                      content={editContent ?? notes.activeNote.content}
+                      onChange={setEditContent}
                       darkMode={themeCtx.resolvedTheme === 'dark'}
                       allNotes={notes.tree}
                       onCursorStateChange={setCursorState}
@@ -487,7 +516,7 @@ function AppContent() {
                   </div>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => setEditing(true)}
+                      onClick={enterEditMode}
                       className="p-1 rounded text-gray-400 hover:text-violet-500 transition-colors"
                       title="Edit note (Ctrl+E)"
                     >
