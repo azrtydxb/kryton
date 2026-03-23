@@ -6,6 +6,13 @@
 
 **Architecture:** Add userId columns to SearchIndex, GraphEdge, and Settings entities. Create a per-user directory helper. Update all route handlers to resolve user-specific paths. Move sample note creation from startup to user registration. No client changes needed — API shapes stay the same.
 
+**Critical implementation notes:**
+- The `search()` query builder has `.orWhere` for title/content matching. When adding userId filtering, use `Brackets` to group the OR conditions: `.where("s.userId = :userId", { userId }).andWhere(new Brackets(qb => { qb.where(...).orWhere(...) }))`. Without brackets, SQL precedence would leak other users' notes.
+- Settings entity uses UUID PK + `@Unique(["key", "userId"])` instead of compound PK — because PostgreSQL doesn't allow NULL in PKs and global settings have `userId IS NULL`.
+- All `noteService` functions (`writeNote`, `deleteNote`, `renameNote`) need `userId` added to their signatures since they call search/graph service functions internally.
+- Use TypeORM's `IsNull()` operator for querying `userId IS NULL` instead of `null as any`.
+- Tasks 3 and 4 (search/graph services) should be done together — they depend on each other through noteService.
+
 **Tech Stack:** TypeORM (entity changes), Express (route updates), Node.js fs (directory operations)
 
 **Spec:** `docs/superpowers/specs/2026-03-23-per-user-file-isolation-design.md`
@@ -98,61 +105,58 @@ git commit -m "feat: add userNotesDir helper with provisioning and cleanup"
 
 ---
 
-## Task 3: Update searchService and noteService for userId
+## Task 3: Update all services for userId (search, graph, note)
 
 **Files:**
 - Modify: `packages/server/src/services/searchService.ts`
+- Modify: `packages/server/src/services/graphService.ts`
 - Modify: `packages/server/src/services/noteService.ts`
+
+**Important:** These three services are interdependent — noteService calls searchService and graphService internally. Update all three in one task to avoid intermediate build failures.
 
 - [ ] **Step 1: Update searchService.ts**
 
-Read the file. Add `userId` parameter to all exported functions:
-- `indexNote(notePath, content, userId)` — set `entry.userId = userId` before save. The save key is now the compound (notePath, userId).
+Read the file. Add `userId` parameter to ALL exported functions:
+- `indexNote(notePath, content, userId)` — set `entry.userId = userId`. Save with compound key `{ notePath, userId }`.
 - `removeFromIndex(notePath, userId)` — delete where `{ notePath, userId }`
 - `renameInIndex(oldPath, newPath, userId)` — find by `{ notePath: oldPath, userId }`, update
-- `search(query, userId)` — add `.andWhere("s.userId = :userId", { userId })` to the query builder
+- `search(query, userId)` — **CRITICAL: use Brackets for SQL precedence safety:**
+```ts
+import { Brackets } from "typeorm";
+// ...
+const results = await repo.createQueryBuilder("s")
+  .where("s.userId = :userId", { userId })
+  .andWhere(new Brackets(qb => {
+    qb.where("s.title ILIKE :pattern", { pattern })
+      .orWhere("s.content ILIKE :pattern", { pattern });
+  }))
+  .orderBy("s.modifiedAt", "DESC")
+  .getMany();
+```
+Without Brackets, the OR would leak other users' notes due to SQL operator precedence.
 - `getAllTags(userId)` — filter `repo.find({ where: { userId } })`
 - `getNotesByTag(tag, userId)` — filter by userId
 - `extractTitle` — no change (doesn't touch DB)
 
-- [ ] **Step 2: Update noteService.ts**
+- [ ] **Step 2: Update graphService.ts**
 
-Read the file. The `indexAllNotes(notesDir)` function currently walks a global directory. Change to:
-- `indexUserNotes(userNotesDir, userId)` — walks the user's directory, calls `indexNote(path, content, userId)` for each .md file
+Read the file. Add `userId` parameter to ALL exported functions explicitly:
+- `updateGraphCache(notePath, content, allNotePaths, userId)` — set `userId` on new GraphEdge records, filter deletes by userId
+- `removeFromGraph(notePath, userId)` — filter by userId when deleting edges
+- `renameInGraph(oldPath, newPath, userId)` — filter by userId
+- `getBacklinks(notePath, userId)` — filter GraphEdge by userId. **Also update the SearchIndex lookup inside getBacklinks to include userId** (compound PK requires it): `searchRepo.findOneBy({ notePath: edge.fromPath, userId })`
+- `getFullGraph(userId)` — filter both SearchIndex and GraphEdge queries by userId
 
-Any other functions that call `indexNote` or `removeFromIndex` need the userId parameter added.
+- [ ] **Step 3: Update noteService.ts**
 
-- [ ] **Step 3: Verify build**
+Read the file. Add `userId` parameter to ALL functions that call search/graph services:
+- `writeNote(notesDir, notePath, content, userId)` — pass userId to `indexNote(...)` and `updateGraphCache(...)`
+- `deleteNote(notesDir, notePath, userId)` — pass userId to `removeFromIndex(...)` and `removeFromGraph(...)`
+- `renameNote(notesDir, oldPath, newPath, userId)` — pass userId to `renameInIndex(...)` and `renameInGraph(...)`
+- `indexAllNotes(notesDir)` → rename to `indexUserNotes(userNotesDir, userId)` — walks the user's directory, calls `indexNote(path, content, userId)` for each .md file
+- `readNote` — no userId needed (file-system only)
 
-```bash
-cd /Users/pascal/Development/mnemo
-npm run typecheck
-npm run build
-```
-
-- [ ] **Step 4: Commit**
-
-```bash
-git add -A
-git commit -m "feat: add userId to searchService and noteService"
-```
-
----
-
-## Task 4: Update graphService for userId
-
-**Files:**
-- Modify: `packages/server/src/services/graphService.ts`
-
-- [ ] **Step 1: Update graphService.ts**
-
-Read the file. Add `userId` parameter:
-- When creating GraphEdge records, set `userId`
-- When querying edges, filter by `userId`
-- `buildGraph(notesDir, userId)` or equivalent — scope to user
-- Any `getGraph()` function — add `WHERE userId = :userId`
-
-- [ ] **Step 2: Verify build**
+- [ ] **Step 4: Verify build**
 
 ```bash
 cd /Users/pascal/Development/mnemo
@@ -160,16 +164,18 @@ npm run typecheck
 npm run build
 ```
 
-- [ ] **Step 3: Commit**
+Note: Routes still call old signatures without userId — typecheck may show errors in route files. That's expected and will be fixed in Tasks 4-5.
+
+- [ ] **Step 5: Commit**
 
 ```bash
 git add -A
-git commit -m "feat: add userId to graphService"
+git commit -m "feat: add userId to searchService, graphService, and noteService"
 ```
 
 ---
 
-## Task 5: Update file-based routes (notes, folders, daily, templates, canvas)
+## Task 4: Update file-based routes (notes, folders, daily, templates, canvas)
 
 **Files:**
 - Modify: `packages/server/src/routes/notes.ts`
@@ -200,8 +206,9 @@ Same pattern — both `createFoldersRouter` and `createFoldersRenameRouter`. Res
 
 Resolve `userDir` for file operations. Update `getDailyTemplate()` to query Settings with userId, falling back to global (userId IS NULL):
 ```ts
+import { IsNull } from "typeorm";
 const userTemplate = await settingsRepo.findOneBy({ key: "dailyNoteTemplate", userId: req.user!.id });
-const globalTemplate = userTemplate || await settingsRepo.findOneBy({ key: "dailyNoteTemplate", userId: null as any });
+const globalTemplate = userTemplate || await settingsRepo.findOneBy({ key: "dailyNoteTemplate", userId: IsNull() });
 ```
 
 - [ ] **Step 4: Update templates.ts**
@@ -229,7 +236,7 @@ git commit -m "feat: resolve per-user notes dir in all file-based routes"
 
 ---
 
-## Task 6: Update DB-query routes (search, graph, settings, backlinks, tags)
+## Task 5: Update DB-query routes (search, graph, settings, backlinks, tags)
 
 **Files:**
 - Modify: `packages/server/src/routes/search.ts`
@@ -248,9 +255,17 @@ Pass `req.user!.id` to graph service functions.
 
 - [ ] **Step 3: Update settings.ts**
 
-- GET: query `WHERE userId = :userId OR userId IS NULL`, with user-specific values taking precedence for same key
-- PUT: upsert with `userId = req.user!.id` (keep the deny-list for admin-only keys)
-- The existing `@PrimaryColumn("text") key` is now just `@Column`, and the entity has a UUID PK. Update the find/save logic accordingly.
+- GET: query `WHERE userId = :userId OR userId IS NULL` (use TypeORM's `IsNull()` for null checks), with user-specific values taking precedence for same key
+- PUT: find by `{ key, userId: req.user!.id }`, create/update with userId. Keep the deny-list for admin-only keys.
+- Since Settings now has a UUID PK + unique constraint on `(key, userId)`, all `findOneBy({ key })` calls must include userId. Use `IsNull()` from TypeORM for global settings queries.
+
+- [ ] **Step 3b: Update admin.ts settings endpoints**
+
+The admin routes at `/admin/settings/registration` GET and PUT also query Settings. Update:
+- GET: `findOneBy({ key: "registration_mode", userId: IsNull() })`
+- PUT: find by `{ key: "registration_mode", userId: IsNull() }`, then update or create. Do NOT use `upsert(..., ["key"])` — the conflict target is now the unique constraint `(key, userId)`.
+
+Import `IsNull` from `typeorm`.
 
 - [ ] **Step 4: Update backlinks.ts**
 
@@ -277,7 +292,7 @@ git commit -m "feat: scope search, graph, settings, backlinks, tags by userId"
 
 ---
 
-## Task 7: Update auth routes for user provisioning
+## Task 6: Update auth routes for user provisioning
 
 **Files:**
 - Modify: `packages/server/src/routes/auth.ts`
@@ -287,7 +302,7 @@ git commit -m "feat: scope search, graph, settings, backlinks, tags by userId"
 
 After creating the user in POST `/register`, call `provisionUserNotes(NOTES_DIR, user.id)` to create the user's directory and sample notes. Import from `../services/userNotesDir`.
 
-The `NOTES_DIR` value needs to be available in auth.ts. Either pass it when creating the router (`createAuthRouter(notesDir)`) or read from env.
+The `NOTES_DIR` value needs to be available in auth.ts. Change `createAuthRouter()` to `createAuthRouter(notesDir: string)` and update the mount call in `index.ts` from `createAuthRouter()` to `createAuthRouter(NOTES_DIR)`.
 
 - [ ] **Step 2: Update OAuth callbacks in auth.ts**
 
@@ -314,7 +329,7 @@ git commit -m "feat: provision user notes on registration and OAuth signup"
 
 ---
 
-## Task 8: Update index.ts and admin routes
+## Task 7: Update index.ts and admin routes
 
 **Files:**
 - Modify: `packages/server/src/index.ts`
@@ -326,8 +341,10 @@ git commit -m "feat: provision user notes on registration and OAuth signup"
 2. Remove `createSampleNotes()` function and its call
 3. Remove global `indexAllNotes(NOTES_DIR)` call
 4. Add startup cleanup: call `cleanupOldNotes(NOTES_DIR)` to move old root-level files to backup
-5. Add startup: ensure `registration_mode = open` global setting exists (re-create if table was rebuilt)
-6. Update the inline `/api/files/{path}` route to resolve per-user directory:
+5. Add startup: delete orphaned DB rows — `DELETE FROM search_index WHERE userId IS NULL`, same for `graph_edge` and `settings WHERE userId IS NOT NULL AND userId NOT IN (SELECT id FROM user)`. Use TypeORM query runner or repository deletes.
+6. Add startup: ensure `registration_mode = open` global setting exists (re-create if table was rebuilt). Use `IsNull()` for the userId query.
+7. Update `createAuthRouter()` call to `createAuthRouter(NOTES_DIR)` (signature changed in Task 6)
+8. Update the inline `/api/files/{path}` route to resolve per-user directory:
 ```ts
 const userDir = await getUserNotesDir(NOTES_DIR, req.user!.id);
 const fullPath = path.resolve(path.join(userDir, filePath));
@@ -361,7 +378,7 @@ git commit -m "feat: remove global note creation, add startup cleanup, update ad
 
 ---
 
-## Task 9: Final verification and push
+## Task 8: Final verification and push
 
 - [ ] **Step 1: Full build check**
 
