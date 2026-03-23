@@ -24,6 +24,7 @@ interface EditorProps {
   allNotes: FileNode[];
   onCursorStateChange?: (state: EditorCursorState) => void;
   viewRef?: React.MutableRefObject<EditorView | undefined>;
+  vimEnabled?: boolean;
 }
 
 function collectNotePaths(nodes: FileNode[]): string[] {
@@ -59,7 +60,7 @@ function getVimMode(view: EditorView): string {
   return '-- NORMAL --';
 }
 
-export function Editor({ content, onChange, darkMode, allNotes, onCursorStateChange, viewRef: externalViewRef }: EditorProps) {
+export function Editor({ content, onChange, darkMode, allNotes, onCursorStateChange, viewRef: externalViewRef, vimEnabled = true }: EditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView>(undefined);
   const onChangeRef = useRef(onChange);
@@ -119,7 +120,7 @@ export function Editor({ content, onChange, darkMode, allNotes, onCursorStateCha
     const state = EditorState.create({
       doc: content,
       extensions: [
-        vim(),
+        ...(vimEnabled ? [vim()] : []),
         ...themeExtensions,
         markdown({ base: markdownLanguage }),
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
@@ -154,10 +155,12 @@ export function Editor({ content, onChange, darkMode, allNotes, onCursorStateCha
     viewRef.current = view;
     if (externalViewRef) externalViewRef.current = view;
 
-    // Start in insert mode so beginners can type immediately
-    const cm = getCM(view) as { processKey?: (key: string) => void };
-    if (cm?.processKey) {
-      cm.processKey('i');
+    // Start in insert mode so beginners can type immediately (only when vim enabled)
+    if (vimEnabled) {
+      const cm = getCM(view) as { processKey?: (key: string) => void };
+      if (cm?.processKey) {
+        cm.processKey('i');
+      }
     }
 
     // Fire initial cursor state
@@ -165,7 +168,7 @@ export function Editor({ content, onChange, darkMode, allNotes, onCursorStateCha
       onCursorStateChangeRef.current({
         line: 1,
         col: 1,
-        vimMode: '-- INSERT --',
+        vimMode: vimEnabled ? '-- INSERT --' : '',
         wordCount: countWords(content),
       });
     }
@@ -175,7 +178,7 @@ export function Editor({ content, onChange, darkMode, allNotes, onCursorStateCha
     };
     // Only re-create editor when darkMode changes, not on every content change
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [darkMode, wikiLinkCompletion]);
+  }, [darkMode, wikiLinkCompletion, vimEnabled]);
 
   // Sync content from parent when it changes externally (e.g., switching notes)
   useEffect(() => {

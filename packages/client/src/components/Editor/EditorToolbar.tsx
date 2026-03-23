@@ -11,6 +11,8 @@ import {
 
 interface EditorToolbarProps {
   viewRef: React.MutableRefObject<EditorView | undefined>;
+  vimEnabled: boolean;
+  onVimToggle: (enabled: boolean) => void;
 }
 
 function ToolbarButton({ icon: Icon, title, onClick }: { icon: React.ComponentType<{ size?: number }>; title: string; onClick: () => void }) {
@@ -29,7 +31,7 @@ function ToolbarSep() {
   return <div className="w-px h-4 bg-gray-700/50 mx-0.5" />;
 }
 
-export function EditorToolbar({ viewRef }: EditorToolbarProps) {
+export function EditorToolbar({ viewRef, vimEnabled, onVimToggle }: EditorToolbarProps) {
   const wrapSelection = useCallback((before: string, after: string) => {
     const view = viewRef.current;
     if (!view) return;
@@ -144,6 +146,18 @@ export function EditorToolbar({ viewRef }: EditorToolbarProps) {
       <ToolbarButton icon={Quote} title="Blockquote" onClick={() => insertAtLineStart('> ')} />
       <ToolbarButton icon={Minus} title="Horizontal rule" onClick={() => insertText('\n---\n')} />
       <ToolbarButton icon={Table} title="Table" onClick={insertTable} />
+      <div className="flex-1" />
+      <button
+        onClick={() => onVimToggle(!vimEnabled)}
+        className={`px-2 py-0.5 rounded text-xs font-mono transition-colors ${
+          vimEnabled
+            ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+            : 'bg-gray-700/30 text-gray-500 hover:bg-gray-700/50'
+        }`}
+        title={vimEnabled ? 'Vim mode enabled — click to disable' : 'Vim mode disabled — click to enable'}
+      >
+        VIM
+      </button>
     </div>
   );
 }

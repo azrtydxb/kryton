@@ -40,8 +40,9 @@ function AppContent() {
   const themeCtx = useTheme();
   const notes = useNotes(user?.id);
   const [editing, setEditing] = useState(false);
-  const [editContent, setEditContent] = useState<string | null>(null); // buffered content during edit
-  const [originalContent, setOriginalContent] = useState<string | null>(null); // snapshot before edit
+  const [editContent, setEditContent] = useState<string | null>(null);
+  const [originalContent, setOriginalContent] = useState<string | null>(null);
+  const [vimEnabled, setVimEnabled] = useState(true);
   const [showAdmin, setShowAdmin] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(256);
   const [rightPanelWidth, setRightPanelWidth] = useState(320);
@@ -77,6 +78,9 @@ function AppContent() {
           // ignore invalid JSON
         }
       }
+      if (settings.vimEnabled !== undefined) {
+        setVimEnabled(settings.vimEnabled === 'true');
+      }
     }).catch(() => {});
   }, [user]);
 
@@ -107,6 +111,11 @@ function AppContent() {
       api.updateSetting('starred', JSON.stringify(arr)).catch(() => {});
       return next;
     });
+  }, []);
+
+  const handleVimToggle = useCallback((enabled: boolean) => {
+    setVimEnabled(enabled);
+    api.updateSetting('vimEnabled', String(enabled)).catch(() => {});
   }, []);
 
   const toggleActiveNoteStar = useCallback(() => {
@@ -465,7 +474,7 @@ function AppContent() {
                       )}
                     </div>
                   </div>
-                  <EditorToolbar viewRef={editorViewRef} />
+                  <EditorToolbar viewRef={editorViewRef} vimEnabled={vimEnabled} onVimToggle={handleVimToggle} />
                   <div className="flex-1 overflow-hidden">
                     <Editor
                       content={editContent ?? notes.activeNote.content}
@@ -474,6 +483,7 @@ function AppContent() {
                       allNotes={notes.tree}
                       onCursorStateChange={setCursorState}
                       viewRef={editorViewRef}
+                      vimEnabled={vimEnabled}
                     />
                   </div>
                   <OutgoingLinksPanel
