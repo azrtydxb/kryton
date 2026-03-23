@@ -1,7 +1,7 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
-import { useCallback, useEffect, useState, useMemo } from 'react';
+import { useCallback, useEffect, useState, useMemo, useRef } from 'react';
 import { api, FileNode } from '../../lib/api';
 
 interface PreviewProps {
@@ -297,11 +297,33 @@ export function Preview({ content, onLinkClick, allNotes, onCreateNote }: Previe
     }
   }, [onLinkClick, onCreateNote]);
 
+  // Heading counter for generating sequential IDs (resets each render)
+  const headingCounterRef = useRef(0);
+  headingCounterRef.current = 0;
+
+  const headingComponents = useMemo(() => {
+    const makeHeading = (Tag: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6') => {
+      return ({ children, ...props }: React.HTMLAttributes<HTMLHeadingElement>) => {
+        headingCounterRef.current++;
+        return <Tag id={`heading-${headingCounterRef.current}`} {...props}>{children}</Tag>;
+      };
+    };
+    return {
+      h1: makeHeading('h1'),
+      h2: makeHeading('h2'),
+      h3: makeHeading('h3'),
+      h4: makeHeading('h4'),
+      h5: makeHeading('h5'),
+      h6: makeHeading('h6'),
+    };
+  }, []);
+
   return (
     <div className="markdown-preview p-6 max-w-3xl mx-auto" onClick={handleClick}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeRaw]}
+        components={headingComponents}
       >
         {transformedContent}
       </ReactMarkdown>
