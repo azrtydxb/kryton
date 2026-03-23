@@ -397,12 +397,13 @@ export default function App() {
                   />
                 </div>
                 <div className="w-1/2 flex flex-col overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-2 border-b bg-gray-50/50 dark:bg-surface-900/50">
+                  <div className="flex items-center justify-between px-4 py-2 bg-gray-50/50 dark:bg-surface-900/50">
                     <div className="flex items-center">
                       <BookOpen size={14} className="text-gray-400 mr-2" />
                       <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Preview</span>
                     </div>
                   </div>
+                  <div className="h-[33px] flex-shrink-0 border-b border-gray-700/50" />
                   <div className="flex-1 overflow-y-auto" ref={previewRef}>
                     <Preview
                       content={notes.activeNote.content}
