@@ -7,6 +7,7 @@ import { api, GraphData } from './lib/api';
 import { exportNoteToPdf } from './lib/exportPdf';
 import { Sidebar } from './components/Sidebar/Sidebar';
 import { Editor, EditorCursorState } from './components/Editor/Editor';
+import { EditorToolbar } from './components/Editor/EditorToolbar';
 import { Preview } from './components/Preview/Preview';
 import { SearchBar } from './components/Search/SearchBar';
 import { GraphPanel } from './components/Graph/GraphPanel';
@@ -373,6 +374,7 @@ export default function App() {
                       )}
                     </div>
                   </div>
+                  <EditorToolbar viewRef={editorViewRef} />
                   <div className="flex-1 overflow-hidden">
                     <Editor
                       content={notes.activeNote.content}
