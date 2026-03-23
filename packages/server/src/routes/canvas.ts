@@ -43,7 +43,7 @@ export function createCanvasRouter(notesDir: string): Router {
   // GET /api/canvas/:name — Get a canvas file content (JSON)
   router.get("/:name", async (req: Request, res: Response) => {
     try {
-      const name = req.params.name;
+      const name = req.params.name as string;
       if (!name) {
         res.status(400).json({ error: "Name is required" });
         return;
@@ -111,7 +111,7 @@ export function createCanvasRouter(notesDir: string): Router {
   // PUT /api/canvas/:name — Update a canvas file
   router.put("/:name", async (req: Request, res: Response) => {
     try {
-      const name = req.params.name;
+      const name = req.params.name as string;
       if (!name) {
         res.status(400).json({ error: "Name is required" });
         return;
@@ -142,7 +142,7 @@ export function createCanvasRouter(notesDir: string): Router {
   // DELETE /api/canvas/:name — Delete a canvas file
   router.delete("/:name", async (req: Request, res: Response) => {
     try {
-      const name = req.params.name;
+      const name = req.params.name as string;
       if (!name) {
         res.status(400).json({ error: "Name is required" });
         return;

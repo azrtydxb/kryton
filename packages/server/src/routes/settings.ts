@@ -27,7 +27,7 @@ export function createSettingsRouter(): Router {
   // PUT /api/settings/:key — Update a setting
   router.put("/:key", async (req: Request, res: Response) => {
     try {
-      const { key } = req.params;
+      const key = req.params.key as string;
       const { value } = req.body as { value?: string };
 
       if (value === undefined) {

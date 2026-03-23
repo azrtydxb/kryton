@@ -18,7 +18,7 @@ export function createTagsRouter(): Router {
   // GET /api/tags/:tag/notes — Get notes with a specific tag
   router.get("/:tag/notes", async (req: Request, res: Response) => {
     try {
-      const { tag } = req.params;
+      const tag = req.params.tag as string;
       const notes = await getNotesByTag(tag);
       res.json(notes);
     } catch (err) {
