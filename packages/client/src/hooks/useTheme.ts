@@ -9,51 +9,45 @@ function getSystemTheme(): 'light' | 'dark' {
 
 function applyTheme(theme: Theme) {
   if (typeof document === 'undefined') return;
-  
+
   const resolved = theme === 'system' ? getSystemTheme() : theme;
   const root = document.documentElement;
-  
+
+  // Explicitly add or remove — never rely on toggle()
   if (resolved === 'dark') {
     root.classList.add('dark');
   } else {
     root.classList.remove('dark');
   }
-  
-  // Also update color-scheme for native elements
-  document.body.style.colorScheme = resolved;
-  
-  console.log('Theme applied:', theme, '→ resolved:', resolved, 'classes:', root.className);
+
+  // Sync data attribute for any non-Tailwind consumers
+  root.dataset.theme = resolved;
 }
 
 export function useTheme() {
   const [theme, setThemeState] = useState<Theme>(() => {
     if (typeof window === 'undefined') return 'system';
     const saved = localStorage.getItem('mnemo-theme') as Theme | null;
-    const initial = saved || 'system';
-    console.log('Initial theme from storage:', saved, '→ using:', initial);
-    return initial;
+    return saved || 'system';
   });
 
   const setTheme = useCallback((newTheme: Theme) => {
-    console.log('setTheme called with:', newTheme);
     setThemeState(newTheme);
     localStorage.setItem('mnemo-theme', newTheme);
+    // Apply immediately — don't wait for the effect
     applyTheme(newTheme);
   }, []);
 
-  // Apply theme on mount and when it changes
+  // Apply theme on mount and when state changes
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
 
-  // Listen for system theme changes
+  // Listen for system theme changes when in "system" mode
   useEffect(() => {
+    if (theme !== 'system') return;
     const mql = window.matchMedia('(prefers-color-scheme: dark)');
-    const handler = () => {
-      if (theme === 'system') {
-        applyTheme('system');
-      }
-    };
+    const handler = () => applyTheme('system');
     mql.addEventListener('change', handler);
     return () => mql.removeEventListener('change', handler);
   }, [theme]);
