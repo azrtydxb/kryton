@@ -62,6 +62,9 @@ export function GraphView({ graphData, loading, activeNotePath, mode, onNoteSele
 
     const isDark = document.documentElement.classList.contains('dark');
 
+    let currentWidth = 0;
+    let currentHeight = 0;
+
     const resize = () => {
       const rect = canvas.parentElement?.getBoundingClientRect();
       if (rect) {
@@ -70,6 +73,8 @@ export function GraphView({ graphData, loading, activeNotePath, mode, onNoteSele
         canvas.style.width = `${rect.width}px`;
         canvas.style.height = `${rect.height}px`;
         ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        currentWidth = rect.width;
+        currentHeight = rect.height;
       }
     };
     resize();
@@ -87,20 +92,17 @@ export function GraphView({ graphData, loading, activeNotePath, mode, onNoteSele
     nodesRef.current = nodes;
     linksRef.current = links;
 
-    const width = canvas.width / window.devicePixelRatio;
-    const height = canvas.height / window.devicePixelRatio;
-
     // Pin active node at center so others orbit around it
     const activeNode = activeNotePath ? nodes.find(n => n.path === activeNotePath) : null;
     if (activeNode) {
-      activeNode.fx = width / 2;
-      activeNode.fy = height / 2;
+      activeNode.fx = currentWidth / 2;
+      activeNode.fy = currentHeight / 2;
     }
 
     const simulation = d3.forceSimulation(nodes)
-      .force('link', d3.forceLink<SimNode, SimLink>(links).id(d => d.id).distance(120))
-      .force('charge', d3.forceManyBody().strength(-300))
-      .force('center', d3.forceCenter(width / 2, height / 2))
+      .force('link', d3.forceLink<SimNode, SimLink>(links).id(d => d.id).distance(100))
+      .force('charge', d3.forceManyBody().strength(-200))
+      .force('center', d3.forceCenter(currentWidth / 2, currentHeight / 2))
       .force('collision', d3.forceCollide().radius(30));
 
     simulationRef.current = simulation;
@@ -251,7 +253,13 @@ export function GraphView({ graphData, loading, activeNotePath, mode, onNoteSele
 
     const resizeObserver = new ResizeObserver(() => {
       resize();
-      draw();
+      // Re-center active node and simulation after resize
+      if (activeNode) {
+        activeNode.fx = currentWidth / 2;
+        activeNode.fy = currentHeight / 2;
+      }
+      simulation.force('center', d3.forceCenter(currentWidth / 2, currentHeight / 2));
+      simulation.alpha(0.3).restart();
     });
     if (canvas.parentElement) resizeObserver.observe(canvas.parentElement);
 
@@ -267,7 +275,7 @@ export function GraphView({ graphData, loading, activeNotePath, mode, onNoteSele
   }, [graphData, mode, activeNotePath, handleNodeClick]);
 
   return (
-    <div className="flex-1 relative">
+    <div className="flex-1 relative overflow-hidden">
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center">
           <Loader2 size={20} className="animate-spin text-violet-500" />
