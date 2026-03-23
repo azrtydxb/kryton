@@ -17,10 +17,12 @@ export interface SearchResult {
   title: string;
   snippet: string;
   tags: string[];
+  isShared?: boolean;
+  ownerUserId?: string;
 }
 
 export interface GraphData {
-  nodes: { id: string; title: string; path: string }[];
+  nodes: { id: string; title: string; path: string; shared?: boolean; ownerUserId?: string }[];
   edges: { fromNoteId: string; toNoteId: string }[];
 }
 
@@ -183,4 +185,35 @@ export const authApi = {
       headers: { 'X-Requested-With': 'XMLHttpRequest' },
     }),
   me: () => request<AuthUser>('/auth/me'),
+};
+
+export const shareApi = {
+  create: (data: { path: string; isFolder: boolean; sharedWithUserId: string; permission: string }) =>
+    request<any>('/shares', { method: 'POST', body: JSON.stringify(data) }),
+  list: () => request<any[]>('/shares'),
+  withMe: () => request<any>('/shares/with-me'),
+  update: (id: string, permission: string) =>
+    request<any>(`/shares/${id}`, { method: 'PUT', body: JSON.stringify({ permission }) }),
+  revoke: (id: string) =>
+    request<any>(`/shares/${id}`, { method: 'DELETE' }),
+  searchUser: (email: string) =>
+    request<{ id: string; name: string; email: string }>(`/users/search?email=${encodeURIComponent(email)}`),
+};
+
+export const accessRequestApi = {
+  create: (ownerUserId: string, notePath: string) =>
+    request<any>('/access-requests', { method: 'POST', body: JSON.stringify({ ownerUserId, notePath }) }),
+  list: () => request<any[]>('/access-requests'),
+  mine: () => request<any[]>('/access-requests/mine'),
+  respond: (id: string, action: string, permission?: string) =>
+    request<any>(`/access-requests/${id}`, { method: 'PUT', body: JSON.stringify({ action, permission }) }),
+};
+
+export const sharedNoteApi = {
+  read: (ownerUserId: string, notePath: string) =>
+    request<{ path: string; content: string; title: string }>(`/notes/shared/${ownerUserId}/${encodeURIComponent(notePath)}`),
+  write: (ownerUserId: string, notePath: string, content: string) =>
+    request<any>(`/notes/shared/${ownerUserId}/${encodeURIComponent(notePath)}`, {
+      method: 'PUT', body: JSON.stringify({ content }),
+    }),
 };
