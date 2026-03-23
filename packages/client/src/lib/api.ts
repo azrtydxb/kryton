@@ -65,6 +65,37 @@ export interface CanvasData {
   }>;
 }
 
+export interface NoteShareData {
+  id: string;
+  ownerUserId: string;
+  path: string;
+  isFolder: boolean;
+  sharedWithUserId: string;
+  permission: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SharedWithMeData {
+  id: string;
+  ownerUserId: string;
+  ownerName: string;
+  path: string;
+  isFolder: boolean;
+  permission: string;
+}
+
+export interface AccessRequestData {
+  id: string;
+  requesterUserId: string;
+  ownerUserId: string;
+  notePath: string;
+  status: string;
+  createdAt: string;
+  requesterName?: string;
+  requesterEmail?: string;
+}
+
 const BASE = '/api';
 
 let _accessToken: string | null = null;
@@ -189,31 +220,31 @@ export const authApi = {
 
 export const shareApi = {
   create: (data: { path: string; isFolder: boolean; sharedWithUserId: string; permission: string }) =>
-    request<any>('/shares', { method: 'POST', body: JSON.stringify(data) }),
-  list: () => request<any[]>('/shares'),
-  withMe: () => request<any>('/shares/with-me'),
+    request<NoteShareData>('/shares', { method: 'POST', body: JSON.stringify(data) }),
+  list: () => request<NoteShareData[]>('/shares'),
+  withMe: () => request<SharedWithMeData[]>('/shares/with-me'),
   update: (id: string, permission: string) =>
-    request<any>(`/shares/${id}`, { method: 'PUT', body: JSON.stringify({ permission }) }),
+    request<NoteShareData>(`/shares/${id}`, { method: 'PUT', body: JSON.stringify({ permission }) }),
   revoke: (id: string) =>
-    request<any>(`/shares/${id}`, { method: 'DELETE' }),
+    request<void>(`/shares/${id}`, { method: 'DELETE' }),
   searchUser: (email: string) =>
     request<{ id: string; name: string; email: string }>(`/users/search?email=${encodeURIComponent(email)}`),
 };
 
 export const accessRequestApi = {
   create: (ownerUserId: string, notePath: string) =>
-    request<any>('/access-requests', { method: 'POST', body: JSON.stringify({ ownerUserId, notePath }) }),
-  list: () => request<any[]>('/access-requests'),
-  mine: () => request<any[]>('/access-requests/mine'),
+    request<AccessRequestData>('/access-requests', { method: 'POST', body: JSON.stringify({ ownerUserId, notePath }) }),
+  list: () => request<AccessRequestData[]>('/access-requests'),
+  mine: () => request<AccessRequestData[]>('/access-requests/mine'),
   respond: (id: string, action: string, permission?: string) =>
-    request<any>(`/access-requests/${id}`, { method: 'PUT', body: JSON.stringify({ action, permission }) }),
+    request<void>(`/access-requests/${id}`, { method: 'PUT', body: JSON.stringify({ action, permission }) }),
 };
 
 export const sharedNoteApi = {
   read: (ownerUserId: string, notePath: string) =>
     request<{ path: string; content: string; title: string }>(`/notes/shared/${ownerUserId}/${encodeURIComponent(notePath)}`),
   write: (ownerUserId: string, notePath: string, content: string) =>
-    request<any>(`/notes/shared/${ownerUserId}/${encodeURIComponent(notePath)}`, {
+    request<void>(`/notes/shared/${ownerUserId}/${encodeURIComponent(notePath)}`, {
       method: 'PUT', body: JSON.stringify({ content }),
     }),
 };

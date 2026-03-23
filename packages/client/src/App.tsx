@@ -81,7 +81,7 @@ function AppContent() {
 
   // Fetch shared notes on mount
   useEffect(() => {
-    shareApi.withMe().then(data => setSharedNotes(data.shares || data || [])).catch(() => {});
+    shareApi.withMe().then(data => setSharedNotes(data || [])).catch(() => {});
   }, []);
 
   // Fetch graph data whenever the note tree changes

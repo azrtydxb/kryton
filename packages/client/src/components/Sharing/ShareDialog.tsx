@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Search, UserPlus, Trash2, Share2, ChevronDown } from 'lucide-react';
-import { shareApi } from '../../lib/api';
+import { shareApi, NoteShareData } from '../../lib/api';
 
 interface ShareDialogProps {
   notePath: string;
@@ -15,14 +15,9 @@ interface FoundUser {
   email: string;
 }
 
-interface ShareRecord {
-  id: string;
-  path: string;
-  isFolder: boolean;
-  sharedWithUserId: string;
+interface ShareRecord extends NoteShareData {
   sharedWithEmail?: string;
   sharedWithName?: string;
-  permission: string;
 }
 
 type Permission = 'read' | 'readwrite';
@@ -117,8 +112,9 @@ export function ShareDialog({ notePath, isFolder: isFolderProp, onClose }: Share
       setFoundUser(null);
       setEmailQuery('');
       await fetchShares();
-    } catch (err: any) {
-      setShareError(err?.message || 'Failed to share');
+    } catch (err: unknown) {
+      const error = err as Error;
+      setShareError(error?.message || 'Failed to share');
     } finally {
       setSharing(false);
     }
