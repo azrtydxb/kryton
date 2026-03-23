@@ -22,9 +22,9 @@ export function createNotesRouter(notesDir: string): Router {
   });
 
   // GET /api/notes/:path(*) — Get note content (path is wildcard to support slashes)
-  router.get("/:path(.*)", async (req: Request, res: Response) => {
+  router.get("/{*path}", async (req: Request, res: Response) => {
     try {
-      const notePath = decodeURIComponent(req.params.path as string);
+      const notePath = decodeURIComponent(Array.isArray(req.params.path) ? req.params.path.join("/") : req.params.path as string);
       if (!notePath) {
         res.status(400).json({ error: "Path is required" });
         return;
@@ -81,9 +81,9 @@ export function createNotesRouter(notesDir: string): Router {
   });
 
   // PUT /api/notes/:path(*) — Update a note
-  router.put("/:path(.*)", async (req: Request, res: Response) => {
+  router.put("/{*path}", async (req: Request, res: Response) => {
     try {
-      const notePath = decodeURIComponent(req.params.path as string);
+      const notePath = decodeURIComponent(Array.isArray(req.params.path) ? req.params.path.join("/") : req.params.path as string);
       if (!notePath) {
         res.status(400).json({ error: "Path is required" });
         return;
@@ -110,9 +110,9 @@ export function createNotesRouter(notesDir: string): Router {
   });
 
   // DELETE /api/notes/:path(*) — Delete a note
-  router.delete("/:path(.*)", async (req: Request, res: Response) => {
+  router.delete("/{*path}", async (req: Request, res: Response) => {
     try {
-      const notePath = decodeURIComponent(req.params.path as string);
+      const notePath = decodeURIComponent(Array.isArray(req.params.path) ? req.params.path.join("/") : req.params.path as string);
       if (!notePath) {
         res.status(400).json({ error: "Path is required" });
         return;
@@ -150,9 +150,9 @@ export function createNotesRenameRouter(notesDir: string): Router {
   const router = Router();
 
   // POST /api/notes-rename/:path(*) — Rename a note
-  router.post("/:path(.*)", async (req: Request, res: Response) => {
+  router.post("/{*path}", async (req: Request, res: Response) => {
     try {
-      const oldPath = decodeURIComponent(req.params.path as string);
+      const oldPath = decodeURIComponent(Array.isArray(req.params.path) ? req.params.path.join("/") : req.params.path as string);
       if (!oldPath) {
         res.status(400).json({ error: "Path is required" });
         return;
