@@ -103,7 +103,7 @@ jobs:
     needs: docker
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-    environment:
+    env:
       GHCR_USER: piwi3910
       GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
@@ -113,7 +113,7 @@ jobs:
           host: ${{ secrets.TRUENAS_HOST }}
           username: ${{ secrets.TRUENAS_USER }}
           password: ${{ secrets.TRUENAS_PASSWORD }}
-          envs: GHCR_USER, GHCR_TOKEN
+          envs: GHCR_USER,GHCR_TOKEN
           script: |
             echo $GHCR_TOKEN | docker login ghcr.io -u $GHCR_USER --password-stdin
             cd /mnt/Pool0/Docker/mnemo
