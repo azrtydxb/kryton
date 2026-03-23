@@ -1,0 +1,201 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --sidebar-width: 260px;
+    color-scheme: light;
+  }
+  .dark {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-white text-gray-900 dark:bg-surface-950 dark:text-gray-100;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  * {
+    @apply border-gray-200 dark:border-gray-700/50;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    @apply w-1.5;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 dark:bg-gray-700 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-400 dark:bg-gray-600;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors duration-150;
+  }
+  .btn-primary {
+    @apply btn bg-blue-500 text-white hover:bg-blue-600 active:bg-blue-700;
+  }
+  .btn-ghost {
+    @apply btn text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800;
+  }
+  .btn-danger {
+    @apply btn text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20;
+  }
+}
+
+/* CodeMirror overrides for seamless look */
+.cm-editor {
+  height: 100% !important;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace !important;
+  font-size: 14px !important;
+}
+
+.cm-editor .cm-scroller {
+  padding: 16px 0 !important;
+}
+
+.cm-editor .cm-content {
+  padding: 0 20px !important;
+}
+
+.cm-editor .cm-gutters {
+  @apply bg-transparent border-r-0 !important;
+  min-width: 40px;
+}
+
+.cm-editor .cm-activeLineGutter,
+.cm-editor .cm-activeLine {
+  @apply bg-blue-500/5 !important;
+}
+
+.cm-editor.cm-focused {
+  outline: none !important;
+}
+
+/* Light theme CodeMirror */
+.cm-editor .cm-gutters {
+  color: #9ca3af;
+}
+
+/* Dark theme CodeMirror */
+.dark .cm-editor {
+  background-color: #0d1117 !important;
+}
+
+.dark .cm-editor .cm-gutters {
+  background-color: #0d1117 !important;
+  color: #4b5563;
+}
+
+/* Markdown preview styling */
+.markdown-preview {
+  @apply text-base leading-relaxed;
+}
+
+.markdown-preview h1 {
+  @apply text-3xl font-bold mt-8 mb-4 pb-2 border-b first:mt-0;
+}
+
+.markdown-preview h2 {
+  @apply text-2xl font-semibold mt-6 mb-3;
+}
+
+.markdown-preview h3 {
+  @apply text-xl font-semibold mt-5 mb-2;
+}
+
+.markdown-preview p {
+  @apply mb-4;
+}
+
+.markdown-preview ul,
+.markdown-preview ol {
+  @apply mb-4 pl-6;
+}
+
+.markdown-preview ul {
+  @apply list-disc;
+}
+
+.markdown-preview ol {
+  @apply list-decimal;
+}
+
+.markdown-preview li {
+  @apply mb-1;
+}
+
+.markdown-preview code {
+  @apply bg-gray-100 dark:bg-gray-800 rounded px-1.5 py-0.5 text-sm font-mono text-pink-600 dark:text-pink-400;
+}
+
+.markdown-preview pre {
+  @apply bg-gray-100 dark:bg-gray-800/80 rounded-lg p-4 mb-4 overflow-x-auto;
+}
+
+.markdown-preview pre code {
+  @apply bg-transparent p-0 text-gray-800 dark:text-gray-200;
+}
+
+.markdown-preview blockquote {
+  @apply border-l-4 border-blue-500 pl-4 italic text-gray-600 dark:text-gray-400 my-4;
+}
+
+.markdown-preview a {
+  @apply text-blue-500 dark:text-blue-400 hover:underline;
+}
+
+.markdown-preview strong {
+  @apply font-semibold;
+}
+
+.markdown-preview hr {
+  @apply my-6 border-gray-200 dark:border-gray-700;
+}
+
+.markdown-preview table {
+  @apply w-full mb-4 border-collapse;
+}
+
+.markdown-preview th,
+.markdown-preview td {
+  @apply border px-3 py-2 text-left;
+}
+
+.markdown-preview th {
+  @apply bg-gray-50 dark:bg-gray-800 font-semibold;
+}
+
+.markdown-preview img {
+  @apply max-w-full rounded-lg;
+}
+
+/* Checkbox styling in markdown */
+.markdown-preview input[type="checkbox"] {
+  @apply mr-2 rounded;
+}
+
+/* Wiki link styling in preview */
+.wiki-link {
+  @apply text-blue-500 dark:text-blue-400 hover:underline cursor-pointer font-medium;
+}
+
+/* Autocomplete dropdown */
+.cm-tooltip-autocomplete {
+  @apply bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-hidden !important;
+}
+
+.cm-tooltip-autocomplete ul li {
+  @apply px-3 py-1.5 text-sm !important;
+}
+
+.cm-tooltip-autocomplete ul li[aria-selected="true"] {
+  @apply bg-blue-500 text-white !important;
+}
