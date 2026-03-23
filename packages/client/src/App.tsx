@@ -222,7 +222,7 @@ export default function App() {
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-white dark:bg-surface-950">
       {/* Header */}
-      <header className="h-14 flex-shrink-0 flex items-center justify-between px-3 border-b bg-gray-50 dark:bg-surface-900">
+      <header className="h-14 flex-shrink-0 flex items-center justify-between px-3 border-b border-gray-700/50 bg-surface-900 text-gray-100 [&_.btn-ghost]:text-gray-400 [&_.btn-ghost:hover]:bg-gray-800">
         <div className="flex items-center gap-1">
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}

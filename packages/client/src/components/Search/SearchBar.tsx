@@ -124,7 +124,7 @@ export function SearchBar({ onSelect, inputRef: externalRef }: SearchBarProps) {
           onFocus={() => { if (results.length > 0) setOpen(true); }}
           onKeyDown={handleKeyDown}
           placeholder="Search notes... (Ctrl+K)"
-          className="w-full bg-gray-100 dark:bg-surface-800 border-0 rounded-md pl-8 pr-8 py-1.5 text-sm placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 transition-shadow"
+          className="w-full bg-surface-800 border-0 rounded-md pl-8 pr-8 py-1.5 text-sm text-gray-100 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 transition-shadow"
         />
         {query && (
           <button
