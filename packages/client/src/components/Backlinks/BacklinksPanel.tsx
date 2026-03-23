@@ -9,7 +9,7 @@ interface BacklinksPanelProps {
 
 export function BacklinksPanel({ notePath, onNoteSelect }: BacklinksPanelProps) {
   const [backlinks, setBacklinks] = useState<BacklinkData[]>([]);
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const fetchBacklinks = useCallback(async () => {

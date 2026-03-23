@@ -50,7 +50,7 @@ function extractLinks(content: string): string[] {
 }
 
 export function OutgoingLinksPanel({ content, allNotes, onNoteSelect, onCreateNote }: OutgoingLinksPanelProps) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
 
   const notePathMap = useMemo(() => collectNotePaths(allNotes), [allNotes]);
 
