@@ -52,7 +52,7 @@ export function createSearchRouter(): Router {
         return;
       }
 
-      const results = await search(query.trim());
+      const results = await search(query.trim(), req.user!.id);
       res.json(results);
     } catch (err) {
       console.error("Error searching notes:", err);

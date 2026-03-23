@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { IsNull } from "typeorm";
 import { AppDataSource } from "../data-source";
 import { Settings } from "../entities/Settings";
 
@@ -76,14 +77,18 @@ export function createSettingsRouter(): Router {
   const router = Router();
 
   // GET /api/settings — Get all settings
-  router.get("/", async (_req: Request, res: Response) => {
+  router.get("/", async (req: Request, res: Response) => {
     try {
       const repo = AppDataSource.getRepository(Settings);
-      const settings = await repo.find();
+      const userSettings = await repo.find({ where: { userId: req.user!.id } });
+      const globalSettings = await repo.find({ where: { userId: IsNull() } });
 
-      // Return as key-value object
+      // Merge: user settings override global for same key
       const result: Record<string, string> = {};
-      for (const setting of settings) {
+      for (const setting of globalSettings) {
+        result[setting.key] = setting.value;
+      }
+      for (const setting of userSettings) {
         result[setting.key] = setting.value;
       }
 
@@ -113,8 +118,12 @@ export function createSettingsRouter(): Router {
       }
 
       const repo = AppDataSource.getRepository(Settings);
-      const setting = new Settings();
-      setting.key = key;
+      let setting = await repo.findOneBy({ key, userId: req.user!.id });
+      if (!setting) {
+        setting = new Settings();
+        setting.key = key;
+        setting.userId = req.user!.id;
+      }
       setting.value = value;
 
       await repo.save(setting);

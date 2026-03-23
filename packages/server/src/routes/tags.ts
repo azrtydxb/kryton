@@ -65,9 +65,9 @@ export function createTagsRouter(): Router {
   const router = Router();
 
   // GET /api/tags — Get all tags with counts
-  router.get("/", async (_req: Request, res: Response) => {
+  router.get("/", async (req: Request, res: Response) => {
     try {
-      const tags = await getAllTags();
+      const tags = await getAllTags(req.user!.id);
       res.json(tags);
     } catch (err) {
       console.error("Error fetching tags:", err);
@@ -79,7 +79,7 @@ export function createTagsRouter(): Router {
   router.get("/:tag/notes", async (req: Request, res: Response) => {
     try {
       const tag = req.params.tag as string;
-      const notes = await getNotesByTag(tag);
+      const notes = await getNotesByTag(tag, req.user!.id);
       res.json(notes);
     } catch (err) {
       console.error("Error fetching notes by tag:", err);

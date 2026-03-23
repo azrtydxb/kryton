@@ -53,7 +53,7 @@ export function createBacklinksRouter(): Router {
         ? notePath
         : `${notePath}.md`;
 
-      const backlinks = await getBacklinks(fullNotePath);
+      const backlinks = await getBacklinks(fullNotePath, req.user!.id);
       res.json(backlinks);
     } catch (err) {
       console.error("Error fetching backlinks:", err);

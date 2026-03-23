@@ -45,9 +45,9 @@ export function createGraphRouter(): Router {
   const router = Router();
 
   // GET /api/graph — Return all nodes and edges for the graph view
-  router.get("/", async (_req: Request, res: Response) => {
+  router.get("/", async (req: Request, res: Response) => {
     try {
-      const graph = await getFullGraph();
+      const graph = await getFullGraph(req.user!.id);
       res.json(graph);
     } catch (err) {
       console.error("Error fetching graph data:", err);

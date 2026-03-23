@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { Router, Request, Response } from "express";
+import { IsNull } from "typeorm";
 import { AppDataSource } from "../data-source";
 import { User } from "../entities/User";
 import { InviteCode } from "../entities/InviteCode";
@@ -514,6 +515,7 @@ export function createAdminRouter(): Router {
         const settingsRepo = AppDataSource.getRepository(Settings);
         const row = await settingsRepo.findOneBy({
           key: "registration_mode",
+          userId: IsNull(),
         });
         const mode = row?.value ?? "open";
         res.json({ mode });
@@ -537,10 +539,17 @@ export function createAdminRouter(): Router {
         }
 
         const settingsRepo = AppDataSource.getRepository(Settings);
-        await settingsRepo.upsert(
-          { key: "registration_mode", value: mode },
-          ["key"],
-        );
+        let row = await settingsRepo.findOneBy({
+          key: "registration_mode",
+          userId: IsNull(),
+        });
+        if (!row) {
+          row = new Settings();
+          row.key = "registration_mode";
+          row.userId = null;
+        }
+        row.value = mode;
+        await settingsRepo.save(row);
 
         res.json({ mode });
       } catch (err) {
