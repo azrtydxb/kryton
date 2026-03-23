@@ -10,6 +10,7 @@ interface GraphViewProps {
   mode: 'local' | 'full';
   onNoteSelect: (path: string) => void;
   recenterRef?: React.MutableRefObject<(() => void) | null>;
+  starredPaths?: Set<string>;
 }
 
 interface SimNode extends d3.SimulationNodeDatum {
@@ -23,7 +24,7 @@ interface SimLink extends d3.SimulationLinkDatum<SimNode> {
   target: SimNode | string;
 }
 
-export function GraphView({ graphData, loading, activeNotePath, mode, onNoteSelect, recenterRef }: GraphViewProps) {
+export function GraphView({ graphData, loading, activeNotePath, mode, onNoteSelect, recenterRef, starredPaths }: GraphViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const simulationRef = useRef<d3.Simulation<SimNode, SimLink>>(undefined);
   const hoveredNodeRef = useRef<SimNode | null>(null);
@@ -139,20 +140,23 @@ export function GraphView({ graphData, loading, activeNotePath, mode, onNoteSele
         if (node.x == null || node.y == null) continue;
         const isHovered = hoveredNodeRef.current === node;
         const isActive = node.path === activeNotePath;
-        const radius = isActive ? 10 : isHovered ? 8 : 6;
+        const isStarred = starredPaths?.has(node.path) ?? false;
+        const radius = isActive ? 10 : isStarred ? 8 : isHovered ? 8 : 6;
 
         // Node circle
         ctx.beginPath();
         ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
         ctx.fillStyle = isActive
           ? '#25D366'
-          : isHovered
-            ? '#7c3aed'
-            : isDark ? '#a78bfa' : '#7c3aed';
+          : isStarred
+            ? '#eab308'
+            : isHovered
+              ? '#7c3aed'
+              : isDark ? '#a78bfa' : '#7c3aed';
         ctx.fill();
 
-        if (isHovered || isActive) {
-          ctx.strokeStyle = isActive ? '#128C7E' : isDark ? '#c4b5fd' : '#6d28d9';
+        if (isHovered || isActive || isStarred) {
+          ctx.strokeStyle = isActive ? '#128C7E' : isStarred ? '#ca8a04' : isDark ? '#c4b5fd' : '#6d28d9';
           ctx.lineWidth = 2;
           ctx.stroke();
         }
@@ -283,7 +287,7 @@ export function GraphView({ graphData, loading, activeNotePath, mode, onNoteSele
       window.removeEventListener('mouseup', handleMouseUp);
       resizeObserver.disconnect();
     };
-  }, [graphData, mode, activeNotePath, handleNodeClick, recenterRef]);
+  }, [graphData, mode, activeNotePath, handleNodeClick, recenterRef, starredPaths]);
 
   return (
     <div className="flex-1 relative overflow-hidden">

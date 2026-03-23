@@ -8,9 +8,10 @@ interface GraphPanelProps {
   loading: boolean;
   activeNotePath: string | null;
   onNoteSelect: (path: string) => void;
+  starredPaths?: Set<string>;
 }
 
-export function GraphPanel({ graphData, loading, activeNotePath, onNoteSelect }: GraphPanelProps) {
+export function GraphPanel({ graphData, loading, activeNotePath, onNoteSelect, starredPaths }: GraphPanelProps) {
   const [mode, setMode] = useState<'local' | 'full'>('local');
   const recenterRef = useRef<(() => void) | null>(null);
 
@@ -62,6 +63,7 @@ export function GraphPanel({ graphData, loading, activeNotePath, onNoteSelect }:
         mode={effectiveMode}
         onNoteSelect={onNoteSelect}
         recenterRef={recenterRef}
+        starredPaths={starredPaths}
       />
     </div>
   );

@@ -503,6 +503,7 @@ export default function App() {
                   loading={graphLoading}
                   activeNotePath={notes.activeNote?.path || null}
                   onNoteSelect={handleNoteSelect}
+                  starredPaths={starredPaths}
                 />
               </div>
               {notes.activeNote && (
