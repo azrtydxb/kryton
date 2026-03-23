@@ -3,14 +3,13 @@ import { EditorView } from '@codemirror/view';
 import { useTheme } from './hooks/useTheme';
 import { useNotes } from './hooks/useNotes';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
-import { api } from './lib/api';
+import { api, GraphData } from './lib/api';
 import { exportNoteToPdf } from './lib/exportPdf';
 import { Sidebar } from './components/Sidebar/Sidebar';
 import { Editor, EditorCursorState } from './components/Editor/Editor';
 import { Preview } from './components/Preview/Preview';
 import { SearchBar } from './components/Search/SearchBar';
-// GraphView is now used via GraphPanel - will be integrated into sidebar layout in a later task
-// import { GraphView } from './components/Graph/GraphView';
+import { GraphPanel } from './components/Graph/GraphPanel';
 import { ThemeToggle } from './components/Layout/ThemeToggle';
 import { BacklinksPanel } from './components/Backlinks/BacklinksPanel';
 import { OutgoingLinksPanel } from './components/OutgoingLinks/OutgoingLinksPanel';
@@ -18,18 +17,15 @@ import { TemplatePicker } from './components/Templates/TemplatePicker';
 import { OutlinePane } from './components/Outline/OutlinePane';
 import { StatusBar } from './components/StatusBar/StatusBar';
 import { QuickSwitcher } from './components/QuickSwitcher/QuickSwitcher';
-import { PanelLeft, BookOpen, Network, X, Menu, ListTree, Star, FileDown } from 'lucide-react';
-
-type ViewMode = 'editor' | 'preview' | 'split';
+import { PanelLeft, BookOpen, X, Menu, Star, FileDown, Pencil } from 'lucide-react';
 
 export default function App() {
   const themeCtx = useTheme();
   const notes = useNotes();
-  const [viewMode, setViewMode] = useState<ViewMode>('split');
-  // showGraph state will be replaced by sidebar graph panel in a later task
-  const [_showGraph, setShowGraph] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [graphData, setGraphData] = useState<GraphData | null>(null);
+  const [graphLoading, setGraphLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [outlineOpen, setOutlineOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [pendingTemplatePath, setPendingTemplatePath] = useState<string | null>(null);
@@ -58,6 +54,17 @@ export default function App() {
     });
   }, []);
 
+  // Fetch graph data whenever the note tree changes
+  const treeKey = notes.tree.length;
+
+  useEffect(() => {
+    let cancelled = false;
+    api.getGraph()
+      .then(data => { if (!cancelled) { setGraphData(data); setGraphLoading(false); } })
+      .catch(() => { if (!cancelled) { setGraphLoading(false); } });
+    return () => { cancelled = true; };
+  }, [treeKey]);
+
   const toggleStar = useCallback((path: string) => {
     setStarredPaths(prev => {
       const next = new Set(prev);
@@ -77,6 +84,7 @@ export default function App() {
 
   const handleNoteSelect = useCallback((path: string) => {
     notes.openNote(path);
+    setEditing(false);
     setMobileMenuOpen(false);
   }, [notes]);
 
@@ -135,17 +143,42 @@ export default function App() {
   }, [notes, pendingTemplatePath]);
 
   const handleOutlineJump = useCallback((line: number) => {
-    const view = editorViewRef.current;
-    if (!view) return;
-    const doc = view.state.doc;
-    if (line < 1 || line > doc.lines) return;
-    const lineObj = doc.line(line);
-    view.dispatch({
-      selection: { anchor: lineObj.from },
-      scrollIntoView: true,
-    });
-    view.focus();
-  }, []);
+    if (editing) {
+      const view = editorViewRef.current;
+      if (!view) return;
+      const doc = view.state.doc;
+      if (line < 1 || line > doc.lines) return;
+      const lineObj = doc.line(line);
+      view.dispatch({
+        selection: { anchor: lineObj.from },
+        scrollIntoView: true,
+      });
+      view.focus();
+    } else {
+      // Preview mode: scroll to heading by sequential index, code-block-aware
+      const lines = (notes.activeNote?.content || '').split('\n');
+      let inCodeBlock = false;
+      let headingIndex = 0;
+      let targetIndex = -1;
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].startsWith('```')) {
+          inCodeBlock = !inCodeBlock;
+          continue;
+        }
+        if (!inCodeBlock && /^#{1,6}\s+/.test(lines[i])) {
+          headingIndex++;
+          if (i + 1 === line) {
+            targetIndex = headingIndex;
+            break;
+          }
+        }
+      }
+      if (targetIndex > 0) {
+        const el = document.getElementById(`heading-${targetIndex}`);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+  }, [editing, notes.activeNote?.content]);
 
   const handleNewNote = useCallback(async () => {
     const now = new Date();
@@ -174,13 +207,13 @@ export default function App() {
 
   const shortcutActions = useMemo(() => ({
     toggleSidebar: () => setSidebarOpen(prev => !prev),
-    toggleOutline: () => setOutlineOpen(prev => !prev),
+    toggleEdit: () => { if (notes.activeNote) setEditing(prev => !prev); },
     openQuickSwitcher: () => setShowQuickSwitcher(true),
     focusSearch: () => searchInputRef.current?.focus(),
     createNote: handleNewNote,
     renameNote: handleRenameNote,
     toggleStar: toggleActiveNoteStar,
-  }), [handleNewNote, handleRenameNote, toggleActiveNoteStar]);
+  }), [handleNewNote, handleRenameNote, toggleActiveNoteStar, notes.activeNote]);
 
   useKeyboardShortcuts(shortcutActions);
 
@@ -219,37 +252,16 @@ export default function App() {
         </div>
 
         <div className="flex items-center gap-0.5">
-          <div className="hidden sm:flex items-center border rounded-md overflow-hidden mr-2">
-            {(['editor', 'split', 'preview'] as ViewMode[]).map((mode) => (
-              <button
-                key={mode}
-                onClick={() => setViewMode(mode)}
-                className={`px-2.5 py-1 text-xs font-medium transition-colors ${
-                  viewMode === mode
-                    ? 'bg-blue-500 text-white'
-                    : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-                }`}
-              >
-                {mode.charAt(0).toUpperCase() + mode.slice(1)}
-              </button>
-            ))}
-          </div>
-          <button
-            onClick={() => setOutlineOpen(!outlineOpen)}
-            className={`btn-ghost p-2 ${outlineOpen ? 'text-blue-500' : ''}`}
-            aria-label="Toggle outline"
-            title="Toggle outline (Ctrl+O)"
-          >
-            <ListTree size={18} />
-          </button>
-          <button
-            onClick={() => setShowGraph(true)}
-            className="btn-ghost p-2"
-            aria-label="Graph view"
-            title="Graph view"
-          >
-            <Network size={18} />
-          </button>
+          {notes.activeNote && (
+            <button
+              onClick={() => setEditing(!editing)}
+              className={`btn-ghost p-2 ${editing ? 'text-blue-500' : ''}`}
+              aria-label={editing ? 'Done editing' : 'Edit note'}
+              title={editing ? 'Done editing (Ctrl+E)' : 'Edit note (Ctrl+E)'}
+            >
+              {editing ? <X size={18} /> : <Pencil size={18} />}
+            </button>
+          )}
           <ThemeToggle theme={themeCtx.theme} setTheme={themeCtx.setTheme} />
         </div>
       </header>
@@ -292,12 +304,13 @@ export default function App() {
           />
         </aside>
 
-        {/* Editor + Preview */}
+        {/* Main content area */}
         <main className="flex-1 flex overflow-hidden">
           {notes.activeNote ? (
-            <>
-              {(viewMode === 'editor' || viewMode === 'split') && (
-                <div className={`${viewMode === 'split' ? 'w-1/2' : 'w-full'} flex flex-col overflow-hidden border-r`}>
+            editing ? (
+              /* ── Edit mode: Editor (left half) | Preview (right half) ── */
+              <>
+                <div className="w-1/2 flex flex-col overflow-hidden border-r">
                   <div className="flex items-center justify-between px-4 py-2 border-b bg-gray-50/50 dark:bg-surface-900/50">
                     <span className="text-xs text-gray-500 dark:text-gray-400 font-medium truncate">
                       {notes.activeNote.path}
@@ -350,36 +363,12 @@ export default function App() {
                     onNoteSelect={handleNoteSelect}
                   />
                 </div>
-              )}
-              {(viewMode === 'preview' || viewMode === 'split') && (
-                <div className={`${viewMode === 'split' ? 'w-1/2' : 'w-full'} flex flex-col overflow-hidden`}>
+                <div className="w-1/2 flex flex-col overflow-hidden">
                   <div className="flex items-center justify-between px-4 py-2 border-b bg-gray-50/50 dark:bg-surface-900/50">
                     <div className="flex items-center">
                       <BookOpen size={14} className="text-gray-400 mr-2" />
                       <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Preview</span>
                     </div>
-                    {viewMode === 'preview' && (
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={toggleActiveNoteStar}
-                          className={`p-1 rounded transition-colors ${
-                            isActiveNoteStarred
-                              ? 'text-yellow-500 hover:text-yellow-600'
-                              : 'text-gray-400 hover:text-yellow-500'
-                          }`}
-                          title={isActiveNoteStarred ? 'Unstar' : 'Star'}
-                        >
-                          <Star size={14} fill={isActiveNoteStarred ? 'currentColor' : 'none'} />
-                        </button>
-                        <button
-                          onClick={handlePdfExport}
-                          className="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                          title="Export as PDF"
-                        >
-                          <FileDown size={14} />
-                        </button>
-                      </div>
-                    )}
                   </div>
                   <div className="flex-1 overflow-y-auto" ref={previewRef}>
                     <Preview
@@ -390,8 +379,58 @@ export default function App() {
                     />
                   </div>
                 </div>
-              )}
-            </>
+              </>
+            ) : (
+              /* ── Default mode: Preview (center) ── */
+              <div className="flex-1 flex flex-col overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-2 border-b bg-gray-50/50 dark:bg-surface-900/50">
+                  <div className="flex items-center">
+                    <BookOpen size={14} className="text-gray-400 mr-2" />
+                    <span className="text-xs text-gray-500 dark:text-gray-400 font-medium truncate">
+                      {notes.activeNote.path}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={toggleActiveNoteStar}
+                      className={`p-1 rounded transition-colors ${
+                        isActiveNoteStarred
+                          ? 'text-yellow-500 hover:text-yellow-600'
+                          : 'text-gray-400 hover:text-yellow-500'
+                      }`}
+                      title={isActiveNoteStarred ? 'Unstar (Ctrl+Shift+S)' : 'Star (Ctrl+Shift+S)'}
+                    >
+                      <Star size={14} fill={isActiveNoteStarred ? 'currentColor' : 'none'} />
+                    </button>
+                    <button
+                      onClick={handlePdfExport}
+                      className="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                      title="Export as PDF"
+                    >
+                      <FileDown size={14} />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex-1 overflow-y-auto" ref={previewRef}>
+                  <Preview
+                    content={notes.activeNote.content}
+                    onLinkClick={handleLinkClick}
+                    allNotes={notes.tree}
+                    onCreateNote={handleCreateNoteFromLink}
+                  />
+                </div>
+                <OutgoingLinksPanel
+                  content={notes.activeNote.content}
+                  allNotes={notes.tree}
+                  onNoteSelect={handleNoteSelect}
+                  onCreateNote={handleCreateNoteFromLink}
+                />
+                <BacklinksPanel
+                  notePath={notes.activeNote.path}
+                  onNoteSelect={handleNoteSelect}
+                />
+              </div>
+            )
           ) : (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center p-8">
@@ -412,13 +451,23 @@ export default function App() {
           )}
         </main>
 
-        {/* Outline pane (right sidebar) */}
-        {outlineOpen && notes.activeNote && (
-          <aside className="w-60 flex-shrink-0 border-l bg-gray-50 dark:bg-surface-900 overflow-hidden">
-            <OutlinePane
-              content={notes.activeNote.content}
-              onJumpToLine={handleOutlineJump}
+        {/* Right panel: Graph + Outline (hidden in edit mode) */}
+        {!editing && (
+          <aside className="w-80 flex-shrink-0 flex flex-col bg-gray-50 dark:bg-surface-900 overflow-hidden border-l">
+            <GraphPanel
+              graphData={graphData}
+              loading={graphLoading}
+              activeNotePath={notes.activeNote?.path || null}
+              onNoteSelect={handleNoteSelect}
             />
+            {notes.activeNote && (
+              <div className="h-48 flex-shrink-0 border-t">
+                <OutlinePane
+                  content={notes.activeNote.content}
+                  onJumpToLine={handleOutlineJump}
+                />
+              </div>
+            )}
           </aside>
         )}
       </div>
@@ -441,8 +490,6 @@ export default function App() {
           </button>
         </div>
       )}
-
-      {/* Graph panel - will be integrated into sidebar layout in a later task */}
 
       {/* Template picker modal */}
       {showTemplatePicker && (
