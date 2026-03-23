@@ -1,5 +1,6 @@
 import { AppDataSource } from "../data-source";
 import { SearchIndex } from "../entities/SearchIndex";
+import { NoteShare } from "../entities/NoteShare";
 import { Brackets } from "typeorm";
 
 /**
@@ -148,16 +149,21 @@ export interface SearchResult {
   snippet: string;
   tags: string[];
   modifiedAt: Date;
+  isShared?: boolean;
+  ownerUserId?: string;
 }
 
 /**
  * Search notes by query, matching against title and content using ILIKE.
+ * Also includes notes shared with the user.
  */
 export async function search(query: string, userId: string): Promise<SearchResult[]> {
   const repo = AppDataSource.getRepository(SearchIndex);
+  const shareRepo = AppDataSource.getRepository(NoteShare);
   const pattern = `%${query}%`;
 
-  const results = await repo
+  // 1. Own notes query (existing behaviour)
+  const ownResults = await repo
     .createQueryBuilder("s")
     .where("s.userId = :userId", { userId })
     .andWhere(new Brackets(qb => {
@@ -167,7 +173,7 @@ export async function search(query: string, userId: string): Promise<SearchResul
     .orderBy("s.modifiedAt", "DESC")
     .getMany();
 
-  return results.map((r) => {
+  const ownMapped: SearchResult[] = ownResults.map((r) => {
     const snippet = createSnippet(r.content, query);
     return {
       path: r.notePath,
@@ -177,6 +183,66 @@ export async function search(query: string, userId: string): Promise<SearchResul
       modifiedAt: r.modifiedAt,
     };
   });
+
+  // 2. Shared notes query
+  const shares = await shareRepo.find({
+    where: { sharedWithUserId: userId },
+  });
+
+  const sharedResults: SearchResult[] = [];
+
+  for (const share of shares) {
+    let matchingNotes: SearchIndex[];
+
+    if (!share.isFolder) {
+      // File share: match by exact path and owner
+      matchingNotes = await repo
+        .createQueryBuilder("si")
+        .where("si.notePath = :notePath", { notePath: share.path })
+        .andWhere("si.userId = :ownerUserId", { ownerUserId: share.ownerUserId })
+        .andWhere(new Brackets(qb => {
+          qb.where("si.title ILIKE :pattern", { pattern })
+            .orWhere("si.content ILIKE :pattern", { pattern });
+        }))
+        .getMany();
+    } else {
+      // Folder share: match notes under the shared folder path
+      matchingNotes = await repo
+        .createQueryBuilder("si")
+        .where("POSITION(:sharePath IN si.notePath) = 1", { sharePath: share.path })
+        .andWhere("si.userId = :ownerUserId", { ownerUserId: share.ownerUserId })
+        .andWhere(new Brackets(qb => {
+          qb.where("si.title ILIKE :pattern", { pattern })
+            .orWhere("si.content ILIKE :pattern", { pattern });
+        }))
+        .getMany();
+    }
+
+    for (const r of matchingNotes) {
+      sharedResults.push({
+        path: r.notePath,
+        title: r.title,
+        snippet: createSnippet(r.content, query),
+        tags: r.tags,
+        modifiedAt: r.modifiedAt,
+        isShared: true,
+        ownerUserId: r.userId,
+      });
+    }
+  }
+
+  // 3. Combine and deduplicate by path (own notes take priority)
+  const seenPaths = new Set(ownMapped.map((r) => r.path));
+  const combined = [...ownMapped];
+  for (const shared of sharedResults) {
+    const key = `${shared.ownerUserId}:${shared.path}`;
+    if (!seenPaths.has(shared.path) && !seenPaths.has(key)) {
+      seenPaths.add(key);
+      combined.push(shared);
+    }
+  }
+
+  return combined;
 }
 
 /**
