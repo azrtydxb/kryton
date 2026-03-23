@@ -13,6 +13,13 @@ import {
   REFRESH_COOKIE_NAME,
   REFRESH_COOKIE_OPTIONS,
 } from "../services/tokenService";
+import {
+  getGoogleAuthUrl,
+  exchangeGoogleCode,
+  getGitHubAuthUrl,
+  exchangeGitHubCode,
+  resolveOAuthUser,
+} from "../services/oauthService";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -461,6 +468,166 @@ export function createAuthRouter(): Router {
     } catch (err) {
       console.error("Error fetching user:", err);
       res.status(500).json({ error: "Failed to fetch user" });
+    }
+  });
+
+  // --------------- OAuth: Google ---------------
+
+  /**
+   * @swagger
+   * /auth/google:
+   *   get:
+   *     summary: Initiate Google OAuth login
+   *     description: Redirects the user to Google's OAuth consent screen. Returns 404 if Google OAuth is not configured.
+   *     tags: [Auth]
+   *     parameters:
+   *       - in: query
+   *         name: inviteCode
+   *         schema:
+   *           type: string
+   *         description: Optional invite code passed through as OAuth state
+   *     responses:
+   *       302:
+   *         description: Redirect to Google OAuth consent screen
+   *       404:
+   *         description: Google OAuth not configured
+   */
+  router.get("/google", (req: Request, res: Response) => {
+    const clientId = process.env.GOOGLE_CLIENT_ID || "";
+    if (!clientId) {
+      res.status(404).json({ error: "Google OAuth is not configured" });
+      return;
+    }
+    const inviteCode = (req.query.inviteCode as string) || undefined;
+    const url = getGoogleAuthUrl(inviteCode);
+    res.redirect(url);
+  });
+
+  /**
+   * @swagger
+   * /auth/google/callback:
+   *   get:
+   *     summary: Google OAuth callback
+   *     description: Handles the callback from Google OAuth. Exchanges the authorization code, resolves the user, and redirects to the app.
+   *     tags: [Auth]
+   *     parameters:
+   *       - in: query
+   *         name: code
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Authorization code from Google
+   *       - in: query
+   *         name: state
+   *         schema:
+   *           type: string
+   *         description: State parameter (invite code)
+   *     responses:
+   *       302:
+   *         description: Redirect to app with auth result
+   */
+  router.get("/google/callback", async (req: Request, res: Response) => {
+    const appUrl = process.env.APP_URL || "http://localhost:5173";
+    try {
+      const code = req.query.code as string;
+      const state = (req.query.state as string) || null;
+
+      if (!code) {
+        res.redirect(`${appUrl}/login?error=oauth-failed`);
+        return;
+      }
+
+      const profile = await exchangeGoogleCode(code);
+      const user = await resolveOAuthUser("google", profile, state);
+
+      const accessToken = generateAccessToken(user);
+      const { cookieValue } = await createRefreshToken(user.id);
+      res.cookie(REFRESH_COOKIE_NAME, cookieValue, REFRESH_COOKIE_OPTIONS);
+
+      res.redirect(`${appUrl}/?auth=success&token=${accessToken}`);
+    } catch (err) {
+      console.error("Google OAuth error:", err);
+      res.redirect(`${appUrl}/login?error=oauth-failed`);
+    }
+  });
+
+  // --------------- OAuth: GitHub ---------------
+
+  /**
+   * @swagger
+   * /auth/github:
+   *   get:
+   *     summary: Initiate GitHub OAuth login
+   *     description: Redirects the user to GitHub's OAuth authorization screen. Returns 404 if GitHub OAuth is not configured.
+   *     tags: [Auth]
+   *     parameters:
+   *       - in: query
+   *         name: inviteCode
+   *         schema:
+   *           type: string
+   *         description: Optional invite code passed through as OAuth state
+   *     responses:
+   *       302:
+   *         description: Redirect to GitHub OAuth authorization screen
+   *       404:
+   *         description: GitHub OAuth not configured
+   */
+  router.get("/github", (req: Request, res: Response) => {
+    const clientId = process.env.GITHUB_CLIENT_ID || "";
+    if (!clientId) {
+      res.status(404).json({ error: "GitHub OAuth is not configured" });
+      return;
+    }
+    const inviteCode = (req.query.inviteCode as string) || undefined;
+    const url = getGitHubAuthUrl(inviteCode);
+    res.redirect(url);
+  });
+
+  /**
+   * @swagger
+   * /auth/github/callback:
+   *   get:
+   *     summary: GitHub OAuth callback
+   *     description: Handles the callback from GitHub OAuth. Exchanges the authorization code, resolves the user, and redirects to the app.
+   *     tags: [Auth]
+   *     parameters:
+   *       - in: query
+   *         name: code
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Authorization code from GitHub
+   *       - in: query
+   *         name: state
+   *         schema:
+   *           type: string
+   *         description: State parameter (invite code)
+   *     responses:
+   *       302:
+   *         description: Redirect to app with auth result
+   */
+  router.get("/github/callback", async (req: Request, res: Response) => {
+    const appUrl = process.env.APP_URL || "http://localhost:5173";
+    try {
+      const code = req.query.code as string;
+      const state = (req.query.state as string) || null;
+
+      if (!code) {
+        res.redirect(`${appUrl}/login?error=oauth-failed`);
+        return;
+      }
+
+      const profile = await exchangeGitHubCode(code);
+      const user = await resolveOAuthUser("github", profile, state);
+
+      const accessToken = generateAccessToken(user);
+      const { cookieValue } = await createRefreshToken(user.id);
+      res.cookie(REFRESH_COOKIE_NAME, cookieValue, REFRESH_COOKIE_OPTIONS);
+
+      res.redirect(`${appUrl}/?auth=success&token=${accessToken}`);
+    } catch (err) {
+      console.error("GitHub OAuth error:", err);
+      res.redirect(`${appUrl}/login?error=oauth-failed`);
     }
   });
 
