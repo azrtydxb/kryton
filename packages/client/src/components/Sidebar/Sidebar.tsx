@@ -1,9 +1,18 @@
 import { useState, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { FileNode } from '../../lib/api';
-import { FileText, Folder, FolderOpen, ChevronRight, Plus, FolderPlus, MoreHorizontal, Pencil, Trash2, Calendar, LayoutTemplate, Star } from 'lucide-react';
+import { FileText, Folder, FolderOpen, ChevronRight, Plus, FolderPlus, MoreHorizontal, Pencil, Trash2, Calendar, LayoutTemplate, Star, Share2 } from 'lucide-react';
 import { TagPane } from '../Tags/TagPane';
 import { ResizeHandle } from '../Layout/ResizeHandle';
+
+interface SharedNote {
+  id: string;
+  ownerUserId: string;
+  ownerName: string;
+  path: string;
+  isFolder: boolean;
+  permission: string;
+}
 
 interface SidebarProps {
   tree: FileNode[];
@@ -19,6 +28,8 @@ interface SidebarProps {
   onCreateFromTemplate: () => void;
   starredPaths: Set<string>;
   onToggleStar: (path: string) => void;
+  sharedNotes?: SharedNote[];
+  onShare?: (path: string, isFolder: boolean) => void;
 }
 
 export function Sidebar({
@@ -35,12 +46,15 @@ export function Sidebar({
   onCreateFromTemplate,
   starredPaths,
   onToggleStar,
+  sharedNotes,
+  onShare,
 }: SidebarProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['']));
   const [creating, setCreating] = useState<{ type: 'file' | 'folder'; parentPath: string } | null>(null);
   const [renaming, setRenaming] = useState<{ path: string; type: 'file' | 'folder' } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; node: FileNode } | null>(null);
   const [newName, setNewName] = useState('');
+  const [sharedCollapsed, setSharedCollapsed] = useState(false);
   const [tagPaneHeight, setTagPaneHeight] = useState(180);
   const handleTagResize = useCallback((delta: number) => {
     setTagPaneHeight(h => Math.max(60, Math.min(500, h - delta)));
@@ -350,6 +364,68 @@ export function Sidebar({
         {tree.map((node) => renderNode(node, 0))}
       </div>
 
+      {/* Shared section */}
+      {sharedNotes && sharedNotes.length > 0 && (
+        <div className="border-t">
+          <button
+            onClick={() => setSharedCollapsed(prev => !prev)}
+            className="w-full px-3 py-1.5 flex items-center gap-1 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          >
+            <ChevronRight
+              size={12}
+              className={`text-gray-400 transition-transform duration-150 ${sharedCollapsed ? '' : 'rotate-90'}`}
+            />
+            <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1">
+              <Share2 size={11} />
+              Shared
+            </span>
+          </button>
+          {!sharedCollapsed && (
+            <div className="pb-1">
+              {(() => {
+                const byOwner = new Map<string, SharedNote[]>();
+                for (const note of sharedNotes) {
+                  const existing = byOwner.get(note.ownerUserId);
+                  if (existing) existing.push(note);
+                  else byOwner.set(note.ownerUserId, [note]);
+                }
+                return Array.from(byOwner.entries()).map(([ownerUserId, notes]) => (
+                  <div key={ownerUserId}>
+                    <div className="px-3 py-0.5">
+                      <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        {notes[0].ownerName}
+                      </span>
+                    </div>
+                    {notes.map((note) => {
+                      const sharedId = `shared:${note.ownerUserId}:${note.path}`;
+                      const fileName = note.path.split('/').pop()?.replace(/\.md$/, '') || note.path;
+                      return (
+                        <div
+                          key={sharedId}
+                          className={`group flex items-center gap-1 px-2 py-1 cursor-pointer text-sm rounded-md mx-1 transition-colors duration-100
+                            ${sharedId === activeNotePath
+                              ? 'bg-violet-500/10 text-violet-600 dark:text-violet-400 font-medium'
+                              : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200/60 dark:hover:bg-gray-700/40'
+                            }`}
+                          style={{ paddingLeft: '20px' }}
+                          onClick={() => onSelect(sharedId)}
+                        >
+                          <Share2 size={13} className="flex-shrink-0 text-amber-500" />
+                          <span className="flex-1 truncate">{fileName}</span>
+                          <span className="text-[10px] text-gray-400 dark:text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {note.permission}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ));
+              })()}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Resize handle between file tree and tags */}
       <ResizeHandle direction="vertical" onResize={handleTagResize} />
 
@@ -379,6 +455,14 @@ export function Sidebar({
               >
                 <FolderPlus size={14} /> New folder here
               </button>
+              {onShare && (
+                <button
+                  onClick={() => { onShare(contextMenu.node.path, true); setContextMenu(null); }}
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                >
+                  <Share2 size={14} /> Share folder...
+                </button>
+              )}
               <div className="border-t my-1" />
             </>
           )}
@@ -393,6 +477,14 @@ export function Sidebar({
               >
                 <Star size={14} /> {starredPaths.has(contextMenu.node.path) ? 'Unstar' : 'Star'}
               </button>
+              {onShare && (
+                <button
+                  onClick={() => { onShare(contextMenu.node.path, false); setContextMenu(null); }}
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                >
+                  <Share2 size={14} /> Share...
+                </button>
+              )}
               <div className="border-t my-1" />
             </>
           )}
