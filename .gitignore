@@ -7,3 +7,6 @@ pgdata/
 .DS_Store
 .superpowers/
 *.tsbuildinfo
+
+# Installed plugins (downloaded from registry at runtime)
+packages/server/plugins/
