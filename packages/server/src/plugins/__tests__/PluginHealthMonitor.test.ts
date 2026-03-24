@@ -3,11 +3,11 @@ import { PluginHealthMonitor } from "../PluginHealthMonitor";
 
 describe("PluginHealthMonitor", () => {
   let monitor: PluginHealthMonitor;
-  let onDisable: ReturnType<typeof vi.fn>;
+  let onDisable: (pluginId: string) => void;
 
   beforeEach(() => {
     vi.useFakeTimers();
-    onDisable = vi.fn();
+    onDisable = vi.fn() as (pluginId: string) => void;
     monitor = new PluginHealthMonitor({
       maxErrors: 5,
       windowMs: 60_000,
