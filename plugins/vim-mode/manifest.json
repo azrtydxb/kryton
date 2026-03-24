@@ -1,0 +1,18 @@
+{
+  "id": "vim-mode",
+  "name": "Vim Mode",
+  "version": "1.0.0",
+  "description": "Adds Vim keybindings to the editor with visual mode indicator and command bar",
+  "author": "Mnemo",
+  "minMnemoVersion": "2.0.0",
+  "client": "client/index.js",
+  "settings": [
+    {
+      "key": "enabled",
+      "type": "boolean",
+      "default": true,
+      "label": "Enable Vim keybindings",
+      "perUser": true
+    }
+  ]
+}
