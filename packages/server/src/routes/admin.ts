@@ -496,8 +496,8 @@ export function createAdminRouter(): Router {
       }
 
       // Update password in the credential Account (better-auth stores passwords in the Account table)
-      const bcrypt = await import("bcrypt");
-      const hashedPassword = await bcrypt.hash(newPassword, 12);
+      const { hashPassword } = await import("better-auth/crypto");
+      const hashedPassword = await hashPassword(newPassword);
 
       await prisma.account.updateMany({
         where: { userId, providerId: "credential" },

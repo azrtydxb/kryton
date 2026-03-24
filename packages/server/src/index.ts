@@ -1,14 +1,14 @@
 import http from "http";
 import express, { Request, Response } from "express";
 import cors from "cors";
-import cookieParser from "cookie-parser";
+import { toNodeHandler } from "better-auth/node";
 import swaggerUi from "swagger-ui-express";
 import * as path from "path";
 import * as fs from "fs/promises";
 import { prisma } from "./prisma.js";
 import { swaggerSpec } from "./swagger.js";
-import { authMiddleware, adminMiddleware, csrfCheck } from "./middleware/auth.js";
-import { createAuthRouter } from "./routes/auth.js";
+import { auth } from "./auth.js";
+import { authMiddleware, adminMiddleware } from "./middleware/auth.js";
 import { createAdminRouter } from "./routes/admin.js";
 import { createNotesRouter, createNotesRenameRouter, createSharedNotesRouter } from "./routes/notes.js";
 import { createFoldersRouter, createFoldersRenameRouter } from "./routes/folders.js";
@@ -84,7 +84,6 @@ async function main(): Promise<void> {
     credentials: true,
   }));
   app.use(express.json());
-  app.use(cookieParser());
 
   // Plugin system initialization
   const pluginsDir = path.join(process.cwd(), "plugins");
@@ -128,8 +127,8 @@ async function main(): Promise<void> {
   // Serve plugin client bundles as static files
   app.use("/plugins", express.static(pluginsDir));
 
-  // Auth routes (unauthenticated, no CSRF)
-  app.use("/api/auth", createAuthRouter(NOTES_DIR));
+  // better-auth handler (replaces old routes/auth.ts)
+  app.all("/api/auth/*splat", toNodeHandler(auth));
 
   // Swagger API docs (unauthenticated, GET-only)
   app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
@@ -163,9 +162,6 @@ async function main(): Promise<void> {
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok", notesDir: NOTES_DIR });
   });
-
-  // CSRF protection for all remaining routes
-  app.use(csrfCheck);
 
   // Admin routes (auth + admin middleware)
   app.use("/api/admin", authMiddleware, adminMiddleware, createAdminRouter());
