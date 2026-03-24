@@ -190,7 +190,7 @@ async function main(): Promise<void> {
   app.use("/api/shares", authMiddleware, createSharesRouter());
   app.use("/api/access-requests", authMiddleware, createAccessRequestsRouter());
   app.use("/api/users", authMiddleware, createUsersRouter());
-  app.use("/api/plugins", authMiddleware, createPluginsRouter(pluginManager));
+  app.use("/api/plugins", authMiddleware, createPluginsRouter(pluginManager, pluginsDir));
 
   /**
    * @swagger

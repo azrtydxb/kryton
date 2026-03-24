@@ -98,6 +98,23 @@ export interface AccessRequestData {
   requesterEmail?: string;
 }
 
+export interface RegistryPlugin {
+  id: string;
+  name: string;
+  description: string;
+  author: string;
+  version: string;
+  minMnemoVersion: string;
+  tags: string[];
+  icon: string;
+}
+
+export interface PluginUpdate {
+  id: string;
+  currentVersion: string;
+  latestVersion: string;
+}
+
 const BASE = '/api';
 
 let _accessToken: string | null = null;
@@ -184,6 +201,16 @@ export const api = {
   // Plugins
   getActivePlugins: () => request<ActivePluginInfo[]>('/plugins/active'),
   getAllPlugins: () => request<unknown[]>('/plugins/all'),
+
+  // Plugin registry
+  getRegistry: () => request<RegistryPlugin[]>('/plugins/registry'),
+  installPlugin: (id: string) => request<unknown>('/plugins/install/' + id, { method: 'POST' }),
+  updatePlugin: (id: string) => request<unknown>('/plugins/update/' + id, { method: 'POST' }),
+  uninstallPlugin: (id: string) => request<unknown>('/plugins/' + id + '/uninstall', { method: 'POST' }),
+  checkPluginUpdates: () => request<PluginUpdate[]>('/plugins/updates'),
+  enablePlugin: (id: string) => request<unknown>('/plugins/' + id + '/enable', { method: 'POST' }),
+  disablePlugin: (id: string) => request<unknown>('/plugins/' + id + '/disable', { method: 'POST' }),
+  reloadPlugin: (id: string) => request<unknown>('/plugins/' + id + '/reload', { method: 'POST' }),
 };
 
 export interface AuthUser {
