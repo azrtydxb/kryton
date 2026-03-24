@@ -1,6 +1,8 @@
+import { useMemo } from 'react';
 import { AuthProvider } from './hooks/useAuth';
 import { useAppState } from './hooks/useAppState';
 import { useAppCallbacks } from './hooks/useAppCallbacks';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { Header } from './components/Layout/Header';
 import { SidebarLayout } from './components/Layout/SidebarLayout';
 import { RightPanel } from './components/Layout/RightPanel';
@@ -62,6 +64,8 @@ function AppContent() {
     handleCreateFromTemplate,
     handleTemplateSelected,
     handleOutlineJump,
+    handleNewNote,
+    handleRenameNote,
     handlePdfExport,
     enterEditMode,
     saveEdit,
@@ -71,6 +75,18 @@ function AppContent() {
     handleGraphResize,
     handleShare,
   } = callbacks;
+
+  const shortcutActions = useMemo(() => ({
+    toggleSidebar: () => setSidebarOpen(prev => !prev),
+    toggleEdit: () => { if (editing) cancelEdit(); else enterEditMode(); },
+    openQuickSwitcher: () => setShowQuickSwitcher(true),
+    focusSearch: () => searchInputRef.current?.focus(),
+    createNote: handleNewNote,
+    renameNote: handleRenameNote,
+    toggleStar: toggleActiveNoteStar,
+  }), [handleNewNote, handleRenameNote, toggleActiveNoteStar, editing, cancelEdit, enterEditMode, setSidebarOpen, setShowQuickSwitcher, searchInputRef]);
+
+  useKeyboardShortcuts(shortcutActions);
 
   if (loading) {
     return (

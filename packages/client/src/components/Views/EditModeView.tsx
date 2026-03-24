@@ -109,7 +109,7 @@ export function EditModeView({
         </div>
         <div className="flex-1 overflow-y-auto" ref={previewRef}>
           <Preview
-            content={activeNote.content}
+            content={editContent ?? activeNote.content}
             onLinkClick={onLinkClick}
             allNotes={allNotes}
             onCreateNote={onCreateNote}

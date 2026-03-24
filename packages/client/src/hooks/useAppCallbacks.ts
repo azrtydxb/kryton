@@ -1,7 +1,6 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 import { api } from '../lib/api';
 import { exportNoteToPdf } from '../lib/exportPdf';
-import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import { AppState } from './useAppState';
 
 export function useAppCallbacks(state: AppState) {
@@ -10,10 +9,10 @@ export function useAppCallbacks(state: AppState) {
     setEditing, setEditContent, setOriginalContent,
     setVimEnabled, setMobileMenuOpen,
     setShowTemplatePicker, setPendingTemplatePath,
-    setShowQuickSwitcher, setSidebarOpen, setSidebarWidth,
+    setSidebarWidth,
     setRightPanelWidth, setGraphHeight, setStarredPaths,
     setShareTarget, setShowShareDialog,
-    editorViewRef, searchInputRef, previewRef,
+    editorViewRef, previewRef,
     pendingTemplatePath,
   } = state;
 
@@ -191,19 +190,6 @@ export function useAppCallbacks(state: AppState) {
     setShareTarget({ path, isFolder });
     setShowShareDialog(true);
   }, [setShareTarget, setShowShareDialog]);
-
-  // Keyboard shortcuts
-  const shortcutActions = useMemo(() => ({
-    toggleSidebar: () => setSidebarOpen(prev => !prev),
-    toggleEdit: () => { if (editing) cancelEdit(); else enterEditMode(); },
-    openQuickSwitcher: () => setShowQuickSwitcher(true),
-    focusSearch: () => searchInputRef.current?.focus(),
-    createNote: handleNewNote,
-    renameNote: handleRenameNote,
-    toggleStar: toggleActiveNoteStar,
-  }), [handleNewNote, handleRenameNote, toggleActiveNoteStar, editing, cancelEdit, enterEditMode, setSidebarOpen, setShowQuickSwitcher, searchInputRef]);
-
-  useKeyboardShortcuts(shortcutActions);
 
   return {
     toggleStar, handleVimToggle, toggleActiveNoteStar,
