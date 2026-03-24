@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { Extension } from "@codemirror/state";
 import { PluginSlotRegistry } from "./PluginSlotRegistry";
 import {
   SidebarPanelRegistration,
@@ -16,6 +17,7 @@ interface PluginContextValue {
   statusBarLeft: StatusBarItemRegistration[];
   statusBarRight: StatusBarItemRegistration[];
   editorToolbarButtons: EditorToolbarButtonRegistration[];
+  editorExtensions: Extension[];
   pages: PageRegistration[];
   noteActions: NoteActionRegistration[];
   commands: CommandRegistration[];
@@ -43,6 +45,7 @@ export function PluginProvider({
     statusBarLeft: registry.getStatusBarItems("left"),
     statusBarRight: registry.getStatusBarItems("right"),
     editorToolbarButtons: registry.getEditorToolbarButtons(),
+    editorExtensions: registry.getEditorExtensions(),
     pages: registry.getPages(),
     noteActions: registry.getNoteActions(),
     commands: registry.getCommands(),
