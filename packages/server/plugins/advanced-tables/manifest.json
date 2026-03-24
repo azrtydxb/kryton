@@ -1,0 +1,11 @@
+{
+  "id": "advanced-tables",
+  "name": "Advanced Tables",
+  "version": "1.0.0",
+  "description": "Improved table navigation, formatting, and manipulation for Markdown tables",
+  "author": "Mnemo",
+  "minMnemoVersion": "2.0.0",
+  "tags": ["editor", "tables", "markdown"],
+  "icon": "table",
+  "client": "client/index.js"
+}

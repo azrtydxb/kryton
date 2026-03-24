@@ -1,0 +1,12 @@
+{
+  "id": "templater",
+  "name": "Templater",
+  "version": "1.0.0",
+  "description": "Advanced template system with dynamic variables and date formatting",
+  "author": "Mnemo",
+  "minMnemoVersion": "2.0.0",
+  "tags": ["templates", "productivity"],
+  "icon": "file-text",
+  "server": "server/index.js",
+  "client": "client/index.js"
+}

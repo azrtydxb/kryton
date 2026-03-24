@@ -1,0 +1,11 @@
+{
+  "id": "calendar",
+  "name": "Calendar",
+  "version": "1.0.0",
+  "description": "Monthly calendar widget for navigating and creating daily notes",
+  "author": "Mnemo",
+  "minMnemoVersion": "2.0.0",
+  "tags": ["navigation", "daily-notes"],
+  "icon": "calendar",
+  "client": "client/index.js"
+}

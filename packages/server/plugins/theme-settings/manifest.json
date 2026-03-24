@@ -1,0 +1,48 @@
+{
+  "id": "theme-settings",
+  "name": "Theme Settings",
+  "version": "1.0.0",
+  "description": "Customize colors, fonts, and layout of Mnemo's interface",
+  "author": "Mnemo",
+  "minMnemoVersion": "2.0.0",
+  "tags": ["appearance", "customization"],
+  "icon": "palette",
+  "client": "client/index.js",
+  "settings": [
+    {
+      "key": "accentColor",
+      "type": "string",
+      "default": "#8b5cf6",
+      "label": "Accent color",
+      "perUser": true
+    },
+    {
+      "key": "fontSize",
+      "type": "number",
+      "default": 14,
+      "label": "Base font size (px)",
+      "perUser": true
+    },
+    {
+      "key": "editorFont",
+      "type": "string",
+      "default": "monospace",
+      "label": "Editor font family",
+      "perUser": true
+    },
+    {
+      "key": "lineHeight",
+      "type": "string",
+      "default": "1.6",
+      "label": "Line height",
+      "perUser": true
+    },
+    {
+      "key": "contentWidth",
+      "type": "number",
+      "default": 768,
+      "label": "Content max width (px)",
+      "perUser": true
+    }
+  ]
+}

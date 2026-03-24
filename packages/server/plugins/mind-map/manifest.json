@@ -1,0 +1,11 @@
+{
+  "id": "mind-map",
+  "name": "Mind Map",
+  "version": "1.0.0",
+  "description": "Display Markdown notes as interactive mind maps using Markmap",
+  "author": "Mnemo",
+  "minMnemoVersion": "2.0.0",
+  "tags": ["visualization", "diagrams"],
+  "icon": "brain",
+  "client": "client/index.js"
+}

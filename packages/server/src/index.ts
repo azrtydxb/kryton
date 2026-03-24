@@ -94,7 +94,7 @@ async function main(): Promise<void> {
   await fs.mkdir(pluginsDir, { recursive: true });
 
   const eventBus = new PluginEventBus();
-  const pluginRouter = new PluginRouter(app);
+  const pluginRouter = new PluginRouter(app, authMiddleware);
   // Use a container object so the healthMonitor closure can reference pluginManager
   // before it is assigned (forward reference pattern)
   const managerRef: { instance: PluginManager | null } = { instance: null };

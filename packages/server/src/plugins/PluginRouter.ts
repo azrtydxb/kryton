@@ -8,11 +8,13 @@ interface RouteEntry {
 
 export class PluginRouter {
   private app: Express;
+  private authMiddleware: RequestHandler | null;
   private routers = new Map<string, Router>();
   private routes = new Map<string, RouteEntry[]>();
 
-  constructor(app: Express) {
+  constructor(app: Express, authMiddleware?: RequestHandler) {
     this.app = app;
+    this.authMiddleware = authMiddleware || null;
   }
 
   register(
@@ -25,7 +27,11 @@ export class PluginRouter {
     if (!router) {
       router = Router();
       this.routers.set(pluginId, router);
-      this.app.use(`/api/plugins/${pluginId}`, router);
+      if (this.authMiddleware) {
+        this.app.use(`/api/plugins/${pluginId}`, this.authMiddleware, router);
+      } else {
+        this.app.use(`/api/plugins/${pluginId}`, router);
+      }
     }
 
     router[method](path, handler);

@@ -1,0 +1,20 @@
+{
+  "id": "mermaid-diagrams",
+  "name": "Mermaid Diagrams",
+  "version": "1.0.0",
+  "description": "Render Mermaid diagrams in code fences with live preview and theme support",
+  "author": "Mnemo",
+  "minMnemoVersion": "2.0.0",
+  "tags": ["diagrams", "visualization", "markdown"],
+  "icon": "git-branch",
+  "client": "client/index.js",
+  "settings": [
+    {
+      "key": "theme",
+      "type": "string",
+      "default": "default",
+      "label": "Mermaid theme (default, dark, forest, neutral)",
+      "perUser": true
+    }
+  ]
+}
