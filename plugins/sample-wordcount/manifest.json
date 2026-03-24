@@ -1,0 +1,18 @@
+{
+  "id": "sample-wordcount",
+  "name": "Word Count",
+  "version": "1.0.0",
+  "description": "Displays word count statistics for notes",
+  "author": "Mnemo",
+  "minMnemoVersion": "2.0.0",
+  "server": "server/index.js",
+  "settings": [
+    {
+      "key": "countOnOpen",
+      "type": "boolean",
+      "default": true,
+      "label": "Count words when opening a note",
+      "perUser": true
+    }
+  ]
+}

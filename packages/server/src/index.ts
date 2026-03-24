@@ -27,6 +27,13 @@ import { cleanupOldNotes, getUserNotesDir } from "./services/userNotesDir";
 import { SearchIndex } from "./entities/SearchIndex";
 import { GraphEdge } from "./entities/GraphEdge";
 import { Settings } from "./entities/Settings";
+import { InstalledPlugin } from "./entities/InstalledPlugin";
+import { PluginEventBus } from "./plugins/PluginEventBus";
+import { PluginHealthMonitor } from "./plugins/PluginHealthMonitor";
+import { PluginRouter } from "./plugins/PluginRouter";
+import { PluginApiFactory } from "./plugins/PluginApiFactory";
+import { PluginManager } from "./plugins/PluginManager";
+import { createPluginsRouter } from "./routes/plugins";
 
 const PORT = parseInt(process.env.PORT || "3001", 10);
 const NOTES_DIR = path.resolve(
@@ -79,6 +86,46 @@ async function main(): Promise<void> {
   }));
   app.use(express.json());
   app.use(cookieParser());
+
+  // Plugin system initialization
+  const pluginsDir = path.join(process.cwd(), "plugins");
+  await fs.mkdir(pluginsDir, { recursive: true });
+
+  const eventBus = new PluginEventBus();
+  const pluginRouter = new PluginRouter(app);
+  // Use a container object so the healthMonitor closure can reference pluginManager
+  // before it is assigned (forward reference pattern)
+  const managerRef: { instance: PluginManager | null } = { instance: null };
+  const healthMonitor = new PluginHealthMonitor({
+    maxErrors: 5,
+    windowMs: 60_000,
+    onDisable: async (pluginId) => {
+      console.warn(`[plugins] Auto-disabling plugin ${pluginId} due to excessive errors`);
+      await managerRef.instance?.disablePlugin(pluginId);
+      const repo = AppDataSource.getRepository(InstalledPlugin);
+      await repo.update(pluginId, { enabled: false, state: "error", error: "Auto-disabled: too many errors" });
+    },
+  });
+  const apiFactory = new PluginApiFactory({
+    eventBus,
+    pluginRouter,
+    healthMonitor,
+    notesDir: NOTES_DIR,
+  });
+  const pluginManager = new PluginManager({
+    pluginsDir,
+    eventBus,
+    pluginRouter,
+    healthMonitor,
+    apiFactory,
+  });
+  managerRef.instance = pluginManager;
+
+  // Discover and load plugins from the plugins directory
+  await pluginManager.discoverAndLoadPlugins();
+
+  // Serve plugin client bundles as static files
+  app.use("/plugins", express.static(pluginsDir));
 
   // Auth routes (unauthenticated, no CSRF)
   app.use("/api/auth", createAuthRouter(NOTES_DIR));
@@ -140,6 +187,7 @@ async function main(): Promise<void> {
   app.use("/api/shares", authMiddleware, createSharesRouter());
   app.use("/api/access-requests", authMiddleware, createAccessRequestsRouter());
   app.use("/api/users", authMiddleware, createUsersRouter());
+  app.use("/api/plugins", authMiddleware, createPluginsRouter(pluginManager));
 
   /**
    * @swagger

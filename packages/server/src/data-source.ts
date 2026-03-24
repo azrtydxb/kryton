@@ -9,6 +9,8 @@ import { SearchIndex } from "./entities/SearchIndex";
 import { Settings } from "./entities/Settings";
 import { PasswordResetToken } from "./entities/PasswordResetToken";
 import { User } from "./entities/User";
+import { PluginStorage } from "./entities/PluginStorage";
+import { InstalledPlugin } from "./entities/InstalledPlugin";
 
 const DATABASE_URL =
   process.env.DATABASE_URL ||
@@ -19,5 +21,5 @@ export const AppDataSource = new DataSource({
   url: DATABASE_URL,
   synchronize: true,
   logging: false,
-  entities: [AccessRequest, AuthProvider, GraphEdge, InviteCode, NoteShare, PasswordResetToken, RefreshToken, SearchIndex, Settings, User],
+  entities: [AccessRequest, AuthProvider, GraphEdge, InviteCode, InstalledPlugin, NoteShare, PasswordResetToken, PluginStorage, RefreshToken, SearchIndex, Settings, User],
 });
