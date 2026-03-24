@@ -1,3 +1,5 @@
+import { ActivePluginInfo } from "../plugins/types";
+
 export interface FileNode {
   name: string;
   path: string;
@@ -178,6 +180,10 @@ export const api = {
     request<void>('/canvas', { method: 'POST', body: JSON.stringify({ name }) }),
   deleteCanvas: (name: string) =>
     request<void>(`/canvas/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+
+  // Plugins
+  getActivePlugins: () => request<ActivePluginInfo[]>('/plugins/active'),
+  getAllPlugins: () => request<unknown[]>('/plugins/all'),
 };
 
 export interface AuthUser {

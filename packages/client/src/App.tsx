@@ -1,5 +1,12 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { AuthProvider } from './hooks/useAuth';
+import { PluginSlotRegistry } from './plugins/PluginSlotRegistry';
+import { ClientPluginManager } from './plugins/PluginManager';
+import { PluginProvider } from './plugins/PluginContext';
+import { PluginSlot } from './components/PluginSlot/PluginSlot';
+
+const pluginRegistry = new PluginSlotRegistry();
+const pluginManager = new ClientPluginManager(pluginRegistry);
 import { useAppState } from './hooks/useAppState';
 import { useAppCallbacks } from './hooks/useAppCallbacks';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
@@ -17,7 +24,9 @@ import LoginPage from './pages/LoginPage';
 export default function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <PluginProvider registry={pluginRegistry}>
+        <AppContent />
+      </PluginProvider>
     </AuthProvider>
   );
 }
@@ -75,6 +84,12 @@ function AppContent() {
     handleGraphResize,
     handleShare,
   } = callbacks;
+
+  useEffect(() => {
+    pluginManager.loadActivePlugins().catch((err) => {
+      console.error('[plugins] Failed to load active plugins:', err);
+    });
+  }, []);
 
   const shortcutActions = useMemo(() => ({
     toggleSidebar: () => setSidebarOpen(prev => !prev),
@@ -137,49 +152,53 @@ function AppContent() {
           onToggleStar={toggleStar}
           onShare={handleShare}
         />
+        <PluginSlot slot="sidebar" />
 
-        <main className="flex-1 flex overflow-hidden">
-          {notes.activeNote ? (
-            editing ? (
-              <EditModeView
-                activeNote={notes.activeNote}
-                editContent={editContent}
-                originalContent={originalContent}
-                vimEnabled={vimEnabled}
-                isStarred={isActiveNoteStarred}
-                resolvedTheme={themeCtx.resolvedTheme}
-                allNotes={notes.tree}
-                editorViewRef={editorViewRef}
-                previewRef={previewRef}
-                onSave={saveEdit}
-                onCancel={cancelEdit}
-                onToggleStar={toggleActiveNoteStar}
-                onPdfExport={handlePdfExport}
-                onVimToggle={handleVimToggle}
-                onContentChange={setEditContent}
-                onCursorStateChange={setCursorState}
-                onNoteSelect={handleNoteSelect}
-                onLinkClick={handleLinkClick}
-                onCreateNote={handleCreateNoteFromLink}
-              />
+        <main className="flex-1 flex flex-col overflow-hidden">
+          <PluginSlot slot="editor-toolbar" />
+          <div className="flex-1 flex overflow-hidden">
+            {notes.activeNote ? (
+              editing ? (
+                <EditModeView
+                  activeNote={notes.activeNote}
+                  editContent={editContent}
+                  originalContent={originalContent}
+                  vimEnabled={vimEnabled}
+                  isStarred={isActiveNoteStarred}
+                  resolvedTheme={themeCtx.resolvedTheme}
+                  allNotes={notes.tree}
+                  editorViewRef={editorViewRef}
+                  previewRef={previewRef}
+                  onSave={saveEdit}
+                  onCancel={cancelEdit}
+                  onToggleStar={toggleActiveNoteStar}
+                  onPdfExport={handlePdfExport}
+                  onVimToggle={handleVimToggle}
+                  onContentChange={setEditContent}
+                  onCursorStateChange={setCursorState}
+                  onNoteSelect={handleNoteSelect}
+                  onLinkClick={handleLinkClick}
+                  onCreateNote={handleCreateNoteFromLink}
+                />
+              ) : (
+                <PreviewModeView
+                  activeNote={notes.activeNote}
+                  isStarred={isActiveNoteStarred}
+                  allNotes={notes.tree}
+                  previewRef={previewRef}
+                  onEdit={enterEditMode}
+                  onShare={() => handleShare(notes.activeNote!.path, false)}
+                  onToggleStar={toggleActiveNoteStar}
+                  onPdfExport={handlePdfExport}
+                  onNoteSelect={handleNoteSelect}
+                  onLinkClick={handleLinkClick}
+                  onCreateNote={handleCreateNoteFromLink}
+                />
+              )
             ) : (
-              <PreviewModeView
-                activeNote={notes.activeNote}
-                isStarred={isActiveNoteStarred}
-                allNotes={notes.tree}
-                previewRef={previewRef}
-                onEdit={enterEditMode}
-                onShare={() => handleShare(notes.activeNote!.path, false)}
-                onToggleStar={toggleActiveNoteStar}
-                onPdfExport={handlePdfExport}
-                onNoteSelect={handleNoteSelect}
-                onLinkClick={handleLinkClick}
-                onCreateNote={handleCreateNoteFromLink}
-              />
-            )
-          ) : (
-            <EmptyStateView />
-          )}
+              <EmptyStateView />
+            )}
+          </div>
         </main>
 
         {!editing && (
@@ -199,13 +218,17 @@ function AppContent() {
         )}
       </div>
 
-      <StatusBar
-        notePath={notes.activeNote?.path ?? null}
-        vimMode={cursorState.vimMode}
-        line={cursorState.line}
-        col={cursorState.col}
-        wordCount={cursorState.wordCount}
-      />
+      <div className="flex items-center">
+        <PluginSlot slot="statusbar-left" />
+        <StatusBar
+          notePath={notes.activeNote?.path ?? null}
+          vimMode={cursorState.vimMode}
+          line={cursorState.line}
+          col={cursorState.col}
+          wordCount={cursorState.wordCount}
+        />
+        <PluginSlot slot="statusbar-right" />
+      </div>
 
       {notes.error && (
         <ErrorToast message={notes.error} onDismiss={() => notes.setError(null)} />
