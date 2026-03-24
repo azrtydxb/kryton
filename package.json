@@ -15,6 +15,9 @@
     "build": "npm run build --workspace=packages/server && npm run build --workspace=packages/client",
     "lint": "npm run lint --workspace=packages/server && npm run lint --workspace=packages/client",
     "lint:fix": "npm run lint:fix --workspace=packages/server && npm run lint:fix --workspace=packages/client",
-    "typecheck": "npm run typecheck --workspace=packages/server && npm run typecheck --workspace=packages/client"
+    "typecheck": "npm run typecheck --workspace=packages/server && npm run typecheck --workspace=packages/client",
+    "test": "npm run test --workspaces",
+    "test:server": "npm run test --workspace=packages/server",
+    "test:client": "npm run test --workspace=packages/client"
   }
 }
