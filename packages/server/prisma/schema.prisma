@@ -30,7 +30,6 @@ model User {
   passkeys Passkey[]
 
   // Domain relations
-  settings                Settings[]
   noteShares              NoteShare[]    @relation("owner")
   sharedWith              NoteShare[]    @relation("sharedWith")
   accessRequestsOwner     AccessRequest[] @relation("arOwner")
@@ -104,7 +103,6 @@ model Settings {
   key    String
   userId String
   value  String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([key, userId])
 }

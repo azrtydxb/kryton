@@ -111,10 +111,10 @@ async function main() {
     console.log("\nMigrating users...");
 
     const usersResult = await client.query<OldUser>(
-      `SELECT id, email, name, password_hash, role, avatar_url, disabled,
-              created_at, updated_at
+      `SELECT id, email, name, "passwordHash" as password_hash, role, "avatarUrl" as avatar_url, disabled,
+              "createdAt" as created_at, "updatedAt" as updated_at
        FROM "user"
-       ORDER BY created_at ASC`
+       ORDER BY "createdAt" ASC`
     );
 
     stats.usersChecked = usersResult.rowCount ?? 0;
@@ -191,7 +191,7 @@ async function main() {
       console.log("\nMigrating OAuth providers...");
 
       const providersResult = await client.query<OldAuthProvider>(
-        `SELECT id, user_id, provider, provider_account_id, created_at
+        `SELECT id, "userId" as user_id, provider, "providerAccountId" as provider_account_id, "createdAt" as created_at
          FROM auth_provider`
       );
 
@@ -241,7 +241,7 @@ async function main() {
       console.log("\nMigrating invite codes...");
 
       const invitesResult = await client.query<OldInviteCode>(
-        `SELECT id, code, created_by, used_by, expires_at, created_at
+        `SELECT id, code, "createdByUserId" as created_by, "usedBy" as used_by, "expiresAt" as expires_at, "createdAt" as created_at
          FROM invite_code`
       );
 

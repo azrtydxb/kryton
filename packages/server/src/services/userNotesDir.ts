@@ -3,8 +3,8 @@ import * as fs from "fs/promises";
 import { indexNote } from "./searchService";
 import { updateGraphCache } from "./graphService";
 
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Accepts both UUIDs and better-auth's alphanumeric IDs
+const SAFE_USER_ID_REGEX = /^[a-zA-Z0-9_-]{8,64}$/;
 
 /**
  * SAMPLE_NOTES — default notes provisioned for every new user.
@@ -161,7 +161,7 @@ export async function getUserNotesDir(
   baseDir: string,
   userId: string,
 ): Promise<string> {
-  if (!UUID_REGEX.test(userId)) throw new Error("Invalid userId format");
+  if (!SAFE_USER_ID_REGEX.test(userId)) throw new Error("Invalid userId format");
   const dir = path.join(baseDir, userId);
   await fs.mkdir(dir, { recursive: true });
   return dir;
@@ -206,7 +206,7 @@ export async function provisionUserNotes(
 export async function cleanupOldNotes(baseDir: string): Promise<void> {
   const entries = await fs.readdir(baseDir).catch(() => []);
   const nonUuid = entries.filter(
-    (e) => !UUID_REGEX.test(e) && e !== ".backup-pre-multiuser",
+    (e) => !SAFE_USER_ID_REGEX.test(e) && e !== ".backup-pre-multiuser",
   );
   if (nonUuid.length === 0) return;
 
