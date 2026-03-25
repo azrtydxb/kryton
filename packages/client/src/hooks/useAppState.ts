@@ -15,38 +15,49 @@ export function useAppState() {
   const queryClient = useQueryClient();
 
   // --- Zustand UI state (replaces all useState calls) ---
-  const sidebarOpen = useUIStore((s) => s.sidebarOpen);
-  const setSidebarOpen = useUIStore((s) => s.setSidebarOpen);
-  const sidebarWidth = useUIStore((s) => s.sidebarWidth);
-  const setSidebarWidth = useUIStore((s) => s.setSidebarWidth);
-  const rightPanelWidth = useUIStore((s) => s.rightPanelWidth);
-  const setRightPanelWidth = useUIStore((s) => s.setRightPanelWidth);
-  const graphHeight = useUIStore((s) => s.graphHeight);
-  const setGraphHeight = useUIStore((s) => s.setGraphHeight);
-  const mobileMenuOpen = useUIStore((s) => s.mobileMenuOpen);
-  const setMobileMenuOpen = useUIStore((s) => s.setMobileMenuOpen);
-  const editing = useUIStore((s) => s.editing);
-  const setEditing = useUIStore((s) => s.setEditing);
-  const editContent = useUIStore((s) => s.editContent);
-  const setEditContent = useUIStore((s) => s.setEditContent);
-  const originalContent = useUIStore((s) => s.originalContent);
-  const setOriginalContent = useUIStore((s) => s.setOriginalContent);
-  const showAdmin = useUIStore((s) => s.showAdmin);
-  const setShowAdmin = useUIStore((s) => s.setShowAdmin);
-  const showTemplatePicker = useUIStore((s) => s.showTemplatePicker);
-  const setShowTemplatePicker = useUIStore((s) => s.setShowTemplatePicker);
-  const pendingTemplatePath = useUIStore((s) => s.pendingTemplatePath);
-  const setPendingTemplatePath = useUIStore((s) => s.setPendingTemplatePath);
-  const showQuickSwitcher = useUIStore((s) => s.showQuickSwitcher);
-  const setShowQuickSwitcher = useUIStore((s) => s.setShowQuickSwitcher);
-  const showShareDialog = useUIStore((s) => s.showShareDialog);
-  const setShowShareDialog = useUIStore((s) => s.setShowShareDialog);
-  const shareTarget = useUIStore((s) => s.shareTarget);
-  const setShareTarget = useUIStore((s) => s.setShareTarget);
-  const showAccessRequests = useUIStore((s) => s.showAccessRequests);
-  const setShowAccessRequests = useUIStore((s) => s.setShowAccessRequests);
-  const cursorState = useUIStore((s) => s.cursorState);
-  const setCursorState = useUIStore((s) => s.setCursorState);
+  const editorSlice = useUIStore((s) => ({
+    editing: s.editing,
+    setEditing: s.setEditing,
+    editContent: s.editContent,
+    setEditContent: s.setEditContent,
+    originalContent: s.originalContent,
+    setOriginalContent: s.setOriginalContent,
+    cursorState: s.cursorState,
+    setCursorState: s.setCursorState,
+  }));
+
+  const sidebarSlice = useUIStore((s) => ({
+    sidebarOpen: s.sidebarOpen,
+    setSidebarOpen: s.setSidebarOpen,
+    sidebarWidth: s.sidebarWidth,
+    setSidebarWidth: s.setSidebarWidth,
+    mobileMenuOpen: s.mobileMenuOpen,
+    setMobileMenuOpen: s.setMobileMenuOpen,
+  }));
+
+  const layoutSlice = useUIStore((s) => ({
+    rightPanelWidth: s.rightPanelWidth,
+    setRightPanelWidth: s.setRightPanelWidth,
+    graphHeight: s.graphHeight,
+    setGraphHeight: s.setGraphHeight,
+  }));
+
+  const modalSlice = useUIStore((s) => ({
+    showAdmin: s.showAdmin,
+    setShowAdmin: s.setShowAdmin,
+    showTemplatePicker: s.showTemplatePicker,
+    setShowTemplatePicker: s.setShowTemplatePicker,
+    pendingTemplatePath: s.pendingTemplatePath,
+    setPendingTemplatePath: s.setPendingTemplatePath,
+    showQuickSwitcher: s.showQuickSwitcher,
+    setShowQuickSwitcher: s.setShowQuickSwitcher,
+    showShareDialog: s.showShareDialog,
+    setShowShareDialog: s.setShowShareDialog,
+    shareTarget: s.shareTarget,
+    setShareTarget: s.setShareTarget,
+    showAccessRequests: s.showAccessRequests,
+    setShowAccessRequests: s.setShowAccessRequests,
+  }));
 
   // --- TanStack Query for server data (replaces useEffect fetches) ---
   const treeKey = notes.tree.length;
@@ -86,27 +97,13 @@ export function useAppState() {
     themeCtx,
     // Notes
     notes,
-    // Editing
-    editing, setEditing,
-    editContent, setEditContent,
-    originalContent, setOriginalContent,
-    // UI toggles
-    showAdmin, setShowAdmin,
-    sidebarOpen, setSidebarOpen,
-    mobileMenuOpen, setMobileMenuOpen,
-    showTemplatePicker, setShowTemplatePicker,
-    pendingTemplatePath, setPendingTemplatePath,
-    showQuickSwitcher, setShowQuickSwitcher,
-    showShareDialog, setShowShareDialog,
-    shareTarget, setShareTarget,
-    showAccessRequests, setShowAccessRequests,
-    // Layout
-    sidebarWidth, setSidebarWidth,
-    rightPanelWidth, setRightPanelWidth,
-    graphHeight, setGraphHeight,
+    // Zustand slices
+    ...editorSlice,
+    ...sidebarSlice,
+    ...layoutSlice,
+    ...modalSlice,
     // Data
     graphData, graphLoading,
-    cursorState, setCursorState,
     starredPaths, setStarredPaths,
     sharedNotes,
     isActiveNoteStarred,
