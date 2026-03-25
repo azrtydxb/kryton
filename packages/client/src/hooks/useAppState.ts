@@ -1,6 +1,7 @@
 import { useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { EditorView } from '@codemirror/view';
+import { useShallow } from 'zustand/react/shallow';
 import { useTheme } from './useTheme';
 import { useNotes } from './useNotes';
 import { useAuth } from './useAuth';
@@ -15,7 +16,8 @@ export function useAppState() {
   const queryClient = useQueryClient();
 
   // --- Zustand UI state (replaces all useState calls) ---
-  const editorSlice = useUIStore((s) => ({
+  // useShallow prevents infinite re-renders from object selectors
+  const editorSlice = useUIStore(useShallow((s) => ({
     editing: s.editing,
     setEditing: s.setEditing,
     editContent: s.editContent,
@@ -24,25 +26,25 @@ export function useAppState() {
     setOriginalContent: s.setOriginalContent,
     cursorState: s.cursorState,
     setCursorState: s.setCursorState,
-  }));
+  })));
 
-  const sidebarSlice = useUIStore((s) => ({
+  const sidebarSlice = useUIStore(useShallow((s) => ({
     sidebarOpen: s.sidebarOpen,
     setSidebarOpen: s.setSidebarOpen,
     sidebarWidth: s.sidebarWidth,
     setSidebarWidth: s.setSidebarWidth,
     mobileMenuOpen: s.mobileMenuOpen,
     setMobileMenuOpen: s.setMobileMenuOpen,
-  }));
+  })));
 
-  const layoutSlice = useUIStore((s) => ({
+  const layoutSlice = useUIStore(useShallow((s) => ({
     rightPanelWidth: s.rightPanelWidth,
     setRightPanelWidth: s.setRightPanelWidth,
     graphHeight: s.graphHeight,
     setGraphHeight: s.setGraphHeight,
-  }));
+  })));
 
-  const modalSlice = useUIStore((s) => ({
+  const modalSlice = useUIStore(useShallow((s) => ({
     showAdmin: s.showAdmin,
     setShowAdmin: s.setShowAdmin,
     showTemplatePicker: s.showTemplatePicker,
@@ -57,7 +59,7 @@ export function useAppState() {
     setShareTarget: s.setShareTarget,
     showAccessRequests: s.showAccessRequests,
     setShowAccessRequests: s.setShowAccessRequests,
-  }));
+  })));
 
   // --- TanStack Query for server data (replaces useEffect fetches) ---
   const treeKey = notes.tree.length;

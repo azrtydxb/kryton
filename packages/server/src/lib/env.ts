@@ -1,4 +1,9 @@
 import { z } from "zod";
+import { config } from "dotenv";
+import { resolve } from "path";
+
+// Load .env from the server package root
+config({ path: resolve(import.meta.dirname, "../../.env") });
 
 const envSchema = z.object({
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
