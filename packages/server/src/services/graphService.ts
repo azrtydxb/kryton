@@ -1,5 +1,5 @@
 import { prisma } from "../prisma.js";
-import { hasAccess, getAccessibleSharedPaths } from "./shareService.js";
+import { getAccessibleSharedPaths } from "./shareService.js";
 
 const WIKI_LINK_REGEX = /\[\[([^\]]+)\]\]/g;
 
