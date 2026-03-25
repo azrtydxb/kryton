@@ -1,4 +1,4 @@
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import {
   scanDirectory,
   readNote,
@@ -8,7 +8,10 @@ import {
 } from "../services/noteService";
 import { getUserNotesDir } from "../services/userNotesDir";
 import { hasAccess } from "../services/shareService";
-import { validate, createNoteSchema, updateNoteSchema } from "../lib/validation";
+import { validate, createNoteSchema, updateNoteSchema, renameNoteSchema } from "../lib/validation";
+import { requireUser } from "../middleware/auth.js";
+import { decodePathParam, ensureExtension } from "../lib/pathUtils.js";
+import { ForbiddenError, ValidationError } from "../lib/errors.js";
 
 /**
  * @swagger
@@ -181,53 +184,40 @@ export function createNotesRouter(notesDir: string): Router {
   const router = Router();
 
   // GET /api/notes — List all notes as tree structure
-  router.get("/", async (req: Request, res: Response) => {
+  router.get("/", async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const userDir = await getUserNotesDir(notesDir, req.user!.id);
+      const user = requireUser(req);
+      const userDir = await getUserNotesDir(notesDir, user.id);
       const tree = await scanDirectory(userDir);
       res.json(tree);
     } catch (err) {
-      console.error("Error scanning notes directory:", err);
-      res.status(500).json({ error: "Failed to scan notes directory" });
+      next(err);
     }
   });
 
   // GET /api/notes/:path(*) — Get note content (path is wildcard to support slashes)
-  router.get("/{*path}", async (req: Request, res: Response) => {
+  router.get("/{*path}", async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const userDir = await getUserNotesDir(notesDir, req.user!.id);
-      const notePath = decodeURIComponent(Array.isArray(req.params.path) ? req.params.path.join("/") : req.params.path as string);
+      const user = requireUser(req);
+      const userDir = await getUserNotesDir(notesDir, user.id);
+      const notePath = decodePathParam(req.params.path);
       if (!notePath) {
-        res.status(400).json({ error: "Path is required" });
-        return;
+        throw new ValidationError("Path is required");
       }
 
-      // Append .md if not present
-      const fullNotePath = notePath.endsWith(".md") ? notePath : `${notePath}.md`;
-
+      const fullNotePath = ensureExtension(notePath, ".md");
       const note = await readNote(userDir, fullNotePath);
       res.json(note);
     } catch (err) {
-      if (
-        err instanceof Error &&
-        (err.message.includes("ENOENT") || err.message.includes("no such file"))
-      ) {
-        res.status(404).json({ error: "Note not found" });
-        return;
-      }
-      if (err instanceof Error && err.message.includes("Invalid path")) {
-        res.status(400).json({ error: err.message });
-        return;
-      }
-      console.error("Error reading note:", err);
-      res.status(500).json({ error: "Failed to read note" });
+      next(err);
     }
   });
 
   // POST /api/notes — Create a new note
-  router.post("/", async (req: Request, res: Response) => {
+  router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const userDir = await getUserNotesDir(notesDir, req.user!.id);
+      const user = requireUser(req);
+      const userDir = await getUserNotesDir(notesDir, user.id);
       const parsed = validate(createNoteSchema, req.body);
       if (!parsed.success) {
         res.status(400).json({ error: parsed.error });
@@ -235,29 +225,22 @@ export function createNotesRouter(notesDir: string): Router {
       }
       const { path: notePath, content } = parsed.data;
 
-      // Append .md if not present
-      const fullNotePath = notePath.endsWith(".md") ? notePath : `${notePath}.md`;
-
-      await writeNote(userDir, fullNotePath, content || "", req.user!.id);
+      const fullNotePath = ensureExtension(notePath, ".md");
+      await writeNote(userDir, fullNotePath, content || "", user.id);
       res.status(201).json({ path: fullNotePath, message: "Note created" });
     } catch (err) {
-      if (err instanceof Error && err.message.includes("Invalid path")) {
-        res.status(400).json({ error: err.message });
-        return;
-      }
-      console.error("Error creating note:", err);
-      res.status(500).json({ error: "Failed to create note" });
+      next(err);
     }
   });
 
   // PUT /api/notes/:path(*) — Update a note
-  router.put("/{*path}", async (req: Request, res: Response) => {
+  router.put("/{*path}", async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const userDir = await getUserNotesDir(notesDir, req.user!.id);
-      const notePath = decodeURIComponent(Array.isArray(req.params.path) ? req.params.path.join("/") : req.params.path as string);
+      const user = requireUser(req);
+      const userDir = await getUserNotesDir(notesDir, user.id);
+      const notePath = decodePathParam(req.params.path);
       if (!notePath) {
-        res.status(400).json({ error: "Path is required" });
-        return;
+        throw new ValidationError("Path is required");
       }
 
       const parsed = validate(updateNoteSchema, req.body);
@@ -267,48 +250,29 @@ export function createNotesRouter(notesDir: string): Router {
       }
       const { content } = parsed.data;
 
-      const fullNotePath = notePath.endsWith(".md") ? notePath : `${notePath}.md`;
-
-      await writeNote(userDir, fullNotePath, content, req.user!.id);
+      const fullNotePath = ensureExtension(notePath, ".md");
+      await writeNote(userDir, fullNotePath, content, user.id);
       res.json({ path: fullNotePath, message: "Note updated" });
     } catch (err) {
-      if (err instanceof Error && err.message.includes("Invalid path")) {
-        res.status(400).json({ error: err.message });
-        return;
-      }
-      console.error("Error updating note:", err);
-      res.status(500).json({ error: "Failed to update note" });
+      next(err);
     }
   });
 
   // DELETE /api/notes/:path(*) — Delete a note
-  router.delete("/{*path}", async (req: Request, res: Response) => {
+  router.delete("/{*path}", async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const userDir = await getUserNotesDir(notesDir, req.user!.id);
-      const notePath = decodeURIComponent(Array.isArray(req.params.path) ? req.params.path.join("/") : req.params.path as string);
+      const user = requireUser(req);
+      const userDir = await getUserNotesDir(notesDir, user.id);
+      const notePath = decodePathParam(req.params.path);
       if (!notePath) {
-        res.status(400).json({ error: "Path is required" });
-        return;
+        throw new ValidationError("Path is required");
       }
 
-      const fullNotePath = notePath.endsWith(".md") ? notePath : `${notePath}.md`;
-
-      await deleteNote(userDir, fullNotePath, req.user!.id);
+      const fullNotePath = ensureExtension(notePath, ".md");
+      await deleteNote(userDir, fullNotePath, user.id);
       res.json({ message: "Note deleted" });
     } catch (err) {
-      if (
-        err instanceof Error &&
-        (err.message.includes("ENOENT") || err.message.includes("no such file"))
-      ) {
-        res.status(404).json({ error: "Note not found" });
-        return;
-      }
-      if (err instanceof Error && err.message.includes("Invalid path")) {
-        res.status(400).json({ error: err.message });
-        return;
-      }
-      console.error("Error deleting note:", err);
-      res.status(500).json({ error: "Failed to delete note" });
+      next(err);
     }
   });
 
@@ -372,40 +336,28 @@ export function createNotesRenameRouter(notesDir: string): Router {
   const router = Router();
 
   // POST /api/notes-rename/:path(*) — Rename a note
-  router.post("/{*path}", async (req: Request, res: Response) => {
+  router.post("/{*path}", async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const userDir = await getUserNotesDir(notesDir, req.user!.id);
-      const oldPath = decodeURIComponent(Array.isArray(req.params.path) ? req.params.path.join("/") : req.params.path as string);
+      const user = requireUser(req);
+      const userDir = await getUserNotesDir(notesDir, user.id);
+      const oldPath = decodePathParam(req.params.path);
       if (!oldPath) {
-        res.status(400).json({ error: "Path is required" });
+        throw new ValidationError("Path is required");
+      }
+
+      const parsed = validate(renameNoteSchema, req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error });
         return;
       }
 
-      const { newPath } = req.body as { newPath?: string };
-      if (!newPath) {
-        res.status(400).json({ error: "newPath is required" });
-        return;
-      }
+      const fullOldPath = ensureExtension(oldPath, ".md");
+      const fullNewPath = ensureExtension(parsed.data.newPath, ".md");
 
-      const fullOldPath = oldPath.endsWith(".md") ? oldPath : `${oldPath}.md`;
-      const fullNewPath = newPath.endsWith(".md") ? newPath : `${newPath}.md`;
-
-      await renameNote(userDir, fullOldPath, fullNewPath, req.user!.id);
+      await renameNote(userDir, fullOldPath, fullNewPath, user.id);
       res.json({ oldPath: fullOldPath, newPath: fullNewPath, message: "Note renamed" });
     } catch (err) {
-      if (
-        err instanceof Error &&
-        (err.message.includes("ENOENT") || err.message.includes("no such file"))
-      ) {
-        res.status(404).json({ error: "Note not found" });
-        return;
-      }
-      if (err instanceof Error && err.message.includes("Invalid path")) {
-        res.status(400).json({ error: err.message });
-        return;
-      }
-      console.error("Error renaming note:", err);
-      res.status(500).json({ error: "Failed to rename note" });
+      next(err);
     }
   });
 
@@ -421,70 +373,46 @@ export function createSharedNotesRouter(notesDir: string): Router {
   const router = Router();
 
   // GET /api/notes/shared/:ownerUserId/:path(*) — Read a shared note
-  router.get("/:ownerUserId/{*path}", async (req: Request, res: Response) => {
+  router.get("/:ownerUserId/{*path}", async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const user = requireUser(req);
       const ownerUserId = req.params.ownerUserId as string;
-      const notePath = decodeURIComponent(
-        Array.isArray(req.params.path) ? req.params.path.join("/") : (req.params.path as string),
-      );
+      const notePath = decodePathParam(req.params.path);
 
       if (!notePath) {
-        res.status(400).json({ error: "Path is required" });
-        return;
+        throw new ValidationError("Path is required");
       }
 
-      // Validate owner UUID and get their notes dir
       const ownerDir = await getUserNotesDir(notesDir, ownerUserId);
-
-      // Check permission
-      const fullNotePath = notePath.endsWith(".md") ? notePath : `${notePath}.md`;
-      const access = await hasAccess(ownerUserId, fullNotePath, req.user!.id);
+      const fullNotePath = ensureExtension(notePath, ".md");
+      const access = await hasAccess(ownerUserId, fullNotePath, user.id);
       if (!access.canRead) {
-        res.status(403).json({ error: "You do not have permission to read this note" });
-        return;
+        throw new ForbiddenError("You do not have permission to read this note");
       }
 
       const note = await readNote(ownerDir, fullNotePath);
       res.json({ path: fullNotePath, content: note.content, title: note.title });
     } catch (err) {
-      if (
-        err instanceof Error &&
-        (err.message.includes("ENOENT") || err.message.includes("no such file"))
-      ) {
-        res.status(404).json({ error: "Note not found" });
-        return;
-      }
-      if (err instanceof Error && err.message.includes("Invalid path")) {
-        res.status(400).json({ error: err.message });
-        return;
-      }
-      console.error("Error reading shared note:", err);
-      res.status(500).json({ error: "Failed to read shared note" });
+      next(err);
     }
   });
 
   // PUT /api/notes/shared/:ownerUserId/:path(*) — Write to a shared note
-  router.put("/:ownerUserId/{*path}", async (req: Request, res: Response) => {
+  router.put("/:ownerUserId/{*path}", async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const user = requireUser(req);
       const ownerUserId = req.params.ownerUserId as string;
-      const notePath = decodeURIComponent(
-        Array.isArray(req.params.path) ? req.params.path.join("/") : (req.params.path as string),
-      );
+      const notePath = decodePathParam(req.params.path);
 
       if (!notePath) {
-        res.status(400).json({ error: "Path is required" });
-        return;
+        throw new ValidationError("Path is required");
       }
 
-      // Validate owner UUID and get their notes dir
       const ownerDir = await getUserNotesDir(notesDir, ownerUserId);
-
-      // Check permission — must have canWrite
-      const fullNotePath = notePath.endsWith(".md") ? notePath : `${notePath}.md`;
-      const access = await hasAccess(ownerUserId, fullNotePath, req.user!.id);
+      const fullNotePath = ensureExtension(notePath, ".md");
+      const access = await hasAccess(ownerUserId, fullNotePath, user.id);
       if (!access.canWrite) {
-        res.status(403).json({ error: "You do not have permission to write to this note" });
-        return;
+        throw new ForbiddenError("You do not have permission to write to this note");
       }
 
       const parsedBody = validate(updateNoteSchema, req.body);
@@ -494,16 +422,10 @@ export function createSharedNotesRouter(notesDir: string): Router {
       }
       const { content } = parsedBody.data;
 
-      // Write to owner's file, re-index under owner's userId
       await writeNote(ownerDir, fullNotePath, content, ownerUserId);
       res.json({ path: fullNotePath, message: "Note updated" });
     } catch (err) {
-      if (err instanceof Error && err.message.includes("Invalid path")) {
-        res.status(400).json({ error: err.message });
-        return;
-      }
-      console.error("Error writing shared note:", err);
-      res.status(500).json({ error: "Failed to write shared note" });
+      next(err);
     }
   });
 
