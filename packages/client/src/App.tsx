@@ -1,10 +1,19 @@
 import { useMemo, useEffect } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './hooks/useAuth';
 import { PluginSlotRegistry } from './plugins/PluginSlotRegistry';
 import { ClientPluginManager } from './plugins/PluginManager';
 import { PluginProvider, usePluginSlots } from './plugins/PluginContext';
 import { PluginSlot } from './components/PluginSlot/PluginSlot';
 
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 const pluginRegistry = new PluginSlotRegistry();
 const pluginManager = new ClientPluginManager(pluginRegistry);
 import { useAppState } from './hooks/useAppState';
@@ -23,11 +32,13 @@ import LoginPage from './pages/LoginPage';
 
 export default function App() {
   return (
-    <AuthProvider>
-      <PluginProvider registry={pluginRegistry}>
-        <AppContent />
-      </PluginProvider>
-    </AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <PluginProvider registry={pluginRegistry}>
+          <AppContent />
+        </PluginProvider>
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }
 

@@ -24,6 +24,7 @@
     "@codemirror/theme-one-dark": "^6.1.3",
     "@codemirror/view": "^6.40.0",
     "@replit/codemirror-vim": "^6.3.0",
+    "@tanstack/react-query": "^5.95.2",
     "better-auth": "^1.5.6",
     "codemirror": "^6.0.2",
     "d3": "^7.9.0",
@@ -38,7 +39,8 @@
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.1",
     "remark-wiki-link": "^2.0.1",
-    "use-debounce": "^10.1.0"
+    "use-debounce": "^10.1.0",
+    "zustand": "^5.0.12"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -1,82 +1,83 @@
-import { useState, useRef, useEffect } from 'react';
+import { useRef, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { EditorView } from '@codemirror/view';
 import { useTheme } from './useTheme';
 import { useNotes } from './useNotes';
 import { useAuth } from './useAuth';
-import { api, shareApi, GraphData } from '../lib/api';
-import { EditorCursorState } from '../components/Editor/Editor';
+import { GraphData } from '../lib/api';
+import { useUIStore } from '../stores/uiStore';
+import { useGraphQuery, useStarredNotes, useSharedNotes } from './useNotesQuery';
 
 export function useAppState() {
   const { user, loading } = useAuth();
   const themeCtx = useTheme();
   const notes = useNotes(user?.id);
+  const queryClient = useQueryClient();
 
-  // Editing state
-  const [editing, setEditing] = useState(false);
-  const [editContent, setEditContent] = useState<string | null>(null);
-  const [originalContent, setOriginalContent] = useState<string | null>(null);
+  // --- Zustand UI state (replaces all useState calls) ---
+  const sidebarOpen = useUIStore((s) => s.sidebarOpen);
+  const setSidebarOpen = useUIStore((s) => s.setSidebarOpen);
+  const sidebarWidth = useUIStore((s) => s.sidebarWidth);
+  const setSidebarWidth = useUIStore((s) => s.setSidebarWidth);
+  const rightPanelWidth = useUIStore((s) => s.rightPanelWidth);
+  const setRightPanelWidth = useUIStore((s) => s.setRightPanelWidth);
+  const graphHeight = useUIStore((s) => s.graphHeight);
+  const setGraphHeight = useUIStore((s) => s.setGraphHeight);
+  const mobileMenuOpen = useUIStore((s) => s.mobileMenuOpen);
+  const setMobileMenuOpen = useUIStore((s) => s.setMobileMenuOpen);
+  const editing = useUIStore((s) => s.editing);
+  const setEditing = useUIStore((s) => s.setEditing);
+  const editContent = useUIStore((s) => s.editContent);
+  const setEditContent = useUIStore((s) => s.setEditContent);
+  const originalContent = useUIStore((s) => s.originalContent);
+  const setOriginalContent = useUIStore((s) => s.setOriginalContent);
+  const showAdmin = useUIStore((s) => s.showAdmin);
+  const setShowAdmin = useUIStore((s) => s.setShowAdmin);
+  const showTemplatePicker = useUIStore((s) => s.showTemplatePicker);
+  const setShowTemplatePicker = useUIStore((s) => s.setShowTemplatePicker);
+  const pendingTemplatePath = useUIStore((s) => s.pendingTemplatePath);
+  const setPendingTemplatePath = useUIStore((s) => s.setPendingTemplatePath);
+  const showQuickSwitcher = useUIStore((s) => s.showQuickSwitcher);
+  const setShowQuickSwitcher = useUIStore((s) => s.setShowQuickSwitcher);
+  const showShareDialog = useUIStore((s) => s.showShareDialog);
+  const setShowShareDialog = useUIStore((s) => s.setShowShareDialog);
+  const shareTarget = useUIStore((s) => s.shareTarget);
+  const setShareTarget = useUIStore((s) => s.setShareTarget);
+  const showAccessRequests = useUIStore((s) => s.showAccessRequests);
+  const setShowAccessRequests = useUIStore((s) => s.setShowAccessRequests);
+  const cursorState = useUIStore((s) => s.cursorState);
+  const setCursorState = useUIStore((s) => s.setCursorState);
 
-  // UI state
-  const [showAdmin, setShowAdmin] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
-  const [pendingTemplatePath, setPendingTemplatePath] = useState<string | null>(null);
-  const [showQuickSwitcher, setShowQuickSwitcher] = useState(false);
-  const [showShareDialog, setShowShareDialog] = useState(false);
-  const [shareTarget, setShareTarget] = useState<{ path: string; isFolder: boolean } | null>(null);
-  const [showAccessRequests, setShowAccessRequests] = useState(false);
+  // --- TanStack Query for server data (replaces useEffect fetches) ---
+  const treeKey = notes.tree.length;
+  const graphQuery = useGraphQuery(user?.id, treeKey);
+  const graphData: GraphData | null = graphQuery.data ?? null;
+  const graphLoading = graphQuery.isLoading;
 
-  // Layout state
-  const [sidebarWidth, setSidebarWidth] = useState(256);
-  const [rightPanelWidth, setRightPanelWidth] = useState(320);
-  const [graphHeight, setGraphHeight] = useState<number | null>(null);
+  const starredQuery = useStarredNotes(user?.id);
+  const starredPaths: Set<string> = starredQuery.data ?? new Set();
 
-  // Data state
-  const [graphData, setGraphData] = useState<GraphData | null>(null);
-  const [graphLoading, setGraphLoading] = useState(true);
-  const [cursorState, setCursorState] = useState<EditorCursorState>({
-    line: 1, col: 1, wordCount: 0,
-  });
-  const [starredPaths, setStarredPaths] = useState<Set<string>>(new Set());
-  const [sharedNotes, setSharedNotes] = useState<{ id: string; ownerUserId: string; ownerName: string; path: string; isFolder: boolean; permission: string }[]>([]);
+  // Provide a backward-compatible setter that mirrors React's setState(updater) pattern.
+  // useAppCallbacks calls setStarredPaths(prev => nextSet) for optimistic UI updates.
+  const setStarredPaths = useCallback(
+    (updater: Set<string> | ((prev: Set<string>) => Set<string>)) => {
+      const queryKey = ['settings', 'starred', user?.id];
+      const current = queryClient.getQueryData<Set<string>>(queryKey) ?? new Set<string>();
+      const next = typeof updater === 'function' ? updater(current) : updater;
+      queryClient.setQueryData<Set<string>>(queryKey, next);
+    },
+    [queryClient, user?.id],
+  );
 
-  // Refs
+  const sharedQuery = useSharedNotes(user?.id);
+  const sharedNotes = sharedQuery.data ?? [];
+
+  const isActiveNoteStarred = notes.activeNote ? starredPaths.has(notes.activeNote.path) : false;
+
+  // Refs (unchanged)
   const editorViewRef = useRef<EditorView>(undefined);
   const searchInputRef = useRef<HTMLInputElement>(undefined);
   const previewRef = useRef<HTMLDivElement>(null);
-
-  // Load starred notes
-  useEffect(() => {
-    if (!user) return;
-    api.getSettings().then(settings => {
-      if (settings.starred) {
-        try {
-          const paths = JSON.parse(settings.starred) as string[];
-          setStarredPaths(new Set(paths));
-        } catch { /* ignore */ }
-      }
-    }).catch(() => {});
-  }, [user]);
-
-  // Fetch shared notes
-  useEffect(() => {
-    if (!user) return;
-    shareApi.withMe().then(data => setSharedNotes(data || [])).catch(() => {});
-  }, [user]);
-
-  // Fetch graph data
-  const treeKey = notes.tree.length;
-  useEffect(() => {
-    if (!user) return;
-    let cancelled = false;
-    api.getGraph()
-      .then(data => { if (!cancelled) { setGraphData(data); setGraphLoading(false); } })
-      .catch(() => { if (!cancelled) { setGraphLoading(false); } });
-    return () => { cancelled = true; };
-  }, [treeKey, user]);
-
-  const isActiveNoteStarred = notes.activeNote ? starredPaths.has(notes.activeNote.path) : false;
 
   return {
     // Auth
