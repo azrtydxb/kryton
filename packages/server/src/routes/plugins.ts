@@ -1,8 +1,9 @@
 import path from "path";
-import fs from "fs";
+import fs from "fs/promises";
 import { Router } from "express";
 import { PluginManager } from "../plugins/PluginManager.js";
 import { adminMiddleware } from "../middleware/auth.js";
+import { validatePluginId } from "../lib/pathUtils.js";
 import {
   fetchRegistry,
   downloadPlugin,
@@ -86,6 +87,7 @@ export function createPluginsRouter(pluginManager: PluginManager, pluginsDir: st
    */
   router.post("/:id/enable", adminMiddleware, async (req, res) => {
     const id = req.params.id as string;
+    validatePluginId(id);
     try {
       await pluginManager.loadPlugin(id);
       const plugin = pluginManager.getPlugin(id);
@@ -115,6 +117,7 @@ export function createPluginsRouter(pluginManager: PluginManager, pluginsDir: st
    */
   router.post("/:id/disable", adminMiddleware, async (req, res) => {
     const id = req.params.id as string;
+    validatePluginId(id);
     await pluginManager.disablePlugin(id);
     res.json({ id, state: "unloaded", enabled: false });
   });
@@ -141,6 +144,7 @@ export function createPluginsRouter(pluginManager: PluginManager, pluginsDir: st
    */
   router.post("/:id/reload", adminMiddleware, async (req, res) => {
     const id = req.params.id as string;
+    validatePluginId(id);
     try {
       await pluginManager.reloadPlugin(id);
       const plugin = pluginManager.getPlugin(id);
@@ -219,6 +223,7 @@ export function createPluginsRouter(pluginManager: PluginManager, pluginsDir: st
    */
   router.post("/install/:id", adminMiddleware, async (req, res) => {
     const id = req.params.id as string;
+    validatePluginId(id);
     try {
       const registry = await fetchRegistry();
       const registryPlugin = registry.plugins.find((p) => p.id === id);
@@ -259,6 +264,7 @@ export function createPluginsRouter(pluginManager: PluginManager, pluginsDir: st
    */
   router.post("/update/:id", adminMiddleware, async (req, res) => {
     const id = req.params.id as string;
+    validatePluginId(id);
     try {
       const registry = await fetchRegistry();
       const registryPlugin = registry.plugins.find((p) => p.id === id);
@@ -298,12 +304,15 @@ export function createPluginsRouter(pluginManager: PluginManager, pluginsDir: st
    */
   router.post("/:id/uninstall", adminMiddleware, async (req, res) => {
     const id = req.params.id as string;
+    validatePluginId(id);
     try {
       await pluginManager.unloadPlugin(id);
 
       const pluginDir = path.join(pluginsDir, id);
-      if (fs.existsSync(pluginDir)) {
-        fs.rmSync(pluginDir, { recursive: true, force: true });
+      try {
+        await fs.rm(pluginDir, { recursive: true, force: true });
+      } catch {
+        // Directory may not exist
       }
 
       await prisma.installedPlugin.delete({ where: { id } });

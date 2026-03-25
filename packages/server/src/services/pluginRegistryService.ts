@@ -1,5 +1,19 @@
 import path from "path";
-import fs from "fs";
+import fs from "fs/promises";
+
+const ALLOWED_DOWNLOAD_HOSTS = ["github.com", "raw.githubusercontent.com", "api.github.com"];
+
+function validateDownloadUrl(url: string): void {
+  try {
+    const parsed = new URL(url);
+    if (!ALLOWED_DOWNLOAD_HOSTS.includes(parsed.hostname)) {
+      throw new Error(`Download URL hostname not allowed: ${parsed.hostname}`);
+    }
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("not allowed")) throw err;
+    throw new Error(`Invalid download URL: ${url}`);
+  }
+}
 
 const REGISTRY_OWNER = "piwi3910";
 const REGISTRY_REPO = "mnemo-plugins";
@@ -112,6 +126,7 @@ async function fetchDirectoryContents(apiUrl: string): Promise<GitHubFileEntry[]
 }
 
 async function downloadFileBytes(downloadUrl: string): Promise<Buffer> {
+  validateDownloadUrl(downloadUrl);
   const response = await fetch(downloadUrl, {
     headers: { "User-Agent": USER_AGENT },
   });
@@ -138,15 +153,15 @@ async function downloadDirRecursive(
     const localPath = path.join(destDir, relPath);
 
     if (entry.type === "dir") {
-      fs.mkdirSync(localPath, { recursive: true });
+      await fs.mkdir(localPath, { recursive: true });
       await downloadDirRecursive(entry.url, destDir, repoBasePath);
     } else if (entry.type === "file") {
       if (!entry.download_url) continue;
       // Skip TypeScript source files — only download built JS, JSON, etc.
       if (entry.name.endsWith(".ts") && !entry.name.endsWith(".d.ts")) continue;
-      fs.mkdirSync(path.dirname(localPath), { recursive: true });
+      await fs.mkdir(path.dirname(localPath), { recursive: true });
       const bytes = await downloadFileBytes(entry.download_url);
-      fs.writeFileSync(localPath, bytes);
+      await fs.writeFile(localPath, bytes);
     }
   }
 }
@@ -156,7 +171,7 @@ export async function downloadPlugin(pluginId: string, targetDir: string): Promi
   const apiUrl = `${GITHUB_API_BASE}/repos/${REGISTRY_OWNER}/${REGISTRY_REPO}/contents/${repoPath}`;
 
   const destDir = path.join(targetDir, pluginId);
-  fs.mkdirSync(destDir, { recursive: true });
+  await fs.mkdir(destDir, { recursive: true });
 
   await downloadDirRecursive(apiUrl, destDir, repoPath);
 }
