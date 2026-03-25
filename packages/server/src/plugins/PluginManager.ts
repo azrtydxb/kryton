@@ -109,8 +109,15 @@ export class PluginManager {
       return;
     }
 
-    // Load module
+    // Load module — validate the resolved path stays within the plugin directory
     const serverEntry = path.resolve(pluginDir, manifest.server);
+    const resolvedPluginDir = path.resolve(pluginDir);
+    if (!serverEntry.startsWith(resolvedPluginDir + path.sep) && serverEntry !== resolvedPluginDir) {
+      instance.state = "error";
+      instance.error = "Invalid server entry: path traversal detected";
+      await this.persistPluginState(manifest, "error", instance.error);
+      return;
+    }
     try {
       // Clear require cache for hot-reload
       delete require.cache[require.resolve(serverEntry)];

@@ -85,6 +85,9 @@ async function main(): Promise<void> {
   // Create Express app
   const app = express();
 
+  // Trust proxy for correct client IP in rate limiter (behind reverse proxy/Docker)
+  app.set("trust proxy", 1);
+
   // Middleware
   app.use(cors({
     origin: process.env.APP_URL || "http://localhost:5173",
@@ -132,8 +135,8 @@ async function main(): Promise<void> {
   // Discover and load plugins from the plugins directory
   await pluginManager.discoverAndLoadPlugins();
 
-  // Serve plugin client bundles as static files
-  app.use("/plugins", express.static(pluginsDir));
+  // Serve plugin client bundles as static files (auth required)
+  app.use("/plugins", authMiddleware, express.static(pluginsDir));
 
   // Rate limiters
   const apiLimiter = rateLimit({

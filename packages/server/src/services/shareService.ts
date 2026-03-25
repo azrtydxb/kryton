@@ -28,7 +28,7 @@ export async function hasAccess(
     },
   });
   // Filter in-app: only keep folder shares where the share path is a prefix of the requested path
-  const matchingFolderShares = folderShares.filter((s) => path.startsWith(s.path));
+  const matchingFolderShares = folderShares.filter((s) => path === s.path || path.startsWith(s.path + "/"));
 
   // 3. Combine all matching shares
   const allShares = [...matchingFolderShares];

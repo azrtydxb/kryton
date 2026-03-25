@@ -27,6 +27,12 @@ export class PluginWebSocket {
             return;
           }
 
+          // Check if user account is disabled
+          if ((session.user as Record<string, unknown>).disabled) {
+            callback(false, 403, "Account is disabled");
+            return;
+          }
+
           callback(true);
         } catch {
           callback(false, 401, "Unauthorized");
