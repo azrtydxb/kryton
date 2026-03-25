@@ -268,6 +268,8 @@ Access at http://localhost:3100
 │  ├── Notes, Folders, Search, Graph, Tags                    │
 │  ├── Sharing & Access Requests                              │
 │  ├── Admin (users, invites, settings)                       │
+│  ├── Plugin system (server + client extensions)             │
+│  ├── WebSocket for real-time plugin communication           │
 │  └── Swagger API Docs                                       │
 ├─────────────────┬──────────────────────────────────────────┤
 │  PostgreSQL 16  │  File System                              │
@@ -299,7 +301,23 @@ npm run lint
 npm run build
 ```
 
+### Running Tests
+
+```bash
+npm run test                              # All tests
+npm run test --workspace=packages/server  # Server only
+npm run test --workspace=packages/client  # Client only
+```
+
 ---
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, code style, and PR process.
+
+## Plugin Development
+
+See [docs/PLUGINS.md](docs/PLUGINS.md) for the plugin API reference and development guide.
 
 ## License
 
