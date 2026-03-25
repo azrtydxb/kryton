@@ -36,6 +36,7 @@ import { PluginApiFactory } from "./plugins/PluginApiFactory.js";
 import { PluginManager } from "./plugins/PluginManager.js";
 import { PluginWebSocket } from "./plugins/PluginWebSocket.js";
 import { createPluginsRouter } from "./routes/plugins.js";
+import { createApiKeysRouter } from "./routes/apiKeys.js";
 
 const log = createLogger("server");
 const PORT = parseInt(process.env.PORT || "3001", 10);
@@ -172,8 +173,22 @@ async function main(): Promise<void> {
     message: { error: "Too many authentication attempts" },
   });
 
+  const apiKeyLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 300,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => req.apiKey?.id || req.ip || "unknown",
+    message: { error: "Too many API requests, please try again later" },
+  });
+
   app.use("/api/auth", authLimiter);
-  app.use("/api", apiLimiter);
+  app.use("/api", (req, res, next) => {
+    if (req.headers.authorization?.startsWith("Bearer mnemo_")) {
+      return apiKeyLimiter(req, res, next);
+    }
+    return apiLimiter(req, res, next);
+  });
 
   // better-auth handler (replaces old routes/auth.ts)
   app.all("/api/auth/*splat", toNodeHandler(auth));
@@ -230,6 +245,7 @@ async function main(): Promise<void> {
   app.use("/api/access-requests", authMiddleware, createAccessRequestsRouter());
   app.use("/api/users", authMiddleware, createUsersRouter());
   app.use("/api/plugins", authMiddleware, createPluginsRouter(pluginManager, pluginsDir));
+  app.use("/api/api-keys", authMiddleware, createApiKeysRouter());
 
   /**
    * @swagger
