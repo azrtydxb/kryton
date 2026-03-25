@@ -1,6 +1,7 @@
 import http from "http";
 import express, { Request, Response } from "express";
 import cors from "cors";
+import rateLimit from "express-rate-limit";
 import { toNodeHandler } from "better-auth/node";
 import swaggerUi from "swagger-ui-express";
 import * as path from "path";
@@ -126,6 +127,26 @@ async function main(): Promise<void> {
 
   // Serve plugin client bundles as static files
   app.use("/plugins", express.static(pluginsDir));
+
+  // Rate limiters
+  const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many requests, please try again later" },
+  });
+
+  const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 20, // stricter for auth
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many authentication attempts" },
+  });
+
+  app.use("/api/auth", authLimiter);
+  app.use("/api", apiLimiter);
 
   // better-auth handler (replaces old routes/auth.ts)
   app.all("/api/auth/*splat", toNodeHandler(auth));

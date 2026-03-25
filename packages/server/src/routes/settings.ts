@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { prisma } from "../prisma.js";
+import { validate, updateSettingSchema } from "../lib/validation.js";
 
 /**
  * @swagger
@@ -105,12 +106,12 @@ export function createSettingsRouter(): Router {
         return;
       }
 
-      const { value } = req.body as { value?: string };
-
-      if (value === undefined) {
-        res.status(400).json({ error: "Value is required" });
+      const parsed = validate(updateSettingSchema, req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error });
         return;
       }
+      const { value } = parsed.data;
 
       await prisma.settings.upsert({
         where: { key_userId: { key, userId: req.user!.id } },

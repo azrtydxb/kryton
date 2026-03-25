@@ -8,6 +8,7 @@ import {
 } from "../services/noteService";
 import { getUserNotesDir } from "../services/userNotesDir";
 import { hasAccess } from "../services/shareService";
+import { validate, createNoteSchema, updateNoteSchema } from "../lib/validation";
 
 /**
  * @swagger
@@ -227,15 +228,12 @@ export function createNotesRouter(notesDir: string): Router {
   router.post("/", async (req: Request, res: Response) => {
     try {
       const userDir = await getUserNotesDir(notesDir, req.user!.id);
-      const { path: notePath, content } = req.body as {
-        path?: string;
-        content?: string;
-      };
-
-      if (!notePath) {
-        res.status(400).json({ error: "Path is required" });
+      const parsed = validate(createNoteSchema, req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error });
         return;
       }
+      const { path: notePath, content } = parsed.data;
 
       // Append .md if not present
       const fullNotePath = notePath.endsWith(".md") ? notePath : `${notePath}.md`;
@@ -262,11 +260,12 @@ export function createNotesRouter(notesDir: string): Router {
         return;
       }
 
-      const { content } = req.body as { content?: string };
-      if (content === undefined) {
-        res.status(400).json({ error: "Content is required" });
+      const parsed = validate(updateNoteSchema, req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error });
         return;
       }
+      const { content } = parsed.data;
 
       const fullNotePath = notePath.endsWith(".md") ? notePath : `${notePath}.md`;
 
@@ -488,11 +487,12 @@ export function createSharedNotesRouter(notesDir: string): Router {
         return;
       }
 
-      const { content } = req.body as { content?: string };
-      if (content === undefined) {
-        res.status(400).json({ error: "Content is required" });
+      const parsedBody = validate(updateNoteSchema, req.body);
+      if (!parsedBody.success) {
+        res.status(400).json({ error: parsedBody.error });
         return;
       }
+      const { content } = parsedBody.data;
 
       // Write to owner's file, re-index under owner's userId
       await writeNote(ownerDir, fullNotePath, content, ownerUserId);

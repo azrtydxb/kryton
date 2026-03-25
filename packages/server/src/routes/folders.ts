@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { getUserNotesDir } from "../services/userNotesDir";
+import { validate, createFolderSchema } from "../lib/validation";
 
 /**
  * @swagger
@@ -89,11 +90,16 @@ export function createFoldersRouter(notesDir: string): Router {
   router.post("/", async (req: Request, res: Response) => {
     try {
       const userDir = await getUserNotesDir(notesDir, req.user!.id);
-      const { path: folderPath } = req.body as { path?: string };
-      if (!folderPath) {
-        res.status(400).json({ error: "Path is required" });
+      // Accept either `path` or `name` for the folder path
+      const bodyToValidate = req.body.path
+        ? { name: req.body.path as string }
+        : req.body;
+      const parsed = validate(createFolderSchema, bodyToValidate);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error });
         return;
       }
+      const folderPath = (req.body.path as string | undefined) ?? parsed.data.name;
 
       const fullPath = path.join(userDir, folderPath);
       if (!validatePath(fullPath, userDir)) {

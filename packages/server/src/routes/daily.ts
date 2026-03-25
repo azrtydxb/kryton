@@ -1,16 +1,10 @@
 import { Router, Request, Response } from "express";
 import * as path from "path";
 import * as fs from "fs/promises";
+import { format } from "date-fns";
 import { readNote, writeNote } from "../services/noteService.js";
 import { prisma } from "../prisma.js";
 import { getUserNotesDir } from "../services/userNotesDir.js";
-
-function formatDate(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
 
 async function getDailyTemplate(userId: string): Promise<string> {
   try {
@@ -82,7 +76,7 @@ export function createDailyRouter(notesDir: string): Router {
   router.post("/", async (req: Request, res: Response) => {
     try {
       const userDir = await getUserNotesDir(notesDir, req.user!.id);
-      const today = formatDate(new Date());
+      const today = format(new Date(), "yyyy-MM-dd");
       const notePath = `Daily/${today}.md`;
       const fullPath = path.join(userDir, notePath);
 

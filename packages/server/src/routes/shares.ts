@@ -1,6 +1,19 @@
 import { Router, Request, Response } from "express";
+import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { getSharedNotesForUser } from "../services/shareService.js";
+import { validate } from "../lib/validation.js";
+
+const createShareBodySchema = z.object({
+  path: z.string().min(1),
+  isFolder: z.boolean().optional(),
+  sharedWithUserId: z.string().min(1),
+  permission: z.enum(["read", "readwrite"]),
+});
+
+const updateShareSchema = z.object({
+  permission: z.enum(["read", "readwrite"]),
+});
 
 /**
  * @swagger
@@ -122,17 +135,12 @@ export function createSharesRouter(): Router {
   // POST /api/shares — Create a share
   router.post("/", async (req: Request, res: Response) => {
     try {
-      const { path, isFolder, sharedWithUserId, permission } = req.body as {
-        path?: string;
-        isFolder?: boolean;
-        sharedWithUserId?: string;
-        permission?: string;
-      };
-
-      if (!path || isFolder === undefined || !sharedWithUserId || !permission) {
-        res.status(400).json({ error: "path, isFolder, sharedWithUserId, and permission are required" });
+      const parsed = validate(createShareBodySchema, req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error });
         return;
       }
+      const { path, isFolder, sharedWithUserId, permission } = parsed.data;
 
       if (sharedWithUserId === req.user!.id) {
         res.status(400).json({ error: "Cannot share with yourself" });
@@ -191,12 +199,12 @@ export function createSharesRouter(): Router {
   router.put("/:id", async (req: Request, res: Response) => {
     try {
       const id = req.params.id as string;
-      const { permission } = req.body as { permission?: string };
-
-      if (!permission) {
-        res.status(400).json({ error: "permission is required" });
+      const parsed = validate(updateShareSchema, req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error });
         return;
       }
+      const { permission } = parsed.data;
 
       const share = await prisma.noteShare.findUnique({ where: { id } });
 
