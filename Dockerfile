@@ -18,7 +18,9 @@ RUN npm install --omit=dev
 RUN npx prisma generate --schema=prisma/schema.prisma
 RUN addgroup -S app && adduser -S app -G app
 RUN mkdir -p /notes && chown -R app:app /app /notes
+COPY --chown=app:app packages/server/prisma.config.mjs ./prisma.config.mjs
+COPY --chown=app:app entrypoint.sh ./entrypoint.sh
 USER app
 ENV PORT=3000
 EXPOSE 3000
-CMD ["node", "dist/index.js"]
+ENTRYPOINT ["./entrypoint.sh"]
