@@ -1,5 +1,6 @@
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { getAllTags, getNotesByTag } from "../services/searchService";
+import { requireUser } from "../middleware/auth.js";
 
 /**
  * @swagger
@@ -65,25 +66,25 @@ export function createTagsRouter(): Router {
   const router = Router();
 
   // GET /api/tags — Get all tags with counts
-  router.get("/", async (req: Request, res: Response) => {
+  router.get("/", async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const tags = await getAllTags(req.user!.id);
+      const user = requireUser(req);
+      const tags = await getAllTags(user.id);
       res.json(tags);
     } catch (err) {
-      console.error("Error fetching tags:", err);
-      res.status(500).json({ error: "Failed to fetch tags" });
+      next(err);
     }
   });
 
   // GET /api/tags/:tag/notes — Get notes with a specific tag
-  router.get("/:tag/notes", async (req: Request, res: Response) => {
+  router.get("/:tag/notes", async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const user = requireUser(req);
       const tag = req.params.tag as string;
-      const notes = await getNotesByTag(tag, req.user!.id);
+      const notes = await getNotesByTag(tag, user.id);
       res.json(notes);
     } catch (err) {
-      console.error("Error fetching notes by tag:", err);
-      res.status(500).json({ error: "Failed to fetch notes by tag" });
+      next(err);
     }
   });
 

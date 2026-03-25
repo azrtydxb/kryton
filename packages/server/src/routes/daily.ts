@@ -1,10 +1,11 @@
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import * as path from "path";
 import * as fs from "fs/promises";
 import { format } from "date-fns";
 import { readNote, writeNote } from "../services/noteService.js";
 import { prisma } from "../prisma.js";
 import { getUserNotesDir } from "../services/userNotesDir.js";
+import { requireUser } from "../middleware/auth.js";
 
 async function getDailyTemplate(userId: string): Promise<string> {
   try {
@@ -73,9 +74,10 @@ export function createDailyRouter(notesDir: string): Router {
   const router = Router();
 
   // POST /api/daily — Create or get today's daily note
-  router.post("/", async (req: Request, res: Response) => {
+  router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const userDir = await getUserNotesDir(notesDir, req.user!.id);
+      const user = requireUser(req);
+      const userDir = await getUserNotesDir(notesDir, user.id);
       const today = format(new Date(), "yyyy-MM-dd");
       const notePath = `Daily/${today}.md`;
       const fullPath = path.join(userDir, notePath);
@@ -95,18 +97,17 @@ export function createDailyRouter(notesDir: string): Router {
       await fs.mkdir(path.join(userDir, "Daily"), { recursive: true });
 
       // Get template and apply variables
-      const template = await getDailyTemplate(req.user!.id);
+      const template = await getDailyTemplate(user.id);
       const content = applyTemplateVars(template, {
         date: today,
         title: `Daily Note — ${today}`,
       });
 
-      await writeNote(userDir, notePath, content, req.user!.id);
+      await writeNote(userDir, notePath, content, user.id);
       const note = await readNote(userDir, notePath);
       res.status(201).json(note);
     } catch (err) {
-      console.error("Error creating daily note:", err);
-      res.status(500).json({ error: "Failed to create daily note" });
+      next(err);
     }
   });
 

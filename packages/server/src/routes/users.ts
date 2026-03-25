@@ -1,4 +1,4 @@
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { prisma } from "../prisma.js";
 
 /**
@@ -40,7 +40,7 @@ export function createUsersRouter(): Router {
   const router = Router();
 
   // GET /api/users/search — Search user by email
-  router.get("/search", async (req: Request, res: Response) => {
+  router.get("/search", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const email = req.query.email as string | undefined;
 
@@ -58,8 +58,7 @@ export function createUsersRouter(): Router {
 
       res.json({ id: user.id, name: user.name, email: user.email });
     } catch (err) {
-      console.error("Error searching users:", err);
-      res.status(500).json({ error: "Failed to search users" });
+      next(err);
     }
   });
 

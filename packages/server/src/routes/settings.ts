@@ -1,6 +1,7 @@
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { prisma } from "../prisma.js";
 import { validate, updateSettingSchema } from "../lib/validation.js";
+import { requireUser } from "../middleware/auth.js";
 
 /**
  * @swagger
@@ -76,10 +77,11 @@ export function createSettingsRouter(): Router {
   const router = Router();
 
   // GET /api/settings — Get all settings
-  router.get("/", async (req: Request, res: Response) => {
+  router.get("/", async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const user = requireUser(req);
       const userSettings = await prisma.settings.findMany({
-        where: { userId: req.user!.id },
+        where: { userId: user.id },
       });
 
       // Merge: user settings override global for same key
@@ -90,14 +92,14 @@ export function createSettingsRouter(): Router {
 
       res.json(result);
     } catch (err) {
-      console.error("Error fetching settings:", err);
-      res.status(500).json({ error: "Failed to fetch settings" });
+      next(err);
     }
   });
 
   // PUT /api/settings/:key — Update a setting
-  router.put("/:key", async (req: Request, res: Response) => {
+  router.put("/:key", async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const user = requireUser(req);
       const key = req.params.key as string;
 
       const ADMIN_ONLY_KEYS = ["registration_mode"];
@@ -114,15 +116,14 @@ export function createSettingsRouter(): Router {
       const { value } = parsed.data;
 
       await prisma.settings.upsert({
-        where: { key_userId: { key, userId: req.user!.id } },
-        create: { key, userId: req.user!.id, value },
+        where: { key_userId: { key, userId: user.id } },
+        create: { key, userId: user.id, value },
         update: { value },
       });
 
       res.json({ key, value, message: "Setting updated" });
     } catch (err) {
-      console.error("Error updating setting:", err);
-      res.status(500).json({ error: "Failed to update setting" });
+      next(err);
     }
   });
 

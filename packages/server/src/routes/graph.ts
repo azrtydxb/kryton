@@ -1,5 +1,6 @@
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { getFullGraph } from "../services/graphService";
+import { requireUser } from "../middleware/auth.js";
 
 /**
  * @swagger
@@ -45,13 +46,13 @@ export function createGraphRouter(): Router {
   const router = Router();
 
   // GET /api/graph — Return all nodes and edges for the graph view
-  router.get("/", async (req: Request, res: Response) => {
+  router.get("/", async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const graph = await getFullGraph(req.user!.id);
+      const user = requireUser(req);
+      const graph = await getFullGraph(user.id);
       res.json(graph);
     } catch (err) {
-      console.error("Error fetching graph data:", err);
-      res.status(500).json({ error: "Failed to fetch graph data" });
+      next(err);
     }
   });
 
