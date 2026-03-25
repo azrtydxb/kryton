@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { useDebouncedCallback } from 'use-debounce';
 import { createPortal } from 'react-dom';
 import { Search, FileText, X, Share2 } from 'lucide-react';
 import { api, SearchResult } from '../../lib/api';
@@ -17,7 +18,6 @@ export function SearchBar({ onSelect, inputRef: externalRef }: SearchBarProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
 
   const doSearch = useCallback(async (q: string) => {
@@ -39,11 +39,14 @@ export function SearchBar({ onSelect, inputRef: externalRef }: SearchBarProps) {
     }
   }, []);
 
+  const debouncedSearch = useDebouncedCallback((value: string) => {
+    doSearch(value);
+  }, 200);
+
   const handleChange = useCallback((value: string) => {
     setQuery(value);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => doSearch(value), 200);
-  }, [doSearch]);
+    debouncedSearch(value);
+  }, [debouncedSearch]);
 
   const handleSelect = useCallback((result: SearchResult) => {
     const path = result.isShared && result.ownerUserId
@@ -102,18 +105,6 @@ export function SearchBar({ onSelect, inputRef: externalRef }: SearchBarProps) {
       externalRef.current = inputRef.current;
     }
   }, [externalRef]);
-
-  // Keyboard shortcut: Ctrl/Cmd+K to focus search
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        inputRef.current?.focus();
-      }
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, []);
 
   return (
     <div ref={containerRef} className="relative w-full">

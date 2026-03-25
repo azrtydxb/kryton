@@ -1,4 +1,5 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { useDebouncedCallback } from 'use-debounce';
 import { api, FileNode, NoteData } from '../lib/api';
 
 export function useNotes(userId?: string) {
@@ -7,7 +8,6 @@ export function useNotes(userId?: string) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const refreshTree = useCallback(async () => {
     try {
@@ -28,22 +28,24 @@ export function useNotes(userId?: string) {
     }
   }, []);
 
+  const debouncedSave = useDebouncedCallback(async (path: string, content: string) => {
+    setSaving(true);
+    try {
+      await api.updateNote(path, content);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  }, 500);
+
   const updateContent = useCallback((content: string) => {
-    setActiveNote(prev => prev ? { ...prev, content } : null);
-    // Auto-save with debounce
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(async () => {
-      if (!activeNote) return;
-      setSaving(true);
-      try {
-        await api.updateNote(activeNote.path, content);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Failed to save');
-      } finally {
-        setSaving(false);
-      }
-    }, 500);
-  }, [activeNote]);
+    setActiveNote(prev => {
+      if (!prev) return null;
+      debouncedSave(prev.path, content);
+      return { ...prev, content };
+    });
+  }, [debouncedSave]);
 
   const createNote = useCallback(async (path: string, content = '') => {
     try {
@@ -120,13 +122,6 @@ export function useNotes(userId?: string) {
     }
     refreshTree().finally(() => setLoading(false));
   }, [refreshTree, userId]);
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    };
-  }, []);
 
   // Set content without auto-saving (for cancel/revert)
   const setActiveNoteContent = useCallback((content: string) => {

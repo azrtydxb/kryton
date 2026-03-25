@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import hotkeys from 'hotkeys-js';
 
 interface ShortcutActions {
   toggleSidebar: () => void;
@@ -12,36 +13,29 @@ interface ShortcutActions {
 
 export function useKeyboardShortcuts(actions: ShortcutActions) {
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
+    hotkeys('ctrl+b,command+b', (e) => { e.preventDefault(); actions.toggleSidebar(); });
+    hotkeys('ctrl+p,command+p', (e) => { e.preventDefault(); actions.openQuickSwitcher(); });
+    hotkeys('ctrl+k,command+k', (e) => { e.preventDefault(); actions.focusSearch(); });
+    hotkeys('ctrl+n,command+n', (e) => { e.preventDefault(); actions.createNote(); });
+    hotkeys('f2', (e) => { e.preventDefault(); actions.renameNote(); });
+    hotkeys('ctrl+shift+s,command+shift+s', (e) => { e.preventDefault(); actions.toggleStar(); });
+
+    // Guard: skip Ctrl+E when focus is inside CodeMirror (Ctrl+E = cursor to line end in CM)
+    hotkeys('ctrl+e,command+e', (e) => {
       const target = e.target as HTMLElement;
-      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
+      if (target.closest('.cm-editor')) return;
+      e.preventDefault();
+      actions.toggleEdit();
+    });
 
-      if (e.ctrlKey && e.shiftKey && e.key === 'S') {
-        e.preventDefault();
-        actions.toggleStar();
-      } else if (e.ctrlKey && e.key === 'b') {
-        e.preventDefault();
-        actions.toggleSidebar();
-      } else if (e.ctrlKey && e.key === 'e' && !target.closest('.cm-editor')) {
-        // Guard: skip when focus is inside CodeMirror (Ctrl+E = cursor to line end)
-        e.preventDefault();
-        actions.toggleEdit();
-      } else if (e.ctrlKey && e.key === 'p') {
-        e.preventDefault();
-        actions.openQuickSwitcher();
-      } else if (e.ctrlKey && e.key === '/') {
-        e.preventDefault();
-        actions.focusSearch();
-      } else if (e.ctrlKey && e.key === 'n') {
-        e.preventDefault();
-        actions.createNote();
-      } else if (e.key === 'F2' && !isInput) {
-        e.preventDefault();
-        actions.renameNote();
-      }
+    return () => {
+      hotkeys.unbind('ctrl+b,command+b');
+      hotkeys.unbind('ctrl+e,command+e');
+      hotkeys.unbind('ctrl+p,command+p');
+      hotkeys.unbind('ctrl+k,command+k');
+      hotkeys.unbind('ctrl+n,command+n');
+      hotkeys.unbind('f2');
+      hotkeys.unbind('ctrl+shift+s,command+shift+s');
     };
-
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
   }, [actions]);
 }
