@@ -1,7 +1,10 @@
 import http from "http";
 import express, { Request, Response } from "express";
 import cors from "cors";
+import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+import { validateEnv } from "./lib/env.js";
+import { errorHandler } from "./lib/errors.js";
 import { toNodeHandler } from "better-auth/node";
 import swaggerUi from "swagger-ui-express";
 import * as path from "path";
@@ -38,6 +41,9 @@ const NOTES_DIR = path.resolve(
 );
 
 async function main(): Promise<void> {
+  // Validate environment variables early
+  validateEnv();
+
   // Initialize the database
   try {
     await prisma.$connect();
@@ -84,6 +90,7 @@ async function main(): Promise<void> {
     origin: process.env.APP_URL || "http://localhost:5173",
     credentials: true,
   }));
+  app.use(helmet({ contentSecurityPolicy: false }));
   app.use(express.json());
 
   // Plugin system initialization
@@ -175,13 +182,10 @@ async function main(): Promise<void> {
    *                 status:
    *                   type: string
    *                   example: ok
-   *                 notesDir:
-   *                   type: string
-   *                   example: /path/to/notes
    */
   // Health check (unauthenticated, GET-only)
   app.get("/api/health", (_req, res) => {
-    res.json({ status: "ok", notesDir: NOTES_DIR });
+    res.json({ status: "ok" });
   });
 
   // Admin routes (auth + admin middleware)
@@ -275,6 +279,9 @@ async function main(): Promise<void> {
   } catch {
     // No public directory — running in dev mode
   }
+
+  // Global error handler (must be last middleware)
+  app.use(errorHandler);
 
   // Start server — create an explicit http.Server so WebSocket can attach to it
   const httpServer = http.createServer(app);
