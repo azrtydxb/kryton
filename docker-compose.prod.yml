@@ -7,6 +7,11 @@ services:
       - ./notes:/notes
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-mnemo}
+      # Required: generate with: openssl rand -hex 32
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET}
+      # Set to your public URL
+      - APP_URL=${APP_URL:-http://localhost:3100}
+      - BETTER_AUTH_URL=${BETTER_AUTH_URL:-http://localhost:3100}
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET}
       - APP_URL=${APP_URL:-http://localhost:3100}
       - NOTES_DIR=/notes

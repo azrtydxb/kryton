@@ -87,6 +87,28 @@
 
 ---
 
+
+## Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DATABASE_URL` | ✅ | PostgreSQL connection string |
+| `BETTER_AUTH_SECRET` | ✅ | Secret key for auth (min 32 chars). Generate with: `openssl rand -hex 32` |
+| `APP_URL` | Optional | Public app URL (default: `http://localhost:5173`) |
+| `BETTER_AUTH_URL` | Optional | Auth service URL (default: `http://localhost:3001`) |
+| `PORT` | Optional | Server port (default: `3001`) |
+| `NOTES_DIR` | Optional | Path to notes directory (default: `../../notes`) |
+| `WEBAUTHN_RP_ID` | Optional | Relying party ID for passkeys (default: `localhost`) |
+| `SMTP_HOST` | Optional | SMTP server for email notifications |
+| `SMTP_PORT` | Optional | SMTP port |
+| `SMTP_USER` | Optional | SMTP username |
+| `SMTP_PASS` | Optional | SMTP password |
+| `SMTP_FROM` | Optional | From address for emails |
+| `GOOGLE_CLIENT_ID` | Optional | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | Optional | Google OAuth client secret |
+| `GITHUB_CLIENT_ID` | Optional | GitHub OAuth client ID |
+| `GITHUB_CLIENT_SECRET` | Optional | GitHub OAuth client secret |
+
 ## Quick Start
 
 ### Prerequisites

@@ -8,6 +8,11 @@ services:
       - ./notes:/app/notes
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/mnemo
+      # Required: generate with: openssl rand -hex 32
+      - BETTER_AUTH_SECRET=change-me-use-openssl-rand-hex-32
+      # Optional: set to your public URL for OAuth/passkey support
+      - APP_URL=http://localhost:3100
+      - BETTER_AUTH_URL=http://localhost:3100
     depends_on:
       - db
 
