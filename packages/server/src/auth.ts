@@ -5,6 +5,9 @@ import { prisma } from "./prisma.js";
 
 const APP_URL = process.env.APP_URL || "http://localhost:5173";
 
+// Map to pass invite code ID from user.create.before to user.create.after
+const pendingInviteCodes = new Map<string, string>(); // email -> inviteCode.id
+
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: "postgresql" }),
   basePath: "/api/auth",
@@ -19,7 +22,7 @@ export const auth = betterAuth({
     sendResetPassword: async ({ user, url }) => {
       const smtpHost = process.env.SMTP_HOST;
       if (!smtpHost) {
-        console.log(`[auth] Password reset requested for ${user.email} but SMTP not configured. URL: ${url}`);
+        console.log(`[auth] Password reset requested for ${user.email} but SMTP not configured.`);
         return;
       }
       try {
@@ -141,6 +144,9 @@ export const auth = betterAuth({
               if (invite.expiresAt && invite.expiresAt < new Date()) {
                 throw new Error("Invite code has expired");
               }
+
+              // Store invite code ID so the after hook can mark it as used
+              pendingInviteCodes.set(user.email, invite.id);
             }
           }
 
@@ -153,9 +159,14 @@ export const auth = betterAuth({
         },
         after: async (user) => {
           // Mark invite code as used (if applicable)
-          // We need to re-check the context, but after hook doesn't have request context easily.
-          // Instead, we handle invite marking in the before hook by storing state.
-          // For now, we'll handle this separately.
+          const inviteCodeId = pendingInviteCodes.get(user.email);
+          if (inviteCodeId) {
+            pendingInviteCodes.delete(user.email);
+            await prisma.inviteCode.update({
+              where: { id: inviteCodeId },
+              data: { usedById: user.id },
+            });
+          }
 
           // Provision user notes directory
           const { provisionUserNotes } = await import("./services/userNotesDir.js");
