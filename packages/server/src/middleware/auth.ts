@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { fromNodeHeaders } from "better-auth/node";
 import { auth } from "../auth.js";
+import { AppError } from "../lib/errors.js";
 
 declare module "express-serve-static-core" {
   interface Request {
@@ -39,6 +40,13 @@ export async function authMiddleware(
   } catch {
     res.status(401).json({ error: "Invalid or expired session" });
   }
+}
+
+export function requireUser(req: Request): { id: string; email: string; name: string; role: string } {
+  if (!req.user) {
+    throw new AppError("Authentication required", 401, "UNAUTHORIZED");
+  }
+  return req.user;
 }
 
 export function adminMiddleware(
