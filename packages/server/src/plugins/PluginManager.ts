@@ -10,6 +10,9 @@ import { PluginHealthMonitor } from "./PluginHealthMonitor.js";
 import { PluginApiFactory } from "./PluginApiFactory.js";
 import { PluginWebSocket } from "./PluginWebSocket.js";
 import { prisma } from "../prisma.js";
+import { createLogger } from "../lib/logger.js";
+
+const log = createLogger("plugin-manager");
 
 interface PluginManagerDeps {
   pluginsDir: string;
@@ -68,7 +71,7 @@ export class PluginManager {
         },
       });
     } catch (err) {
-      console.error(`[plugins] Failed to persist state for ${manifest.id}:`, err);
+      log.error(`Failed to persist state for ${manifest.id}:`, err);
     }
   }
 
@@ -79,7 +82,7 @@ export class PluginManager {
         data: { enabled },
       });
     } catch (err) {
-      console.error(`[plugins] Failed to update enabled for ${pluginId}:`, err);
+      log.error(`Failed to update enabled for ${pluginId}:`, err);
     }
   }
 
@@ -249,7 +252,7 @@ export class PluginManager {
       try {
         await this.loadPlugin(entry.name);
       } catch (err) {
-        console.error(`[plugins] Failed to load plugin ${entry.name}:`, err);
+        log.error(`Failed to load plugin ${entry.name}:`, err);
       }
     }
   }

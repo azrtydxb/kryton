@@ -1,4 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
+import { createLogger } from "./logger.js";
+
+const log = createLogger("error-handler");
 
 export class AppError extends Error {
   constructor(message: string, public statusCode: number, public code?: string) {
@@ -35,7 +38,7 @@ export function classifyError(err: unknown): AppError {
 export function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction): void {
   const appError = classifyError(err);
   if (appError.statusCode >= 500) {
-    console.error("[error]", err);
+    log.error("Unhandled server error", err);
   }
   res.status(appError.statusCode).json({
     error: appError.message,

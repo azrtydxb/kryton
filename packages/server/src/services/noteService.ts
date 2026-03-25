@@ -3,6 +3,9 @@ import * as path from "path";
 import { indexNote, removeFromIndex, renameInIndex, extractTitle } from "./searchService.js";
 import { updateGraphCache, removeFromGraph, renameInGraph } from "./graphService.js";
 import { prisma } from "../prisma.js";
+import { createLogger } from "../lib/logger.js";
+
+const log = createLogger("note-service");
 
 export interface FileTreeNode {
   name: string;
@@ -202,7 +205,7 @@ export async function indexUserNotes(userNotesDir: string, userId: string): Prom
           await indexNote(node.path, content, userId);
           await updateGraphCache(node.path, content, userId);
         } catch (err) {
-          console.error(`Failed to index ${node.path}:`, err);
+          log.error(`Failed to index ${node.path}:`, err);
         }
       } else if (node.children) {
         await processNodes(node.children);

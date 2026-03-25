@@ -1,5 +1,8 @@
 import path from "path";
 import fs from "fs/promises";
+import { createLogger } from "../lib/logger.js";
+
+const log = createLogger("plugin-registry");
 
 const ALLOWED_DOWNLOAD_HOSTS = ["github.com", "raw.githubusercontent.com", "api.github.com"];
 
@@ -60,19 +63,19 @@ export async function fetchRegistry(): Promise<RegistryIndex> {
       },
     });
   } catch (err) {
-    console.warn("[plugin-registry] Failed to reach GitHub API:", (err as Error).message);
+    log.warn(`Failed to reach GitHub API: ${(err as Error).message}`);
     return registryCache?.data ?? { version: 1, plugins: [] };
   }
 
   if (response.status === 404) {
-    console.warn("[plugin-registry] registry.json not found in repo — returning empty registry");
+    log.warn("registry.json not found in repo — returning empty registry");
     const empty: RegistryIndex = { version: 1, plugins: [] };
     registryCache = { data: empty, fetchedAt: now };
     return empty;
   }
 
   if (!response.ok) {
-    console.warn(`[plugin-registry] GitHub API returned ${response.status} — returning cached/empty registry`);
+    log.warn(`GitHub API returned ${response.status} — returning cached/empty registry`);
     return registryCache?.data ?? { version: 1, plugins: [] };
   }
 
@@ -80,12 +83,12 @@ export async function fetchRegistry(): Promise<RegistryIndex> {
   try {
     body = await response.json() as { content?: string; encoding?: string };
   } catch (err) {
-    console.warn("[plugin-registry] Failed to parse GitHub API response:", (err as Error).message);
+    log.warn(`Failed to parse GitHub API response: ${(err as Error).message}`);
     return registryCache?.data ?? { version: 1, plugins: [] };
   }
 
   if (!body.content || body.encoding !== "base64") {
-    console.warn("[plugin-registry] Unexpected response format from GitHub API");
+    log.warn("Unexpected response format from GitHub API");
     return registryCache?.data ?? { version: 1, plugins: [] };
   }
 
@@ -94,7 +97,7 @@ export async function fetchRegistry(): Promise<RegistryIndex> {
     const decoded = Buffer.from(body.content, "base64").toString("utf-8");
     parsed = JSON.parse(decoded) as RegistryIndex;
   } catch (err) {
-    console.warn("[plugin-registry] Failed to parse registry.json content:", (err as Error).message);
+    log.warn(`Failed to parse registry.json content: ${(err as Error).message}`);
     return registryCache?.data ?? { version: 1, plugins: [] };
   }
 

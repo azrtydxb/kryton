@@ -14,6 +14,7 @@ import { RequestHandler } from "express";
 import path from "path";
 import fs from "fs";
 import { validatePathWithinBase, ensureExtension } from "../lib/pathUtils.js";
+import { createLogger } from "../lib/logger.js";
 
 interface PluginApiFactoryDeps {
   eventBus: PluginEventBus;
@@ -41,14 +42,14 @@ export class PluginApiFactory {
       storage: this.createStorageApi(pluginId),
       settings: this.createSettingsApi(pluginId),
       search: this.createSearchApi(pluginId),
-      log: {
-        info: (msg: string, ...args: unknown[]) =>
-          console.log(`[plugin:${pluginId}]`, msg, ...args),
-        warn: (msg: string, ...args: unknown[]) =>
-          console.warn(`[plugin:${pluginId}]`, msg, ...args),
-        error: (msg: string, ...args: unknown[]) =>
-          console.error(`[plugin:${pluginId}]`, msg, ...args),
-      },
+      log: (() => {
+        const pluginLog = createLogger(`plugin:${pluginId}`);
+        return {
+          info: (msg: string, ..._args: unknown[]) => pluginLog.info(msg),
+          warn: (msg: string, ..._args: unknown[]) => pluginLog.warn(msg),
+          error: (msg: string, ..._args: unknown[]) => pluginLog.error(msg),
+        };
+      })(),
       plugin: {
         id: pluginId,
         version: manifest.version,

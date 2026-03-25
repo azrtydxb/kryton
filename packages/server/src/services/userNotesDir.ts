@@ -2,6 +2,9 @@ import * as path from "path";
 import * as fs from "fs/promises";
 import { indexNote } from "./searchService";
 import { updateGraphCache } from "./graphService";
+import { createLogger } from "../lib/logger.js";
+
+const log = createLogger("user-notes");
 
 // Accepts both UUIDs and better-auth's alphanumeric IDs
 const SAFE_USER_ID_REGEX = /^[a-zA-Z0-9_-]{8,64}$/;
@@ -181,13 +184,11 @@ export async function provisionUserNotes(
   // If the directory already has files, skip provisioning.
   const entries = await fs.readdir(userDir);
   if (entries.length > 0) {
-    console.log(
-      `[Mnemo] User directory already populated for ${userId}, skipping provisioning.`,
-    );
+    log.info(`User directory already populated for ${userId}, skipping provisioning.`);
     return;
   }
 
-  console.log(`[Mnemo] Provisioning sample notes for user ${userId}...`);
+  log.info(`Provisioning sample notes for user ${userId}...`);
   for (const [relativePath, content] of Object.entries(SAMPLE_NOTES)) {
     const fullPath = path.join(userDir, relativePath);
     await fs.mkdir(path.dirname(fullPath), { recursive: true });
@@ -212,15 +213,13 @@ export async function cleanupOldNotes(baseDir: string): Promise<void> {
 
   const backupDir = path.join(baseDir, ".backup-pre-multiuser");
   await fs.mkdir(backupDir, { recursive: true });
-  console.warn(
-    `[Mnemo] Moving ${nonUuid.length} old files to ${backupDir}`,
-  );
+  log.warn(`Moving ${nonUuid.length} old files to ${backupDir}`);
   for (const entry of nonUuid) {
     await fs.rename(
       path.join(baseDir, entry),
       path.join(backupDir, entry),
     ).catch((err) => {
-      console.error(`Failed to move ${entry}:`, err);
+      log.error(`Failed to move ${entry}:`, err);
     });
   }
 }

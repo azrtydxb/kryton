@@ -4,6 +4,7 @@ import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { validateEnv } from "./lib/env.js";
+import { createLogger } from "./lib/logger.js";
 import { errorHandler } from "./lib/errors.js";
 import { toNodeHandler } from "better-auth/node";
 import swaggerUi from "swagger-ui-express";
@@ -35,6 +36,7 @@ import { PluginManager } from "./plugins/PluginManager.js";
 import { PluginWebSocket } from "./plugins/PluginWebSocket.js";
 import { createPluginsRouter } from "./routes/plugins.js";
 
+const log = createLogger("server");
 const PORT = parseInt(process.env.PORT || "3001", 10);
 const NOTES_DIR = path.resolve(
   process.env.NOTES_DIR || path.join(import.meta.dirname, "../../notes")
@@ -47,9 +49,9 @@ async function main(): Promise<void> {
   // Initialize the database
   try {
     await prisma.$connect();
-    console.log("Database connection established.");
+    log.info("Database connection established.");
   } catch (err) {
-    console.error("Failed to connect to database:", err);
+    log.error("Failed to connect to database:", err);
     process.exit(1);
   }
 
@@ -64,7 +66,7 @@ async function main(): Promise<void> {
     await prisma.searchIndex.deleteMany({ where: { userId: "" } });
     await prisma.graphEdge.deleteMany({ where: { userId: "" } });
   } catch (err) {
-    console.log("Orphan cleanup skipped (table may have been recreated):", err);
+    log.info("Orphan cleanup skipped (table may have been recreated)");
   }
 
   // Ensure registration_mode global setting exists
@@ -76,11 +78,11 @@ async function main(): Promise<void> {
     await prisma.settings.create({
       data: { key: "registration_mode", value: "invite-only", userId: GLOBAL_USER },
     });
-    console.log("Created default registration_mode = invite-only");
+    log.info("Created default registration_mode = invite-only");
   }
 
   // Note: per-user indexing is now handled during provisioning and login.
-  console.log("Startup complete — per-user notes are indexed on demand.");
+  log.info("Startup complete — per-user notes are indexed on demand.");
 
   // Create Express app
   const app = express();
@@ -124,7 +126,7 @@ async function main(): Promise<void> {
     maxErrors: 5,
     windowMs: 60_000,
     onDisable: async (pluginId) => {
-      console.warn(`[plugins] Auto-disabling plugin ${pluginId} due to excessive errors`);
+      log.warn(`Auto-disabling plugin ${pluginId} due to excessive errors`);
       await managerRef.instance?.disablePlugin(pluginId);
       await prisma.installedPlugin.update({
         where: { id: pluginId },
@@ -292,7 +294,7 @@ async function main(): Promise<void> {
       app.get("*", (_req, res) => {
         res.sendFile(path.join(publicDir, "index.html"));
       });
-      console.log(`Serving static files from ${publicDir}`);
+      log.info(`Serving static files from ${publicDir}`);
     }
   } catch {
     // No public directory — running in dev mode
@@ -307,12 +309,12 @@ async function main(): Promise<void> {
   pluginManager.setPluginWebSocket(pluginWebSocket);
 
   httpServer.listen(PORT, () => {
-    console.log(`Mnemo server listening on port ${PORT}`);
-    console.log(`Notes directory: ${NOTES_DIR}`);
+    log.info(`Mnemo server listening on port ${PORT}`);
+    log.info(`Notes directory: ${NOTES_DIR}`);
   });
 }
 
 main().catch((err) => {
-  console.error("Fatal error:", err);
+  log.error("Fatal error:", err);
   process.exit(1);
 });

@@ -2,6 +2,9 @@ import { betterAuth } from "better-auth";
 import { passkey } from "@better-auth/passkey";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "./prisma.js";
+import { createLogger } from "./lib/logger.js";
+
+const log = createLogger("auth");
 
 const APP_URL = process.env.APP_URL || "http://localhost:5173";
 
@@ -22,7 +25,7 @@ export const auth = betterAuth({
     sendResetPassword: async ({ user, url }) => {
       const smtpHost = process.env.SMTP_HOST;
       if (!smtpHost) {
-        console.log(`[auth] Password reset requested for ${user.email} but SMTP not configured.`);
+        log.info(`Password reset requested for ${user.email} but SMTP not configured.`);
         return;
       }
       try {
@@ -44,7 +47,7 @@ export const auth = betterAuth({
           html: `<p>You requested a password reset.</p><p><a href="${url}">Click here to reset your password</a></p><p>This link expires in 1 hour.</p><p>If you didn't request this, ignore this email.</p>`,
         });
       } catch (err) {
-        console.error("[auth] Failed to send reset email:", err);
+        log.error("Failed to send reset email:", err);
       }
     },
   },

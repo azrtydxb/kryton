@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { config } from "dotenv";
 import { resolve } from "path";
+import { createLogger } from "./logger.js";
+
+const log = createLogger("env");
 
 // Load .env from the server package root
 config({ path: resolve(import.meta.dirname, "../../.env") });
@@ -30,9 +33,9 @@ export type Env = z.infer<typeof envSchema>;
 export function validateEnv(): Env {
   const result = envSchema.safeParse(process.env);
   if (!result.success) {
-    console.error("Environment validation failed:");
+    log.error("Environment validation failed");
     for (const issue of result.error.issues) {
-      console.error(`  ${issue.path.join(".")}: ${issue.message}`);
+      log.error(`  ${issue.path.join(".")}: ${issue.message}`);
     }
     process.exit(1);
   }

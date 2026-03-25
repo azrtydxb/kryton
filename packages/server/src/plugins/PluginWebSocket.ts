@@ -1,6 +1,9 @@
 import http from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { auth } from "../auth.js";
+import { createLogger } from "../lib/logger.js";
+
+const log = createLogger("plugin-ws");
 
 export class PluginWebSocket {
   private wss: WebSocketServer;
@@ -42,11 +45,11 @@ export class PluginWebSocket {
 
     this.wss.on("connection", (ws) => {
       ws.on("error", (err) => {
-        console.error("[plugin-ws] Client error:", err);
+        log.error("Client error:", err);
       });
     });
 
-    console.log("[plugin-ws] WebSocket server attached at /ws/plugins");
+    log.info("WebSocket server attached at /ws/plugins");
   }
 
   broadcast(event: string, data: object): void {
