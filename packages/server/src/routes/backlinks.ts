@@ -1,5 +1,8 @@
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { getBacklinks } from "../services/graphService";
+import { requireUser } from "../middleware/auth.js";
+import { decodePathParam, ensureExtension } from "../lib/pathUtils.js";
+import { ValidationError } from "../lib/errors.js";
 
 /**
  * @swagger
@@ -41,23 +44,19 @@ export function createBacklinksRouter(): Router {
   const router = Router();
 
   // GET /api/backlinks/:path(*) — Get notes that link TO this note
-  router.get("/{*path}", async (req: Request, res: Response) => {
+  router.get("/{*path}", async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const notePath = decodeURIComponent(Array.isArray(req.params.path) ? req.params.path.join("/") : req.params.path as string);
+      const user = requireUser(req);
+      const notePath = decodePathParam(req.params.path);
       if (!notePath) {
-        res.status(400).json({ error: "Path is required" });
-        return;
+        throw new ValidationError("Path is required");
       }
 
-      const fullNotePath = notePath.endsWith(".md")
-        ? notePath
-        : `${notePath}.md`;
-
-      const backlinks = await getBacklinks(fullNotePath, req.user!.id);
+      const fullNotePath = ensureExtension(notePath, ".md");
+      const backlinks = await getBacklinks(fullNotePath, user.id);
       res.json(backlinks);
     } catch (err) {
-      console.error("Error fetching backlinks:", err);
-      res.status(500).json({ error: "Failed to fetch backlinks" });
+      next(err);
     }
   });
 

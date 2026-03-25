@@ -1,19 +1,10 @@
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { getUserNotesDir } from "../services/userNotesDir";
-
-/**
- * Validate that a resolved path stays within the base directory (path traversal protection).
- */
-function safePath(baseDir: string, name: string): string {
-  const resolved = path.resolve(baseDir, name);
-  const resolvedBase = path.resolve(baseDir);
-  if (!resolved.startsWith(resolvedBase + path.sep) && resolved !== resolvedBase) {
-    throw new Error("Invalid path: path traversal detected");
-  }
-  return resolved;
-}
+import { requireUser } from "../middleware/auth.js";
+import { validatePathWithinBase, ensureExtension } from "../lib/pathUtils.js";
+import { validate, createCanvasSchema } from "../lib/validation.js";
 
 /**
  * @swagger
@@ -204,9 +195,10 @@ export function createCanvasRouter(notesDir: string): Router {
   }
 
   // GET /api/canvas — List all .canvas files
-  router.get("/", async (req: Request, res: Response) => {
+  router.get("/", async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const userDir = await getUserNotesDir(notesDir, req.user!.id);
+      const user = requireUser(req);
+      const userDir = await getUserNotesDir(notesDir, user.id);
       const canvasDir = path.join(userDir, "Canvas");
       await ensureCanvasDir(canvasDir);
       const entries = await fs.readdir(canvasDir);
@@ -215,15 +207,15 @@ export function createCanvasRouter(notesDir: string): Router {
         .map((f) => f.replace(/\.canvas$/, ""));
       res.json(canvasFiles);
     } catch (err) {
-      console.error("Error listing canvas files:", err);
-      res.status(500).json({ error: "Failed to list canvas files" });
+      next(err);
     }
   });
 
   // GET /api/canvas/:name — Get a canvas file content (JSON)
-  router.get("/:name", async (req: Request, res: Response) => {
+  router.get("/:name", async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const userDir = await getUserNotesDir(notesDir, req.user!.id);
+      const user = requireUser(req);
+      const userDir = await getUserNotesDir(notesDir, user.id);
       const canvasDir = path.join(userDir, "Canvas");
       const name = req.params.name as string;
       if (!name) {
@@ -231,42 +223,34 @@ export function createCanvasRouter(notesDir: string): Router {
         return;
       }
 
-      const fileName = name.endsWith(".canvas") ? name : `${name}.canvas`;
-      const filePath = safePath(canvasDir, fileName);
+      const fileName = ensureExtension(name, ".canvas");
+      const filePath = path.resolve(canvasDir, fileName);
+      validatePathWithinBase(filePath, canvasDir);
 
       const content = await fs.readFile(filePath, "utf-8");
       res.json(JSON.parse(content));
     } catch (err) {
-      if (
-        err instanceof Error &&
-        (err.message.includes("ENOENT") || err.message.includes("no such file"))
-      ) {
-        res.status(404).json({ error: "Canvas file not found" });
-        return;
-      }
-      if (err instanceof Error && err.message.includes("Invalid path")) {
-        res.status(400).json({ error: err.message });
-        return;
-      }
-      console.error("Error reading canvas file:", err);
-      res.status(500).json({ error: "Failed to read canvas file" });
+      next(err);
     }
   });
 
   // POST /api/canvas — Create a new canvas file
-  router.post("/", async (req: Request, res: Response) => {
+  router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const userDir = await getUserNotesDir(notesDir, req.user!.id);
+      const user = requireUser(req);
+      const userDir = await getUserNotesDir(notesDir, user.id);
       const canvasDir = path.join(userDir, "Canvas");
-      const { name, content } = req.body as { name?: string; content?: unknown };
 
-      if (!name) {
-        res.status(400).json({ error: "Name is required" });
+      const parsed = validate(createCanvasSchema, req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error });
         return;
       }
+      const { name, content } = parsed.data;
 
-      const fileName = name.endsWith(".canvas") ? name : `${name}.canvas`;
-      const filePath = safePath(canvasDir, fileName);
+      const fileName = ensureExtension(name, ".canvas");
+      const filePath = path.resolve(canvasDir, fileName);
+      validatePathWithinBase(filePath, canvasDir);
 
       await ensureCanvasDir(canvasDir);
 
@@ -283,19 +267,15 @@ export function createCanvasRouter(notesDir: string): Router {
       await fs.writeFile(filePath, JSON.stringify(data, null, 2), "utf-8");
       res.status(201).json({ name: fileName, message: "Canvas file created" });
     } catch (err) {
-      if (err instanceof Error && err.message.includes("Invalid path")) {
-        res.status(400).json({ error: err.message });
-        return;
-      }
-      console.error("Error creating canvas file:", err);
-      res.status(500).json({ error: "Failed to create canvas file" });
+      next(err);
     }
   });
 
   // PUT /api/canvas/:name — Update a canvas file
-  router.put("/:name", async (req: Request, res: Response) => {
+  router.put("/:name", async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const userDir = await getUserNotesDir(notesDir, req.user!.id);
+      const user = requireUser(req);
+      const userDir = await getUserNotesDir(notesDir, user.id);
       const canvasDir = path.join(userDir, "Canvas");
       const name = req.params.name as string;
       if (!name) {
@@ -309,26 +289,23 @@ export function createCanvasRouter(notesDir: string): Router {
         return;
       }
 
-      const fileName = name.endsWith(".canvas") ? name : `${name}.canvas`;
-      const filePath = safePath(canvasDir, fileName);
+      const fileName = ensureExtension(name, ".canvas");
+      const filePath = path.resolve(canvasDir, fileName);
+      validatePathWithinBase(filePath, canvasDir);
 
       await ensureCanvasDir(canvasDir);
       await fs.writeFile(filePath, JSON.stringify(body, null, 2), "utf-8");
       res.json({ name: fileName, message: "Canvas file updated" });
     } catch (err) {
-      if (err instanceof Error && err.message.includes("Invalid path")) {
-        res.status(400).json({ error: err.message });
-        return;
-      }
-      console.error("Error updating canvas file:", err);
-      res.status(500).json({ error: "Failed to update canvas file" });
+      next(err);
     }
   });
 
   // DELETE /api/canvas/:name — Delete a canvas file
-  router.delete("/:name", async (req: Request, res: Response) => {
+  router.delete("/:name", async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const userDir = await getUserNotesDir(notesDir, req.user!.id);
+      const user = requireUser(req);
+      const userDir = await getUserNotesDir(notesDir, user.id);
       const canvasDir = path.join(userDir, "Canvas");
       const name = req.params.name as string;
       if (!name) {
@@ -336,25 +313,14 @@ export function createCanvasRouter(notesDir: string): Router {
         return;
       }
 
-      const fileName = name.endsWith(".canvas") ? name : `${name}.canvas`;
-      const filePath = safePath(canvasDir, fileName);
+      const fileName = ensureExtension(name, ".canvas");
+      const filePath = path.resolve(canvasDir, fileName);
+      validatePathWithinBase(filePath, canvasDir);
 
       await fs.unlink(filePath);
       res.json({ message: "Canvas file deleted" });
     } catch (err) {
-      if (
-        err instanceof Error &&
-        (err.message.includes("ENOENT") || err.message.includes("no such file"))
-      ) {
-        res.status(404).json({ error: "Canvas file not found" });
-        return;
-      }
-      if (err instanceof Error && err.message.includes("Invalid path")) {
-        res.status(400).json({ error: err.message });
-        return;
-      }
-      console.error("Error deleting canvas file:", err);
-      res.status(500).json({ error: "Failed to delete canvas file" });
+      next(err);
     }
   });
 

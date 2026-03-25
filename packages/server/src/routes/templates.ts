@@ -1,7 +1,9 @@
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import * as path from "path";
 import * as fs from "fs/promises";
 import { getUserNotesDir } from "../services/userNotesDir";
+import { requireUser } from "../middleware/auth.js";
+import { validatePathWithinBase } from "../lib/pathUtils.js";
 
 /**
  * @swagger
@@ -69,9 +71,10 @@ export function createTemplatesRouter(notesDir: string): Router {
   const router = Router();
 
   // GET /api/templates — List all templates
-  router.get("/", async (req: Request, res: Response) => {
+  router.get("/", async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const userDir = await getUserNotesDir(notesDir, req.user!.id);
+      const user = requireUser(req);
+      const userDir = await getUserNotesDir(notesDir, user.id);
       const templatesDir = path.join(userDir, "Templates");
 
       // Ensure templates directory exists
@@ -87,38 +90,26 @@ export function createTemplatesRouter(notesDir: string): Router {
 
       res.json(templates);
     } catch (err) {
-      console.error("Error listing templates:", err);
-      res.status(500).json({ error: "Failed to list templates" });
+      next(err);
     }
   });
 
   // GET /api/templates/:name — Get template content
-  router.get("/:name", async (req: Request, res: Response) => {
+  router.get("/:name", async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const userDir = await getUserNotesDir(notesDir, req.user!.id);
+      const user = requireUser(req);
+      const userDir = await getUserNotesDir(notesDir, user.id);
       const templatesDir = path.join(userDir, "Templates");
       const { name } = req.params;
       const filePath = path.join(templatesDir, `${name}.md`);
 
       // Security check
-      const resolved = path.resolve(filePath);
-      if (!resolved.startsWith(path.resolve(templatesDir) + path.sep)) {
-        res.status(400).json({ error: "Invalid template name" });
-        return;
-      }
+      validatePathWithinBase(filePath, templatesDir);
 
       const content = await fs.readFile(filePath, "utf-8");
       res.json({ name, content });
     } catch (err) {
-      if (
-        err instanceof Error &&
-        (err.message.includes("ENOENT") || err.message.includes("no such file"))
-      ) {
-        res.status(404).json({ error: "Template not found" });
-        return;
-      }
-      console.error("Error reading template:", err);
-      res.status(500).json({ error: "Failed to read template" });
+      next(err);
     }
   });
 
