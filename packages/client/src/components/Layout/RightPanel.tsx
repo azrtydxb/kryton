@@ -31,7 +31,7 @@ export function RightPanel({
         className="flex-shrink-0 flex flex-col bg-gray-50 dark:bg-surface-900 overflow-hidden"
         style={{ width: `${rightPanelWidth}px` }}
       >
-        <div style={graphHeight != null ? { height: `${graphHeight}px` } : { flex: 1 }} className="flex flex-col overflow-hidden">
+        <div style={graphHeight !== null && graphHeight !== undefined ? { height: `${graphHeight}px` } : { flex: 1 }} className="flex flex-col overflow-hidden">
           <GraphPanel
             graphData={graphData}
             loading={graphLoading}
@@ -40,7 +40,7 @@ export function RightPanel({
             starredPaths={starredPaths}
           />
         </div>
-        {activeNoteContent != null && (
+        {activeNoteContent !== null && activeNoteContent !== undefined && (
           <>
             <ResizeHandle direction="vertical" onResize={onGraphResize} />
             <div className="flex-1 min-h-[100px] overflow-hidden">

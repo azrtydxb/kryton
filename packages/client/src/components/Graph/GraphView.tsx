@@ -134,7 +134,7 @@ export function GraphView({ graphData, loading, activeNotePath, mode, onNoteSele
       for (const link of links) {
         const source = link.source as SimNode;
         const target = link.target as SimNode;
-        if (source.x == null || source.y == null || target.x == null || target.y == null) continue;
+        if (source.x === undefined || source.y === undefined || target.x === undefined || target.y === undefined) continue;
         ctx.beginPath();
         ctx.moveTo(source.x, source.y);
         ctx.lineTo(target.x, target.y);
@@ -143,7 +143,7 @@ export function GraphView({ graphData, loading, activeNotePath, mode, onNoteSele
 
       // Draw nodes
       for (const node of nodes) {
-        if (node.x == null || node.y == null) continue;
+        if (node.x === undefined || node.y === undefined) continue;
         const isHovered = hoveredNodeRef.current === node;
         const isActive = node.path === activeNotePath;
         const isStarred = starredPaths?.has(node.path) ?? false;
@@ -236,7 +236,7 @@ export function GraphView({ graphData, loading, activeNotePath, mode, onNoteSele
       const x = (mx - t.x) / t.k;
       const y = (my - t.y) / t.k;
       for (const node of nodes) {
-        if (node.x == null || node.y == null) continue;
+        if (node.x === undefined || node.y === undefined) continue;
         const dx = x - node.x;
         const dy = y - node.y;
         if (dx * dx + dy * dy < 100) return node;
