@@ -1,16 +1,16 @@
 import { z } from "zod";
 
 export const createNoteSchema = z.object({
-  path: z.string().min(1),
-  content: z.string(),
+  path: z.string().min(1).max(500),
+  content: z.string().max(1_000_000),
 });
 
 export const updateNoteSchema = z.object({
-  content: z.string(),
+  content: z.string().max(1_000_000),
 });
 
 export const createFolderSchema = z.object({
-  name: z.string().min(1),
+  name: z.string().min(1).max(200),
 });
 
 export const updateSettingSchema = z.object({
