@@ -8,11 +8,12 @@ import {
   deleteStorageValue,
   listStorageEntries,
 } from "../services/pluginStorageService.js";
+import { readNote, writeNote, deleteNote, scanDirectory } from "../services/noteService.js";
 import { prisma } from "../prisma.js";
 import { RequestHandler } from "express";
 import path from "path";
 import fs from "fs";
-import { validatePathWithinBase } from "../lib/pathUtils.js";
+import { validatePathWithinBase, ensureExtension } from "../lib/pathUtils.js";
 
 interface PluginApiFactoryDeps {
   eventBus: PluginEventBus;
@@ -62,49 +63,42 @@ export class PluginApiFactory {
     const notesDir = this.deps.notesDir;
     return {
       async get(userId: string, notePath: string) {
-        const fullPath = path.join(notesDir, userId, `${notePath}.md`);
-        validatePathWithinBase(fullPath, path.join(notesDir, userId));
-        const content = await fs.promises.readFile(fullPath, "utf-8");
-        const stat = await fs.promises.stat(fullPath);
-        const title = notePath.split("/").pop() || notePath;
-        return { path: notePath, content, title, modifiedAt: stat.mtime };
+        const userDir = path.join(notesDir, userId);
+        const fullNotePath = ensureExtension(notePath, ".md");
+        const note = await readNote(userDir, fullNotePath);
+        return { path: notePath, content: note.content, title: note.title, modifiedAt: note.modifiedAt };
       },
       async list(userId: string, folder?: string) {
-        async function scanDir(dirPath: string, prefix: string): Promise<NoteEntry[]> {
-          const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
-          const results: NoteEntry[] = [];
-          for (const e of entries) {
-            const entryPath = prefix ? `${prefix}/${e.name}` : e.name;
-            if (e.isDirectory()) {
-              const children = await scanDir(path.join(dirPath, e.name), entryPath);
-              results.push({ name: e.name, path: entryPath, type: "directory", children });
-            } else {
-              results.push({ name: e.name, path: entryPath, type: "file" });
-            }
-          }
-          return results;
-        }
         const dir = folder
           ? path.join(notesDir, userId, folder)
           : path.join(notesDir, userId);
         validatePathWithinBase(dir, path.join(notesDir, userId));
-        return scanDir(dir, folder || "");
+        const tree = await scanDirectory(dir, folder || "");
+        // Convert FileTreeNode to NoteEntry format
+        function toNoteEntries(nodes: { name: string; path: string; type: string; children?: unknown[] }[]): NoteEntry[] {
+          return nodes.map((n) => ({
+            name: n.name,
+            path: n.path,
+            type: n.type === "folder" ? "directory" as const : "file" as const,
+            ...(n.children ? { children: toNoteEntries(n.children as typeof nodes) } : {}),
+          }));
+        }
+        return toNoteEntries(tree);
       },
       async create(userId: string, notePath: string, content: string) {
-        const fullPath = path.join(notesDir, userId, `${notePath}.md`);
-        validatePathWithinBase(fullPath, path.join(notesDir, userId));
-        await fs.promises.mkdir(path.dirname(fullPath), { recursive: true });
-        await fs.promises.writeFile(fullPath, content, "utf-8");
+        const userDir = path.join(notesDir, userId);
+        const fullNotePath = ensureExtension(notePath, ".md");
+        await writeNote(userDir, fullNotePath, content, userId);
       },
       async update(userId: string, notePath: string, content: string) {
-        const fullPath = path.join(notesDir, userId, `${notePath}.md`);
-        validatePathWithinBase(fullPath, path.join(notesDir, userId));
-        await fs.promises.writeFile(fullPath, content, "utf-8");
+        const userDir = path.join(notesDir, userId);
+        const fullNotePath = ensureExtension(notePath, ".md");
+        await writeNote(userDir, fullNotePath, content, userId);
       },
       async delete(userId: string, notePath: string) {
-        const fullPath = path.join(notesDir, userId, `${notePath}.md`);
-        validatePathWithinBase(fullPath, path.join(notesDir, userId));
-        await fs.promises.unlink(fullPath);
+        const userDir = path.join(notesDir, userId);
+        const fullNotePath = ensureExtension(notePath, ".md");
+        await deleteNote(userDir, fullNotePath, userId);
       },
     };
   }
