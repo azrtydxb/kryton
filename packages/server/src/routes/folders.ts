@@ -3,7 +3,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { getUserNotesDir } from "../services/userNotesDir";
 import { validate, createFolderSchema, renameFolderSchema } from "../lib/validation";
-import { requireUser } from "../middleware/auth.js";
+import { requireUser, requireScope } from "../middleware/auth.js";
 import { decodePathParam, validatePathWithinBase } from "../lib/pathUtils.js";
 import { ValidationError } from "../lib/errors.js";
 
@@ -84,6 +84,7 @@ export function createFoldersRouter(notesDir: string): Router {
   router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const user = requireUser(req);
+      requireScope(req, "read-write");
       const userDir = await getUserNotesDir(notesDir, user.id);
       // Accept either `path` or `name` for the folder path
       const bodyToValidate = req.body.path
@@ -110,6 +111,7 @@ export function createFoldersRouter(notesDir: string): Router {
   router.delete("/{*path}", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const user = requireUser(req);
+      requireScope(req, "read-write");
       const userDir = await getUserNotesDir(notesDir, user.id);
       const folderPath = decodePathParam(req.params.path);
       if (!folderPath) {
@@ -195,6 +197,7 @@ export function createFoldersRenameRouter(notesDir: string): Router {
   router.post("/{*path}", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const user = requireUser(req);
+      requireScope(req, "read-write");
       const userDir = await getUserNotesDir(notesDir, user.id);
       const folderPath = decodePathParam(req.params.path);
       if (!folderPath) {

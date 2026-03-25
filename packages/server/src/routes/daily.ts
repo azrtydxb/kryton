@@ -5,7 +5,7 @@ import { format } from "date-fns";
 import { readNote, writeNote } from "../services/noteService.js";
 import { prisma } from "../prisma.js";
 import { getUserNotesDir } from "../services/userNotesDir.js";
-import { requireUser } from "../middleware/auth.js";
+import { requireUser, requireScope } from "../middleware/auth.js";
 
 async function getDailyTemplate(userId: string): Promise<string> {
   try {
@@ -77,6 +77,7 @@ export function createDailyRouter(notesDir: string): Router {
   router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const user = requireUser(req);
+      requireScope(req, "read-write");
       const userDir = await getUserNotesDir(notesDir, user.id);
       const today = format(new Date(), "yyyy-MM-dd");
       const notePath = `Daily/${today}.md`;

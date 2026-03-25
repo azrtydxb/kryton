@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from "express";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { getUserNotesDir } from "../services/userNotesDir";
-import { requireUser } from "../middleware/auth.js";
+import { requireUser, requireScope } from "../middleware/auth.js";
 import { validatePathWithinBase, ensureExtension } from "../lib/pathUtils.js";
 import { validate, createCanvasSchema } from "../lib/validation.js";
 
@@ -238,6 +238,7 @@ export function createCanvasRouter(notesDir: string): Router {
   router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const user = requireUser(req);
+      requireScope(req, "read-write");
       const userDir = await getUserNotesDir(notesDir, user.id);
       const canvasDir = path.join(userDir, "Canvas");
 
@@ -275,6 +276,7 @@ export function createCanvasRouter(notesDir: string): Router {
   router.put("/:name", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const user = requireUser(req);
+      requireScope(req, "read-write");
       const userDir = await getUserNotesDir(notesDir, user.id);
       const canvasDir = path.join(userDir, "Canvas");
       const name = req.params.name as string;
@@ -305,6 +307,7 @@ export function createCanvasRouter(notesDir: string): Router {
   router.delete("/:name", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const user = requireUser(req);
+      requireScope(req, "read-write");
       const userDir = await getUserNotesDir(notesDir, user.id);
       const canvasDir = path.join(userDir, "Canvas");
       const name = req.params.name as string;

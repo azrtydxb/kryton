@@ -9,7 +9,7 @@ import {
   createAccessRequestSchema,
   updateAccessRequestSchema,
 } from "../lib/validation.js";
-import { requireUser } from "../middleware/auth.js";
+import { requireUser, requireScope } from "../middleware/auth.js";
 
 /**
  * @swagger
@@ -132,6 +132,7 @@ export function createSharesRouter(): Router {
   router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const user = requireUser(req);
+      requireScope(req, "read-write");
       const parsed = validate(createShareSchema, req.body);
       if (!parsed.success) {
         res.status(400).json({ error: parsed.error });
@@ -192,6 +193,7 @@ export function createSharesRouter(): Router {
   router.put("/:id", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const user = requireUser(req);
+      requireScope(req, "read-write");
       const id = req.params.id as string;
       const parsed = validate(updateShareSchema, req.body);
       if (!parsed.success) {
@@ -226,6 +228,7 @@ export function createSharesRouter(): Router {
   router.delete("/:id", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const user = requireUser(req);
+      requireScope(req, "read-write");
       const id = req.params.id as string;
       const share = await prisma.noteShare.findUnique({ where: { id } });
 
@@ -350,6 +353,7 @@ export function createAccessRequestsRouter(): Router {
   router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const user = requireUser(req);
+      requireScope(req, "read-write");
       const parsed = validate(createAccessRequestSchema, req.body);
       if (!parsed.success) {
         res.status(400).json({ error: parsed.error });
@@ -439,6 +443,7 @@ export function createAccessRequestsRouter(): Router {
   router.put("/:id", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const user = requireUser(req);
+      requireScope(req, "read-write");
       const id = req.params.id as string;
       const parsed = validate(updateAccessRequestSchema, req.body);
       if (!parsed.success) {

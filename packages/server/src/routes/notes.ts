@@ -9,7 +9,7 @@ import {
 import { getUserNotesDir } from "../services/userNotesDir";
 import { hasAccess } from "../services/shareService";
 import { validate, createNoteSchema, updateNoteSchema, renameNoteSchema } from "../lib/validation";
-import { requireUser } from "../middleware/auth.js";
+import { requireUser, requireScope } from "../middleware/auth.js";
 import { decodePathParam, ensureExtension } from "../lib/pathUtils.js";
 import { ForbiddenError, ValidationError } from "../lib/errors.js";
 
@@ -217,6 +217,7 @@ export function createNotesRouter(notesDir: string): Router {
   router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const user = requireUser(req);
+      requireScope(req, "read-write");
       const userDir = await getUserNotesDir(notesDir, user.id);
       const parsed = validate(createNoteSchema, req.body);
       if (!parsed.success) {
@@ -237,6 +238,7 @@ export function createNotesRouter(notesDir: string): Router {
   router.put("/{*path}", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const user = requireUser(req);
+      requireScope(req, "read-write");
       const userDir = await getUserNotesDir(notesDir, user.id);
       const notePath = decodePathParam(req.params.path);
       if (!notePath) {
@@ -262,6 +264,7 @@ export function createNotesRouter(notesDir: string): Router {
   router.delete("/{*path}", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const user = requireUser(req);
+      requireScope(req, "read-write");
       const userDir = await getUserNotesDir(notesDir, user.id);
       const notePath = decodePathParam(req.params.path);
       if (!notePath) {
@@ -339,6 +342,7 @@ export function createNotesRenameRouter(notesDir: string): Router {
   router.post("/{*path}", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const user = requireUser(req);
+      requireScope(req, "read-write");
       const userDir = await getUserNotesDir(notesDir, user.id);
       const oldPath = decodePathParam(req.params.path);
       if (!oldPath) {

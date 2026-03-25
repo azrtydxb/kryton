@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { Router, Request, Response, NextFunction } from "express";
 import { prisma } from "../prisma.js";
-import { requireUser } from "../middleware/auth.js";
+import { requireUser, requireSession } from "../middleware/auth.js";
 import { GLOBAL_USER_ID } from "../lib/pathUtils.js";
 import {
   validate,
@@ -347,8 +347,10 @@ export function createAdminRouter(): Router {
   const router = Router();
 
   // GET /users — list all users
-  router.get("/users", async (_req: Request, res: Response, next: NextFunction) => {
+  router.get("/users", async (req: Request, res: Response, next: NextFunction) => {
     try {
+      requireUser(req);
+      requireSession(req);
       const users = await prisma.user.findMany({
         orderBy: { createdAt: "desc" },
         select: { id: true, email: true, name: true, role: true, disabled: true, createdAt: true },
@@ -363,6 +365,7 @@ export function createAdminRouter(): Router {
   router.put("/users/:id", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const currentUser = requireUser(req);
+      requireSession(req);
       const userId = req.params.id as string;
 
       if (userId === currentUser.id) {
@@ -427,6 +430,7 @@ export function createAdminRouter(): Router {
   router.delete("/users/:id", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const currentUser = requireUser(req);
+      requireSession(req);
       const userId = req.params.id as string;
 
       if (userId === currentUser.id) {
@@ -489,6 +493,8 @@ export function createAdminRouter(): Router {
    */
   router.post("/users/:id/reset-password", async (req: Request, res: Response, next: NextFunction) => {
     try {
+      requireUser(req);
+      requireSession(req);
       const userId = req.params.id as string;
       const parsed = validate(resetPasswordSchema, req.body);
       if (!parsed.success) {
@@ -525,6 +531,7 @@ export function createAdminRouter(): Router {
   router.post("/invites", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const user = requireUser(req);
+      requireSession(req);
       const parsed = validate(createInviteSchema, req.body);
       if (!parsed.success) {
         res.status(400).json({ error: parsed.error });
@@ -547,8 +554,10 @@ export function createAdminRouter(): Router {
   });
 
   // GET /invites — list all invites
-  router.get("/invites", async (_req: Request, res: Response, next: NextFunction) => {
+  router.get("/invites", async (req: Request, res: Response, next: NextFunction) => {
     try {
+      requireUser(req);
+      requireSession(req);
       const invites = await prisma.inviteCode.findMany({
         orderBy: { createdAt: "desc" },
         select: { id: true, code: true, createdById: true, usedById: true, expiresAt: true, createdAt: true },
@@ -562,6 +571,8 @@ export function createAdminRouter(): Router {
   // DELETE /invites/:id — delete invite
   router.delete("/invites/:id", async (req: Request, res: Response, next: NextFunction) => {
     try {
+      requireUser(req);
+      requireSession(req);
       const inviteId = req.params.id as string;
 
       const invite = await prisma.inviteCode.findUnique({ where: { id: inviteId } });
@@ -580,8 +591,10 @@ export function createAdminRouter(): Router {
   // GET /settings/registration — read registration mode
   router.get(
     "/settings/registration",
-    async (_req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
+        requireUser(req);
+        requireSession(req);
         // Registration mode is stored as a global setting with a sentinel userId
         const rows = await prisma.settings.findMany({
           where: { key: "registration_mode" },
@@ -600,6 +613,8 @@ export function createAdminRouter(): Router {
     "/settings/registration",
     async (req: Request, res: Response, next: NextFunction) => {
       try {
+        requireUser(req);
+        requireSession(req);
         const parsed = validate(registrationModeSchema, req.body);
         if (!parsed.success) {
           res.status(400).json({ error: parsed.error });
