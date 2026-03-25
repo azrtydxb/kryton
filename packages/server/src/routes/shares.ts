@@ -1,19 +1,15 @@
-import { Router, Request, Response } from "express";
-import { z } from "zod";
+import { Router, Request, Response, NextFunction } from "express";
 import { prisma } from "../prisma.js";
+import { Prisma } from "../generated/prisma/client.js";
 import { getSharedNotesForUser } from "../services/shareService.js";
-import { validate } from "../lib/validation.js";
-
-const createShareBodySchema = z.object({
-  path: z.string().min(1),
-  isFolder: z.boolean().optional(),
-  sharedWithUserId: z.string().min(1),
-  permission: z.enum(["read", "readwrite"]),
-});
-
-const updateShareSchema = z.object({
-  permission: z.enum(["read", "readwrite"]),
-});
+import {
+  validate,
+  createShareSchema,
+  updateShareSchema,
+  createAccessRequestSchema,
+  updateAccessRequestSchema,
+} from "../lib/validation.js";
+import { requireUser } from "../middleware/auth.js";
 
 /**
  * @swagger
@@ -133,23 +129,24 @@ export function createSharesRouter(): Router {
   const router = Router();
 
   // POST /api/shares — Create a share
-  router.post("/", async (req: Request, res: Response) => {
+  router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const parsed = validate(createShareBodySchema, req.body);
+      const user = requireUser(req);
+      const parsed = validate(createShareSchema, req.body);
       if (!parsed.success) {
         res.status(400).json({ error: parsed.error });
         return;
       }
       const { path, isFolder, sharedWithUserId, permission } = parsed.data;
 
-      if (sharedWithUserId === req.user!.id) {
+      if (sharedWithUserId === user.id) {
         res.status(400).json({ error: "Cannot share with yourself" });
         return;
       }
 
       const saved = await prisma.noteShare.create({
         data: {
-          ownerUserId: req.user!.id,
+          ownerUserId: user.id,
           path,
           isFolder: isFolder ?? false,
           sharedWithUserId,
@@ -159,45 +156,42 @@ export function createSharesRouter(): Router {
 
       res.status(201).json(saved);
     } catch (err: unknown) {
-      if (
-        err instanceof Error &&
-        (err.message.includes("UNIQUE") || err.message.includes("duplicate") || err.message.includes("Unique constraint"))
-      ) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
         res.status(409).json({ error: "Share already exists" });
         return;
       }
-      console.error("Error creating share:", err);
-      res.status(500).json({ error: "Failed to create share" });
+      next(err);
     }
   });
 
   // GET /api/shares — List my shares (as owner)
-  router.get("/", async (req: Request, res: Response) => {
+  router.get("/", async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const user = requireUser(req);
       const shares = await prisma.noteShare.findMany({
-        where: { ownerUserId: req.user!.id },
+        where: { ownerUserId: user.id },
       });
       res.json(shares);
     } catch (err) {
-      console.error("Error listing shares:", err);
-      res.status(500).json({ error: "Failed to list shares" });
+      next(err);
     }
   });
 
   // GET /api/shares/with-me — List shares with me
-  router.get("/with-me", async (req: Request, res: Response) => {
+  router.get("/with-me", async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const shares = await getSharedNotesForUser(req.user!.id);
+      const user = requireUser(req);
+      const shares = await getSharedNotesForUser(user.id);
       res.json(shares);
     } catch (err) {
-      console.error("Error listing shared notes:", err);
-      res.status(500).json({ error: "Failed to list shared notes" });
+      next(err);
     }
   });
 
   // PUT /api/shares/:id — Update permission
-  router.put("/:id", async (req: Request, res: Response) => {
+  router.put("/:id", async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const user = requireUser(req);
       const id = req.params.id as string;
       const parsed = validate(updateShareSchema, req.body);
       if (!parsed.success) {
@@ -213,7 +207,7 @@ export function createSharesRouter(): Router {
         return;
       }
 
-      if (share.ownerUserId !== req.user!.id) {
+      if (share.ownerUserId !== user.id) {
         res.status(403).json({ error: "Not the owner of this share" });
         return;
       }
@@ -224,14 +218,14 @@ export function createSharesRouter(): Router {
       });
       res.json(updated);
     } catch (err) {
-      console.error("Error updating share:", err);
-      res.status(500).json({ error: "Failed to update share" });
+      next(err);
     }
   });
 
   // DELETE /api/shares/:id — Revoke share
-  router.delete("/:id", async (req: Request, res: Response) => {
+  router.delete("/:id", async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const user = requireUser(req);
       const id = req.params.id as string;
       const share = await prisma.noteShare.findUnique({ where: { id } });
 
@@ -240,7 +234,7 @@ export function createSharesRouter(): Router {
         return;
       }
 
-      if (share.ownerUserId !== req.user!.id) {
+      if (share.ownerUserId !== user.id) {
         res.status(403).json({ error: "Not the owner of this share" });
         return;
       }
@@ -248,8 +242,7 @@ export function createSharesRouter(): Router {
       await prisma.noteShare.delete({ where: { id } });
       res.json({ message: "Share revoked" });
     } catch (err) {
-      console.error("Error revoking share:", err);
-      res.status(500).json({ error: "Failed to revoke share" });
+      next(err);
     }
   });
 
@@ -354,17 +347,15 @@ export function createAccessRequestsRouter(): Router {
   const router = Router();
 
   // POST /api/access-requests — Request access
-  router.post("/", async (req: Request, res: Response) => {
+  router.post("/", async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { ownerUserId, notePath } = req.body as {
-        ownerUserId?: string;
-        notePath?: string;
-      };
-
-      if (!ownerUserId || !notePath) {
-        res.status(400).json({ error: "ownerUserId and notePath are required" });
+      const user = requireUser(req);
+      const parsed = validate(createAccessRequestSchema, req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error });
         return;
       }
+      const { ownerUserId, notePath } = parsed.data;
 
       const ownerUser = await prisma.user.findUnique({ where: { id: ownerUserId } });
       if (!ownerUser) {
@@ -374,7 +365,7 @@ export function createAccessRequestsRouter(): Router {
 
       const existing = await prisma.accessRequest.findFirst({
         where: {
-          requesterUserId: req.user!.id,
+          requesterUserId: user.id,
           ownerUserId,
           notePath,
         },
@@ -396,7 +387,7 @@ export function createAccessRequestsRouter(): Router {
 
       const saved = await prisma.accessRequest.create({
         data: {
-          requesterUserId: req.user!.id,
+          requesterUserId: user.id,
           ownerUserId,
           notePath,
           status: "pending",
@@ -405,17 +396,17 @@ export function createAccessRequestsRouter(): Router {
 
       res.status(201).json(saved);
     } catch (err) {
-      console.error("Error creating access request:", err);
-      res.status(500).json({ error: "Failed to create access request" });
+      next(err);
     }
   });
 
   // GET /api/access-requests — List pending requests I need to act on (as owner)
-  router.get("/", async (req: Request, res: Response) => {
+  router.get("/", async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const user = requireUser(req);
       const requests = await prisma.accessRequest.findMany({
         where: {
-          ownerUserId: req.user!.id,
+          ownerUserId: user.id,
           status: "pending",
         },
         include: {
@@ -427,37 +418,34 @@ export function createAccessRequestsRouter(): Router {
 
       res.json(requests);
     } catch (err) {
-      console.error("Error listing access requests:", err);
-      res.status(500).json({ error: "Failed to list access requests" });
+      next(err);
     }
   });
 
   // GET /api/access-requests/mine — List my outgoing requests
-  router.get("/mine", async (req: Request, res: Response) => {
+  router.get("/mine", async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const user = requireUser(req);
       const requests = await prisma.accessRequest.findMany({
-        where: { requesterUserId: req.user!.id },
+        where: { requesterUserId: user.id },
       });
       res.json(requests);
     } catch (err) {
-      console.error("Error listing my access requests:", err);
-      res.status(500).json({ error: "Failed to list access requests" });
+      next(err);
     }
   });
 
   // PUT /api/access-requests/:id — Approve or deny
-  router.put("/:id", async (req: Request, res: Response) => {
+  router.put("/:id", async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const user = requireUser(req);
       const id = req.params.id as string;
-      const { action, permission } = req.body as {
-        action?: "approve" | "deny";
-        permission?: "read" | "readwrite";
-      };
-
-      if (!action || (action !== "approve" && action !== "deny")) {
-        res.status(400).json({ error: "action must be 'approve' or 'deny'" });
+      const parsed = validate(updateAccessRequestSchema, req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error });
         return;
       }
+      const { status: action, permission } = parsed.data;
 
       const request = await prisma.accessRequest.findUnique({ where: { id } });
 
@@ -466,12 +454,12 @@ export function createAccessRequestsRouter(): Router {
         return;
       }
 
-      if (request.ownerUserId !== req.user!.id) {
+      if (request.ownerUserId !== user.id) {
         res.status(403).json({ error: "Not the owner of the requested note" });
         return;
       }
 
-      if (action === "approve") {
+      if (action === "approved") {
         if (!permission) {
           res.status(400).json({ error: "permission is required when approving" });
           return;
@@ -501,8 +489,7 @@ export function createAccessRequestsRouter(): Router {
         res.json(updated);
       }
     } catch (err) {
-      console.error("Error updating access request:", err);
-      res.status(500).json({ error: "Failed to update access request" });
+      next(err);
     }
   });
 

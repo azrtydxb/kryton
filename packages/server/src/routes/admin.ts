@@ -1,6 +1,15 @@
 import crypto from "crypto";
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { prisma } from "../prisma.js";
+import { requireUser } from "../middleware/auth.js";
+import { GLOBAL_USER_ID } from "../lib/pathUtils.js";
+import {
+  validate,
+  updateUserSchema,
+  resetPasswordSchema,
+  createInviteSchema,
+  registrationModeSchema,
+} from "../lib/validation.js";
 
 /**
  * @swagger
@@ -338,7 +347,7 @@ export function createAdminRouter(): Router {
   const router = Router();
 
   // GET /users — list all users
-  router.get("/users", async (_req: Request, res: Response) => {
+  router.get("/users", async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const users = await prisma.user.findMany({
         orderBy: { createdAt: "desc" },
@@ -346,17 +355,17 @@ export function createAdminRouter(): Router {
       });
       res.json(users);
     } catch (err) {
-      console.error("Error listing users:", err);
-      res.status(500).json({ error: "Failed to list users" });
+      next(err);
     }
   });
 
   // PUT /users/:id — update user
-  router.put("/users/:id", async (req: Request, res: Response) => {
+  router.put("/users/:id", async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const currentUser = requireUser(req);
       const userId = req.params.id as string;
 
-      if (userId === req.user!.id) {
+      if (userId === currentUser.id) {
         res.status(400).json({ error: "Cannot modify yourself" });
         return;
       }
@@ -368,13 +377,14 @@ export function createAdminRouter(): Router {
         return;
       }
 
-      const { disabled, role } = req.body as {
-        disabled?: boolean;
-        role?: string;
-      };
+      const parsed = validate(updateUserSchema, req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error });
+        return;
+      }
+      const { disabled, role } = parsed.data;
 
       let shouldInvalidateTokens = false;
-
       const updateData: Record<string, unknown> = {};
 
       if (typeof disabled === "boolean") {
@@ -382,13 +392,6 @@ export function createAdminRouter(): Router {
           shouldInvalidateTokens = true;
         }
         updateData.disabled = disabled;
-      }
-
-      if (role !== undefined) {
-        if (typeof role !== "string" || !["user", "admin"].includes(role)) {
-          res.status(400).json({ error: "Invalid role. Must be 'user' or 'admin'" });
-          return;
-        }
       }
 
       if (typeof role === "string") {
@@ -399,7 +402,6 @@ export function createAdminRouter(): Router {
       }
 
       if (shouldInvalidateTokens) {
-        // Delete all sessions for this user (better-auth equivalent of invalidating tokens)
         await prisma.session.deleteMany({ where: { userId } });
       }
 
@@ -417,17 +419,17 @@ export function createAdminRouter(): Router {
         createdAt: saved.createdAt,
       });
     } catch (err) {
-      console.error("Error updating user:", err);
-      res.status(500).json({ error: "Failed to update user" });
+      next(err);
     }
   });
 
   // DELETE /users/:id — delete user
-  router.delete("/users/:id", async (req: Request, res: Response) => {
+  router.delete("/users/:id", async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const currentUser = requireUser(req);
       const userId = req.params.id as string;
 
-      if (userId === req.user!.id) {
+      if (userId === currentUser.id) {
         res.status(400).json({ error: "Cannot delete yourself" });
         return;
       }
@@ -455,8 +457,7 @@ export function createAdminRouter(): Router {
 
       res.json({ ok: true });
     } catch (err) {
-      console.error("Error deleting user:", err);
-      res.status(500).json({ error: "Failed to delete user" });
+      next(err);
     }
   });
 
@@ -486,15 +487,15 @@ export function createAdminRouter(): Router {
    *       200:
    *         description: Password reset
    */
-  router.post("/users/:id/reset-password", async (req: Request, res: Response) => {
+  router.post("/users/:id/reset-password", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const userId = req.params.id as string;
-      const { newPassword } = req.body as { newPassword: string };
-
-      if (!newPassword || newPassword.length < 8 || newPassword.length > 72) {
-        res.status(400).json({ error: "Password must be 8-72 characters" });
+      const parsed = validate(resetPasswordSchema, req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error });
         return;
       }
+      const { newPassword } = parsed.data;
 
       const user = await prisma.user.findUnique({ where: { id: userId } });
       if (!user) {
@@ -516,34 +517,37 @@ export function createAdminRouter(): Router {
 
       res.json({ ok: true });
     } catch (err) {
-      console.error("Error resetting password:", err);
-      res.status(500).json({ error: "Failed to reset password" });
+      next(err);
     }
   });
 
   // POST /invites — create invite code
-  router.post("/invites", async (req: Request, res: Response) => {
+  router.post("/invites", async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { expiresAt } = req.body as { expiresAt?: string };
+      const user = requireUser(req);
+      const parsed = validate(createInviteSchema, req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error });
+        return;
+      }
 
       const code = crypto.randomBytes(4).toString("hex"); // 8-char hex
 
       const saved = await prisma.inviteCode.create({
         data: {
           code,
-          createdById: req.user!.id,
-          expiresAt: expiresAt ? new Date(expiresAt) : null,
+          createdById: user.id,
+          expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null,
         },
       });
       res.json(saved);
     } catch (err) {
-      console.error("Error creating invite:", err);
-      res.status(500).json({ error: "Failed to create invite" });
+      next(err);
     }
   });
 
   // GET /invites — list all invites
-  router.get("/invites", async (_req: Request, res: Response) => {
+  router.get("/invites", async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const invites = await prisma.inviteCode.findMany({
         orderBy: { createdAt: "desc" },
@@ -551,13 +555,12 @@ export function createAdminRouter(): Router {
       });
       res.json(invites);
     } catch (err) {
-      console.error("Error listing invites:", err);
-      res.status(500).json({ error: "Failed to list invites" });
+      next(err);
     }
   });
 
   // DELETE /invites/:id — delete invite
-  router.delete("/invites/:id", async (req: Request, res: Response) => {
+  router.delete("/invites/:id", async (req: Request, res: Response, next: NextFunction) => {
     try {
       const inviteId = req.params.id as string;
 
@@ -570,27 +573,25 @@ export function createAdminRouter(): Router {
       await prisma.inviteCode.delete({ where: { id: inviteId } });
       res.json({ ok: true });
     } catch (err) {
-      console.error("Error deleting invite:", err);
-      res.status(500).json({ error: "Failed to delete invite" });
+      next(err);
     }
   });
 
   // GET /settings/registration — read registration mode
   router.get(
     "/settings/registration",
-    async (_req: Request, res: Response) => {
+    async (_req: Request, res: Response, next: NextFunction) => {
       try {
         // Registration mode is stored as a global setting with a sentinel userId
         const rows = await prisma.settings.findMany({
           where: { key: "registration_mode" },
         });
         // Find the global row (empty userId used as global sentinel)
-        const row = rows.find((r) => r.userId === "" || r.userId === "__global__") ?? rows[0];
+        const row = rows.find((r) => r.userId === "" || r.userId === GLOBAL_USER_ID) ?? rows[0];
         const mode = row?.value ?? "open";
         res.json({ mode });
       } catch (err) {
-        console.error("Error reading registration setting:", err);
-        res.status(500).json({ error: "Failed to read registration setting" });
+        next(err);
       }
     },
   );
@@ -598,29 +599,24 @@ export function createAdminRouter(): Router {
   // PUT /settings/registration — update registration mode
   router.put(
     "/settings/registration",
-    async (req: Request, res: Response) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const { mode } = req.body as { mode?: string };
-
-        if (mode !== "open" && mode !== "invite-only") {
-          res.status(400).json({ error: "Invalid mode. Must be 'open' or 'invite-only'" });
+        const parsed = validate(registrationModeSchema, req.body);
+        if (!parsed.success) {
+          res.status(400).json({ error: parsed.error });
           return;
         }
+        const { mode } = parsed.data;
 
-        // Use a sentinel userId for global settings (Prisma Settings has a composite key [key, userId])
-        const GLOBAL_USER = "__global__";
         await prisma.settings.upsert({
-          where: { key_userId: { key: "registration_mode", userId: GLOBAL_USER } },
-          create: { key: "registration_mode", userId: GLOBAL_USER, value: mode },
+          where: { key_userId: { key: "registration_mode", userId: GLOBAL_USER_ID } },
+          create: { key: "registration_mode", userId: GLOBAL_USER_ID, value: mode },
           update: { value: mode },
         });
 
         res.json({ mode });
       } catch (err) {
-        console.error("Error updating registration setting:", err);
-        res
-          .status(500)
-          .json({ error: "Failed to update registration setting" });
+        next(err);
       }
     },
   );
