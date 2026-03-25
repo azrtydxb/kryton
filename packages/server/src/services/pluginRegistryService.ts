@@ -11,7 +11,7 @@ function validateDownloadUrl(url: string): void {
     }
   } catch (err) {
     if (err instanceof Error && err.message.includes("not allowed")) throw err;
-    throw new Error(`Invalid download URL: ${url}`);
+    throw new Error(`Invalid download URL: ${url}`, { cause: err });
   }
 }
 
