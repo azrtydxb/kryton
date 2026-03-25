@@ -66,7 +66,7 @@ async function main(): Promise<void> {
   try {
     await prisma.searchIndex.deleteMany({ where: { userId: "" } });
     await prisma.graphEdge.deleteMany({ where: { userId: "" } });
-  } catch (err) {
+  } catch {
     log.info("Orphan cleanup skipped (table may have been recreated)");
   }
 

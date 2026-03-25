@@ -66,7 +66,7 @@ describe("PluginApiFactory", () => {
   });
 
   it("prefixes log messages with plugin id", () => {
-    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const consoleSpy = vi.spyOn(console, "info").mockImplementation(() => {});
     const api = factory.createApi({
       id: "test-plugin",
       name: "Test Plugin",
@@ -77,7 +77,9 @@ describe("PluginApiFactory", () => {
     });
 
     api.log.info("hello");
-    expect(consoleSpy).toHaveBeenCalledWith("[plugin:test-plugin]", "hello");
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("[INFO] [plugin:test-plugin] hello"),
+    );
     consoleSpy.mockRestore();
   });
 });
