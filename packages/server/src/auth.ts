@@ -11,8 +11,19 @@ const log = createLogger("auth");
 
 const APP_URL = process.env.APP_URL || "http://localhost:5173";
 
-// Map to pass invite code ID from user.create.before to user.create.after
-const pendingInviteCodes = new Map<string, string>(); // email -> inviteCode.id
+// Temporary store to pass invite code ID from before to after hook.
+// Uses a TTL Map to prevent memory leaks on registration failure.
+const pendingInviteCodes = new Map<string, { id: string; timestamp: number }>();
+const PENDING_TTL_MS = 30_000; // 30 seconds
+
+function cleanupPendingInvites(): void {
+  const now = Date.now();
+  for (const [email, entry] of pendingInviteCodes) {
+    if (now - entry.timestamp > PENDING_TTL_MS) {
+      pendingInviteCodes.delete(email);
+    }
+  }
+}
 
 export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET,
@@ -151,8 +162,19 @@ export const auth = betterAuth({
                 throw new Error("Invite code has expired");
               }
 
-              // Store invite code ID so the after hook can mark it as used
-              pendingInviteCodes.set(user.email, invite.id);
+              // Atomically claim the invite code to prevent race conditions
+              // with concurrent registrations using the same code
+              const claimed = await prisma.inviteCode.updateMany({
+                where: { id: invite.id, usedById: null },
+                data: { usedById: "pending" },
+              });
+              if (claimed.count === 0) {
+                throw new Error("Invite code has already been used");
+              }
+
+              // Store invite code ID so the after hook can set the real userId
+              cleanupPendingInvites();
+              pendingInviteCodes.set(user.email, { id: invite.id, timestamp: Date.now() });
             }
           }
 
@@ -164,14 +186,18 @@ export const auth = betterAuth({
           };
         },
         after: async (user) => {
-          // Mark invite code as used (if applicable)
-          const inviteCodeId = pendingInviteCodes.get(user.email);
-          if (inviteCodeId) {
+          // Finalize invite code — replace "pending" placeholder with actual userId
+          const pending = pendingInviteCodes.get(user.email);
+          if (pending) {
             pendingInviteCodes.delete(user.email);
-            await prisma.inviteCode.update({
-              where: { id: inviteCodeId },
-              data: { usedById: user.id },
-            });
+            try {
+              await prisma.inviteCode.update({
+                where: { id: pending.id },
+                data: { usedById: user.id },
+              });
+            } catch (err) {
+              log.error("Failed to finalize invite code", err);
+            }
           }
 
           // Provision user notes directory

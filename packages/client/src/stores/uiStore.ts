@@ -49,6 +49,8 @@ interface UIState {
   // Compound actions
   enterEditMode: (content: string) => void;
   cancelEdit: () => void;
+  /** Reset all UI state to initial values (call on logout) */
+  reset: () => void;
 }
 
 // Helper: resolve value-or-updater against current state field
@@ -97,4 +99,22 @@ export const useUIStore = create<UIState>((set, get) => ({
 
   enterEditMode: (content) => set({ editing: true, editContent: content, originalContent: content }),
   cancelEdit: () => set({ editing: false, editContent: null, originalContent: null }),
+  reset: () => set({
+    sidebarOpen: true,
+    sidebarWidth: 256,
+    rightPanelWidth: 320,
+    graphHeight: null,
+    mobileMenuOpen: false,
+    editing: false,
+    editContent: null,
+    originalContent: null,
+    showAdmin: false,
+    showTemplatePicker: false,
+    pendingTemplatePath: null,
+    showQuickSwitcher: false,
+    showShareDialog: false,
+    shareTarget: null,
+    showAccessRequests: false,
+    cursorState: { line: 1, col: 1, wordCount: 0 },
+  }),
 }));

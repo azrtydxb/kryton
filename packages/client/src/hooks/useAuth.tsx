@@ -1,5 +1,6 @@
 import { createContext, useContext, useCallback, useMemo } from 'react';
 import { authClient } from '../lib/auth-client';
+import { useUIStore } from '../stores/uiStore';
 import type { AuthUser } from '../lib/api';
 
 interface AuthContextType {
@@ -67,9 +68,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } as Parameters<typeof authClient.signIn.social>[0]);
   }, []);
 
+  const resetUI = useUIStore((s) => s.reset);
   const logout = useCallback(async () => {
     await authClient.signOut();
-  }, []);
+    resetUI();
+  }, [resetUI]);
 
   const value = useMemo(() => ({
     user, loading, login, register, loginWithGoogle, loginWithGithub, logout,
