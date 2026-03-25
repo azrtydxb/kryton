@@ -37,6 +37,7 @@ import { PluginManager } from "./plugins/PluginManager.js";
 import { PluginWebSocket } from "./plugins/PluginWebSocket.js";
 import { createPluginsRouter } from "./routes/plugins.js";
 import { createApiKeysRouter } from "./routes/apiKeys.js";
+import { createMcpRouter } from "./mcp/mcpServer.js";
 
 const log = createLogger("server");
 const PORT = parseInt(process.env.PORT || "3001", 10);
@@ -246,6 +247,7 @@ async function main(): Promise<void> {
   app.use("/api/users", authMiddleware, createUsersRouter());
   app.use("/api/plugins", authMiddleware, createPluginsRouter(pluginManager, pluginsDir));
   app.use("/api/api-keys", authMiddleware, createApiKeysRouter());
+  app.use("/api/mcp", createMcpRouter());
 
   /**
    * @swagger
