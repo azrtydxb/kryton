@@ -129,15 +129,14 @@ function createMcpServerInstance(userId: string, keyScope: string, rawKey: strin
 
         if (dynTool.method === "GET" || dynTool.method === "DELETE") {
           // Substitute path params, remainder become query params
-          let remainingArgs = { ...args };
+          const remainingArgs = { ...args };
           const pathParamPattern = /\{(\w+)\}/g;
           let match: RegExpExecArray | null;
           while ((match = pathParamPattern.exec(dynTool.apiPath)) !== null) {
             const paramName = match[1];
             if (paramName in remainingArgs) {
               url = url.replace(`{${paramName}}`, encodeURIComponent(String(remainingArgs[paramName])));
-              // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-              delete remainingArgs[paramName];
+              delete (remainingArgs as Record<string, unknown>)[paramName];
             }
           }
           const queryEntries = Object.entries(remainingArgs).filter(([, v]) => v !== undefined && v !== null);

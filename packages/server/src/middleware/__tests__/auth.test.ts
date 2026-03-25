@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import express, { Request, Response, NextFunction } from "express";
-import { authMiddleware, requireScope, requireSession } from "../auth.js";
+import { describe, it, expect } from "vitest";
+import { Request } from "express";
+import { requireScope, requireSession } from "../auth.js";
 
 // We test requireScope and requireSession as unit functions.
 // Full bearer token integration is tested via route tests.
