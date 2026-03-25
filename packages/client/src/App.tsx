@@ -80,6 +80,8 @@ function AppModals({
   const setShowShareDialog = useUIStore((s) => s.setShowShareDialog);
   const showAccessRequests = useUIStore((s) => s.showAccessRequests);
   const setShowAccessRequests = useUIStore((s) => s.setShowAccessRequests);
+  const showAccountSettings = useUIStore((s) => s.showAccountSettings);
+  const setShowAccountSettings = useUIStore((s) => s.setShowAccountSettings);
   const shareTarget = useUIStore((s) => s.shareTarget);
 
   return (
@@ -89,6 +91,7 @@ function AppModals({
       showAdmin={showAdmin}
       showShareDialog={showShareDialog}
       showAccessRequests={showAccessRequests}
+      showAccountSettings={showAccountSettings}
       shareTarget={shareTarget}
       noteTree={noteTree}
       onTemplateSelected={onTemplateSelected}
@@ -98,6 +101,7 @@ function AppModals({
       onCloseAdmin={() => setShowAdmin(false)}
       onCloseShareDialog={() => setShowShareDialog(false)}
       onCloseAccessRequests={() => setShowAccessRequests(false)}
+      onCloseAccountSettings={() => setShowAccountSettings(false)}
     />
   );
 }

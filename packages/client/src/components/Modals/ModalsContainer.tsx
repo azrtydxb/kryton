@@ -4,6 +4,7 @@ import { QuickSwitcher } from '../QuickSwitcher/QuickSwitcher';
 import { ShareDialog } from '../Sharing/ShareDialog';
 import { AccessRequestsModal } from '../Sharing/AccessRequestsModal';
 import AdminPage from '../../pages/AdminPage';
+import AccountSettingsPage from '../../pages/AccountSettingsPage';
 
 interface ModalsContainerProps {
   showTemplatePicker: boolean;
@@ -11,6 +12,7 @@ interface ModalsContainerProps {
   showAdmin: boolean;
   showShareDialog: boolean;
   showAccessRequests: boolean;
+  showAccountSettings: boolean;
   shareTarget: { path: string; isFolder: boolean } | null;
   noteTree: FileNode[];
   onTemplateSelected: (content: string) => void;
@@ -20,14 +22,16 @@ interface ModalsContainerProps {
   onCloseAdmin: () => void;
   onCloseShareDialog: () => void;
   onCloseAccessRequests: () => void;
+  onCloseAccountSettings: () => void;
 }
 
 export function ModalsContainer({
   showTemplatePicker, showQuickSwitcher, showAdmin,
-  showShareDialog, showAccessRequests, shareTarget, noteTree,
+  showShareDialog, showAccessRequests, showAccountSettings, shareTarget, noteTree,
   onTemplateSelected, onCloseTemplatePicker,
   onNoteSelect, onCloseQuickSwitcher,
   onCloseAdmin, onCloseShareDialog, onCloseAccessRequests,
+  onCloseAccountSettings,
 }: ModalsContainerProps) {
   return (
     <>
@@ -42,6 +46,7 @@ export function ModalsContainer({
         <ShareDialog notePath={shareTarget.path} isFolder={shareTarget.isFolder} onClose={onCloseShareDialog} />
       )}
       {showAccessRequests && <AccessRequestsModal onClose={onCloseAccessRequests} />}
+      {showAccountSettings && <AccountSettingsPage onClose={onCloseAccountSettings} />}
     </>
   );
 }
