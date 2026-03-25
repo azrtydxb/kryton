@@ -86,7 +86,7 @@ async function main(): Promise<void> {
   app.use(express.json());
 
   // Plugin system initialization
-  const pluginsDir = path.join(process.cwd(), "plugins");
+  const pluginsDir = path.resolve(import.meta.dirname, "../plugins");
   await fs.mkdir(pluginsDir, { recursive: true });
 
   const eventBus = new PluginEventBus();
