@@ -6,6 +6,8 @@ import { z } from "zod";
 import { validateApiKey } from "../services/apiKeyService.js";
 import { prisma } from "../prisma.js";
 import { getToolDefinitions, executeTool } from "./mcpTools.js";
+import { generateDynamicTools } from "./dynamicTools.js";
+import { swaggerSpec } from "../swagger.js";
 import { scanDirectory } from "../services/noteService.js";
 import { getUserNotesDir } from "../services/userNotesDir.js";
 import { createLogger } from "../lib/logger.js";
@@ -39,7 +41,7 @@ function jsonSchemaToZod(props: Record<string, { type: string; description?: str
   return zodProps;
 }
 
-function createMcpServerInstance(userId: string, keyScope: string): McpServer {
+function createMcpServerInstance(userId: string, keyScope: string, rawKey: string): McpServer {
   const server = new McpServer({ name: "Mnemo", version: "3.1.0" });
 
   // Register 14 core tools
@@ -99,6 +101,81 @@ function createMcpServerInstance(userId: string, keyScope: string): McpServer {
     }
   }
 
+  // Register dynamic tools from OpenAPI spec (e.g. plugin routes)
+  const coreToolNames = toolDefs.map(t => t.name);
+  const dynamicTools = generateDynamicTools(swaggerSpec as Record<string, unknown>, coreToolNames);
+  const port = process.env.PORT || "3001";
+
+  for (const dynTool of dynamicTools) {
+    const props = (dynTool.inputSchema.properties ?? {}) as Record<string, { type: string; description?: string }>;
+    const hasParams = Object.keys(props).length > 0;
+
+    const handler = async (args: Record<string, unknown>) => {
+      if (dynTool.scope === "read-write" && keyScope !== "read-write") {
+        return {
+          content: [{ type: "text" as const, text: "Error: This tool requires a read-write API key." }],
+          isError: true,
+        };
+      }
+      try {
+        let url = `http://localhost:${port}/api${dynTool.apiPath}`;
+        const fetchInit: RequestInit = {
+          method: dynTool.method,
+          headers: {
+            "Authorization": `Bearer ${rawKey}`,
+            "Content-Type": "application/json",
+          },
+        };
+
+        if (dynTool.method === "GET" || dynTool.method === "DELETE") {
+          // Substitute path params, remainder become query params
+          let remainingArgs = { ...args };
+          const pathParamPattern = /\{(\w+)\}/g;
+          let match: RegExpExecArray | null;
+          while ((match = pathParamPattern.exec(dynTool.apiPath)) !== null) {
+            const paramName = match[1];
+            if (paramName in remainingArgs) {
+              url = url.replace(`{${paramName}}`, encodeURIComponent(String(remainingArgs[paramName])));
+              // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+              delete remainingArgs[paramName];
+            }
+          }
+          const queryEntries = Object.entries(remainingArgs).filter(([, v]) => v !== undefined && v !== null);
+          if (queryEntries.length > 0) {
+            const qs = new URLSearchParams(queryEntries.map(([k, v]) => [k, String(v)]));
+            url = `${url}?${qs.toString()}`;
+          }
+        } else {
+          // POST / PUT — send as JSON body
+          fetchInit.body = JSON.stringify(args);
+        }
+
+        const response = await fetch(url, fetchInit);
+        const text = await response.text();
+        if (!response.ok) {
+          return {
+            content: [{ type: "text" as const, text: `HTTP ${response.status}: ${text}` }],
+            isError: true,
+          };
+        }
+        return { content: [{ type: "text" as const, text: text }] };
+      } catch (err) {
+        log.error(`MCP dynamic tool ${dynTool.name} error:`, err);
+        return {
+          content: [{ type: "text" as const, text: `Error: ${err instanceof Error ? err.message : "Unknown error"}` }],
+          isError: true,
+        };
+      }
+    };
+
+    if (hasParams) {
+      const zodProps = jsonSchemaToZod(props);
+      server.tool(dynTool.name, dynTool.description, zodProps, handler);
+    } else {
+      server.tool(dynTool.name, dynTool.description, async () => handler({}));
+    }
+  }
+
   // Register mnemo://notes resource
   server.resource(
     "notes",
@@ -149,7 +226,7 @@ export function createMcpRouter(): Router {
     }
 
     // Create a stateless MCP server per request
-    const server = createMcpServerInstance(user.id, keyData.scope);
+    const server = createMcpServerInstance(user.id, keyData.scope, rawKey);
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
     await server.connect(transport);
 
