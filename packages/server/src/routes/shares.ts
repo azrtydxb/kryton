@@ -366,6 +366,12 @@ export function createAccessRequestsRouter(): Router {
         return;
       }
 
+      const ownerUser = await prisma.user.findUnique({ where: { id: ownerUserId } });
+      if (!ownerUser) {
+        res.status(400).json({ error: "Owner user not found" });
+        return;
+      }
+
       const existing = await prisma.accessRequest.findFirst({
         where: {
           requesterUserId: req.user!.id,

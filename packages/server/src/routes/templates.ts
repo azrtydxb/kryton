@@ -102,7 +102,7 @@ export function createTemplatesRouter(notesDir: string): Router {
 
       // Security check
       const resolved = path.resolve(filePath);
-      if (!resolved.startsWith(path.resolve(templatesDir))) {
+      if (!resolved.startsWith(path.resolve(templatesDir) + path.sep)) {
         res.status(400).json({ error: "Invalid template name" });
         return;
       }

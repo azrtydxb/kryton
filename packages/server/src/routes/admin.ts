@@ -384,6 +384,13 @@ export function createAdminRouter(): Router {
         updateData.disabled = disabled;
       }
 
+      if (role !== undefined) {
+        if (typeof role !== "string" || !["user", "admin"].includes(role)) {
+          res.status(400).json({ error: "Invalid role. Must be 'user' or 'admin'" });
+          return;
+        }
+      }
+
       if (typeof role === "string") {
         if (role !== user.role) {
           shouldInvalidateTokens = true;
