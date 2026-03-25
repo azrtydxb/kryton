@@ -1,10 +1,11 @@
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useCallback } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './hooks/useAuth';
 import { PluginSlotRegistry } from './plugins/PluginSlotRegistry';
 import { ClientPluginManager } from './plugins/PluginManager';
 import { PluginProvider, usePluginSlots } from './plugins/PluginContext';
 import { PluginSlot } from './components/PluginSlot/PluginSlot';
+import { useUIStore } from './stores/uiStore';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -28,6 +29,7 @@ import { EmptyStateView } from './components/Views/EmptyStateView';
 import { ModalsContainer } from './components/Modals/ModalsContainer';
 import { ErrorToast } from './components/Toast/ErrorToast';
 import { StatusBar } from './components/StatusBar/StatusBar';
+import { FileNode } from './lib/api';
 import LoginPage from './pages/LoginPage';
 
 export default function App() {
@@ -42,6 +44,64 @@ export default function App() {
   );
 }
 
+function AppStatusBar({ notePath }: { notePath: string | null }) {
+  const cursorState = useUIStore((s) => s.cursorState);
+
+  return (
+    <div className="flex items-center">
+      <PluginSlot slot="statusbar-left" />
+      <StatusBar
+        notePath={notePath}
+        line={cursorState.line}
+        col={cursorState.col}
+        wordCount={cursorState.wordCount}
+      />
+      <PluginSlot slot="statusbar-right" />
+    </div>
+  );
+}
+
+function AppModals({
+  noteTree,
+  onTemplateSelected,
+  onNoteSelect,
+}: {
+  noteTree: FileNode[];
+  onTemplateSelected: (content: string) => void;
+  onNoteSelect: (path: string) => void;
+}) {
+  const showTemplatePicker = useUIStore((s) => s.showTemplatePicker);
+  const setShowTemplatePicker = useUIStore((s) => s.setShowTemplatePicker);
+  const showQuickSwitcher = useUIStore((s) => s.showQuickSwitcher);
+  const setShowQuickSwitcher = useUIStore((s) => s.setShowQuickSwitcher);
+  const showAdmin = useUIStore((s) => s.showAdmin);
+  const setShowAdmin = useUIStore((s) => s.setShowAdmin);
+  const showShareDialog = useUIStore((s) => s.showShareDialog);
+  const setShowShareDialog = useUIStore((s) => s.setShowShareDialog);
+  const showAccessRequests = useUIStore((s) => s.showAccessRequests);
+  const setShowAccessRequests = useUIStore((s) => s.setShowAccessRequests);
+  const shareTarget = useUIStore((s) => s.shareTarget);
+
+  return (
+    <ModalsContainer
+      showTemplatePicker={showTemplatePicker}
+      showQuickSwitcher={showQuickSwitcher}
+      showAdmin={showAdmin}
+      showShareDialog={showShareDialog}
+      showAccessRequests={showAccessRequests}
+      shareTarget={shareTarget}
+      noteTree={noteTree}
+      onTemplateSelected={onTemplateSelected}
+      onCloseTemplatePicker={() => setShowTemplatePicker(false)}
+      onNoteSelect={onNoteSelect}
+      onCloseQuickSwitcher={() => setShowQuickSwitcher(false)}
+      onCloseAdmin={() => setShowAdmin(false)}
+      onCloseShareDialog={() => setShowShareDialog(false)}
+      onCloseAccessRequests={() => setShowAccessRequests(false)}
+    />
+  );
+}
+
 function AppContent() {
   const state = useAppState();
   const callbacks = useAppCallbacks(state);
@@ -51,26 +111,25 @@ function AppContent() {
     themeCtx,
     notes,
     editing,
-    editContent, setEditContent,
+    editContent,
     originalContent,
-    showAdmin, setShowAdmin,
     sidebarOpen, setSidebarOpen,
     mobileMenuOpen, setMobileMenuOpen,
-    showTemplatePicker, setShowTemplatePicker,
-    showQuickSwitcher, setShowQuickSwitcher,
-    showShareDialog, setShowShareDialog,
-    showAccessRequests, setShowAccessRequests,
-    shareTarget,
     sidebarWidth,
     rightPanelWidth,
     graphHeight,
     graphData, graphLoading,
-    cursorState, setCursorState,
+    setCursorState,
     starredPaths,
     sharedNotes,
     isActiveNoteStarred,
     editorViewRef, searchInputRef, previewRef,
   } = state;
+
+  const setShowAdmin = useUIStore((s) => s.setShowAdmin);
+  const setShowAccessRequests = useUIStore((s) => s.setShowAccessRequests);
+  const setShowQuickSwitcher = useUIStore((s) => s.setShowQuickSwitcher);
+  const setEditContent = useUIStore((s) => s.setEditContent);
 
   const {
     toggleStar,
@@ -114,6 +173,10 @@ function AppContent() {
   useKeyboardShortcuts(shortcutActions);
 
   const { editorExtensions, getCodeFenceRenderer } = usePluginSlots();
+
+  const onShareActiveNote = useCallback(() => {
+    if (notes.activeNote) handleShare(notes.activeNote.path, false);
+  }, [notes.activeNote, handleShare]);
 
   if (loading) {
     return (
@@ -200,7 +263,7 @@ function AppContent() {
                   allNotes={notes.tree}
                   previewRef={previewRef}
                   onEdit={enterEditMode}
-                  onShare={() => handleShare(notes.activeNote!.path, false)}
+                  onShare={onShareActiveNote}
                   onToggleStar={toggleActiveNoteStar}
                   onPdfExport={handlePdfExport}
                   onNoteSelect={handleNoteSelect}
@@ -232,36 +295,16 @@ function AppContent() {
         )}
       </div>
 
-      <div className="flex items-center">
-        <PluginSlot slot="statusbar-left" />
-        <StatusBar
-          notePath={notes.activeNote?.path ?? null}
-          line={cursorState.line}
-          col={cursorState.col}
-          wordCount={cursorState.wordCount}
-        />
-        <PluginSlot slot="statusbar-right" />
-      </div>
+      <AppStatusBar notePath={notes.activeNote?.path ?? null} />
 
       {notes.error && (
         <ErrorToast message={notes.error} onDismiss={() => notes.setError(null)} />
       )}
 
-      <ModalsContainer
-        showTemplatePicker={showTemplatePicker}
-        showQuickSwitcher={showQuickSwitcher}
-        showAdmin={showAdmin}
-        showShareDialog={showShareDialog}
-        showAccessRequests={showAccessRequests}
-        shareTarget={shareTarget}
+      <AppModals
         noteTree={notes.tree}
         onTemplateSelected={handleTemplateSelected}
-        onCloseTemplatePicker={() => setShowTemplatePicker(false)}
         onNoteSelect={handleNoteSelect}
-        onCloseQuickSwitcher={() => setShowQuickSwitcher(false)}
-        onCloseAdmin={() => setShowAdmin(false)}
-        onCloseShareDialog={() => setShowShareDialog(false)}
-        onCloseAccessRequests={() => setShowAccessRequests(false)}
       />
     </div>
   );
