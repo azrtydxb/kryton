@@ -76,6 +76,20 @@ export const registrationModeSchema = z.object({
   mode: z.enum(["open", "invite-only"]),
 });
 
+// API Key schemas
+export const createApiKeySchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(100, "Name must be 100 characters or less"),
+  scope: z.enum(["read-only", "read-write"]),
+  expiresAt: z
+    .string()
+    .datetime()
+    .optional()
+    .refine(
+      (val) => !val || new Date(val) > new Date(),
+      "Expiration date must be in the future",
+    ),
+});
+
 // Helper to validate and return parsed body or send 400
 export function validate<T>(
   schema: z.ZodSchema<T>,
