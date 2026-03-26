@@ -1,13 +1,17 @@
-import { MutableRefObject, ComponentType } from 'react';
+import { MutableRefObject, ComponentType, useState, useEffect, useRef } from 'react';
 import { Extension } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
+import { useDebouncedCallback } from 'use-debounce';
 import { FileNode } from '../../lib/api';
 import { Editor, EditorCursorState } from '../Editor/Editor';
 import { EditorToolbar } from '../Editor/EditorToolbar';
 import { Preview } from '../Preview/Preview';
 import { OutgoingLinksPanel } from '../OutgoingLinks/OutgoingLinksPanel';
 import { BacklinksPanel } from '../Backlinks/BacklinksPanel';
+import { Breadcrumbs } from '../Layout/Breadcrumbs';
 import { BookOpen, Star, FileDown } from 'lucide-react';
+
+type SaveStatus = 'unchanged' | 'unsaved' | 'saving' | 'saved' | 'error';
 
 interface EditModeViewProps {
   activeNote: { path: string; title: string; content: string };
@@ -21,6 +25,7 @@ interface EditModeViewProps {
   pluginExtensions?: Extension[];
   getCodeFenceRenderer?: (language: string) => { component: ComponentType<{ content: string; notePath: string }> } | undefined;
   onSave: () => void;
+  onAutoSave: () => Promise<void>;
   onCancel: () => void;
   onToggleStar: () => void;
   onPdfExport: () => void;
@@ -36,11 +41,65 @@ export function EditModeView({
   isStarred, resolvedTheme, allNotes,
   editorViewRef, previewRef, pluginExtensions,
   getCodeFenceRenderer,
-  onSave, onCancel, onToggleStar, onPdfExport,
+  onSave, onAutoSave, onCancel, onToggleStar, onPdfExport,
   onContentChange, onCursorStateChange,
   onNoteSelect, onLinkClick, onCreateNote,
 }: EditModeViewProps) {
   const hasChanges = editContent !== originalContent;
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('unchanged');
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const debouncedAutoSave = useDebouncedCallback(async () => {
+    setSaveStatus('saving');
+    try {
+      await onAutoSave();
+      setSaveStatus('saved');
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+      savedTimerRef.current = setTimeout(() => {
+        setSaveStatus('unchanged');
+      }, 2000);
+    } catch {
+      setSaveStatus('error');
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+      savedTimerRef.current = setTimeout(() => {
+        setSaveStatus('unsaved');
+      }, 3000);
+    }
+  }, 2000);
+
+  useEffect(() => {
+    if (hasChanges) {
+      setSaveStatus('unsaved');
+      debouncedAutoSave();
+    } else if (saveStatus === 'unsaved') {
+      setSaveStatus('unchanged');
+      debouncedAutoSave.cancel();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editContent, originalContent]);
+
+  useEffect(() => {
+    return () => {
+      debouncedAutoSave.cancel();
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function renderSaveStatus() {
+    switch (saveStatus) {
+      case 'saving':
+        return <span className="text-xs text-gray-400 italic">Saving...</span>;
+      case 'saved':
+        return <span className="text-xs text-green-500">Saved</span>;
+      case 'error':
+        return <span className="text-xs text-red-500">Save failed</span>;
+      case 'unsaved':
+        return <span className="text-xs text-yellow-500">Unsaved changes</span>;
+      default:
+        return <span className="text-xs text-gray-500">No changes</span>;
+    }
+  }
 
   return (
     <>
@@ -78,8 +137,7 @@ export function EditModeView({
             >
               <FileDown size={14} />
             </button>
-            {hasChanges && <span className="text-xs text-yellow-500">Unsaved</span>}
-            {!hasChanges && <span className="text-xs text-gray-500">No changes</span>}
+            {renderSaveStatus()}
           </div>
         </div>
         <EditorToolbar viewRef={editorViewRef} />

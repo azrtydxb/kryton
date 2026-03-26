@@ -162,6 +162,13 @@ export function useAppCallbacks(state: AppState) {
     setOriginalContent(null);
   }, [notes, editContent, setEditing, setEditContent, setOriginalContent]);
 
+  const saveEditInPlace = useCallback(async () => {
+    if (!notes.activeNote || editContent === null) return;
+    if (editContent === originalContent) return;
+    notes.updateContent(editContent);
+    setOriginalContent(editContent);
+  }, [notes, editContent, originalContent, setOriginalContent]);
+
   const cancelEdit = useCallback(() => {
     if (originalContent !== null && notes.activeNote) {
       notes.setActiveNoteContent(originalContent);
@@ -191,7 +198,7 @@ export function useAppCallbacks(state: AppState) {
     handleNoteSelect, handleLinkClick, handleCreateNoteFromLink,
     handleDailyNote, handleCreateFromTemplate, handleTemplateSelected,
     handleOutlineJump, handleNewNote, handleRenameNote, handlePdfExport,
-    enterEditMode, saveEdit, cancelEdit,
+    enterEditMode, saveEdit, saveEditInPlace, cancelEdit,
     handleSidebarResize, handleRightPanelResize, handleGraphResize,
     handleShare,
   };

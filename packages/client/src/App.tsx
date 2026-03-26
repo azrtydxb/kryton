@@ -151,6 +151,7 @@ function AppContent() {
     handlePdfExport,
     enterEditMode,
     saveEdit,
+    saveEditInPlace,
     cancelEdit,
     handleSidebarResize,
     handleRightPanelResize,
@@ -254,6 +255,7 @@ function AppContent() {
                   pluginExtensions={editorExtensions}
                   getCodeFenceRenderer={getCodeFenceRenderer}
                   onSave={saveEdit}
+                  onAutoSave={saveEditInPlace}
                   onCancel={cancelEdit}
                   onToggleStar={toggleActiveNoteStar}
                   onPdfExport={handlePdfExport}
