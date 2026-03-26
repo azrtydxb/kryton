@@ -54,12 +54,10 @@ export async function updateGraphCache(
   const edges = await Promise.all(
     links.map(async (link) => {
       let toPath = linkToPath(link);
-      const toNoteId = noteIdFromPath(toPath);
 
       // If the link has no folder separator, try to resolve by filename across all notes
       if (!link.includes("/")) {
         const filename = link.endsWith(".md") ? link : `${link}.md`;
-        const basename = filename.replace(/\.md$/, "");
 
         // Search SearchIndex for a note whose path ends with /filename or equals filename
         const match = await prisma.searchIndex.findFirst({
