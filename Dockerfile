@@ -7,6 +7,9 @@ RUN npm install
 COPY . .
 RUN npx prisma generate --schema=packages/server/prisma/schema.prisma
 RUN npm run build
+# tsc with moduleResolution:"bundler" emits extensionless relative imports,
+# but Node ESM requires .js extensions. Patch all compiled .js files.
+RUN node scripts/fix-esm-imports.mjs
 
 FROM node:24-alpine
 WORKDIR /app
@@ -15,7 +18,6 @@ COPY --from=builder /app/packages/server/package*.json ./
 COPY --from=builder /app/packages/server/prisma ./prisma
 COPY --from=builder /app/packages/client/dist ./public
 RUN npm install --omit=dev
-RUN npx prisma generate --schema=prisma/schema.prisma
 RUN addgroup -S app && adduser -S app -G app
 RUN mkdir -p /notes && chown -R app:app /app /notes
 COPY --chown=app:app packages/server/prisma.config.mjs ./prisma.config.mjs
