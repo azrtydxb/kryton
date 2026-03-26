@@ -3,6 +3,7 @@ import { FileNode } from '../../lib/api';
 import { Preview } from '../Preview/Preview';
 import { OutgoingLinksPanel } from '../OutgoingLinks/OutgoingLinksPanel';
 import { BacklinksPanel } from '../Backlinks/BacklinksPanel';
+import { Breadcrumbs } from '../Layout/Breadcrumbs';
 import { BookOpen, Pencil, Share2, Star, FileDown } from 'lucide-react';
 
 interface PreviewModeViewProps {
@@ -29,10 +30,8 @@ export function PreviewModeView({
     <div className="flex-1 flex flex-col overflow-hidden">
       <div className="flex items-center justify-between px-4 py-2 border-b bg-gray-50/50 dark:bg-surface-900/50">
         <div className="flex items-center">
-          <BookOpen size={14} className="text-gray-400 mr-2" />
-          <span className="text-xs text-gray-500 dark:text-gray-400 font-medium truncate">
-            {activeNote.path}
-          </span>
+          <BookOpen size={14} className="text-gray-400 mr-2 shrink-0" />
+          <Breadcrumbs path={activeNote.path} onFolderClick={onNoteSelect} />
         </div>
         <div className="flex items-center gap-2">
           <button onClick={onEdit} className="p-1 rounded text-gray-400 hover:text-violet-500 transition-colors" title="Edit note (Ctrl+E)">

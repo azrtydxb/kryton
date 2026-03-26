@@ -105,9 +105,7 @@ export function EditModeView({
     <>
       <div className="w-full md:w-1/2 flex flex-col overflow-hidden md:border-r">
         <div className="flex items-center justify-between px-4 py-2 border-b bg-gray-50/50 dark:bg-surface-900/50">
-          <span className="text-xs text-gray-500 dark:text-gray-400 font-medium truncate">
-            {activeNote.path}
-          </span>
+          <Breadcrumbs path={activeNote.path} onFolderClick={onNoteSelect} />
           <div className="flex items-center gap-2">
             <button
               onClick={onSave}
