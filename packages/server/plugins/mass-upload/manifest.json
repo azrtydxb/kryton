@@ -1,0 +1,19 @@
+{
+  "id": "mass-upload",
+  "name": "Mass Upload",
+  "version": "1.0.0",
+  "description": "Bulk import .md files with validation and duplicate detection",
+  "author": "Mnemo",
+  "minMnemoVersion": "3.0.0",
+  "server": "server/index.js",
+  "client": "client/index.js",
+  "settings": [
+    {
+      "key": "maxFileSize",
+      "type": "number",
+      "default": 1048576,
+      "label": "Max file size (bytes)",
+      "perUser": false
+    }
+  ]
+}
