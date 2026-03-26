@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
 import { Slot, useRouter, useSegments } from "expo-router";
+import Toast from "react-native-toast-message";
 import { AuthProvider, useAuthContext } from "../src/contexts/AuthContext";
 import { colors } from "../src/lib/theme";
 
@@ -65,6 +66,7 @@ export default function RootLayout() {
       <AuthGuard>
         <Slot />
       </AuthGuard>
+      <Toast />
     </AuthProvider>
   );
 }
