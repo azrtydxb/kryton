@@ -5,6 +5,7 @@ import { getUserNotesDir } from "../services/userNotesDir.js";
 import { requireUser, requireScope } from "../middleware/auth.js";
 import { decodePathParam, ensureExtension } from "../lib/pathUtils.js";
 import { ValidationError, NotFoundError } from "../lib/errors.js";
+import { prisma } from "../prisma.js";
 
 const TRASH_DIR = ".trash";
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
@@ -173,6 +174,18 @@ export function createTrashRouter(notesDir: string): Router {
       // Clean up empty dirs in trash
       await removeEmptyDirs(path.dirname(trashFilePath), trashDir);
 
+      // Record trash item removal for sync
+      const restoredPath = fullNotePath;
+      const trashRecord = await prisma.trashItem.findFirst({
+        where: { originalPath: restoredPath, userId: user.id },
+      });
+      if (trashRecord) {
+        await prisma.syncDeletion.create({
+          data: { tableName: "trash_items", recordId: trashRecord.id, userId: user.id },
+        });
+        await prisma.trashItem.delete({ where: { id: trashRecord.id } });
+      }
+
       res.json({ message: "Note restored", path: fullNotePath });
     } catch (err) {
       next(err);
@@ -211,6 +224,20 @@ export function createTrashRouter(notesDir: string): Router {
       // Clean up empty parent dirs in trash
       await removeEmptyDirs(path.dirname(trashFilePath), trashDir);
 
+      // Record trash item removal for sync
+      const trashRecord = await prisma.trashItem.findFirst({
+        where: { originalPath: fullNotePath, userId: user.id },
+      });
+      if (trashRecord) {
+        await prisma.syncDeletion.create({
+          data: { tableName: "trash_items", recordId: trashRecord.id, userId: user.id },
+        });
+        await prisma.trashItem.delete({ where: { id: trashRecord.id } });
+      }
+      await prisma.syncDeletion.create({
+        data: { tableName: "notes", recordId: fullNotePath, userId: user.id },
+      });
+
       res.json({ message: "Note permanently deleted" });
     } catch (err) {
       next(err);
@@ -235,10 +262,36 @@ export function createTrashEmptyRouter(notesDir: string): Router {
       const userDir = await getUserNotesDir(notesDir, user.id);
       const trashDir = getTrashDir(userDir);
 
+      // Gather all TrashItem records for this user before deleting, for sync recording
+      const trashItemRecords = await prisma.trashItem.findMany({
+        where: { userId: user.id },
+      });
+
       try {
         await fs.rm(trashDir, { recursive: true, force: true });
       } catch {
         // If trash doesn't exist, that's fine
+      }
+
+      // Record all trash items and notes as deleted for sync
+      if (trashItemRecords.length > 0) {
+        await prisma.syncDeletion.createMany({
+          data: [
+            ...trashItemRecords.map((item) => ({
+              tableName: "trash_items",
+              recordId: item.id,
+              userId: user.id,
+            })),
+            ...trashItemRecords.map((item) => ({
+              tableName: "notes",
+              recordId: item.originalPath,
+              userId: user.id,
+            })),
+          ],
+        });
+        await prisma.trashItem.deleteMany({
+          where: { userId: user.id },
+        });
       }
 
       res.json({ message: "Trash emptied" });

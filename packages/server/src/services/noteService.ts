@@ -161,6 +161,14 @@ export async function deleteNote(notesDir: string, notePath: string, userId: str
   // Move to trash instead of permanently deleting
   await moveToTrash(notesDir, notePath);
 
+  // Record for sync
+  await prisma.trashItem.create({
+    data: { originalPath: notePath, userId },
+  });
+  await prisma.syncDeletion.create({
+    data: { tableName: "notes", recordId: notePath, userId },
+  });
+
   // Clean up indexes
   await Promise.all([
     removeFromIndex(notePath, userId),

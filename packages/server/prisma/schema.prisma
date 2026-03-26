@@ -113,9 +113,10 @@ model TwoFactor {
 // ---------------------------------------------------------------------------
 
 model Settings {
-  key    String
-  userId String
-  value  String
+  key       String
+  userId    String
+  value     String
+  updatedAt DateTime @default(now()) @updatedAt
 
   @@id([key, userId])
 }
@@ -224,4 +225,23 @@ model ApiKey {
 
   @@index([userId])
   @@index([keyHash])
+}
+
+model TrashItem {
+  id           String   @id @default(uuid())
+  originalPath String
+  userId       String
+  trashedAt    DateTime @default(now())
+
+  @@index([userId, trashedAt])
+}
+
+model SyncDeletion {
+  id        String   @id @default(uuid())
+  tableName String
+  recordId  String
+  userId    String
+  deletedAt DateTime @default(now())
+
+  @@index([userId, deletedAt])
 }
