@@ -26,9 +26,11 @@ export function RightPanel({
 }: RightPanelProps) {
   return (
     <>
-      <ResizeHandle direction="horizontal" onResize={onRightPanelResize} />
+      <div className="hidden md:block">
+        <ResizeHandle direction="horizontal" onResize={onRightPanelResize} />
+      </div>
       <aside
-        className="flex-shrink-0 flex flex-col bg-gray-50 dark:bg-surface-900 overflow-hidden"
+        className="hidden md:flex flex-shrink-0 flex-col bg-gray-50 dark:bg-surface-900 overflow-hidden"
         style={{ width: `${rightPanelWidth}px` }}
       >
         <div style={graphHeight !== null && graphHeight !== undefined ? { height: `${graphHeight}px` } : { flex: 1 }} className="flex flex-col overflow-hidden">

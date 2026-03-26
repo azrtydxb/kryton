@@ -23,6 +23,7 @@ import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { Header } from './components/Layout/Header';
 import { SidebarLayout } from './components/Layout/SidebarLayout';
 import { RightPanel } from './components/Layout/RightPanel';
+import { MobileGraphOverlay } from './components/Graph/MobileGraphOverlay';
 import { EditModeView } from './components/Views/EditModeView';
 import { PreviewModeView } from './components/Views/PreviewModeView';
 import { EmptyStateView } from './components/Views/EmptyStateView';
@@ -235,7 +236,9 @@ function AppContent() {
         </SidebarLayout>
 
         <main className="flex-1 flex flex-col overflow-hidden">
-          <PluginSlot slot="editor-toolbar" />
+          <div className="hidden md:block">
+            <PluginSlot slot="editor-toolbar" />
+          </div>
           <div className="flex-1 flex overflow-hidden">
             {notes.activeNote ? (
               editing ? (
@@ -283,19 +286,28 @@ function AppContent() {
         </main>
 
         {!editing && (
-          <RightPanel
-            rightPanelWidth={rightPanelWidth}
-            graphHeight={graphHeight}
-            graphData={graphData}
-            graphLoading={graphLoading}
-            activeNotePath={notes.activeNote?.path ?? null}
-            activeNoteContent={notes.activeNote?.content ?? null}
-            starredPaths={starredPaths}
-            onRightPanelResize={handleRightPanelResize}
-            onGraphResize={handleGraphResize}
-            onNoteSelect={handleNoteSelect}
-            onOutlineJump={handleOutlineJump}
-          />
+          <>
+            <RightPanel
+              rightPanelWidth={rightPanelWidth}
+              graphHeight={graphHeight}
+              graphData={graphData}
+              graphLoading={graphLoading}
+              activeNotePath={notes.activeNote?.path ?? null}
+              activeNoteContent={notes.activeNote?.content ?? null}
+              starredPaths={starredPaths}
+              onRightPanelResize={handleRightPanelResize}
+              onGraphResize={handleGraphResize}
+              onNoteSelect={handleNoteSelect}
+              onOutlineJump={handleOutlineJump}
+            />
+            <MobileGraphOverlay
+              graphData={graphData}
+              loading={graphLoading}
+              activeNotePath={notes.activeNote?.path ?? null}
+              onNoteSelect={handleNoteSelect}
+              starredPaths={starredPaths}
+            />
+          </>
         )}
       </div>
 

@@ -37,7 +37,7 @@ export function Header({
         </div>
       </div>
 
-      <div className="flex-1 max-w-md mx-4">
+      <div className="flex-1 max-w-md mx-2 md:mx-4">
         <SearchBar onSelect={onNoteSelect} inputRef={searchInputRef} />
       </div>
 
@@ -46,7 +46,7 @@ export function Header({
           href="/api/docs"
           target="_blank"
           rel="noopener noreferrer"
-          className="btn-ghost px-2 py-1 text-xs font-medium"
+          className="btn-ghost px-2 py-1 text-xs font-medium hidden md:inline-flex"
           title="API Docs"
         >
           API

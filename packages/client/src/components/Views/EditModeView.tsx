@@ -44,7 +44,7 @@ export function EditModeView({
 
   return (
     <>
-      <div className="w-1/2 flex flex-col overflow-hidden border-r">
+      <div className="w-full md:w-1/2 flex flex-col overflow-hidden md:border-r">
         <div className="flex items-center justify-between px-4 py-2 border-b bg-gray-50/50 dark:bg-surface-900/50">
           <span className="text-xs text-gray-500 dark:text-gray-400 font-medium truncate">
             {activeNote.path}
@@ -102,7 +102,7 @@ export function EditModeView({
         />
         <BacklinksPanel notePath={activeNote.path} onNoteSelect={onNoteSelect} />
       </div>
-      <div className="w-1/2 flex flex-col overflow-hidden">
+      <div className="hidden md:flex md:w-1/2 flex-col overflow-hidden">
         <div className="flex items-center justify-between px-4 border-b bg-gray-50/50 dark:bg-surface-900/50" style={{ minHeight: '39px' }}>
           <div className="flex items-center">
             <BookOpen size={14} className="text-gray-400 mr-2" />
