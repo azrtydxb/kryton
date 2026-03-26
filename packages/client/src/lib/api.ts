@@ -115,6 +115,12 @@ export interface PluginUpdate {
   latestVersion: string;
 }
 
+export interface TrashItem {
+  path: string;
+  originalPath: string;
+  trashedAt: string;
+}
+
 const BASE = '/api';
 
 export async function request<T>(url: string, options?: RequestInit): Promise<T> {
@@ -189,6 +195,15 @@ export const api = {
     request<void>('/canvas', { method: 'POST', body: JSON.stringify({ name }) }),
   deleteCanvas: (name: string) =>
     request<void>(`/canvas/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+
+  // Trash
+  listTrash: () => request<TrashItem[]>('/trash'),
+  restoreFromTrash: (notePath: string) =>
+    request<{ message: string; path: string }>(`/trash/restore/${encodeURIComponent(notePath)}`, { method: 'POST' }),
+  permanentlyDelete: (notePath: string) =>
+    request<{ message: string }>(`/trash/${encodeURIComponent(notePath)}`, { method: 'DELETE' }),
+  emptyTrash: () =>
+    request<{ message: string }>('/trash-empty', { method: 'DELETE' }),
 
   // Plugins
   getActivePlugins: () => request<ActivePluginInfo[]>('/plugins/active'),

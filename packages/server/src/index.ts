@@ -39,6 +39,7 @@ import { createPluginsRouter } from "./routes/plugins.js";
 import { createApiKeysRouter } from "./routes/apiKeys.js";
 import { createMcpRouter } from "./mcp/mcpServer.js";
 import { setGraphWebSocket } from "./services/noteService.js";
+import { createTrashRouter, createTrashEmptyRouter, purgeOldTrash } from "./routes/trash.js";
 
 const log = createLogger("server");
 const PORT = parseInt(process.env.PORT || "3001", 10);
@@ -82,6 +83,22 @@ async function main(): Promise<void> {
       data: { key: "registration_mode", value: "invite-only", userId: GLOBAL_USER_ID },
     });
     log.info("Created default registration_mode = invite-only");
+  }
+
+  // Auto-purge trash items older than 30 days for all users
+  try {
+    const userDirs = await fs.readdir(NOTES_DIR, { withFileTypes: true });
+    for (const entry of userDirs) {
+      if (entry.isDirectory() && !entry.name.startsWith(".")) {
+        const userNotesDir = path.join(NOTES_DIR, entry.name);
+        await purgeOldTrash(userNotesDir).catch((err) => {
+          log.error(`Failed to purge old trash for ${entry.name}:`, err);
+        });
+      }
+    }
+    log.info("Trash auto-purge complete.");
+  } catch (err) {
+    log.error("Trash auto-purge failed:", err);
   }
 
   // Note: per-user indexing is now handled during provisioning and login.
@@ -254,6 +271,8 @@ async function main(): Promise<void> {
   app.use("/api/plugins", authMiddleware, createPluginsRouter(pluginManager, pluginsDir));
   app.use("/api/api-keys", authMiddleware, createApiKeysRouter());
   app.use("/api/mcp", createMcpRouter());
+  app.use("/api/trash-empty", authMiddleware, createTrashEmptyRouter(NOTES_DIR));
+  app.use("/api/trash", authMiddleware, createTrashRouter(NOTES_DIR));
 
   /**
    * @swagger

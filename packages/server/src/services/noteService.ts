@@ -2,6 +2,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { indexNote, removeFromIndex, renameInIndex, extractTitle } from "./searchService.js";
 import { updateGraphCache, removeFromGraph, renameInGraph } from "./graphService.js";
+import { moveToTrash } from "../routes/trash.js";
 import type { PluginWebSocket } from "../plugins/PluginWebSocket.js";
 
 // Optional WebSocket instance for broadcasting graph updates
@@ -52,7 +53,7 @@ export async function scanDirectory(dir: string, basePath = ""): Promise<FileTre
     const fullPath = path.join(dir, entry.name);
 
     if (entry.isDirectory()) {
-      // Skip hidden directories
+      // Skip hidden directories (includes .trash)
       if (entry.name.startsWith(".")) continue;
 
       const children = await scanDirectory(fullPath, relativePath);
@@ -135,7 +136,8 @@ export async function writeNote(
 }
 
 /**
- * Delete a note from disk and clean up indexes.
+ * Move a note to trash (soft delete) and clean up indexes.
+ * The file is moved to .trash/{notePath} inside the user's notes directory.
  */
 export async function deleteNote(notesDir: string, notePath: string, userId: string): Promise<void> {
   const fullPath = path.join(notesDir, notePath);
@@ -147,7 +149,8 @@ export async function deleteNote(notesDir: string, notePath: string, userId: str
     throw new Error("Invalid path: outside notes directory");
   }
 
-  await fs.unlink(fullPath);
+  // Move to trash instead of permanently deleting
+  await moveToTrash(notesDir, notePath);
 
   // Clean up indexes
   await Promise.all([

@@ -1,9 +1,10 @@
 import { useState, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { FileNode } from '../../lib/api';
+import { FileNode, TrashItem, api } from '../../lib/api';
 import { FileText, Folder, FolderOpen, ChevronRight, Plus, FolderPlus, MoreHorizontal, Pencil, Trash2, Calendar, LayoutTemplate, Star, Share2 } from 'lucide-react';
 import { TagPane } from '../Tags/TagPane';
 import { ResizeHandle } from '../Layout/ResizeHandle';
+import { TrashPane } from './TrashPane';
 
 interface SharedNote {
   id: string;
@@ -56,9 +57,18 @@ export function Sidebar({
   const [newName, setNewName] = useState('');
   const [sharedCollapsed, setSharedCollapsed] = useState(false);
   const [tagPaneHeight, setTagPaneHeight] = useState(180);
+  const [trashItems, setTrashItems] = useState<TrashItem[]>([]);
   const handleTagResize = useCallback((delta: number) => {
     setTagPaneHeight(h => Math.max(60, Math.min(500, h - delta)));
   }, []);
+
+  const refreshTrash = useCallback(() => {
+    api.listTrash().then(setTrashItems).catch(() => setTrashItems([]));
+  }, []);
+
+  useEffect(() => {
+    refreshTrash();
+  }, [refreshTrash]);
 
   // Listen for external rename requests (F2 shortcut)
   useEffect(() => {
@@ -126,10 +136,11 @@ export function Sidebar({
     if (!confirmed) return;
     if (node.type === 'file') {
       await onDeleteNote(node.path);
+      refreshTrash();
     } else {
       await onDeleteFolder(node.path);
     }
-  }, [onDeleteNote, onDeleteFolder]);
+  }, [onDeleteNote, onDeleteFolder, refreshTrash]);
 
   const handleContextMenu = useCallback((e: React.MouseEvent, node: FileNode) => {
     e.preventDefault();
@@ -433,6 +444,9 @@ export function Sidebar({
       <div className="flex-shrink-0 overflow-hidden" style={{ height: `${tagPaneHeight}px` }}>
         <TagPane onNoteSelect={onSelect} />
       </div>
+
+      {/* Trash Pane */}
+      <TrashPane items={trashItems} onRefresh={refreshTrash} />
 
       {/* Context menu - portaled to body to escape sidebar's stacking context */}
       {contextMenu && createPortal(
