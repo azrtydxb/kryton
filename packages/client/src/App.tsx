@@ -29,6 +29,7 @@ import { PreviewModeView } from './components/Views/PreviewModeView';
 import { EmptyStateView } from './components/Views/EmptyStateView';
 import { ModalsContainer } from './components/Modals/ModalsContainer';
 import { ErrorToast } from './components/Toast/ErrorToast';
+import { ToastContainer } from './components/Toast/ToastContainer';
 import { StatusBar } from './components/StatusBar/StatusBar';
 import { FileNode } from './lib/api';
 import LoginPage from './pages/LoginPage';
@@ -315,9 +316,9 @@ function AppContent() {
 
       <AppStatusBar notePath={notes.activeNote?.path ?? null} />
 
-      {notes.error && (
-        <ErrorToast message={notes.error} onDismiss={() => notes.setError(null)} />
-      )}
+      <ErrorToast message={notes.error} onDismiss={() => notes.setError(null)} />
+
+      <ToastContainer />
 
       <AppModals
         noteTree={notes.tree}
