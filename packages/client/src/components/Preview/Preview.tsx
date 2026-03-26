@@ -7,7 +7,9 @@ import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
 import { api, FileNode } from '../../lib/api';
 import { collectNoteNames } from '../../lib/noteTreeUtils';
 import { rehypeWikiLinks } from '../../lib/rehype-wiki-links';
+import { parseFrontmatter } from '../../lib/frontmatter';
 import { DataviewBlock } from './DataviewBlock';
+import { FrontmatterBlock } from './FrontmatterBlock';
 
 const sanitizeSchema = {
   ...defaultSchema,
@@ -103,13 +105,16 @@ export function Preview({ content, onLinkClick, allNotes, onCreateNote, notePath
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [noteEmbeds.join(',')]);
 
+  // Parse frontmatter — use the body (content without frontmatter) for rendering
+  const { frontmatter, body: contentBody } = parseFrontmatter(content);
+
   // Extract dataview blocks before markdown transformation
   const dataviewBlocks: { id: string; query: string }[] = [];
-  let processedContent = content;
+  let processedContent = contentBody;
 
   const dataviewRegex = /```dataview\n([\s\S]*?)```/g;
   let dvMatch;
-  while ((dvMatch = dataviewRegex.exec(content)) !== null) {
+  while ((dvMatch = dataviewRegex.exec(contentBody)) !== null) {
     const id = `dataview-${dataviewBlocks.length}`;
     dataviewBlocks.push({ id, query: dvMatch[1].trim() });
     processedContent = processedContent.replace(dvMatch[0], `<div data-dataview-id="${id}"></div>`);
@@ -202,6 +207,7 @@ export function Preview({ content, onLinkClick, allNotes, onCreateNote, notePath
 
   return (
     <div className="markdown-preview p-6 max-w-3xl mx-auto" onClick={handleClick}>
+      {frontmatter && <FrontmatterBlock frontmatter={frontmatter} />}
       <ReactMarkdown
         remarkPlugins={[
           remarkGfm,

@@ -88,6 +88,82 @@ async function buildIndex(userId: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Frontmatter helpers
+// ---------------------------------------------------------------------------
+
+interface ParsedFrontmatter {
+  frontmatter: Record<string, string> | null;
+  body: string;
+}
+
+/**
+ * Parse YAML-style frontmatter (key: value pairs) from a markdown string.
+ * Returns the parsed fields and the body with frontmatter stripped.
+ */
+function parseFrontmatter(content: string): ParsedFrontmatter {
+  if (!content.startsWith("---")) {
+    return { frontmatter: null, body: content };
+  }
+
+  const afterOpen = content.indexOf("\n", 3);
+  if (afterOpen === -1) return { frontmatter: null, body: content };
+
+  const closeIndex = content.indexOf("\n---", afterOpen);
+  if (closeIndex === -1) return { frontmatter: null, body: content };
+
+  const yamlBlock = content.slice(afterOpen + 1, closeIndex);
+  const body = content.slice(closeIndex + 4).replace(/^\n/, "");
+
+  const result: Record<string, string> = {};
+  const lines = yamlBlock.split("\n");
+  let currentKey: string | null = null;
+  const listAccumulator: string[] = [];
+
+  function flushList() {
+    if (currentKey !== null && listAccumulator.length > 0) {
+      result[currentKey] = listAccumulator.join(", ");
+      listAccumulator.length = 0;
+    }
+  }
+
+  for (const line of lines) {
+    if (line.trim() === "") continue;
+
+    if (/^\s+-\s+/.test(line)) {
+      listAccumulator.push(line.replace(/^\s+-\s+/, "").trim());
+      continue;
+    }
+
+    const kvMatch = line.match(/^([^:]+):\s*(.*)/);
+    if (kvMatch) {
+      flushList();
+      currentKey = kvMatch[1].trim();
+      const val = kvMatch[2].trim();
+      if (val.startsWith("[") && val.endsWith("]")) {
+        result[currentKey] = val
+          .slice(1, -1)
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+          .join(", ");
+        currentKey = null;
+      } else if (val !== "") {
+        result[currentKey] = val.replace(/^['"]|['"]$/g, "");
+        currentKey = null;
+      }
+    }
+  }
+
+  flushList();
+
+  if (Object.keys(result).length === 0) {
+    return { frontmatter: null, body: content };
+  }
+
+  return { frontmatter: result, body };
+}
+
+// ---------------------------------------------------------------------------
 // Markdown helpers
 // ---------------------------------------------------------------------------
 
@@ -133,10 +209,14 @@ function extractTags(content: string): string[] {
 }
 
 /**
- * Extract the title from markdown content. Uses the first # heading, or
- * falls back to the filename.
+ * Extract the title from markdown content. Checks frontmatter `title` field
+ * first, then the first # heading, then falls back to the filename.
  */
 export function extractTitle(content: string, filePath: string): string {
+  const { frontmatter } = parseFrontmatter(content);
+  if (frontmatter?.title) {
+    return frontmatter.title;
+  }
   const headingMatch = content.match(/^#\s+(.+)$/m);
   if (headingMatch) {
     return headingMatch[1].trim();
@@ -158,9 +238,28 @@ export async function indexNote(
   content: string,
   userId: string
 ): Promise<void> {
+  const { frontmatter, body } = parseFrontmatter(content);
   const title = extractTitle(content, notePath);
-  const plainContent = stripMarkdown(content);
-  const tags = extractTags(content);
+
+  // Strip markdown from the body (frontmatter stripped) so YAML syntax isn't indexed
+  const plainContent = [
+    stripMarkdown(body),
+    // Append all frontmatter values so they are searchable
+    ...(frontmatter ? Object.values(frontmatter) : []),
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  // Combine inline #tags with any comma-separated tags from frontmatter
+  const inlineTags = extractTags(body);
+  const frontmatterTags: string[] =
+    frontmatter?.tags
+      ? frontmatter.tags
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean)
+      : [];
+  const tags = [...new Set([...inlineTags, ...frontmatterTags])];
 
   // Persist to Prisma
   await prisma.searchIndex.upsert({
