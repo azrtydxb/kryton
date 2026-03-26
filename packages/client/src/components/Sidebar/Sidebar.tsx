@@ -167,20 +167,103 @@ export function Sidebar({
     };
   }, [contextMenu]);
 
+  const handleDragStart = useCallback((e: React.DragEvent, node: FileNode) => {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', node.path);
+    setDraggedPath(node.path);
+    setDraggedType(node.type);
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent, node: FileNode) => {
+    if (node.type !== 'folder') return;
+    if (!draggedPath) return;
+
+    // Prevent dropping a folder into itself or any of its descendants
+    if (draggedType === 'folder') {
+      const normalizedDragged = draggedPath.endsWith('/') ? draggedPath : draggedPath + '/';
+      if (node.path === draggedPath || node.path.startsWith(normalizedDragged)) return;
+    }
+
+    // Prevent dropping onto the folder that already contains the dragged item
+    const draggedParent = draggedPath.includes('/')
+      ? draggedPath.substring(0, draggedPath.lastIndexOf('/'))
+      : '';
+    if (node.path === draggedParent) return;
+
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverPath(node.path);
+  }, [draggedPath, draggedType]);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setDragOverPath(null);
+    }
+  }, []);
+
+  const handleDrop = useCallback(async (e: React.DragEvent, targetNode: FileNode) => {
+    e.preventDefault();
+    setDragOverPath(null);
+
+    const sourcePath = e.dataTransfer.getData('text/plain') || draggedPath;
+    if (!sourcePath || targetNode.type !== 'folder') return;
+    if (sourcePath === targetNode.path) return;
+
+    // Prevent dropping a folder into itself or any descendant
+    if (draggedType === 'folder') {
+      const normalizedDragged = sourcePath.endsWith('/') ? sourcePath : sourcePath + '/';
+      if (targetNode.path.startsWith(normalizedDragged)) return;
+    }
+
+    // Prevent dropping onto the current parent folder
+    const sourceParent = sourcePath.includes('/')
+      ? sourcePath.substring(0, sourcePath.lastIndexOf('/'))
+      : '';
+    if (targetNode.path === sourceParent) return;
+
+    const filename = sourcePath.split('/').pop()!;
+    const newPath = `${targetNode.path}/${filename}`;
+
+    if (draggedType === 'folder') {
+      await onRenameFolder(sourcePath, newPath);
+      setExpanded(prev => {
+        const next = new Set(prev);
+        next.add(newPath);
+        return next;
+      });
+    } else {
+      await onRenameNote(sourcePath, newPath);
+    }
+    // Expand the target folder so the moved item is visible
+    setExpanded(prev => new Set(prev).add(targetNode.path));
+  }, [draggedPath, draggedType, onRenameNote, onRenameFolder]);
+
+  const handleDragEnd = useCallback(() => {
+    setDraggedPath(null);
+    setDraggedType(null);
+    setDragOverPath(null);
+  }, []);
+
   const renderNode = (node: FileNode, depth: number) => {
     const isActive = node.type === 'file' && node.path === activeNotePath;
     const isExpanded = expanded.has(node.path);
     const isRenaming = renaming?.path === node.path;
     const isStarred = node.type === 'file' && starredPaths.has(node.path);
+    const isDragging = node.path === draggedPath;
+    const isDragOver = node.type === 'folder' && node.path === dragOverPath;
     const displayName = node.type === 'file' ? node.name.replace(/\.md$/, '') : node.name;
 
     return (
       <div key={node.path}>
         <div
+          draggable
           className={`group flex items-center gap-1 px-2 py-1 cursor-pointer text-sm rounded-md mx-1 transition-colors duration-100
-            ${isActive
-              ? 'bg-violet-500/10 text-violet-600 dark:text-violet-400 font-medium'
-              : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200/60 dark:hover:bg-gray-700/40'
+            ${isDragging ? 'opacity-50' : ''}
+            ${isDragOver
+              ? 'bg-violet-500/10 border border-violet-500/30 text-violet-600 dark:text-violet-400'
+              : isActive
+                ? 'bg-violet-500/10 text-violet-600 dark:text-violet-400 font-medium'
+                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200/60 dark:hover:bg-gray-700/40'
             }`}
           style={{ paddingLeft: `${depth * 16 + 8}px` }}
           onClick={() => {
@@ -188,6 +271,11 @@ export function Sidebar({
             else onSelect(node.path);
           }}
           onContextMenu={(e) => handleContextMenu(e, node)}
+          onDragStart={(e) => handleDragStart(e, node)}
+          onDragEnd={handleDragEnd}
+          onDragOver={(e) => handleDragOver(e, node)}
+          onDragLeave={handleDragLeave}
+          onDrop={(e) => handleDrop(e, node)}
         >
           {node.type === 'folder' ? (
             <>
