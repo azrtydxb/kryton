@@ -41,11 +41,7 @@
             "deploymentTarget": "15.1"
           },
           "android": {
-            "minSdkVersion": 24,
-            "kotlinVersion": "1.9.25",
-            "packagingOptions": {
-              "pickFirst": ["**/libc++_shared.so", "**/libfbjni.so"]
-            }
+            "minSdkVersion": 24
           }
         }
       ]
