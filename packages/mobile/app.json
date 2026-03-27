@@ -48,6 +48,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "b2dd9d59-3159-422b-a48c-45f8c8312e6e"
+      }
+    },
+    "owner": "piwi3910"
   }
 }
