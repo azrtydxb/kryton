@@ -1,0 +1,16 @@
+{
+  "review_id": "full_ui_20260327_100000",
+  "target": "packages/client/src + packages/mobile/src + packages/mobile/app",
+  "focus_areas": ["visual", "usability", "code", "performance"],
+  "context": "Full application - note-taking knowledge base",
+  "platform": "all",
+  "status": "complete",
+  "started_at": "2026-03-27T10:00:00Z",
+  "issues_found": 48,
+  "severity_counts": {
+    "critical": 7,
+    "major": 18,
+    "minor": 17,
+    "suggestion": 6
+  }
+}
