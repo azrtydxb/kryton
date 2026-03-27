@@ -89,11 +89,11 @@ export default function DailyScreen() {
       }
     }
 
-    router.push(`/(app)/note/${todayPath}`);
+    router.push(`/(app)/(tabs)/note/${todayPath}`);
   }
 
   function handleOpenNote(path: string) {
-    router.push(`/(app)/note/${path}`);
+    router.push(`/(app)/(tabs)/note/${path}`);
   }
 
   const todayPath = getTodayPath();

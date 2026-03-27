@@ -78,6 +78,11 @@ export default function TabsLayout() {
           }}
         />
       ))}
+      {/* Note screen lives inside tabs so the tab bar stays visible */}
+      <Tabs.Screen
+        name="note/[...path]"
+        options={{ href: null }}
+      />
     </Tabs>
   );
 }

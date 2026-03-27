@@ -84,7 +84,7 @@ export default function TemplatesScreen() {
       setModalVisible(false);
       setSelectedTemplate(null);
       setNewNoteName("");
-      router.push(`/(app)/note/${path}`);
+      router.push(`/(app)/(tabs)/note/${path}`);
     } catch (err) {
       Alert.alert(
         "Error",

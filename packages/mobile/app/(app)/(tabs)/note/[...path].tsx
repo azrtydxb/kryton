@@ -14,13 +14,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect } from "react";
-import { getDatabase, NoteRow } from "../../../src/db";
-import { colors, fontSize, spacing, borderRadius } from "../../../src/lib/theme";
-import { parseFrontmatter } from "../../../src/lib/frontmatter";
-import Breadcrumbs from "../../../src/components/Breadcrumbs";
-import FrontmatterBlock from "../../../src/components/FrontmatterBlock";
-import EditorBridge from "../../../src/webview/EditorBridge";
-import PreviewBridge from "../../../src/webview/PreviewBridge";
+import { getDatabase, NoteRow } from "../../../../src/db";
+import { colors, fontSize, spacing, borderRadius } from "../../../../src/lib/theme";
+import { parseFrontmatter } from "../../../../src/lib/frontmatter";
+import Breadcrumbs from "../../../../src/components/Breadcrumbs";
+import FrontmatterBlock from "../../../../src/components/FrontmatterBlock";
+import EditorBridge from "../../../../src/webview/EditorBridge";
+import PreviewBridge from "../../../../src/webview/PreviewBridge";
+import { activeNoteStore } from "../../../../src/lib/activeNote";
 
 type Mode = "preview" | "edit";
 
@@ -41,8 +42,9 @@ export default function NoteScreen() {
   const [isDirty, setIsDirty] = useState(false);
   const pendingContentRef = useRef("");
 
-  // Load note from expo-sqlite
+  // Load note from expo-sqlite and update active note store
   useEffect(() => {
+    activeNoteStore.set(notePath);
     const db = getDatabase();
     const rows = db.getAllSync<NoteRow>(
       "SELECT * FROM notes WHERE path = ? AND _status != 'deleted'",
@@ -53,6 +55,9 @@ export default function NoteScreen() {
       setContent(rows[0].content ?? "");
       pendingContentRef.current = rows[0].content ?? "";
     }
+    return () => {
+      activeNoteStore.set(null);
+    };
   }, [notePath]);
 
   const handleContentChange = useCallback((newContent: string) => {

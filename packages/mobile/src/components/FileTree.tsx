@@ -50,7 +50,7 @@ function TreeNodeItem({ node, depth }: TreeNodeItemProps) {
       style={[styles.row, { paddingLeft: spacing.lg + indent }]}
       onPress={() =>
         router.push(
-          `/(app)/note/${encodeURIComponent(node.path)}` as `/${string}`
+          `/(app)/(tabs)/note/${encodeURIComponent(node.path)}` as `/${string}`
         )
       }
       activeOpacity={0.7}

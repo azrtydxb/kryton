@@ -52,7 +52,7 @@ export function FavoritesSection({ refresh }: FavoritesSectionProps = {}) {
           style={styles.item}
           onPress={() =>
             router.push(
-              `/(app)/note/${encodeURIComponent(item.path)}` as `/${string}`
+              `/(app)/(tabs)/note/${encodeURIComponent(item.path)}` as `/${string}`
             )
           }
           activeOpacity={0.7}

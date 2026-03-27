@@ -6,6 +6,7 @@ import { useRouter } from "expo-router";
 import { useEffect } from "react";
 import { getDatabase, NoteRow } from "../../../src/db";
 import { colors, fontSize, spacing } from "../../../src/lib/theme";
+import { activeNoteStore } from "../../../src/lib/activeNote";
 
 interface GraphNode {
   id: string;
@@ -334,7 +335,7 @@ function buildGraphHTML(): string {
   requestAnimationFrame(tick);
 
   // Listen for graph data updates from React Native
-  function initGraph(newGraph) {
+  function initGraph(newGraph, activeNotePath) {
     graph = newGraph;
     nodes = graph.nodes.map(function(n) {
       return {
@@ -342,7 +343,7 @@ function buildGraphHTML(): string {
         label: n.label,
         starred: n.starred || false,
         shared: n.shared || false,
-        isActive: false,
+        isActive: activeNotePath ? n.id === activeNotePath : false,
         x: W / 2 + (Math.random() - 0.5) * W * 0.6,
         y: H / 2 + (Math.random() - 0.5) * H * 0.6,
         vx: 0, vy: 0,
@@ -357,7 +358,7 @@ function buildGraphHTML(): string {
     }).filter(function(e) { return e.source && e.target; });
     nodeIndex = {};
     nodes.forEach(function(n) { nodeIndex[n.id] = n; });
-    activeNode = null;
+    activeNode = activeNotePath ? (nodeIndex[activeNotePath] || null) : null;
     alpha = 1;
   }
 
@@ -365,7 +366,7 @@ function buildGraphHTML(): string {
     try {
       var msg = JSON.parse(event.data);
       if (msg.type === 'updateGraph') {
-        initGraph(msg.graph);
+        initGraph(msg.graph, msg.activeNotePath || null);
       }
     } catch(e) {}
   }
@@ -392,6 +393,20 @@ export default function GraphScreen() {
   const isReadyRef = useRef(false);
   const pendingGraphRef = useRef<GraphData | null>(null);
   const [graph, setGraph] = useState<GraphData | null>(null);
+  const activeNotePathRef = useRef<string | null>(activeNoteStore.get());
+
+  // Subscribe to active note changes and push updated graph if WebView is ready
+  useEffect(() => {
+    const unsubscribe = activeNoteStore.subscribe((path) => {
+      activeNotePathRef.current = path;
+      if (isReadyRef.current && pendingGraphRef.current === null && graph !== null) {
+        webViewRef.current?.postMessage(
+          JSON.stringify({ type: "updateGraph", graph, activeNotePath: path })
+        );
+      }
+    });
+    return unsubscribe;
+  }, [graph]);
 
   const loadGraph = useCallback(() => {
     const db = getDatabase();
@@ -399,7 +414,9 @@ export default function GraphScreen() {
     const g = buildGraph(notes);
     setGraph(g);
     if (isReadyRef.current) {
-      webViewRef.current?.postMessage(JSON.stringify({ type: "updateGraph", graph: g }));
+      webViewRef.current?.postMessage(
+        JSON.stringify({ type: "updateGraph", graph: g, activeNotePath: activeNotePathRef.current })
+      );
     } else {
       pendingGraphRef.current = g;
     }
@@ -413,7 +430,11 @@ export default function GraphScreen() {
     isReadyRef.current = true;
     if (pendingGraphRef.current) {
       webViewRef.current?.postMessage(
-        JSON.stringify({ type: "updateGraph", graph: pendingGraphRef.current })
+        JSON.stringify({
+          type: "updateGraph",
+          graph: pendingGraphRef.current,
+          activeNotePath: activeNotePathRef.current,
+        })
       );
       pendingGraphRef.current = null;
     }
@@ -427,7 +448,7 @@ export default function GraphScreen() {
           handleWebViewReady();
         } else if (data.type === "nodePress" && data.id) {
           const encoded = encodeURIComponent(data.id);
-          router.push(`/(app)/note/${encoded}` as never);
+          router.push(`/(app)/(tabs)/note/${encoded}` as never);
         }
       } catch {
         // ignore

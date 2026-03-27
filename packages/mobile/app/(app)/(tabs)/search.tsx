@@ -75,7 +75,7 @@ export default function SearchScreen() {
   const handlePress = useCallback(
     (path: string) => {
       const encoded = encodeURIComponent(path);
-      router.push(`/(app)/note/${encoded}` as never);
+      router.push(`/(app)/(tabs)/note/${encoded}` as never);
     },
     [router]
   );

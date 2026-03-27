@@ -229,7 +229,7 @@ export default function PreviewBridge({ content, darkMode }: PreviewBridgeProps)
         if (data.type === "wikilink" && data.target) {
           // Navigate to the linked note; encode path segments
           const encoded = encodeURIComponent(data.target);
-          router.push(`/(app)/note/${encoded}` as never);
+          router.push(`/(app)/(tabs)/note/${encoded}` as never);
         }
       } catch {
         // ignore

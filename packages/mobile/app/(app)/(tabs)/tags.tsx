@@ -120,7 +120,7 @@ export default function TagsScreen() {
   const handleNotePress = useCallback(
     (path: string) => {
       const encoded = encodeURIComponent(path);
-      router.push(`/(app)/note/${encoded}` as never);
+      router.push(`/(app)/(tabs)/note/${encoded}` as never);
     },
     [router]
   );
