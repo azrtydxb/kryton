@@ -78,6 +78,7 @@ const versionRowStyles = StyleSheet.create({
     borderRadius: borderRadius.sm,
     borderWidth: 1,
     borderColor: colors.border,
+    minHeight: 44,
   },
   previewText: { color: colors.textSecondary, fontSize: fontSize.sm, fontWeight: "600" },
   restoreButton: {
@@ -86,6 +87,7 @@ const versionRowStyles = StyleSheet.create({
     alignItems: "center",
     borderRadius: borderRadius.sm,
     backgroundColor: colors.primary,
+    minHeight: 44,
   },
   restoreText: { color: "#fff", fontSize: fontSize.sm, fontWeight: "600" },
 });
@@ -201,8 +203,12 @@ export default function HistoryScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backText}>← Back</Text>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons name="chevron-back" size={24} color={colors.primary} />
         </TouchableOpacity>
         <View style={styles.headerText}>
           <Text style={styles.title}>History</Text>

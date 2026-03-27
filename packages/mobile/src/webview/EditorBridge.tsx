@@ -136,17 +136,7 @@ export default function EditorBridge({
   // When content prop changes externally, push it into the editor
   useEffect(() => {
     if (!isInitializedRef.current) return;
-    webViewRef.current?.injectJavaScript(`
-      (function() {
-        var editor = document.getElementById('editor');
-        if (editor && editor.value !== ${JSON.stringify(content)}) {
-          editor.value = ${JSON.stringify(content)};
-          editor.style.height = 'auto';
-          editor.style.height = editor.scrollHeight + 'px';
-        }
-        true;
-      })();
-    `);
+    webViewRef.current?.postMessage(JSON.stringify({ type: "setContent", content }));
   }, [content]);
 
   return (

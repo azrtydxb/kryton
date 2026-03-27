@@ -91,19 +91,17 @@ export function OutlinePane({ content, onJumpToLine }: OutlinePaneProps) {
             const isCollapsed = collapsed.has(heading.line);
 
             return (
-              <button
+              <div
                 key={`${heading.line}-${idx}`}
-                className="w-full flex items-center gap-1 px-2 py-1 mx-1 rounded-md text-sm hover:bg-gray-200/60 dark:hover:bg-gray-700/40 text-gray-700 dark:text-gray-300 transition-colors duration-100 text-left"
-                style={{ paddingLeft: `${(heading.level - 1) * 16 + 8}px` }}
-                onClick={() => onJumpToLine(heading.line)}
+                role="group"
+                style={{ display: 'flex', paddingLeft: `${(heading.level - 1) * 16 + 8}px` }}
+                className="w-full flex items-center gap-1 px-2 py-1 mx-1 rounded-md text-sm hover:bg-gray-200/60 dark:hover:bg-gray-700/40 text-gray-700 dark:text-gray-300 transition-colors duration-100"
               >
                 {hasKids ? (
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleCollapse(heading.line);
-                    }}
+                    onClick={() => toggleCollapse(heading.line)}
                     className="flex-shrink-0 p-0.5"
+                    aria-label={isCollapsed ? 'Expand section' : 'Collapse section'}
                   >
                     <ChevronRight
                       size={12}
@@ -113,10 +111,13 @@ export function OutlinePane({ content, onJumpToLine }: OutlinePaneProps) {
                 ) : (
                   <span className="w-4" />
                 )}
-                <span className={`truncate ${heading.level === 1 ? 'font-semibold' : heading.level === 2 ? 'font-medium' : ''}`}>
+                <button
+                  className={`truncate text-left flex-1 ${heading.level === 1 ? 'font-semibold' : heading.level === 2 ? 'font-medium' : ''}`}
+                  onClick={() => onJumpToLine(heading.line)}
+                >
                   {heading.text}
-                </span>
-              </button>
+                </button>
+              </div>
             );
           })
         )}

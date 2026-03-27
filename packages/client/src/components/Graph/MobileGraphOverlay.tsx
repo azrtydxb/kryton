@@ -18,9 +18,8 @@ export function MobileGraphOverlay({
 
   return (
     <div
-      role="button"
-      aria-label="Open graph view"
-      tabIndex={expanded ? -1 : 0}
+      role={expanded ? 'region' : undefined}
+      aria-label={expanded ? 'Graph view' : undefined}
       className={`
         md:hidden fixed z-20 transition-all duration-300 ease-in-out
         ${expanded
@@ -29,8 +28,6 @@ export function MobileGraphOverlay({
         }
         bg-surface-900/95 backdrop-blur-sm border border-gray-700/50 shadow-lg overflow-hidden
       `}
-      onClick={() => !expanded && setExpanded(true)}
-      onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && !expanded) setExpanded(true); }}
     >
       {/* Header - only visible when expanded */}
       {expanded && (
@@ -40,18 +37,25 @@ export function MobileGraphOverlay({
             <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Graph</span>
           </div>
           <button
-            onClick={(e) => { e.stopPropagation(); setExpanded(false); }}
+            onClick={() => setExpanded(false)}
             className="px-2 py-0.5 text-xs rounded bg-gray-700/50 text-gray-400 hover:text-gray-200"
+            aria-label="Minimize graph"
           >
             Minimize
           </button>
         </div>
       )}
-      {/* Mini icon overlay when collapsed */}
+      {/* Mini icon overlay when collapsed — tappable button to expand */}
       {!expanded && (
-        <div className="absolute top-1 right-1 z-10">
-          <Network size={10} className="text-violet-400/70" />
-        </div>
+        <button
+          aria-label="Open graph view"
+          className="absolute inset-0 w-full h-full z-10"
+          onClick={() => setExpanded(true)}
+        >
+          <div className="absolute top-1 right-1">
+            <Network size={10} className="text-violet-400/70" />
+          </div>
+        </button>
       )}
       <div className={expanded ? 'flex-1 h-[calc(100%-36px)]' : 'w-full h-full'}>
         <GraphView

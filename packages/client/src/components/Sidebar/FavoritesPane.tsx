@@ -46,31 +46,33 @@ export function FavoritesPane({ starredPaths, onSelect, onToggleStar }: Favorite
               const dirPath = parts.length > 1 ? parts.slice(0, -1).join('/') : null;
 
               return (
-                <button
+                <div
                   key={path}
-                  className="group w-full flex items-center gap-1.5 px-2 py-1 mx-1 rounded-md text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-200/60 dark:hover:bg-gray-700/40 transition-colors duration-100 text-left"
-                  onClick={() => onSelect(path)}
+                  className="group flex items-center gap-1.5 px-2 py-1 mx-1 rounded-md text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-200/60 dark:hover:bg-gray-700/40 transition-colors duration-100"
                 >
-                  <Star size={13} className="flex-shrink-0 text-yellow-500" fill="currentColor" />
-                  <div className="flex-1 min-w-0">
-                    <div className="truncate font-medium text-sm leading-tight">{fileName}</div>
-                    {dirPath && (
-                      <div className="truncate text-[10px] text-gray-400 dark:text-gray-500 leading-tight mt-0.5">
-                        {dirPath}
-                      </div>
-                    )}
-                  </div>
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onToggleStar(path);
-                    }}
+                    className="flex-1 flex items-center gap-1.5 min-w-0 text-left"
+                    onClick={() => onSelect(path)}
+                  >
+                    <Star size={13} className="flex-shrink-0 text-yellow-500" fill="currentColor" />
+                    <div className="flex-1 min-w-0">
+                      <div className="truncate font-medium text-sm leading-tight">{fileName}</div>
+                      {dirPath && (
+                        <div className="truncate text-[10px] text-gray-400 dark:text-gray-500 leading-tight mt-0.5">
+                          {dirPath}
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => onToggleStar(path)}
                     className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-yellow-500 hover:text-yellow-600 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-opacity flex-shrink-0"
                     title="Unstar"
+                    aria-label="Unstar note"
                   >
                     <Star size={13} fill="currentColor" />
                   </button>
-                </button>
+                </div>
               );
             })
           )}

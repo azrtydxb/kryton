@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { getDatabase, SettingRow } from "../db";
 import { colors, spacing, fontSize } from "../lib/theme";
@@ -56,7 +57,7 @@ export function FavoritesSection({ refresh }: FavoritesSectionProps = {}) {
           }
           activeOpacity={0.7}
         >
-          <Text style={styles.starIcon}>★</Text>
+          <Ionicons name="star" size={16} color={colors.star} />
           <Text style={styles.itemName} numberOfLines={1}>
             {item.name}
           </Text>
@@ -88,10 +89,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: spacing.sm,
     gap: spacing.sm,
-  },
-  starIcon: {
-    color: colors.star,
-    fontSize: fontSize.md,
   },
   itemName: {
     color: colors.text,
