@@ -21,6 +21,7 @@ RUN npm install --omit=dev
 RUN addgroup -S app && adduser -S app -G app
 RUN mkdir -p /notes /data && chown -R app:app /app /notes /data
 COPY --chown=app:app packages/server/prisma.config.mjs ./prisma.config.mjs
+COPY --chown=app:app packages/server/scripts/migrate.mjs ./scripts/migrate.mjs
 COPY --chown=app:app entrypoint.sh ./entrypoint.sh
 USER app
 ENV PORT=3000
