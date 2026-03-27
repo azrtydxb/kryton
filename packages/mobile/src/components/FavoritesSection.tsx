@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
-import { database } from "../db";
-import Setting from "../db/models/Setting";
+import { getDatabase, SettingRow } from "../db";
 import { colors, spacing, fontSize } from "../lib/theme";
 
 interface FavoriteItem {
@@ -10,7 +9,7 @@ interface FavoriteItem {
   name: string;
 }
 
-function parseFavorites(setting: Setting | null): FavoriteItem[] {
+function parseFavorites(setting: SettingRow | null): FavoriteItem[] {
   if (!setting) return [];
   try {
     const paths: string[] = JSON.parse(setting.value);
@@ -28,15 +27,12 @@ export function FavoritesSection() {
   const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
 
   useEffect(() => {
-    const collection = database.get<Setting>("settings");
-    const subscription = collection
-      .query()
-      .observe()
-      .subscribe((records) => {
-        const starredSetting = records.find((r) => r.key === "starred") ?? null;
-        setFavorites(parseFavorites(starredSetting));
-      });
-    return () => subscription.unsubscribe();
+    const db = getDatabase();
+    const rows = db.getAllSync<SettingRow>(
+      "SELECT * FROM settings WHERE _status != 'deleted'"
+    );
+    const starredSetting = rows.find((r) => r.key === "starred") ?? null;
+    setFavorites(parseFavorites(starredSetting));
   }, []);
 
   if (favorites.length === 0) return null;

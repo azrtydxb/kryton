@@ -13,9 +13,7 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect } from "react";
-import { database } from "../../../src/db";
-import Note from "../../../src/db/models/Note";
-import { Q } from "@nozbe/watermelondb";
+import { getDatabase, NoteRow } from "../../../src/db";
 import { colors, fontSize, spacing, borderRadius } from "../../../src/lib/theme";
 import { parseFrontmatter } from "../../../src/lib/frontmatter";
 import Breadcrumbs from "../../../src/components/Breadcrumbs";
@@ -35,25 +33,24 @@ export default function NoteScreen() {
     : params.path ?? "";
   const notePath = decodeURIComponent(rawPath);
 
-  const [note, setNote] = useState<Note | null>(null);
+  const [note, setNote] = useState<NoteRow | null>(null);
   const [content, setContent] = useState("");
   const [mode, setMode] = useState<Mode>("preview");
   const [isDirty, setIsDirty] = useState(false);
   const pendingContentRef = useRef("");
 
-  // Load note from WatermelonDB
+  // Load note from expo-sqlite
   useEffect(() => {
-    let subscription: { unsubscribe: () => void } | null = null;
-    const col = database.get<Note>("notes");
-    const obs = col.query(Q.where("path", notePath)).observe();
-    subscription = obs.subscribe((notes) => {
-      if (notes.length > 0) {
-        setNote(notes[0]);
-        setContent(notes[0].content ?? "");
-        pendingContentRef.current = notes[0].content ?? "";
-      }
-    });
-    return () => subscription?.unsubscribe();
+    const db = getDatabase();
+    const rows = db.getAllSync<NoteRow>(
+      "SELECT * FROM notes WHERE path = ? AND _status != 'deleted'",
+      [notePath]
+    );
+    if (rows.length > 0) {
+      setNote(rows[0]);
+      setContent(rows[0].content ?? "");
+      pendingContentRef.current = rows[0].content ?? "";
+    }
   }, [notePath]);
 
   const handleContentChange = useCallback((newContent: string) => {
@@ -64,11 +61,19 @@ export default function NoteScreen() {
   const handleSave = useCallback(async () => {
     if (!note || !isDirty) return;
     try {
-      await database.write(async () => {
-        await note.update((n) => {
-          n.content = pendingContentRef.current;
-        });
-      });
+      const db = getDatabase();
+      const newContent = pendingContentRef.current;
+      const title =
+        newContent.match(/^#\s+(.+)/m)?.[1] ||
+        note.path.replace(/\.md$/, "").split("/").pop() ||
+        "";
+      db.runSync(
+        "UPDATE notes SET content = ?, title = ?, modified_at = ?, _status = CASE WHEN _status = 'created' THEN 'created' ELSE 'updated' END, _changed = 'content,title' WHERE id = ?",
+        [newContent, title, Date.now(), note.id]
+      );
+      setNote((prev) =>
+        prev ? { ...prev, content: newContent, title } : prev
+      );
       setIsDirty(false);
     } catch (err) {
       console.error("Failed to save note:", err);

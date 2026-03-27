@@ -34,7 +34,6 @@
       "expo-router",
       "expo-secure-store",
       "expo-web-browser",
-      "@morrowdigital/watermelondb-expo-plugin",
       [
         "expo-build-properties",
         {

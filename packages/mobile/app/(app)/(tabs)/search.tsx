@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -9,10 +9,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { Q } from "@nozbe/watermelondb";
-import { useEffect } from "react";
-import { database } from "../../../src/db";
-import Note from "../../../src/db/models/Note";
+import { getDatabase, NoteRow } from "../../../src/db";
 import {
   colors,
   fontSize,
@@ -27,12 +24,12 @@ interface SearchResult {
   snippet: string;
 }
 
-function noteToResult(note: Note): SearchResult {
-  const snippet = (note.content ?? "").slice(0, 100).replace(/\n/g, " ");
+function rowToResult(row: NoteRow): SearchResult {
+  const snippet = (row.content ?? "").slice(0, 100).replace(/\n/g, " ");
   return {
-    id: note.id,
-    title: note.title ?? note.path,
-    path: note.path,
+    id: row.id,
+    title: row.title ?? row.path,
+    path: row.path,
     snippet,
   };
 }
@@ -49,21 +46,12 @@ export default function SearchScreen() {
     }
 
     const term = `%${query.trim()}%`;
-    const col = database.get<Note>("notes");
-    const obs = col
-      .query(
-        Q.or(
-          Q.where("title", Q.like(term)),
-          Q.where("content", Q.like(term))
-        )
-      )
-      .observe();
-
-    const subscription = obs.subscribe((notes) => {
-      setResults(notes.map(noteToResult));
-    });
-
-    return () => subscription.unsubscribe();
+    const db = getDatabase();
+    const rows = db.getAllSync<NoteRow>(
+      "SELECT * FROM notes WHERE _status != 'deleted' AND (title LIKE ? OR content LIKE ?)",
+      [term, term]
+    );
+    setResults(rows.map(rowToResult));
   }, [query]);
 
   const handlePress = useCallback(

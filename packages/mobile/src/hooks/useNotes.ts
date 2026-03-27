@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { database } from "../db";
-import Note from "../db/models/Note";
+import { getDatabase, NoteRow } from "../db";
 
 export interface NoteRecord {
   id: string;
@@ -73,14 +72,14 @@ function buildTree(notes: NoteRecord[]): TreeNode[] {
   return sortNodes(root);
 }
 
-function noteToRecord(note: Note): NoteRecord {
+function rowToRecord(row: NoteRow): NoteRecord {
   return {
-    id: note.id,
-    path: note.path,
-    title: note.title,
-    content: note.content,
-    tags: note.tags,
-    modifiedAt: note.modifiedAt,
+    id: row.id,
+    path: row.path,
+    title: row.title,
+    content: row.content,
+    tags: row.tags,
+    modifiedAt: new Date(row.modified_at),
   };
 }
 
@@ -97,51 +96,51 @@ export function useNotes(): UseNotesReturn {
   const [notes, setNotes] = useState<NoteRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const collection = database.get<Note>("notes");
-    const subscription = collection.query().observe().subscribe((records) => {
-      setNotes(records.map(noteToRecord));
-      setIsLoading(false);
-    });
-    return () => subscription.unsubscribe();
+  const refresh = useCallback(() => {
+    const db = getDatabase();
+    const rows = db.getAllSync<NoteRow>(
+      "SELECT * FROM notes WHERE _status != 'deleted' ORDER BY path"
+    );
+    setNotes(rows.map(rowToRecord));
+    setIsLoading(false);
   }, []);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   const createNote = useCallback(async (path: string, content = "") => {
-    const collection = database.get<Note>("notes");
-    const title = path.split("/").pop()?.replace(/\.md$/, "") ?? path;
-    await database.write(async () => {
-      await collection.create((note) => {
-        note.path = path;
-        note.title = title;
-        note.content = content;
-        note.tags = "[]";
-      });
-    });
-  }, []);
-
-  const deleteNote = useCallback(async (path: string) => {
-    const collection = database.get<Note>("notes");
-    const results = await collection.query().fetch();
-    const target = results.find((n) => n.path === path);
-    if (target) {
-      await database.write(async () => {
-        await target.destroyPermanently();
-      });
-    }
-  }, []);
+    const db = getDatabase();
+    const id = path; // Use path as ID
+    const title =
+      content.match(/^#\s+(.+)/m)?.[1] ||
+      path.replace(/\.md$/, "").split("/").pop() ||
+      "";
+    db.runSync(
+      "INSERT OR REPLACE INTO notes (id, path, title, content, tags, modified_at, _status, _changed) VALUES (?, ?, ?, ?, '[]', ?, 'created', 'path,title,content')",
+      [id, path, title, content, Date.now()]
+    );
+    refresh();
+  }, [refresh]);
 
   const updateNote = useCallback(async (path: string, content: string) => {
-    const collection = database.get<Note>("notes");
-    const results = await collection.query().fetch();
-    const target = results.find((n) => n.path === path);
-    if (target) {
-      await database.write(async () => {
-        await target.update((note) => {
-          note.content = content;
-        });
-      });
-    }
-  }, []);
+    const db = getDatabase();
+    const title =
+      content.match(/^#\s+(.+)/m)?.[1] ||
+      path.replace(/\.md$/, "").split("/").pop() ||
+      "";
+    db.runSync(
+      "UPDATE notes SET content = ?, title = ?, modified_at = ?, _status = CASE WHEN _status = 'created' THEN 'created' ELSE 'updated' END, _changed = 'content,title' WHERE id = ?",
+      [content, title, Date.now(), path]
+    );
+    refresh();
+  }, [refresh]);
+
+  const deleteNote = useCallback(async (path: string) => {
+    const db = getDatabase();
+    db.runSync("UPDATE notes SET _status = 'deleted' WHERE id = ?", [path]);
+    refresh();
+  }, [refresh]);
 
   const tree = buildTree(notes);
 
