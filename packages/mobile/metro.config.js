@@ -6,13 +6,17 @@ const monorepoRoot = path.resolve(projectRoot, "../..");
 
 const config = getDefaultConfig(projectRoot);
 
-// Watch all files in the monorepo
+// Monorepo support: watch all files but resolve from mobile's node_modules first
 config.watchFolders = [monorepoRoot];
-
-// Resolve modules from both the mobile package and the monorepo root
 config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, "node_modules"),
   path.resolve(monorepoRoot, "node_modules"),
 ];
+
+// Ensure only one copy of react/react-native is used (from mobile package)
+config.resolver.extraNodeModules = {
+  react: path.resolve(projectRoot, "node_modules/react"),
+  "react-native": path.resolve(projectRoot, "node_modules/react-native"),
+};
 
 module.exports = config;
