@@ -43,6 +43,7 @@ import { setGraphWebSocket } from "./services/noteService.js";
 import { createTrashRouter, createTrashEmptyRouter, purgeOldTrash } from "./routes/trash.js";
 import { createHistoryRouter, createHistoryTimestampRouter, createHistoryRestoreRouter } from "./routes/history.js";
 import { createSyncRouter } from "./routes/sync.js";
+import { APP_VERSION, APP_COMMIT, APP_MAJOR_VERSION } from "./lib/version.js";
 
 const log = createLogger("server");
 const PORT = parseInt(process.env.PORT || "3001", 10);
@@ -259,9 +260,14 @@ async function main(): Promise<void> {
    *                   type: string
    *                   example: ok
    */
+  // Version info (unauthenticated)
+  app.get("/api/version", (_req, res) => {
+    res.json({ version: APP_VERSION, commit: APP_COMMIT, majorVersion: APP_MAJOR_VERSION });
+  });
+
   // Health check (unauthenticated, GET-only)
   app.get("/api/health", (_req, res) => {
-    res.json({ status: "ok" });
+    res.json({ status: "ok", version: APP_VERSION, commit: APP_COMMIT, majorVersion: APP_MAJOR_VERSION });
   });
 
   // Admin routes (auth + admin middleware)
