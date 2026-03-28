@@ -190,36 +190,45 @@ async function main(): Promise<void> {
   // Serve plugin client bundles as static files (auth required)
   app.use("/plugins", authMiddleware, express.static(pluginsDir));
 
-  // Rate limiters
-  const apiLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100,
+  // Rate limiters — keyed per session/key so one client can't lock out others
+  // Auth: keyed by IP+email combo (unauthenticated, so IP is all we have)
+  const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 50, // generous for normal use, stops brute force
     standardHeaders: true,
     legacyHeaders: false,
+    keyGenerator: (req) => {
+      const email = req.body?.email || "";
+      return `auth:${req.ip}:${email}`;
+    },
+    message: { error: "Too many authentication attempts — please wait a few minutes" },
+  });
+
+  // Web/mobile session API: keyed by user ID (authenticated), very generous
+  const sessionLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 1000, // normal UI use should never hit this
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => `session:${req.user?.id || req.ip}`,
     message: { error: "Too many requests, please try again later" },
   });
 
-  const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 20, // stricter for auth
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { error: "Too many authentication attempts" },
-  });
-
+  // MCP / API key: keyed by individual API key, higher limit for automation
   const apiKeyLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 300,
+    max: 2000, // AI agents make many calls — this is per key
     standardHeaders: true,
     legacyHeaders: false,
-    keyGenerator: (req) => req.apiKey?.id || req.ip || "unknown",
-    message: { error: "Too many API requests, please try again later" },
+    keyGenerator: (req) => `apikey:${req.apiKey?.id || req.ip}`,
+    message: { error: "API key rate limit exceeded — please try again later" },
   });
 
+  // Sync: keyed by user/key, generous for mobile sync
   const syncLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 40,
-    keyGenerator: (req) => req.apiKey?.id || req.user?.id || req.ip || "unknown",
+    max: 200,
+    keyGenerator: (req) => `sync:${req.apiKey?.id || req.user?.id || req.ip}`,
     message: { error: "Sync rate limit exceeded" },
   });
   app.use("/api/sync", authMiddleware, syncLimiter, createSyncRouter(NOTES_DIR));
@@ -229,7 +238,7 @@ async function main(): Promise<void> {
     if (req.headers.authorization?.startsWith("Bearer mnemo_")) {
       return apiKeyLimiter(req, res, next);
     }
-    return apiLimiter(req, res, next);
+    return sessionLimiter(req, res, next);
   });
 
   // better-auth handler (replaces old routes/auth.ts)
