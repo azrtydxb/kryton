@@ -295,7 +295,9 @@ export default function PreviewBridge({ content, darkMode }: PreviewBridgeProps)
             router.push(`/(app)/(tabs)/note/${encoded}` as never);
           }
         } else if (data.type === "external-link" && data.url) {
-          Linking.openURL(data.url);
+          if (/^https?:\/\//i.test(data.url)) {
+            Linking.openURL(data.url);
+          }
         }
       } catch {
         // ignore

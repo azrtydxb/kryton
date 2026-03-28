@@ -144,7 +144,12 @@ export function useAppCallbacks(state: AppState) {
       await exportNoteToPdf(notes.activeNote.title, el.innerHTML);
     } else {
       const div = document.createElement('div');
-      div.innerHTML = `<h1>${notes.activeNote.title}</h1><pre>${notes.activeNote.content}</pre>`;
+      const h1 = document.createElement('h1');
+      h1.textContent = notes.activeNote.title;
+      const pre = document.createElement('pre');
+      pre.textContent = notes.activeNote.content;
+      div.appendChild(h1);
+      div.appendChild(pre);
       await exportNoteToPdf(notes.activeNote.title, div.innerHTML);
     }
   }, [notes.activeNote, previewRef]);

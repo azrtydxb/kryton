@@ -1,4 +1,5 @@
 import * as path from "path";
+import { validatePathWithinBase } from "../lib/pathUtils.js";
 import { scanDirectory, readNote, writeNote, deleteNote } from "../services/noteService.js";
 import { getUserNotesDir } from "../services/userNotesDir.js";
 import { search, getAllTags } from "../services/searchService.js";
@@ -192,6 +193,7 @@ export async function executeTool(
     }
     case "create_folder": {
       const folderPath = path.join(userDir, args.path as string);
+      validatePathWithinBase(folderPath, userDir);
       const { mkdir } = await import("fs/promises");
       await mkdir(folderPath, { recursive: true });
       return { success: true, path: args.path };
@@ -212,7 +214,11 @@ export async function executeTool(
         return [];
       }
     case "create_note_from_template": {
-      const templateContent = await readNote(userDir, `templates/${args.templateName as string}.md`);
+      const templateName = args.templateName as string;
+      if (templateName.includes("/") || templateName.includes("\\") || templateName.includes("..")) {
+        throw new Error("Invalid template name");
+      }
+      const templateContent = await readNote(userDir, `templates/${templateName}.md`);
       await writeNote(userDir, args.notePath as string, templateContent.content, userId);
       return { success: true, path: args.notePath };
     }
