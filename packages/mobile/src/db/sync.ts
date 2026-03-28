@@ -1,10 +1,17 @@
 import { getDatabase } from "./index";
 import { api } from "../lib/api";
 import { storage } from "../lib/storage";
+import { checkVersionCompatibility } from "../lib/versionCheck";
 
 export async function syncWithServer(): Promise<void> {
   const db = getDatabase();
   const lastPulledAt = await storage.getLastSyncAt();
+
+  // Verify server version compatibility before syncing
+  const versionResult = await checkVersionCompatibility();
+  if (!versionResult.compatible) {
+    throw new Error(versionResult.message ?? "Incompatible server version");
+  }
 
   // 1. PULL — get server changes
   const pullResponse = await api.syncPull(lastPulledAt);
