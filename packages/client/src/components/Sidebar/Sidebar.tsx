@@ -528,6 +528,7 @@ export function Sidebar({
         <div
           className="fixed bg-white dark:bg-gray-800 border rounded-lg shadow-lg py-1 min-w-[160px]"
           style={{ left: contextMenu.x, top: contextMenu.y, zIndex: 99999 }}
+          onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
         >
           {contextMenu.node.type === 'folder' && (
