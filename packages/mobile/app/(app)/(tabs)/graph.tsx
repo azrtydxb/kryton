@@ -93,23 +93,25 @@ function buildGraph(notes: NoteRow[], activeNotePath?: string | null): GraphData
     });
   }
 
+  // Build path lookup maps for O(1) resolution
+  const pathLookup = new Map<string, string>();
+  for (const p of nodeMap.keys()) {
+    const pLower = p.toLowerCase();
+    pathLookup.set(pLower, p);
+    const withoutMd = pLower.replace(/\.md$/, "");
+    pathLookup.set(withoutMd, p);
+    const basename = withoutMd.split("/").pop()!;
+    if (!pathLookup.has(basename)) pathLookup.set(basename, p);
+  }
+
   const edges: GraphEdge[] = [];
 
   for (const note of notes) {
     const links = parseWikiLinks(note.content ?? "");
     for (const link of links) {
-      // Try to find a note matching the link target
-      const linkMd = link.endsWith(".md") ? link : `${link}.md`;
-      const linkLower = linkMd.toLowerCase();
-      const target = Array.from(nodeMap.keys()).find((p) => {
-        const pLower = p.toLowerCase();
-        return (
-          pLower === linkLower ||
-          pLower === link.toLowerCase() ||
-          pLower.endsWith(`/${linkLower}`) ||
-          pLower.endsWith(`/${link.toLowerCase()}`)
-        );
-      });
+      const linkLower = link.toLowerCase();
+      const linkMdLower = linkLower.endsWith(".md") ? linkLower : `${linkLower}.md`;
+      const target = pathLookup.get(linkMdLower) ?? pathLookup.get(linkLower) ?? null;
       if (target && target !== note.path) {
         edges.push({ source: note.path, target });
       }
@@ -196,6 +198,7 @@ function buildGraphHTML(): string {
   // --- Force simulation ---
   var alpha = 1;
   var alphaDecay = 0.02;
+  var animFrameId = null;
 
   function tick() {
     if (alpha > 0.001) {
@@ -276,9 +279,18 @@ function buildGraphHTML(): string {
         n.x = Math.max(n.radius + 2, Math.min(W - n.radius - 2, n.x));
         n.y = Math.max(n.radius + 2, Math.min(H - n.radius - 2, n.y));
       });
+
+      draw();
+      animFrameId = requestAnimationFrame(tick);
+    } else {
+      draw(); // final frame
+      animFrameId = null;
     }
-    draw();
-    requestAnimationFrame(tick);
+  }
+
+  function reheat() {
+    alpha = 1;
+    if (!animFrameId) animFrameId = requestAnimationFrame(tick);
   }
 
   function drawStar(ctx, cx, cy, spikes, outerR, innerR) {
@@ -392,6 +404,7 @@ function buildGraphHTML(): string {
     dragging.x = t.clientX - rect.left - dragOffX;
     dragging.y = t.clientY - rect.top - dragOffY;
     dragging.vx = 0; dragging.vy = 0;
+    reheat();
   }, { passive: false });
 
   canvas.addEventListener('touchend', function(e) {
@@ -413,7 +426,7 @@ function buildGraphHTML(): string {
     dragging = null;
   }, { passive: false });
 
-  requestAnimationFrame(tick);
+  reheat();
 
   // Listen for graph data updates from React Native
   function initGraph(newGraph, activeNotePath) {
@@ -453,7 +466,7 @@ function buildGraphHTML(): string {
     nodeIndex = {};
     nodes.forEach(function(n) { nodeIndex[n.id] = n; });
     activeNode = activeNotePath ? (nodeIndex[activeNotePath] || null) : null;
-    alpha = 1;
+    reheat();
   }
 
   function handleMessage(event) {
