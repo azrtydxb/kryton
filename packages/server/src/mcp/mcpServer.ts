@@ -149,6 +149,11 @@ function createMcpServerInstance(userId: string, keyScope: string, rawKey: strin
           fetchInit.body = JSON.stringify(args);
         }
 
+        const urlObj = new URL(url);
+        if (urlObj.hostname !== "localhost" && urlObj.hostname !== "127.0.0.1") {
+          throw new Error("Dynamic tool URLs must target localhost");
+        }
+
         const response = await fetch(url, fetchInit);
         const text = await response.text();
         if (!response.ok) {

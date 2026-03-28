@@ -51,40 +51,55 @@ export async function updateGraphCache(
   // Build edges, resolving short wiki-links (e.g. [[truenas]]) to full paths
   // by searching the SearchIndex for a matching filename.
   // This implements Obsidian-style shortest-path resolution.
-  const edges = await Promise.all(
-    links.map(async (link) => {
-      let toPath = linkToPath(link);
 
-      // If the link has no folder separator, try to resolve by filename across all notes
-      if (!link.includes("/")) {
-        const filename = link.endsWith(".md") ? link : `${link}.md`;
+  // Collect all short links (no `/` separator) and batch-resolve them
+  const shortLinks = links.filter((link) => !link.includes("/"));
+  const shortFilenames = shortLinks.map((link) => (link.endsWith(".md") ? link : `${link}.md`));
 
-        // Search SearchIndex for a note whose path ends with /filename or equals filename
-        const match = await prisma.searchIndex.findFirst({
-          where: {
-            userId,
-            OR: [
-              { notePath: filename },
-              { notePath: { endsWith: `/${filename}` } },
-            ],
-          },
-          select: { notePath: true },
-        });
+  // ONE query to resolve all short wiki-links by filename
+  const resolvedRows = shortFilenames.length > 0
+    ? await prisma.searchIndex.findMany({
+        where: {
+          userId,
+          OR: shortFilenames.flatMap((filename) => [
+            { notePath: filename },
+            { notePath: { endsWith: `/${filename}` } },
+          ]),
+        },
+        select: { notePath: true },
+      })
+    : [];
 
-        if (match) {
-          toPath = match.notePath;
-        }
+  // Build a lookup map: filename -> resolved notePath (first match wins)
+  const resolvedMap = new Map<string, string>();
+  for (const filename of shortFilenames) {
+    const match = resolvedRows.find(
+      (r) => r.notePath === filename || r.notePath.endsWith(`/${filename}`)
+    );
+    if (match) {
+      resolvedMap.set(filename, match.notePath);
+    }
+  }
+
+  const edges = links.map((link) => {
+    let toPath = linkToPath(link);
+
+    if (!link.includes("/")) {
+      const filename = link.endsWith(".md") ? link : `${link}.md`;
+      const resolved = resolvedMap.get(filename);
+      if (resolved) {
+        toPath = resolved;
       }
+    }
 
-      return {
-        fromPath: notePath,
-        toPath,
-        fromNoteId: noteIdFromPath(notePath),
-        toNoteId: noteIdFromPath(toPath),
-        userId,
-      };
-    })
-  );
+    return {
+      fromPath: notePath,
+      toPath,
+      fromNoteId: noteIdFromPath(notePath),
+      toNoteId: noteIdFromPath(toPath),
+      userId,
+    };
+  });
 
   await prisma.graphEdge.createMany({ data: edges });
 }
@@ -93,9 +108,9 @@ export async function updateGraphCache(
  * Remove all graph edges that reference the given note path (as source or target).
  */
 export async function removeFromGraph(notePath: string, userId: string): Promise<void> {
-  await prisma.graphEdge.deleteMany({ where: { fromPath: notePath, userId } });
-  // We also remove edges pointing TO this note
-  await prisma.graphEdge.deleteMany({ where: { toPath: notePath, userId } });
+  await prisma.graphEdge.deleteMany({
+    where: { userId, OR: [{ fromPath: notePath }, { toPath: notePath }] },
+  });
 }
 
 /**
@@ -275,11 +290,9 @@ export async function getFullGraph(userId: string): Promise<GraphData> {
 
   // --- Shared edges (from owners' data) ---
   const ownerIds = [...new Set(sharedPaths.map((sp) => sp.ownerUserId))];
-  const sharedEdges: typeof allEdges = [];
-  for (const ownerId of ownerIds) {
-    const ownerEdges = await prisma.graphEdge.findMany({ where: { userId: ownerId } });
-    sharedEdges.push(...ownerEdges);
-  }
+  const sharedEdges = ownerIds.length > 0
+    ? await prisma.graphEdge.findMany({ where: { userId: { in: ownerIds } } })
+    : [];
 
   // --- Map and filter all edges ---
   const resolveId = (rawNoteId: string, ownerId: string): string | null => {

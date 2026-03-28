@@ -102,6 +102,11 @@ export function createSettingsRouter(): Router {
       const user = requireUser(req);
       const key = req.params.key as string;
 
+      if (!/^[a-zA-Z0-9_.-]{1,100}$/.test(key)) {
+        res.status(400).json({ error: "Invalid setting key format" });
+        return;
+      }
+
       const ADMIN_ONLY_KEYS = ["registration_mode"];
       if (ADMIN_ONLY_KEYS.includes(key)) {
         res.status(403).json({ error: "This setting requires admin access" });

@@ -9,6 +9,8 @@ const log = createLogger("user-notes");
 // Accepts both UUIDs and better-auth's alphanumeric IDs
 const SAFE_USER_ID_REGEX = /^[a-zA-Z0-9_-]{8,64}$/;
 
+const knownDirs = new Set<string>();
+
 /**
  * SAMPLE_NOTES — default notes provisioned for every new user.
  * Moved here from index.ts so that provisionUserNotes can reuse them.
@@ -166,7 +168,10 @@ export async function getUserNotesDir(
 ): Promise<string> {
   if (!SAFE_USER_ID_REGEX.test(userId)) throw new Error("Invalid userId format");
   const dir = path.join(baseDir, userId);
-  await fs.mkdir(dir, { recursive: true });
+  if (!knownDirs.has(dir)) {
+    await fs.mkdir(dir, { recursive: true });
+    knownDirs.add(dir);
+  }
   return dir;
 }
 

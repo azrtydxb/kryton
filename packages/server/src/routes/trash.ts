@@ -6,8 +6,8 @@ import { requireUser, requireScope } from "../middleware/auth.js";
 import { decodePathParam, ensureExtension } from "../lib/pathUtils.js";
 import { ValidationError, NotFoundError } from "../lib/errors.js";
 import { prisma } from "../prisma.js";
+import { moveToTrash, getTrashDir } from "../services/trashService.js";
 
-const TRASH_DIR = ".trash";
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
 export interface TrashItem {
@@ -16,12 +16,8 @@ export interface TrashItem {
   trashedAt: Date;
 }
 
-/**
- * Return the trash directory path for a given user notes dir.
- */
-export function getTrashDir(userNotesDir: string): string {
-  return path.join(userNotesDir, TRASH_DIR);
-}
+// Re-export for backward compatibility
+export { moveToTrash, getTrashDir };
 
 /**
  * Recursively scan a directory and return all .md file paths relative to basePath.
@@ -94,21 +90,6 @@ async function removeEmptyDirs(dir: string, stopDir: string): Promise<void> {
   } catch {
     // Ignore errors
   }
-}
-
-/**
- * Move a note to the trash directory, preserving its relative path structure.
- */
-export async function moveToTrash(userNotesDir: string, notePath: string): Promise<void> {
-  const trashDir = getTrashDir(userNotesDir);
-  const sourcePath = path.join(userNotesDir, notePath);
-  const destPath = path.join(trashDir, notePath);
-
-  // Ensure trash parent directory exists
-  await fs.mkdir(path.dirname(destPath), { recursive: true });
-
-  // Use rename (same filesystem)
-  await fs.rename(sourcePath, destPath);
 }
 
 export function createTrashRouter(notesDir: string): Router {

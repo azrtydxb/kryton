@@ -1,9 +1,11 @@
 import * as fs from "fs/promises";
 import * as path from "path";
+import { prisma } from "../prisma.js";
+import { createLogger } from "../lib/logger.js";
 import { indexNote, removeFromIndex, renameInIndex, extractTitle } from "./searchService.js";
 import { updateGraphCache, removeFromGraph, renameInGraph } from "./graphService.js";
-import { moveToTrash } from "../routes/trash.js";
-import { saveHistorySnapshot } from "../routes/history.js";
+import { moveToTrash } from "./trashService.js";
+import { saveHistorySnapshot } from "./historyService.js";
 import type { PluginWebSocket } from "../plugins/PluginWebSocket.js";
 
 // Optional WebSocket instance for broadcasting graph updates
@@ -16,8 +18,6 @@ let pluginWs: PluginWebSocket | null = null;
 export function setGraphWebSocket(ws: PluginWebSocket): void {
   pluginWs = ws;
 }
-import { prisma } from "../prisma.js";
-import { createLogger } from "../lib/logger.js";
 
 const log = createLogger("note-service");
 
@@ -231,9 +231,27 @@ export async function renameNote(
 export async function indexUserNotes(userNotesDir: string, userId: string): Promise<void> {
   const tree = await scanDirectory(userNotesDir);
 
-  async function processNodes(nodes: FileTreeNode[]): Promise<void> {
+  // Flatten tree to list of file nodes
+  function collectFiles(nodes: FileTreeNode[]): FileTreeNode[] {
+    const files: FileTreeNode[] = [];
     for (const node of nodes) {
       if (node.type === "file") {
+        files.push(node);
+      } else if (node.children) {
+        files.push(...collectFiles(node.children));
+      }
+    }
+    return files;
+  }
+
+  const files = collectFiles(tree);
+
+  // Process in batches of 10 for bounded concurrency
+  const BATCH_SIZE = 10;
+  for (let i = 0; i < files.length; i += BATCH_SIZE) {
+    const batch = files.slice(i, i + BATCH_SIZE);
+    await Promise.all(
+      batch.map(async (node) => {
         try {
           const fullPath = path.join(userNotesDir, node.path);
           const content = await fs.readFile(fullPath, "utf-8");
@@ -242,11 +260,7 @@ export async function indexUserNotes(userNotesDir: string, userId: string): Prom
         } catch (err) {
           log.error(`Failed to index ${node.path}:`, err);
         }
-      } else if (node.children) {
-        await processNodes(node.children);
-      }
-    }
+      })
+    );
   }
-
-  await processNodes(tree);
 }

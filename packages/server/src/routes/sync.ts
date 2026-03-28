@@ -1,13 +1,33 @@
 import { Router, Request, Response } from "express";
 import * as fs from "fs/promises";
 import * as path from "path";
+import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { requireUser, requireScope } from "../middleware/auth.js";
 import { getUserNotesDir } from "../services/userNotesDir.js";
 import { writeNote, deleteNote } from "../services/noteService.js";
+import { createLogger } from "../lib/logger.js";
+
+const log = createLogger("sync");
 
 export function createSyncRouter(notesDir: string): Router {
   const router = Router();
+
+  const tableChangesSchema = z.object({
+    created: z.array(z.record(z.string(), z.unknown())).max(500).optional().default([]),
+    updated: z.array(z.record(z.string(), z.unknown())).max(500).optional().default([]),
+    deleted: z.array(z.string().max(500)).max(500).optional().default([]),
+  });
+
+  const syncPushSchema = z.object({
+    changes: z.object({
+      notes: tableChangesSchema.optional(),
+      settings: tableChangesSchema.optional(),
+      note_shares: tableChangesSchema.optional(),
+      trash_items: tableChangesSchema.optional(),
+    }).optional(),
+    last_pulled_at: z.number().optional().default(0),
+  });
 
   // POST /api/sync/pull
   router.post("/pull", async (req: Request, res: Response) => {
@@ -26,22 +46,24 @@ export function createSyncRouter(notesDir: string): Router {
         where: { userId, modifiedAt: { gt: lastPulledAt } },
       });
 
-      const noteRecords: object[] = [];
-      for (const entry of searchEntries) {
-        try {
-          const content = await fs.readFile(path.join(userDir, entry.notePath), "utf-8");
-          noteRecords.push({
-            id: entry.notePath,
-            path: entry.notePath,
-            title: entry.title,
-            content,
-            tags: entry.tags,
-            modified_at: entry.modifiedAt.getTime(),
-          });
-        } catch {
-          // File may have been deleted after index update — skip it
-        }
-      }
+      const noteRecords = (await Promise.all(
+        searchEntries.map(async (entry) => {
+          try {
+            const content = await fs.readFile(path.join(userDir, entry.notePath), "utf-8");
+            return {
+              id: entry.notePath,
+              path: entry.notePath,
+              title: entry.title,
+              content,
+              tags: entry.tags,
+              modified_at: entry.modifiedAt.getTime(),
+            };
+          } catch {
+            // File may have been deleted after index update — skip it
+            return null;
+          }
+        })
+      )).filter((r): r is NonNullable<typeof r> => r !== null);
 
       // --- Settings ---
       const settingsEntries = await prisma.settings.findMany({
@@ -111,7 +133,7 @@ export function createSyncRouter(notesDir: string): Router {
         }
       }
 
-      // Build WatermelonDB response
+      // Build sync response
       // On first sync everything goes in "created"; otherwise everything goes in "updated"
       const notesChanges = isFirstSync
         ? { created: noteRecords, updated: [], deleted: deletedNotes }
@@ -139,7 +161,7 @@ export function createSyncRouter(notesDir: string): Router {
         timestamp,
       });
     } catch (err) {
-      console.error("[sync]", err);
+      log.error("[sync]", err);
       res.status(500).json({ error: err instanceof Error ? err.message : "Sync pull failed" });
     }
   });
@@ -151,20 +173,26 @@ export function createSyncRouter(notesDir: string): Router {
       requireScope(req, "read-write");
       const userId = user.id;
 
-      const changes = req.body?.changes ?? {};
+      const parsed = syncPushSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid sync payload" });
+        return;
+      }
+
+      const changes = parsed.data.changes;
       const userDir = await getUserNotesDir(notesDir, userId);
 
       // --- Notes ---
-      const notesChanges = changes.notes ?? {};
-      const notesCreated: Array<{ path: string; content: string }> = notesChanges.created ?? [];
-      const notesUpdated: Array<{ path: string; content: string }> = notesChanges.updated ?? [];
-      const notesDeleted: string[] = notesChanges.deleted ?? [];
+      const notesChanges = changes?.notes;
+      const notesCreated = (notesChanges?.created ?? []) as Array<Record<string, unknown>>;
+      const notesUpdated = (notesChanges?.updated ?? []) as Array<Record<string, unknown>>;
+      const notesDeleted = (notesChanges?.deleted ?? []) as string[];
 
       for (const note of [...notesCreated, ...notesUpdated]) {
         try {
-          await writeNote(userDir, note.path, note.content ?? "", userId);
+          await writeNote(userDir, note.path as string, (note.content as string) ?? "", userId);
         } catch (err) {
-          console.error("[sync] Failed to write note", note.path, err);
+          log.error(`[sync] Failed to write note ${note.path}`, err);
         }
       }
 
@@ -172,24 +200,24 @@ export function createSyncRouter(notesDir: string): Router {
         try {
           await deleteNote(userDir, notePath, userId);
         } catch (err) {
-          console.error("[sync] Failed to delete note", notePath, err);
+          log.error(`[sync] Failed to delete note ${notePath}`, err);
         }
       }
 
       // --- Settings ---
-      const settingsChanges = changes.settings ?? {};
-      const settingsCreated: Array<{ key: string; value: string }> = settingsChanges.created ?? [];
-      const settingsUpdated: Array<{ key: string; value: string }> = settingsChanges.updated ?? [];
+      const settingsChanges = changes?.settings;
+      const settingsCreated = (settingsChanges?.created ?? []) as Array<Record<string, unknown>>;
+      const settingsUpdated = (settingsChanges?.updated ?? []) as Array<Record<string, unknown>>;
 
       for (const setting of [...settingsCreated, ...settingsUpdated]) {
         try {
           await prisma.settings.upsert({
-            where: { key_userId: { key: setting.key, userId } },
-            update: { value: setting.value },
-            create: { key: setting.key, userId, value: setting.value },
+            where: { key_userId: { key: setting.key as string, userId } },
+            update: { value: setting.value as string },
+            create: { key: setting.key as string, userId, value: setting.value as string },
           });
         } catch (err) {
-          console.error("[sync] Failed to upsert setting", setting.key, err);
+          log.error(`[sync] Failed to upsert setting ${setting.key}`, err);
         }
       }
 
@@ -197,7 +225,7 @@ export function createSyncRouter(notesDir: string): Router {
 
       res.json({});
     } catch (err) {
-      console.error("[sync]", err);
+      log.error("[sync]", err);
       res.status(500).json({ error: err instanceof Error ? err.message : "Sync push failed" });
     }
   });
