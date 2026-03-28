@@ -23,6 +23,8 @@ interface GraphEdge {
 interface GraphData {
   nodes: GraphNode[];
   edges: GraphEdge[];
+  viewMode?: "local" | "full";
+  hopDistances?: Record<string, number>;
 }
 
 function parseWikiLinks(content: string): string[] {
@@ -33,7 +35,33 @@ function parseWikiLinks(content: string): string[] {
   });
 }
 
-function buildGraph(notes: NoteRow[]): GraphData {
+function computeHopDistances(
+  sourceId: string,
+  edges: GraphEdge[],
+  maxHops: number
+): Map<string, number> {
+  const distances = new Map<string, number>();
+  distances.set(sourceId, 0);
+  const queue = [sourceId];
+  let idx = 0;
+  while (idx < queue.length) {
+    const current = queue[idx++];
+    const currentDist = distances.get(current)!;
+    if (currentDist >= maxHops) continue;
+    for (const edge of edges) {
+      let neighbor: string | null = null;
+      if (edge.source === current) neighbor = edge.target;
+      else if (edge.target === current) neighbor = edge.source;
+      if (neighbor && !distances.has(neighbor)) {
+        distances.set(neighbor, currentDist + 1);
+        queue.push(neighbor);
+      }
+    }
+  }
+  return distances;
+}
+
+function buildGraph(notes: NoteRow[], activeNotePath?: string | null): GraphData {
   const db = getDatabase();
 
   // Get starred paths
@@ -88,7 +116,26 @@ function buildGraph(notes: NoteRow[]): GraphData {
     }
   }
 
-  return { nodes: Array.from(nodeMap.values()), edges };
+  const viewMode: "local" | "full" = activeNotePath ? "local" : "full";
+  const allNodes = Array.from(nodeMap.values());
+
+  if (viewMode === "local" && activeNotePath) {
+    const hopMap = computeHopDistances(activeNotePath, edges, 2);
+    const visibleIds = new Set(hopMap.keys());
+    const filteredNodes = allNodes
+      .filter((n) => visibleIds.has(n.id))
+      .map((n) => ({ ...n }));
+    const filteredEdges = edges.filter(
+      (e) => visibleIds.has(e.source) && visibleIds.has(e.target)
+    );
+    const hopDistances: Record<string, number> = {};
+    hopMap.forEach((v, k) => {
+      hopDistances[k] = v;
+    });
+    return { nodes: filteredNodes, edges: filteredEdges, viewMode, hopDistances };
+  }
+
+  return { nodes: allNodes, edges, viewMode };
 }
 
 function buildGraphHTML(): string {
@@ -143,6 +190,8 @@ function buildGraphHTML(): string {
   var activeNode = null;
   var dragging = null;
   var dragOffX = 0, dragOffY = 0;
+  var viewMode = 'full';
+  var hopDistances = {};
 
   // --- Force simulation ---
   var alpha = 1;
@@ -152,13 +201,15 @@ function buildGraphHTML(): string {
     if (alpha > 0.001) {
       alpha *= (1 - alphaDecay);
 
+      var linkDist = viewMode === 'local' ? 80 : 150;
+
       // Repulsion
       for (var i = 0; i < nodes.length; i++) {
         for (var j = i + 1; j < nodes.length; j++) {
           var a = nodes[i], b = nodes[j];
           var dx = b.x - a.x, dy = b.y - a.y;
           var dist = Math.sqrt(dx * dx + dy * dy) || 1;
-          var force = (1200 / (dist * dist)) * alpha;
+          var force = (2400 / (dist * dist)) * alpha;
           var fx = (dx / dist) * force;
           var fy = (dy / dist) * force;
           a.vx -= fx; a.vy -= fy;
@@ -171,7 +222,7 @@ function buildGraphHTML(): string {
         var dx = e.target.x - e.source.x;
         var dy = e.target.y - e.source.y;
         var dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        var force = (dist - 100) * 0.05 * alpha;
+        var force = (dist - linkDist) * 0.05 * alpha;
         var fx = (dx / dist) * force;
         var fy = (dy / dist) * force;
         e.source.vx += fx; e.source.vy += fy;
@@ -180,13 +231,43 @@ function buildGraphHTML(): string {
 
       // Center gravity
       nodes.forEach(function(n) {
-        n.vx += (W / 2 - n.x) * 0.005 * alpha;
-        n.vy += (H / 2 - n.y) * 0.005 * alpha;
+        n.vx += (W / 2 - n.x) * 0.003 * alpha;
+        n.vy += (H / 2 - n.y) * 0.003 * alpha;
       });
+
+      // Radial ring constraint for local mode
+      if (viewMode === 'local' && activeNode) {
+        var cx = W / 2, cy = H / 2;
+        var ringSpacing = Math.min(W, H) * 0.18;
+        nodes.forEach(function(n) {
+          if (n === activeNode || n === dragging) return;
+          var hop = n.hopDistance || 1;
+          var targetR = hop * ringSpacing;
+          var ndx = n.x - cx, ndy = n.y - cy;
+          var currR = Math.sqrt(ndx * ndx + ndy * ndy) || 1;
+          var radialForce = (targetR - currR) * 0.06 * alpha;
+          n.vx += (ndx / currR) * radialForce;
+          n.vy += (ndy / currR) * radialForce;
+        });
+      }
+
+      // Soft active node pull toward center in full mode
+      if (viewMode === 'full' && activeNode && activeNode !== dragging) {
+        activeNode.vx += (W / 2 - activeNode.x) * 0.1 * alpha;
+        activeNode.vy += (H / 2 - activeNode.y) * 0.1 * alpha;
+      }
 
       // Integrate
       nodes.forEach(function(n) {
         if (n === dragging) return;
+        // Pin active node at center in local mode
+        if (viewMode === 'local' && n.isActive) {
+          n.x = W / 2;
+          n.y = H / 2;
+          n.vx = 0;
+          n.vy = 0;
+          return;
+        }
         n.vx *= 0.8;
         n.vy *= 0.8;
         n.x += n.vx;
@@ -337,15 +418,28 @@ function buildGraphHTML(): string {
   // Listen for graph data updates from React Native
   function initGraph(newGraph, activeNotePath) {
     graph = newGraph;
+    viewMode = graph.viewMode || (activeNotePath ? 'local' : 'full');
+    hopDistances = graph.hopDistances || {};
     nodes = graph.nodes.map(function(n) {
+      var isActive = activeNotePath ? n.id === activeNotePath : false;
+      var hopDist = hopDistances[n.id];
+      var startX, startY;
+      if (viewMode === 'local' && isActive) {
+        startX = W / 2;
+        startY = H / 2;
+      } else {
+        startX = W / 2 + (Math.random() - 0.5) * W * 0.6;
+        startY = H / 2 + (Math.random() - 0.5) * H * 0.6;
+      }
       return {
         id: n.id,
         label: n.label,
         starred: n.starred || false,
         shared: n.shared || false,
-        isActive: activeNotePath ? n.id === activeNotePath : false,
-        x: W / 2 + (Math.random() - 0.5) * W * 0.6,
-        y: H / 2 + (Math.random() - 0.5) * H * 0.6,
+        isActive: isActive,
+        hopDistance: hopDist !== undefined ? hopDist : -1,
+        x: startX,
+        y: startY,
         vx: 0, vy: 0,
         radius: n.starred ? 7 : 6
       };
@@ -395,23 +489,27 @@ export default function GraphScreen() {
   const [graph, setGraph] = useState<GraphData | null>(null);
   const activeNotePathRef = useRef<string | null>(activeNoteStore.get());
 
-  // Subscribe to active note changes and push updated graph if WebView is ready
+  // Subscribe to active note changes — rebuild graph to update viewMode and filtering
   useEffect(() => {
     const unsubscribe = activeNoteStore.subscribe((path) => {
       activeNotePathRef.current = path;
-      if (isReadyRef.current && pendingGraphRef.current === null && graph !== null) {
+      if (isReadyRef.current && pendingGraphRef.current === null) {
+        const db = getDatabase();
+        const notes = db.getAllSync<NoteRow>("SELECT * FROM notes WHERE _status != 'deleted'");
+        const g = buildGraph(notes, path);
+        setGraph(g);
         webViewRef.current?.postMessage(
-          JSON.stringify({ type: "updateGraph", graph, activeNotePath: path })
+          JSON.stringify({ type: "updateGraph", graph: g, activeNotePath: path })
         );
       }
     });
     return unsubscribe;
-  }, [graph]);
+  }, []);
 
   const loadGraph = useCallback(() => {
     const db = getDatabase();
     const notes = db.getAllSync<NoteRow>("SELECT * FROM notes WHERE _status != 'deleted'");
-    const g = buildGraph(notes);
+    const g = buildGraph(notes, activeNotePathRef.current);
     setGraph(g);
     if (isReadyRef.current) {
       webViewRef.current?.postMessage(

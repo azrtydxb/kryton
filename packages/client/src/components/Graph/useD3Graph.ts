@@ -9,6 +9,7 @@ interface SimNode extends d3.SimulationNodeDatum {
   path: string;
   shared?: boolean;
   ownerUserId?: string;
+  hopDistance?: number; // distance from active node (local mode)
 }
 
 interface SimLink extends d3.SimulationLinkDatum<SimNode> {
@@ -22,6 +23,39 @@ interface UseD3GraphOptions {
   starredPaths?: Set<string>;
   onNodeClick: (path: string) => void;
   recenterRef?: React.MutableRefObject<(() => void) | null>;
+}
+
+/**
+ * Compute hop distances from a source node using BFS.
+ * Returns a Map of nodeId -> hop distance.
+ */
+function computeHopDistances(
+  sourceId: string,
+  edges: { fromNoteId: string; toNoteId: string }[],
+  maxHops: number
+): Map<string, number> {
+  const distances = new Map<string, number>();
+  distances.set(sourceId, 0);
+  const queue = [sourceId];
+  let idx = 0;
+
+  while (idx < queue.length) {
+    const current = queue[idx++];
+    const currentDist = distances.get(current)!;
+    if (currentDist >= maxHops) continue;
+
+    for (const edge of edges) {
+      let neighbor: string | null = null;
+      if (edge.fromNoteId === current) neighbor = edge.toNoteId;
+      else if (edge.toNoteId === current) neighbor = edge.fromNoteId;
+      if (neighbor && !distances.has(neighbor)) {
+        distances.set(neighbor, currentDist + 1);
+        queue.push(neighbor);
+      }
+    }
+  }
+
+  return distances;
 }
 
 export function useD3Graph(
@@ -54,21 +88,20 @@ export function useD3Graph(
 
     const cfg = GRAPH_CONFIG;
 
-    // Filter for local mode
+    // Filter for local mode (2-hop neighborhood)
     let filteredNodes = graphData.nodes;
     let filteredEdges = graphData.edges;
+    let hopDistances: Map<string, number> | null = null;
 
     if (mode === 'local' && activeNotePath) {
       const activeNodeId = graphData.nodes.find(n => n.path === activeNotePath)?.id;
       if (activeNodeId) {
-        const connectedIds = new Set<string>();
-        connectedIds.add(activeNodeId);
-        for (const edge of graphData.edges) {
-          if (edge.fromNoteId === activeNodeId) connectedIds.add(edge.toNoteId);
-          if (edge.toNoteId === activeNodeId) connectedIds.add(edge.fromNoteId);
-        }
-        filteredNodes = graphData.nodes.filter(n => connectedIds.has(n.id));
-        filteredEdges = graphData.edges.filter(e => connectedIds.has(e.fromNoteId) && connectedIds.has(e.toNoteId));
+        hopDistances = computeHopDistances(activeNodeId, graphData.edges, 2);
+        const includedIds = new Set(hopDistances.keys());
+        filteredNodes = graphData.nodes.filter(n => includedIds.has(n.id));
+        filteredEdges = graphData.edges.filter(
+          e => includedIds.has(e.fromNoteId) && includedIds.has(e.toNoteId)
+        );
       }
     }
 
@@ -92,7 +125,10 @@ export function useD3Graph(
     };
     resize();
 
-    const nodes: SimNode[] = filteredNodes.map(n => ({ ...n }));
+    const nodes: SimNode[] = filteredNodes.map(n => ({
+      ...n,
+      hopDistance: hopDistances?.get(n.id) ?? undefined,
+    }));
     const nodeMap = new Map(nodes.map(n => [n.id, n]));
 
     const links: SimLink[] = filteredEdges
@@ -105,18 +141,54 @@ export function useD3Graph(
     nodesRef.current = nodes;
     linksRef.current = links;
 
-    // Pin active node at center so others orbit around it
-    const activeNode = activeNotePath ? nodes.find(n => n.path === activeNotePath) : null;
-    if (activeNode) {
-      activeNode.fx = currentWidth / 2;
-      activeNode.fy = currentHeight / 2;
-    }
+    const cx = currentWidth / 2;
+    const cy = currentHeight / 2;
+    const minDim = Math.min(currentWidth, currentHeight);
 
-    const simulation = d3.forceSimulation(nodes)
-      .force('link', d3.forceLink<SimNode, SimLink>(links).id(d => d.id).distance(cfg.simulation.linkDistance))
-      .force('charge', d3.forceManyBody().strength(cfg.simulation.chargeStrength))
-      .force('center', d3.forceCenter(currentWidth / 2, currentHeight / 2))
-      .force('collision', d3.forceCollide().radius(cfg.simulation.collisionRadius));
+    // Build simulation based on mode
+    const simulation = d3.forceSimulation(nodes);
+
+    if (mode === 'local' && activeNotePath) {
+      const localCfg = cfg.simulation.local;
+      const activeNode = nodes.find(n => n.path === activeNotePath);
+
+      // Pin active node at center
+      if (activeNode) {
+        activeNode.fx = cx;
+        activeNode.fy = cy;
+      }
+
+      simulation
+        .force('link', d3.forceLink<SimNode, SimLink>(links).id(d => d.id).distance(localCfg.linkDistance))
+        .force('charge', d3.forceManyBody().strength(localCfg.chargeStrength))
+        .force('collision', d3.forceCollide().radius(localCfg.collisionRadius))
+        .force('radial', d3.forceRadial<SimNode>(
+          (d) => {
+            if (d.hopDistance === 0) return 0;
+            if (d.hopDistance === 1) return minDim * localCfg.ring1Ratio;
+            return minDim * localCfg.ring2Ratio;
+          },
+          cx,
+          cy
+        ).strength(localCfg.radialStrength));
+    } else {
+      // Global (full) mode
+      const globalCfg = cfg.simulation.global;
+      const activeNode = activeNotePath ? nodes.find(n => n.path === activeNotePath) : null;
+
+      simulation
+        .force('link', d3.forceLink<SimNode, SimLink>(links).id(d => d.id).distance(globalCfg.linkDistance))
+        .force('charge', d3.forceManyBody().strength(globalCfg.chargeStrength))
+        .force('center', d3.forceCenter(cx, cy))
+        .force('collision', d3.forceCollide().radius(globalCfg.collisionRadius));
+
+      // Soft radial pull for active node toward center
+      if (activeNode) {
+        simulation.force('activeRadial', d3.forceRadial<SimNode>(
+          0, cx, cy
+        ).strength((d) => d.path === activeNotePath ? globalCfg.activeRadialStrength : 0));
+      }
+    }
 
     simulationRef.current = simulation;
 
@@ -155,7 +227,6 @@ export function useD3Graph(
         const radius = isActive ? cfg.node.activeRadius : isHovered ? cfg.node.hoveredRadius : cfg.node.defaultRadius;
 
         if (isStarred && !isActive) {
-          // Draw star shape for starred nodes
           const r = isHovered ? cfg.node.starHoveredRadius : cfg.node.starDefaultRadius;
           const innerR = r * cfg.node.starInnerRadiusRatio;
           ctx.beginPath();
@@ -174,7 +245,6 @@ export function useD3Graph(
           ctx.lineWidth = 1;
           ctx.stroke();
         } else {
-          // Normal circle node
           ctx.beginPath();
           ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
           ctx.fillStyle = isActive
@@ -214,7 +284,7 @@ export function useD3Graph(
 
     simulation.on('tick', draw);
 
-    // Reset zoom to identity so the pinned center node is visible
+    // Reset zoom to identity
     transformRef.current = d3.zoomIdentity;
 
     // Zoom + pan
@@ -251,7 +321,7 @@ export function useD3Graph(
       return null;
     }
 
-    // Hover detection
+    // Hover
     const handleMouseMove = (e: MouseEvent) => {
       const rect = canvas.getBoundingClientRect();
       const node = getNodeAt(e.clientX - rect.left, e.clientY - rect.top);
@@ -260,14 +330,14 @@ export function useD3Graph(
       draw();
     };
 
-    // Click detection
+    // Click
     const handleMouseClick = (e: MouseEvent) => {
       const rect = canvas.getBoundingClientRect();
       const node = getNodeAt(e.clientX - rect.left, e.clientY - rect.top);
       if (node) handleNodeClick(node);
     };
 
-    // Drag behavior
+    // Drag
     let dragNode: SimNode | null = null;
 
     const handleMouseDown = (e: MouseEvent) => {
@@ -276,7 +346,6 @@ export function useD3Graph(
       if (node) {
         dragNode = node;
         simulation.alphaTarget(cfg.simulation.dragAlphaTarget).restart();
-        // Prevent zoom while dragging
         d3Canvas.on('.zoom', null);
       }
     };
@@ -291,8 +360,11 @@ export function useD3Graph(
 
     const handleMouseUp = () => {
       if (dragNode) {
-        dragNode.fx = null;
-        dragNode.fy = null;
+        // Don't unpin active node in local mode
+        if (!(mode === 'local' && dragNode.path === activeNotePath)) {
+          dragNode.fx = null;
+          dragNode.fy = null;
+        }
         dragNode = null;
         simulation.alphaTarget(0);
         d3Canvas.call(zoom);
@@ -307,12 +379,28 @@ export function useD3Graph(
 
     const resizeObserver = new ResizeObserver(() => {
       resize();
-      // Re-center active node and simulation after resize
-      if (activeNode) {
-        activeNode.fx = currentWidth / 2;
-        activeNode.fy = currentHeight / 2;
+      const newCx = currentWidth / 2;
+      const newCy = currentHeight / 2;
+      const newMinDim = Math.min(currentWidth, currentHeight);
+
+      if (mode === 'local' && activeNotePath) {
+        const activeNode = nodes.find(n => n.path === activeNotePath);
+        if (activeNode) {
+          activeNode.fx = newCx;
+          activeNode.fy = newCy;
+        }
+        simulation.force('radial', d3.forceRadial<SimNode>(
+          (d) => {
+            if (d.hopDistance === 0) return 0;
+            if (d.hopDistance === 1) return newMinDim * cfg.simulation.local.ring1Ratio;
+            return newMinDim * cfg.simulation.local.ring2Ratio;
+          },
+          newCx,
+          newCy
+        ).strength(cfg.simulation.local.radialStrength));
+      } else {
+        simulation.force('center', d3.forceCenter(newCx, newCy));
       }
-      simulation.force('center', d3.forceCenter(currentWidth / 2, currentHeight / 2));
       simulation.alpha(cfg.simulation.resizeAlpha).restart();
     });
     if (canvas.parentElement) resizeObserver.observe(canvas.parentElement);
