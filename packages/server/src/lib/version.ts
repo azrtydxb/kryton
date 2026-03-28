@@ -14,10 +14,16 @@ function getVersion(): string {
 }
 
 function getCommit(): string {
+  // Try git first (works in dev / source builds)
   try {
     return execSync("git rev-parse --short HEAD", { encoding: "utf-8" }).trim();
   } catch {
-    return "unknown";
+    // Fall back to build-time commit file (Docker)
+    try {
+      return readFileSync("/COMMIT_SHA", "utf-8").trim();
+    } catch {
+      return "unknown";
+    }
   }
 }
 

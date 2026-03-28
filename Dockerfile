@@ -5,6 +5,7 @@ COPY packages/client/package*.json packages/client/
 COPY packages/server/package*.json packages/server/
 RUN npm install
 COPY . .
+RUN git rev-parse --short HEAD > /tmp/COMMIT_SHA || echo "unknown" > /tmp/COMMIT_SHA
 RUN npx prisma generate --schema=packages/server/prisma/schema.prisma
 RUN npm run build
 # tsc with moduleResolution:"bundler" emits extensionless relative imports,
@@ -23,6 +24,7 @@ RUN mkdir -p /notes /data && chown -R app:app /app /notes /data
 COPY --chown=app:app packages/server/prisma.config.mjs ./prisma.config.mjs
 COPY --chown=app:app packages/server/scripts/migrate.mjs ./scripts/migrate.mjs
 COPY --from=builder /app/package.json /package.json
+COPY --from=builder /tmp/COMMIT_SHA /COMMIT_SHA
 COPY --chown=app:app entrypoint.sh ./entrypoint.sh
 USER app
 ENV PORT=3000
