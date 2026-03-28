@@ -161,6 +161,7 @@ model NoteShare {
   sharedWith       User     @relation("sharedWith", fields: [sharedWithUserId], references: [id], onDelete: Cascade)
 
   @@unique([ownerUserId, path, sharedWithUserId])
+  @@index([sharedWithUserId])
 }
 
 model AccessRequest {

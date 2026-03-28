@@ -370,9 +370,11 @@ export function useD3Graph(
     const handleMouseMove = (e: MouseEvent) => {
       const rect = canvas.getBoundingClientRect();
       const node = getNodeAt(e.clientX - rect.left, e.clientY - rect.top);
-      hoveredNodeRef.current = node;
-      canvas.style.cursor = node ? 'pointer' : 'default';
-      draw();
+      if (node !== hoveredNodeRef.current) {
+        hoveredNodeRef.current = node;
+        canvas.style.cursor = node ? 'pointer' : 'default';
+        draw();
+      }
     };
 
     // Click

@@ -398,12 +398,12 @@ export async function getNotesByTag(
   tag: string,
   userId: string
 ): Promise<{ notePath: string; title: string }[]> {
-  const allNotes = await prisma.searchIndex.findMany({
-    where: { userId },
+  const candidates = await prisma.searchIndex.findMany({
+    where: { userId, tags: { contains: tag } },
     select: { notePath: true, title: true, tags: true },
   });
 
-  return allNotes
+  return candidates
     .filter((note) => parseTags(note.tags).includes(tag))
     .map((note) => ({ notePath: note.notePath, title: note.title }));
 }

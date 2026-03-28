@@ -231,9 +231,27 @@ export async function renameNote(
 export async function indexUserNotes(userNotesDir: string, userId: string): Promise<void> {
   const tree = await scanDirectory(userNotesDir);
 
-  async function processNodes(nodes: FileTreeNode[]): Promise<void> {
+  // Flatten tree to list of file nodes
+  function collectFiles(nodes: FileTreeNode[]): FileTreeNode[] {
+    const files: FileTreeNode[] = [];
     for (const node of nodes) {
       if (node.type === "file") {
+        files.push(node);
+      } else if (node.children) {
+        files.push(...collectFiles(node.children));
+      }
+    }
+    return files;
+  }
+
+  const files = collectFiles(tree);
+
+  // Process in batches of 10 for bounded concurrency
+  const BATCH_SIZE = 10;
+  for (let i = 0; i < files.length; i += BATCH_SIZE) {
+    const batch = files.slice(i, i + BATCH_SIZE);
+    await Promise.all(
+      batch.map(async (node) => {
         try {
           const fullPath = path.join(userNotesDir, node.path);
           const content = await fs.readFile(fullPath, "utf-8");
@@ -242,11 +260,7 @@ export async function indexUserNotes(userNotesDir: string, userId: string): Prom
         } catch (err) {
           log.error(`Failed to index ${node.path}:`, err);
         }
-      } else if (node.children) {
-        await processNodes(node.children);
-      }
-    }
+      })
+    );
   }
-
-  await processNodes(tree);
 }
