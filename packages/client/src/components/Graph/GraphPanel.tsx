@@ -97,43 +97,46 @@ export function GraphPanel({ graphData, loading, activeNotePath, onNoteSelect, s
       {/* Full-screen overlay */}
       {expanded && createPortal(
         <div
-          className="fixed inset-0 bg-black/80 flex flex-col"
-          style={{ zIndex: 99998 }}
+          className="fixed inset-0 flex items-center justify-center p-6"
+          style={{ zIndex: 99998, backgroundColor: 'rgba(0, 0, 0, 0.7)' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setExpanded(false); }}
         >
-          <div className="flex items-center justify-between px-4 py-3 bg-surface-900 border-b border-gray-700/50">
-            <div className="flex items-center gap-2">
-              <Network size={16} className="text-violet-400" />
-              <span className="text-sm font-semibold text-gray-200">Knowledge Graph</span>
+          <div className="w-full h-full max-w-[1400px] max-h-[900px] flex flex-col rounded-xl border border-gray-700/50 bg-surface-950 shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700/50 bg-surface-900 rounded-t-xl">
+              <div className="flex items-center gap-2">
+                <Network size={16} className="text-violet-400" />
+                <span className="text-sm font-semibold text-gray-200">Knowledge Graph</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => expandedRecenterRef.current?.()}
+                  className="p-1.5 text-gray-400 hover:text-gray-200 rounded transition-colors"
+                  aria-label="Center graph"
+                  title="Center graph"
+                >
+                  <Crosshair size={16} />
+                </button>
+                <button
+                  onClick={() => setExpanded(false)}
+                  className="p-1.5 text-gray-400 hover:text-gray-200 rounded transition-colors"
+                  aria-label="Close overlay"
+                  title="Close overlay"
+                >
+                  <Minimize2 size={16} />
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => expandedRecenterRef.current?.()}
-                className="p-1.5 text-gray-400 hover:text-gray-200 rounded transition-colors"
-                aria-label="Center graph"
-                title="Center graph"
-              >
-                <Crosshair size={16} />
-              </button>
-              <button
-                onClick={() => setExpanded(false)}
-                className="p-1.5 text-gray-400 hover:text-gray-200 rounded transition-colors"
-                aria-label="Close overlay"
-                title="Close overlay"
-              >
-                <Minimize2 size={16} />
-              </button>
+            <div className="flex-1 bg-surface-950">
+              <GraphView
+                graphData={graphData}
+                loading={loading}
+                activeNotePath={activeNotePath}
+                mode="full"
+                onNoteSelect={handleOverlayNoteSelect}
+                recenterRef={expandedRecenterRef}
+                starredPaths={starredPaths}
+              />
             </div>
-          </div>
-          <div className="flex-1">
-            <GraphView
-              graphData={graphData}
-              loading={loading}
-              activeNotePath={activeNotePath}
-              mode="full"
-              onNoteSelect={handleOverlayNoteSelect}
-              recenterRef={expandedRecenterRef}
-              starredPaths={starredPaths}
-            />
           </div>
         </div>,
         document.body

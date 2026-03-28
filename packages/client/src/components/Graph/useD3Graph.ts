@@ -145,8 +145,10 @@ export function useD3Graph(
     const cy = currentHeight / 2;
     const minDim = Math.min(currentWidth, currentHeight);
 
-    // Build simulation based on mode
-    const simulation = d3.forceSimulation(nodes);
+    // Build simulation based on mode — slow alpha decay for smooth settling
+    const simulation = d3.forceSimulation(nodes)
+      .alphaDecay(cfg.simulation.alphaDecay)
+      .velocityDecay(cfg.simulation.velocityDecay);
 
     if (mode === 'local' && activeNotePath) {
       const localCfg = cfg.simulation.local;

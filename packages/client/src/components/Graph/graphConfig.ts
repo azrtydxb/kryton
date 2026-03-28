@@ -5,25 +5,28 @@ export const GRAPH_CONFIG = {
       linkDistance: 150,
       chargeStrength: -400,
       collisionRadius: 40,
-      activeRadialStrength: 0.1, // soft pull toward center
+      activeRadialStrength: 0.08,
     },
     // Local mode (concentric rings)
     local: {
       linkDistance: 80,
-      chargeStrength: -300,
+      chargeStrength: -250,
       collisionRadius: 35,
-      ring1Ratio: 0.3, // inner ring at 30% of min(width,height)
-      ring2Ratio: 0.6, // outer ring at 60% of min(width,height)
-      radialStrength: 0.8, // how tightly nodes stick to their ring
+      ring1Ratio: 0.28,
+      ring2Ratio: 0.48,
+      radialStrength: 0.6,
     },
-    dragAlphaTarget: 0.3,
-    resizeAlpha: 0.3,
-    transitionAlpha: 0.5, // alpha reheat on mode switch
+    // Shared physics tuning
+    alphaDecay: 0.008,     // much slower cooldown (default 0.0228) — smooth settling
+    velocityDecay: 0.4,    // more damping (default 0.4) — less jittery
+    dragAlphaTarget: 0.1,  // gentler drag reheat
+    resizeAlpha: 0.2,
+    transitionAlpha: 0.4,
   },
   zoom: {
     scaleMin: 0.2,
     scaleMax: 5,
-    recenterDuration: 300,
+    recenterDuration: 500,
   },
   node: {
     activeRadius: 10,
