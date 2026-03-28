@@ -1,10 +1,24 @@
 export const GRAPH_CONFIG = {
   simulation: {
-    linkDistance: 100,
-    chargeStrength: -200,
-    collisionRadius: 30,
+    // Global mode (tuned force-directed)
+    global: {
+      linkDistance: 150,
+      chargeStrength: -400,
+      collisionRadius: 40,
+      activeRadialStrength: 0.1, // soft pull toward center
+    },
+    // Local mode (concentric rings)
+    local: {
+      linkDistance: 80,
+      chargeStrength: -300,
+      collisionRadius: 35,
+      ring1Ratio: 0.3, // inner ring at 30% of min(width,height)
+      ring2Ratio: 0.6, // outer ring at 60% of min(width,height)
+      radialStrength: 0.8, // how tightly nodes stick to their ring
+    },
     dragAlphaTarget: 0.3,
     resizeAlpha: 0.3,
+    transitionAlpha: 0.5, // alpha reheat on mode switch
   },
   zoom: {
     scaleMin: 0.2,

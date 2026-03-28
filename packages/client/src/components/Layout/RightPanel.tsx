@@ -26,7 +26,7 @@ export function RightPanel({
 }: RightPanelProps) {
   return (
     <>
-      <div className="hidden md:block">
+      <div className="hidden md:flex self-stretch">
         <ResizeHandle direction="horizontal" onResize={onRightPanelResize} />
       </div>
       <aside
