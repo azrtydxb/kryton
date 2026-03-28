@@ -20,9 +20,20 @@
     "typecheck": "npm run typecheck --workspace=packages/server && npm run typecheck --workspace=packages/client",
     "test": "npm run test --workspace=packages/server --workspace=packages/client",
     "test:server": "npm run test --workspace=packages/server",
-    "test:client": "npm run test --workspace=packages/client"
+    "test:client": "npm run test --workspace=packages/client",
+    "prepare": "husky"
   },
   "dependencies": {
     "react": "19.2.4"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^20.5.0",
+    "@commitlint/config-conventional": "^20.5.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0"
+  },
+  "lint-staged": {
+    "packages/client/src/**/*.{ts,tsx}": "eslint --fix",
+    "packages/server/src/**/*.ts": "eslint --fix"
   }
 }
