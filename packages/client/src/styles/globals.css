@@ -50,20 +50,21 @@
   }
 }
 
-@layer components {
-  .btn {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors duration-150;
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-950;
-  }
-  .btn-primary {
-    @apply btn bg-violet-500 text-white hover:bg-violet-600 active:bg-violet-700;
-  }
-  .btn-ghost {
-    @apply btn text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 active:bg-gray-200 dark:active:bg-gray-700;
-  }
-  .btn-danger {
-    @apply btn text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 active:bg-red-100 dark:active:bg-red-900/30;
-  }
+@utility btn {
+  @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors duration-150;
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-950;
+}
+
+@utility btn-primary {
+  @apply btn bg-violet-500 text-white hover:bg-violet-600 active:bg-violet-700;
+}
+
+@utility btn-ghost {
+  @apply btn text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 active:bg-gray-200 dark:active:bg-gray-700;
+}
+
+@utility btn-danger {
+  @apply btn text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 active:bg-red-100 dark:active:bg-red-900/30;
 }
 
 /* CodeMirror overrides for seamless look */

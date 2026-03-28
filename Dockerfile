@@ -5,7 +5,7 @@ COPY packages/client/package*.json packages/client/
 COPY packages/server/package*.json packages/server/
 RUN npm install
 COPY . .
-RUN npx prisma generate
+RUN npx prisma generate --schema=packages/server/prisma/schema.prisma
 RUN npm run build
 # tsc with moduleResolution:"bundler" emits extensionless relative imports,
 # but Node ESM requires .js extensions. Patch all compiled .js files.

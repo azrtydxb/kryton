@@ -8,6 +8,8 @@ pgdata/
 .DS_Store
 .superpowers/
 .worktrees/
+.claude/
+.ui-design/
 *.tsbuildinfo
 
 # Installed plugins (downloaded from registry at runtime)
