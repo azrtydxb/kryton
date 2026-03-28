@@ -1,11 +1,45 @@
 import React, { useCallback } from "react";
-import { StyleSheet } from "react-native";
+import { Linking, StyleSheet } from "react-native";
 import WebView, { WebViewMessageEvent } from "react-native-webview";
+import type { ShouldStartLoadRequest } from "react-native-webview/lib/WebViewTypes";
 import { useRouter } from "expo-router";
+import { getDatabase } from "../db";
 
 interface PreviewBridgeProps {
   content: string;
   darkMode: boolean;
+}
+
+/**
+ * Resolve a wiki-link target (e.g. "Welcome", "Projects/Mnemo Roadmap") to an
+ * actual note path in the local SQLite database. Uses the same fuzzy matching
+ * as the graph view and web client: tries exact match, with/without .md suffix,
+ * and suffix matching for nested paths. Case-insensitive.
+ */
+function resolveNoteLink(target: string): string | null {
+  const db = getDatabase();
+  const allPaths = db
+    .getAllSync<{ path: string }>(
+      "SELECT path FROM notes WHERE _status != 'deleted'"
+    )
+    .map((r) => r.path);
+
+  const targetMd = target.endsWith(".md") ? target : `${target}.md`;
+  const targetLower = target.toLowerCase();
+  const targetMdLower = targetMd.toLowerCase();
+
+  for (const p of allPaths) {
+    const pLower = p.toLowerCase();
+    if (
+      pLower === targetMdLower ||
+      pLower === targetLower ||
+      pLower.endsWith(`/${targetMdLower}`) ||
+      pLower.endsWith(`/${targetLower}`)
+    ) {
+      return p;
+    }
+  }
+  return null;
 }
 
 function escapeHtml(str: string): string {
@@ -202,17 +236,45 @@ function buildPreviewHTML(content: string, darkMode: boolean): string {
 <body>
 <div class="content">${body}</div>
 <script>
-  document.querySelectorAll('a.wikilink').forEach(function(link) {
-    link.addEventListener('click', function(e) {
-      e.preventDefault();
-      var target = link.getAttribute('data-target');
+  // Intercept ALL link clicks — wiki-links, markdown links, and any other anchors
+  document.addEventListener('click', function(e) {
+    var link = e.target.closest ? e.target.closest('a') : null;
+    if (!link) return;
+    e.preventDefault();
+
+    // Wiki-links have data-target
+    var wikiTarget = link.getAttribute('data-target');
+    if (wikiTarget) {
       if (window.ReactNativeWebView) {
         window.ReactNativeWebView.postMessage(JSON.stringify({
           type: 'wikilink',
-          target: target
+          target: wikiTarget
         }));
       }
-    });
+      return;
+    }
+
+    // Regular links — check if external URL or internal note reference
+    var href = link.getAttribute('href');
+    if (!href || href === '#') return;
+
+    if (/^https?:\/\//i.test(href)) {
+      // External URL — open in system browser
+      if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'external-link',
+          url: href
+        }));
+      }
+    } else {
+      // Treat as internal note link
+      if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'wikilink',
+          target: href.replace(/^\\//, '')
+        }));
+      }
+    }
   });
 </script>
 </body>
@@ -227,9 +289,13 @@ export default function PreviewBridge({ content, darkMode }: PreviewBridgeProps)
       try {
         const data = JSON.parse(event.nativeEvent.data);
         if (data.type === "wikilink" && data.target) {
-          // Navigate to the linked note; encode path segments
-          const encoded = encodeURIComponent(data.target);
-          router.push(`/(app)/(tabs)/note/${encoded}` as never);
+          const resolved = resolveNoteLink(data.target);
+          if (resolved) {
+            const encoded = encodeURIComponent(resolved);
+            router.push(`/(app)/(tabs)/note/${encoded}` as never);
+          }
+        } else if (data.type === "external-link" && data.url) {
+          Linking.openURL(data.url);
         }
       } catch {
         // ignore
@@ -238,11 +304,21 @@ export default function PreviewBridge({ content, darkMode }: PreviewBridgeProps)
     [router]
   );
 
+  // Block the WebView from navigating away from the inline HTML
+  const handleNavRequest = useCallback((event: ShouldStartLoadRequest) => {
+    // Allow the initial HTML load, block everything else
+    if (event.url === "about:blank" || event.url.startsWith("data:")) {
+      return true;
+    }
+    return false;
+  }, []);
+
   return (
     <WebView
       source={{ html: buildPreviewHTML(content, darkMode) }}
       style={styles.webview}
       onMessage={handleMessage}
+      onShouldStartLoadWithRequest={handleNavRequest}
       javaScriptEnabled={true}
       scrollEnabled={true}
       showsVerticalScrollIndicator={false}

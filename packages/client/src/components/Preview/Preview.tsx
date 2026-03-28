@@ -151,6 +151,8 @@ export function Preview({ content, onLinkClick, allNotes, onCreateNote, notePath
 
   const handleClick = useCallback((e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
+
+    // Check for wiki-links first (have data-wiki-target attribute)
     const wikiTarget = target.closest<HTMLElement>('[data-wiki-target]');
     if (wikiTarget) {
       e.preventDefault();
@@ -162,6 +164,24 @@ export function Preview({ content, onLinkClick, allNotes, onCreateNote, notePath
         } else {
           onLinkClick(noteName);
         }
+      }
+      return;
+    }
+
+    // Intercept any other <a> clicks to prevent browser navigation
+    const anchor = target.closest<HTMLAnchorElement>('a');
+    if (anchor) {
+      const href = anchor.getAttribute('href');
+      if (!href || href === '#') return;
+
+      // Allow external links to open normally
+      if (/^https?:\/\//i.test(href)) return;
+
+      // Treat as internal note link — strip leading slash
+      e.preventDefault();
+      const noteName = decodeURIComponent(href.replace(/^\//, ''));
+      if (noteName) {
+        onLinkClick(noteName);
       }
     }
   }, [onLinkClick, onCreateNote]);
