@@ -34,7 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (email: string, password: string): Promise<{ twoFactorRequired?: boolean }> => {
     const result = await authClient.signIn.email({ email, password });
     if (result.error) {
-      throw new Error(String(result.error.message) || 'Login failed');
+      throw new Error(result.error.message ?? result.error.statusText ?? 'Login failed');
     }
     // better-auth sets twoFactorRedirect on the data when 2FA is required
     const data = result.data as Record<string, unknown> | null | undefined;
@@ -52,7 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ...(inviteCode ? { inviteCode } : {}),
     } as Parameters<typeof authClient.signUp.email>[0]);
     if (result.error) {
-      throw new Error(String(result.error.message) || 'Registration failed');
+      throw new Error(result.error.message ?? result.error.statusText ?? 'Registration failed');
     }
   }, []);
 
