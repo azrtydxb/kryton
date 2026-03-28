@@ -9,12 +9,12 @@ export const GRAPH_CONFIG = {
     },
     // Local mode (concentric rings)
     local: {
-      linkDistance: 80,
-      chargeStrength: -250,
-      collisionRadius: 35,
-      ring1Ratio: 0.28,
-      ring2Ratio: 0.48,
-      radialStrength: 0.6,
+      linkDistance: 60,
+      chargeStrength: -150,
+      collisionRadius: 25,
+      ring1Ratio: 0.3,
+      ring2Ratio: 0.55,
+      radialStrength: 1.2,
     },
     // Shared physics tuning
     alphaDecay: 0.008,     // slower cooldown (default 0.0228) — smooth settling

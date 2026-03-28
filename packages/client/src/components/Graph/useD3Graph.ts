@@ -173,6 +173,27 @@ export function useD3Graph(
       // Pin active node at center
       activeNode.fx = cx;
       activeNode.fy = cy;
+      activeNode.x = cx;
+      activeNode.y = cy;
+
+      // Initialize ring nodes at evenly spaced angles to minimize edge crossings
+      const ring1Nodes = nodes.filter(n => n.hopDistance === 1);
+      const ring2Nodes = nodes.filter(n => n.hopDistance === 2);
+      const r1 = minDim * localCfg.ring1Ratio;
+      const r2 = minDim * localCfg.ring2Ratio;
+
+      ring1Nodes.forEach((n, i) => {
+        const angle = (2 * Math.PI * i) / ring1Nodes.length - Math.PI / 2;
+        n.x = cx + Math.cos(angle) * r1;
+        n.y = cy + Math.sin(angle) * r1;
+      });
+
+      // Place ring 2 nodes near their ring 1 connections
+      ring2Nodes.forEach((n, i) => {
+        const angle = (2 * Math.PI * i) / Math.max(ring2Nodes.length, 1) - Math.PI / 2;
+        n.x = cx + Math.cos(angle) * r2;
+        n.y = cy + Math.sin(angle) * r2;
+      });
 
       simulation
         .force('link', d3.forceLink<SimNode, SimLink>(links).id(d => d.id).distance(localCfg.linkDistance))
@@ -181,8 +202,8 @@ export function useD3Graph(
         .force('radial', d3.forceRadial<SimNode>(
           (d) => {
             if (d.hopDistance === 0) return 0;
-            if (d.hopDistance === 1) return minDim * localCfg.ring1Ratio;
-            return minDim * localCfg.ring2Ratio;
+            if (d.hopDistance === 1) return r1;
+            return r2;
           },
           cx,
           cy
@@ -302,10 +323,33 @@ export function useD3Graph(
     // Reset zoom to identity
     transformRef.current = d3.zoomIdentity;
 
-    // Zoom + pan
+    // Hit-test helper (defined early so zoom filter can use it)
+    function getNodeAt(mx: number, my: number): SimNode | null {
+      const t = transformRef.current;
+      const x = (mx - t.x) / t.k;
+      const y = (my - t.y) / t.k;
+      for (const node of nodes) {
+        if (node.x === undefined || node.y === undefined) continue;
+        const dx = x - node.x;
+        const dy = y - node.y;
+        if (dx * dx + dy * dy < cfg.node.hitTestRadiusSq) return node;
+      }
+      return null;
+    }
+
+    // Zoom + pan — filter out mousedown on nodes so drag works
     const d3Canvas = d3.select(canvas);
     const zoom = d3.zoom<HTMLCanvasElement, unknown>()
       .scaleExtent([cfg.zoom.scaleMin, cfg.zoom.scaleMax])
+      .filter((event) => {
+        // Allow wheel zoom always, but block pan-start on nodes
+        if (event.type === 'mousedown') {
+          const rect = canvas.getBoundingClientRect();
+          const node = getNodeAt(event.clientX - rect.left, event.clientY - rect.top);
+          if (node) return false; // don't start zoom/pan on a node
+        }
+        return true;
+      })
       .on('zoom', (event) => {
         transformRef.current = event.transform;
         draw();
@@ -320,20 +364,6 @@ export function useD3Graph(
         transformRef.current = d3.zoomIdentity;
         d3Canvas.transition().duration(cfg.zoom.recenterDuration).call(zoom.transform, d3.zoomIdentity);
       };
-    }
-
-    // Hit-test helper
-    function getNodeAt(mx: number, my: number): SimNode | null {
-      const t = transformRef.current;
-      const x = (mx - t.x) / t.k;
-      const y = (my - t.y) / t.k;
-      for (const node of nodes) {
-        if (node.x === undefined || node.y === undefined) continue;
-        const dx = x - node.x;
-        const dy = y - node.y;
-        if (dx * dx + dy * dy < cfg.node.hitTestRadiusSq) return node;
-      }
-      return null;
     }
 
     // Hover
