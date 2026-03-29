@@ -2,7 +2,8 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { Network, Crosshair, Maximize2, Minimize2 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { GraphView } from './GraphView';
-import { GraphData } from '../../lib/api';
+import { GraphData, api } from '../../lib/api';
+import type { HoveredNodeInfo } from './useD3Graph';
 
 interface GraphPanelProps {
   graphData: GraphData | null;
@@ -12,11 +13,21 @@ interface GraphPanelProps {
   starredPaths?: Set<string>;
 }
 
+interface TooltipState {
+  x: number;
+  y: number;
+  title: string;
+  preview: string;
+}
+
 export function GraphPanel({ graphData, loading, activeNotePath, onNoteSelect, starredPaths }: GraphPanelProps) {
   const [mode, setMode] = useState<'local' | 'full'>('local');
   const [expanded, setExpanded] = useState(false);
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const recenterRef = useRef<(() => void) | null>(null);
   const expandedRecenterRef = useRef<(() => void) | null>(null);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewCacheRef = useRef<Map<string, string>>(new Map());
 
   const effectiveMode = activeNotePath ? mode : 'full';
 
@@ -24,7 +35,7 @@ export function GraphPanel({ graphData, loading, activeNotePath, onNoteSelect, s
   useEffect(() => {
     if (!expanded) return;
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setExpanded(false);
+      if (e.key === 'Escape') { setExpanded(false); setTooltip(null); }
     };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
@@ -34,7 +45,43 @@ export function GraphPanel({ graphData, loading, activeNotePath, onNoteSelect, s
   const handleOverlayNoteSelect = useCallback((path: string) => {
     onNoteSelect(path);
     setExpanded(false);
+    setTooltip(null);
   }, [onNoteSelect]);
+
+  // Handle hover in overlay — fetch preview after short delay
+  const handleOverlayHover = useCallback((node: HoveredNodeInfo | null) => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+
+    if (!node) {
+      setTooltip(null);
+      return;
+    }
+
+    const cached = previewCacheRef.current.get(node.path);
+    if (cached !== undefined) {
+      setTooltip({ x: node.x, y: node.y, title: node.title, preview: cached });
+      return;
+    }
+
+    // Delay fetch to avoid hammering API on quick mouse passes
+    hoverTimerRef.current = setTimeout(async () => {
+      try {
+        const note = await api.getNote(node.path);
+        // Strip frontmatter and take first 3 non-empty lines
+        const body = note.content.replace(/^---[\s\S]*?---\n*/, '');
+        const lines = body.split('\n').filter(l => l.trim()).slice(0, 3);
+        const preview = lines.join('\n').slice(0, 200);
+        previewCacheRef.current.set(node.path, preview);
+        setTooltip({ x: node.x, y: node.y, title: node.title, preview });
+      } catch {
+        previewCacheRef.current.set(node.path, '');
+        setTooltip(null);
+      }
+    }, 300);
+  }, []);
 
   return (
     <>
@@ -101,7 +148,7 @@ export function GraphPanel({ graphData, loading, activeNotePath, onNoteSelect, s
         <div
           className="fixed inset-0 flex items-center justify-center p-6 backdrop-blur-sm"
           style={{ zIndex: 100000, backgroundColor: 'rgba(0, 0, 0, 0.7)' }}
-          onClick={(e) => { if (e.target === e.currentTarget) setExpanded(false); }}
+          onClick={(e) => { if (e.target === e.currentTarget) { setExpanded(false); setTooltip(null); } }}
         >
           <div
             className="w-full h-full max-w-[1400px] max-h-[900px] flex flex-col rounded-xl border border-gray-700/50 bg-surface-950 shadow-2xl overflow-hidden"
@@ -133,16 +180,37 @@ export function GraphPanel({ graphData, loading, activeNotePath, onNoteSelect, s
                 </button>
               </div>
             </div>
-            <div className="flex-1 bg-surface-950">
+            <div className="flex-1 bg-surface-950 relative">
               <GraphView
                 graphData={graphData}
                 loading={loading}
                 activeNotePath={activeNotePath}
                 mode="full"
                 onNoteSelect={handleOverlayNoteSelect}
+                onNodeHover={handleOverlayHover}
                 recenterRef={expandedRecenterRef}
                 starredPaths={starredPaths}
               />
+              {/* Hover tooltip */}
+              {tooltip && (
+                <div
+                  className="absolute pointer-events-none max-w-[320px] bg-surface-900 border border-gray-700/50 rounded-lg shadow-xl px-4 py-3"
+                  style={{
+                    left: Math.min(tooltip.x + 16, window.innerWidth - 350),
+                    top: Math.max(tooltip.y - 80, 10),
+                    zIndex: 100001,
+                  }}
+                >
+                  <div className="text-sm font-semibold text-violet-400 mb-1 truncate">{tooltip.title}</div>
+                  {tooltip.preview ? (
+                    <div className="text-xs text-gray-400 whitespace-pre-line leading-relaxed line-clamp-3">
+                      {tooltip.preview}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-gray-500 italic">No content</div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>,

@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { Loader2 } from 'lucide-react';
 import { GraphData } from '../../lib/api';
 import { useD3Graph } from './useD3Graph';
+import type { HoveredNodeInfo } from './useD3Graph';
 
 interface GraphViewProps {
   graphData: GraphData | null;
@@ -9,11 +10,12 @@ interface GraphViewProps {
   activeNotePath: string | null;
   mode: 'local' | 'full';
   onNoteSelect: (path: string) => void;
+  onNodeHover?: (node: HoveredNodeInfo | null) => void;
   recenterRef?: React.MutableRefObject<(() => void) | null>;
   starredPaths?: Set<string>;
 }
 
-export function GraphView({ graphData, loading, activeNotePath, mode, onNoteSelect, recenterRef, starredPaths }: GraphViewProps) {
+export function GraphView({ graphData, loading, activeNotePath, mode, onNoteSelect, onNodeHover, recenterRef, starredPaths }: GraphViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useD3Graph(canvasRef, graphData, {
@@ -21,6 +23,7 @@ export function GraphView({ graphData, loading, activeNotePath, mode, onNoteSele
     mode,
     starredPaths,
     onNodeClick: onNoteSelect,
+    onNodeHover,
     recenterRef,
   });
 

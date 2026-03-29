@@ -17,11 +17,19 @@ interface SimLink extends d3.SimulationLinkDatum<SimNode> {
   target: SimNode | string;
 }
 
+export interface HoveredNodeInfo {
+  path: string;
+  title: string;
+  x: number;
+  y: number;
+}
+
 interface UseD3GraphOptions {
   activeNotePath: string | null;
   mode: 'local' | 'full';
   starredPaths?: Set<string>;
   onNodeClick: (path: string) => void;
+  onNodeHover?: (node: HoveredNodeInfo | null) => void;
   recenterRef?: React.MutableRefObject<(() => void) | null>;
 }
 
@@ -72,7 +80,7 @@ export function useD3Graph(
   graphData: GraphData | null,
   options: UseD3GraphOptions,
 ): void {
-  const { activeNotePath, mode, starredPaths, onNodeClick, recenterRef } = options;
+  const { activeNotePath, mode, starredPaths, onNodeClick, onNodeHover, recenterRef } = options;
   const simulationRef = useRef<d3.Simulation<SimNode, SimLink>>(undefined);
   const hoveredNodeRef = useRef<SimNode | null>(null);
   const nodesRef = useRef<SimNode[]>([]);
@@ -374,6 +382,7 @@ export function useD3Graph(
         hoveredNodeRef.current = node;
         canvas.style.cursor = node ? 'pointer' : 'default';
         draw();
+        onNodeHover?.(node ? { path: node.path, title: node.title, x: e.clientX, y: e.clientY } : null);
       }
     };
 
@@ -466,5 +475,5 @@ export function useD3Graph(
       window.removeEventListener('mouseup', handleMouseUp);
       resizeObserver.disconnect();
     };
-  }, [graphData, mode, activeNotePath, handleNodeClick, recenterRef, starredPaths, canvasRef]);
+  }, [graphData, mode, activeNotePath, handleNodeClick, onNodeHover, recenterRef, starredPaths, canvasRef]);
 }
