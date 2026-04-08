@@ -416,11 +416,7 @@ export function useD3Graph(
 
     const handleMouseUp = () => {
       if (dragNode) {
-        // Don't unpin active node in local mode
-        if (!(useLocalLayout && dragNode.path === activeNotePath)) {
-          dragNode.fx = null;
-          dragNode.fy = null;
-        }
+        // Keep node pinned where user dropped it (fx/fy stay set)
         dragNode = null;
         simulation.alphaTarget(0);
         d3Canvas.call(zoom);
