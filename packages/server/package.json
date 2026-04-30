@@ -19,7 +19,8 @@
     "bench:attachments": "tsx scripts/bench/attachments.ts",
     "stress:yjs:converge": "tsx scripts/yjs-stress/two-client-convergence.ts",
     "stress:yjs:reconnect": "tsx scripts/yjs-stress/reconnect-storm.ts",
-    "stress:yjs:rate": "tsx scripts/yjs-stress/op-rate-ceiling.ts"
+    "stress:yjs:rate": "tsx scripts/yjs-stress/op-rate-ceiling.ts",
+    "verify:migration": "tsx scripts/migration-verify.ts"
   },
   "dependencies": {
     "@better-auth/passkey": "^1.5.6",
@@ -46,6 +47,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "fast-check": "^3.23.2",
     "@types/better-sqlite3": "^7.6.13",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
