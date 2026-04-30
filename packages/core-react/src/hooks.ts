@@ -14,25 +14,6 @@ interface ChangeEvent {
   source: string;
 }
 
-/**
- * Build a `subscribe` function that re-renders when the bus emits a "change"
- * event matching the given entityType predicate.
- */
-function useEntitySubscribe(entityType: string | null, ids?: string[]) {
-  const core = useKryton();
-  return useMemo(
-    () =>
-      (cb: () => void): (() => void) =>
-        core.bus.on("change", (e: ChangeEvent) => {
-          if (entityType !== null && e.entityType !== entityType) return;
-          if (ids && !ids.some((id) => e.ids.includes(id))) return;
-          cb();
-        }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [core, entityType, ids?.join(",")],
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Note hooks
 // ---------------------------------------------------------------------------
@@ -121,21 +102,29 @@ export interface SyncStatus {
 
 export function useSyncStatus(): SyncStatus {
   const core = useKryton();
-  const subscribe = useMemo(
-    () =>
-      (cb: () => void): (() => void) =>
-        core.bus.on("sync:complete", () => cb()),
-    [core],
-  );
-  const get = (): SyncStatus => ({
+  const [status, setStatus] = useState<SyncStatus>(() => ({
     lastPullAt:
       parseInt(core.storage?.get?.("last_pull_at", "0") ?? "0", 10) || null,
     lastPushAt:
       parseInt(core.storage?.get?.("last_push_at", "0") ?? "0", 10) || null,
     pending: 0,
     online: true,
-  });
-  return useSyncExternalStore(subscribe, get, get);
+  }));
+  useEffect(() => {
+    return core.bus.on("sync:complete", () => {
+      setStatus({
+        lastPullAt:
+          parseInt(core.storage?.get?.("last_pull_at", "0") ?? "0", 10) ||
+          null,
+        lastPushAt:
+          parseInt(core.storage?.get?.("last_push_at", "0") ?? "0", 10) ||
+          null,
+        pending: 0,
+        online: true,
+      });
+    });
+  }, [core]);
+  return status;
 }
 
 // ---------------------------------------------------------------------------
