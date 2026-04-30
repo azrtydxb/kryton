@@ -13,6 +13,20 @@ const log = createLogger("sync");
 export function createSyncRouter(notesDir: string): Router {
   const router = Router();
 
+  // Deprecation warning: this route group will be removed in v4.5. Clients should
+  // migrate to /api/sync/v2/* (cursor-based, per-row versioning, conflict detection).
+  router.use((req, _res, next) => {
+    const userAgent = req.headers["user-agent"] ?? "unknown";
+    const userId = (req as Request & { user?: { id?: string } }).user?.id ?? "anonymous";
+    log.warn("DEPRECATED endpoint hit; client should migrate to /api/sync/v2", {
+      path: req.path,
+      method: req.method,
+      userId,
+      userAgent: String(userAgent).slice(0, 200),
+    });
+    next();
+  });
+
   const tableChangesSchema = z.object({
     created: z.array(z.record(z.string(), z.unknown())).max(500).optional().default([]),
     updated: z.array(z.record(z.string(), z.unknown())).max(500).optional().default([]),
