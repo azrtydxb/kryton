@@ -21,6 +21,11 @@
     "test": "echo 'no tests yet' && exit 0",
     "typecheck": "tsc --noEmit"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/azrtydxb/kryton.git",
+    "directory": "packages/core"
+  },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com",
     "access": "restricted"
