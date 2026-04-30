@@ -167,7 +167,7 @@ async function onConnection(
         awarenessProtocol.applyAwarenessUpdate(entry.awareness, update, ws);
       }
     } catch (e) {
-      log.warn("Error processing Yjs message", e);
+      log.warn("Error processing Yjs message", { error: e instanceof Error ? e.message : String(e) });
     }
   });
 
@@ -191,7 +191,7 @@ async function onConnection(
   });
 
   ws.on("error", (err) => {
-    log.warn("Yjs WebSocket error", err);
+    log.warn("Yjs WebSocket error", { error: err instanceof Error ? err.message : String(err) });
   });
 }
 
@@ -231,7 +231,7 @@ export function setupYjsWss(
     try {
       authResult = await opts.authenticate(token);
     } catch (e) {
-      log.warn("Yjs auth error", e);
+      log.warn("Yjs auth error", { error: e instanceof Error ? e.message : String(e) });
     }
 
     if (!authResult) {

@@ -67,7 +67,7 @@ async function ensureBackfilled(userId: string, notesRoot: string): Promise<void
     await backfillTags(userId);
   } catch (err) {
     // Non-fatal: log and continue
-    log.warn("backfill failed for user", userId, err);
+    log.warn("backfill failed for user", { userId, error: err instanceof Error ? err.message : String(err) });
     backfilledUsers.delete(userId); // Allow retry on next request
   }
 }

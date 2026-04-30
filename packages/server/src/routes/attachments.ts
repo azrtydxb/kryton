@@ -49,7 +49,7 @@ export function createAttachmentsRouter(storageRoot: string): Router {
   router.get("/:id", async (req: Request, res: Response) => {
     try {
       const user = requireUser(req);
-      const att = await prisma.attachment.findUnique({ where: { id: req.params.id } });
+      const att = await prisma.attachment.findUnique({ where: { id: req.params.id as string } });
       if (!att || att.userId !== user.id) {
         res.status(404).end();
         return;
