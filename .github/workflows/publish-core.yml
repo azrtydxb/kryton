@@ -22,14 +22,16 @@ jobs:
         run: npm ci
       - name: Verify versions match
         run: node scripts/verify-versions.js
+      - name: Build core (must precede core-react typecheck so its imports resolve)
+        run: npm run build --workspace=packages/core
       - name: Typecheck core packages
         run: |
           npm run typecheck --workspace=packages/core
           npm run typecheck --workspace=packages/core-react
       - name: Test core packages
         run: npm run test:core
-      - name: Build core packages
-        run: npm run build:core
+      - name: Build core-react
+        run: npm run build --workspace=packages/core-react
       - name: Publish to GitHub Packages
         run: node scripts/publish-core.js
         env:
