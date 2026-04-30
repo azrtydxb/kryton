@@ -53,7 +53,7 @@ export default function ServerScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.logoContainer}>
-          <Text style={styles.logoText}>Mnemo</Text>
+          <Text style={styles.logoText}>Kryton</Text>
           <Text style={styles.tagline}>Your personal knowledge base</Text>
         </View>
 
@@ -66,7 +66,7 @@ export default function ServerScreen() {
               setUrl(text);
               setError(null);
             }}
-            placeholder="https://mnemo.example.com"
+            placeholder="https://kryton.example.com"
             placeholderTextColor={colors.textMuted}
             autoCapitalize="none"
             autoCorrect={false}

@@ -5,9 +5,9 @@ const options: swaggerJsdoc.Options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'Mnemo API',
+      title: 'Kryton API',
       version: '3.2.0',
-      description: 'API for Mnemo - a personal knowledge base with wiki-style linking, graph visualization, and markdown editing.',
+      description: 'API for Kryton - a personal knowledge base with wiki-style linking, graph visualization, and markdown editing.',
     },
     servers: [
       { url: '/api', description: 'API server' },
@@ -23,7 +23,7 @@ const options: swaggerJsdoc.Options = {
         bearerAuth: {
           type: 'http',
           scheme: 'bearer',
-          description: 'API key with mnemo_ prefix (e.g. mnemo_a1b2c3d4...)',
+          description: 'API key with kryton_ prefix (e.g. kryton_a1b2c3d4...)',
         },
       },
     },

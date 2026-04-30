@@ -11,8 +11,8 @@ function getCommit(): string {
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: config.name ?? "Mnemo",
-  slug: config.slug ?? "mnemo",
+  name: config.name ?? "Kryton",
+  slug: config.slug ?? "kryton",
   extra: {
     ...config.extra,
     commit: getCommit(),

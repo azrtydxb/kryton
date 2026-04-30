@@ -55,10 +55,10 @@ import { requireUser } from "../middleware/auth.js";
  *                 properties:
  *                   path:
  *                     type: string
- *                     example: Projects/Mnemo Roadmap.md
+ *                     example: Projects/Kryton Roadmap.md
  *                   title:
  *                     type: string
- *                     example: Mnemo Roadmap
+ *                     example: Kryton Roadmap
  *       500:
  *         description: Failed to fetch notes by tag
  */

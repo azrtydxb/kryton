@@ -5,7 +5,7 @@
 
 ## Problem
 
-Mnemo has notes (markdown files) and a graph view (auto-derived from wikilinks). It does not have a way to lay notes out spatially, draw freeform arrows, or sketch structure visually — the kind of work users do in Obsidian Canvas, Heptabase, or Kinopio.
+Kryton has notes (markdown files) and a graph view (auto-derived from wikilinks). It does not have a way to lay notes out spatially, draw freeform arrows, or sketch structure visually — the kind of work users do in Obsidian Canvas, Heptabase, or Kinopio.
 
 Adding a canvas-style surface as a separate sub-product would fragment the knowledge base: parallel storage, parallel sharing, parallel search, parallel mobile story. The goal is to integrate canvas seamlessly so canvases are first-class artifacts that share every piece of infrastructure with notes — no duplication of file model, sharing, search, or sync.
 
@@ -13,7 +13,7 @@ Adding a canvas-style surface as a separate sub-product would fragment the knowl
 
 ### Canvas as a File Type
 
-A canvas is a `.canvas` file living alongside `.md` files in the per-user notes tree. Format conforms to the [JSON Canvas 1.0 spec](https://jsoncanvas.org) for full Obsidian interoperability — a canvas authored in Mnemo opens in Obsidian and vice versa with no data loss.
+A canvas is a `.canvas` file living alongside `.md` files in the per-user notes tree. Format conforms to the [JSON Canvas 1.0 spec](https://jsoncanvas.org) for full Obsidian interoperability — a canvas authored in Kryton opens in Obsidian and vice versa with no data loss.
 
 This means canvas inherits the entire file abstraction:
 
@@ -91,7 +91,7 @@ This requires extracting the existing markdown editor into a reusable component 
 
 Canvas concurrency matches note concurrency: last-write-wins on the file. Two users dragging different cards on the same shared canvas simultaneously will result in whoever saves last winning; the other's positional edits are lost.
 
-This is a known limitation, accepted for v1. Realtime collaborative editing (CRDT-based) is filed as [#87](https://github.com/azrtydxb/mnemo/issues/87) and should land for notes and canvases together.
+This is a known limitation, accepted for v1. Realtime collaborative editing (CRDT-based) is filed as [#87](https://github.com/azrtydxb/kryton/issues/87) and should land for notes and canvases together.
 
 ### Plugin Extensibility
 
@@ -150,7 +150,7 @@ Each canvas indexes as one `SearchIndex` entry, scoped by user. Indexed content:
 - All `text` node markdown content concatenated
 - Titles (not bodies) of all note-embed nodes — bodies are already indexed under the notes themselves
 
-A search hit on a canvas opens the canvas as a whole; per-card deep-linking is deferred to [#89](https://github.com/azrtydxb/mnemo/issues/89).
+A search hit on a canvas opens the canvas as a whole; per-card deep-linking is deferred to [#89](https://github.com/azrtydxb/kryton/issues/89).
 
 Reindexing hooks into the same path used for note saves (extension to `writeNote` / equivalent for `.canvas` files).
 
@@ -165,7 +165,7 @@ V1 is view-only on mobile. Mobile clients can:
 - Create an empty canvas at a path (file-level operation)
 - Delete a canvas (file-level operation)
 
-Mobile cannot drag, resize, create non-empty canvases, or edit cards in place. The desktop-only authoring experience is intentional — see [#88](https://github.com/azrtydxb/mnemo/issues/88) for tablet full-edit parity.
+Mobile cannot drag, resize, create non-empty canvases, or edit cards in place. The desktop-only authoring experience is intentional — see [#88](https://github.com/azrtydxb/kryton/issues/88) for tablet full-edit parity.
 
 ### Sharing
 
@@ -212,9 +212,9 @@ Canvases get history snapshots on save through the existing `historyService.save
 
 ## Deferred (filed)
 
-- [#87](https://github.com/azrtydxb/mnemo/issues/87) — Realtime collaborative editing (CRDT) for notes and canvases
-- [#88](https://github.com/azrtydxb/mnemo/issues/88) — Full canvas editing parity on tablets and large mobile screens
-- [#89](https://github.com/azrtydxb/mnemo/issues/89) — Per-card search indexing with deep-link to node
+- [#87](https://github.com/azrtydxb/kryton/issues/87) — Realtime collaborative editing (CRDT) for notes and canvases
+- [#88](https://github.com/azrtydxb/kryton/issues/88) — Full canvas editing parity on tablets and large mobile screens
+- [#89](https://github.com/azrtydxb/kryton/issues/89) — Per-card search indexing with deep-link to node
 
 ## Open Items for Implementation Plan
 

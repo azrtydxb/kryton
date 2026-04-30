@@ -1,7 +1,7 @@
-# Mnemo - Vim Keybindings & Keyboard-First Interface
+# Kryton - Vim Keybindings & Keyboard-First Interface
 
 ## Overview
-Transform Mnemo into a keyboard-first note-taking app with Vim-style navigation and editing.
+Transform Kryton into a keyboard-first note-taking app with Vim-style navigation and editing.
 
 ## 1. Vim Keybindings in Editor
 
@@ -103,7 +103,7 @@ H1 heading
 
 ### Example
 ```
-Projects/Mnemo Roadmap.md | -- INSERT -- | 42:18 | 1,234 words
+Projects/Kryton Roadmap.md | -- INSERT -- | 42:18 | 1,234 words
 ```
 
 ## 5. Implementation Notes

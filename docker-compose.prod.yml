@@ -1,13 +1,13 @@
 services:
-  mnemo:
-    image: ghcr.io/piwi3910/mnemo/mnemo:latest
+  kryton:
+    image: ghcr.io/piwi3910/kryton/kryton:latest
     ports:
       - "3100:3000"
     volumes:
       - ./notes:/notes
-      - mnemo-data:/data
+      - kryton-data:/data
     environment:
-      - DATABASE_URL=file:/data/mnemo.db
+      - DATABASE_URL=file:/data/kryton.db
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET}
       - APP_URL=${APP_URL:-http://localhost:3100}
       - BETTER_AUTH_URL=${BETTER_AUTH_URL:-http://localhost:3100}
@@ -15,4 +15,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  mnemo-data:
+  kryton-data:

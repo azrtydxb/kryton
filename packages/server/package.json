@@ -1,5 +1,5 @@
 {
-  "name": "@mnemo/server",
+  "name": "@kryton/server",
   "version": "4.3.2",
   "private": true,
   "type": "module",

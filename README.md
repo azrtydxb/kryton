@@ -1,8 +1,8 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="logos/mnemo_banner_dark.png" />
-    <source media="(prefers-color-scheme: light)" srcset="logos/mnemo_banner_dark.png" />
-    <img src="logos/mnemo_banner_dark.png" alt="Mnemo" width="600" style="border-radius: 12px; background-color: #0d1117; padding: 20px;" />
+    <source media="(prefers-color-scheme: dark)" srcset="logos/kryton_banner_dark.png" />
+    <source media="(prefers-color-scheme: light)" srcset="logos/kryton_banner_dark.png" />
+    <img src="logos/kryton_banner_dark.png" alt="Kryton" width="600" style="border-radius: 12px; background-color: #0d1117; padding: 20px;" />
   </picture>
 </p>
 
@@ -15,20 +15,20 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/azrtydxb/mnemo/actions"><img src="https://github.com/azrtydxb/mnemo/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/azrtydxb/mnemo/releases"><img src="https://img.shields.io/github/v/release/azrtydxb/mnemo" alt="Release"></a>
-  <a href="https://github.com/azrtydxb/mnemo/blob/master/LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License"></a>
+  <a href="https://github.com/azrtydxb/kryton/actions"><img src="https://github.com/azrtydxb/kryton/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/azrtydxb/kryton/releases"><img src="https://img.shields.io/github/v/release/azrtydxb/kryton" alt="Release"></a>
+  <a href="https://github.com/azrtydxb/kryton/blob/master/LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License"></a>
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/hero.png" alt="Mnemo Screenshot" width="800" />
+  <img src="docs/screenshots/hero.png" alt="Kryton Screenshot" width="800" />
 </p>
 
 ---
 
-## Why Mnemo?
+## Why Kryton?
 
-Your notes shouldn't live in a silo. Mnemo is a knowledge base that both humans and AI agents can read, write, and reason over — through the same API, the same notes, the same graph.
+Your notes shouldn't live in a silo. Kryton is a knowledge base that both humans and AI agents can read, write, and reason over — through the same API, the same notes, the same graph.
 
 **For humans:** A full-featured note-taking app with wiki-links, graph view, markdown editor, mobile app, and multi-user sharing.
 
@@ -40,7 +40,7 @@ Your notes shouldn't live in a silo. Mnemo is a knowledge base that both humans 
 
 ## Built-in MCP Server
 
-Mnemo ships with a production-ready MCP server at `/api/mcp`. No sidecar, no proxy, no extra setup — it's part of the app.
+Kryton ships with a production-ready MCP server at `/api/mcp`. No sidecar, no proxy, no extra setup — it's part of the app.
 
 ### What AI Agents Can Do
 
@@ -62,7 +62,7 @@ Mnemo ships with a production-ready MCP server at `/api/mcp`. No sidecar, no pro
 
 ### Connect Your AI Agent
 
-**1. Create an API key** in Mnemo: Account Settings > API Keys > Create (read-write scope)
+**1. Create an API key** in Kryton: Account Settings > API Keys > Create (read-write scope)
 
 **2. Configure your agent:**
 
@@ -74,11 +74,11 @@ Add to your MCP settings (`~/.claude.json` or project `.mcp.json`):
 ```json
 {
   "mcpServers": {
-    "mnemo": {
+    "kryton": {
       "type": "streamable-http",
-      "url": "https://your-mnemo-instance/api/mcp",
+      "url": "https://your-kryton-instance/api/mcp",
       "headers": {
-        "Authorization": "Bearer mnemo_your_key_here"
+        "Authorization": "Bearer kryton_your_key_here"
       }
     }
   }
@@ -92,11 +92,11 @@ Add to your MCP settings (`~/.claude.json` or project `.mcp.json`):
 ```json
 {
   "mcpServers": {
-    "mnemo": {
+    "kryton": {
       "type": "streamable-http",
-      "url": "https://your-mnemo-instance/api/mcp",
+      "url": "https://your-kryton-instance/api/mcp",
       "headers": {
-        "Authorization": "Bearer mnemo_your_key_here"
+        "Authorization": "Bearer kryton_your_key_here"
       }
     }
   }
@@ -110,7 +110,7 @@ Add to your MCP settings (`~/.claude.json` or project `.mcp.json`):
 
 - **Scoped API keys** — read-only or read-write, with optional expiration
 - **Per-user isolation** — each key accesses only that user's notes
-- **256-bit entropy** — keys use `mnemo_` prefix for secret scanning detection
+- **256-bit entropy** — keys use `kryton_` prefix for secret scanning detection
 - **Rate limited** — 300 requests / 15 minutes per key
 - **No admin access** — API keys cannot access admin functions
 
@@ -181,7 +181,7 @@ See [API Keys & MCP docs](docs/API-ACCESS.md) for the full reference.
 </p>
 
 ### Plugin Ecosystem
-12 plugins available via [mnemo-plugins](https://github.com/azrtydxb/mnemo-plugins):
+12 plugins available via [kryton-plugins](https://github.com/azrtydxb/kryton-plugins):
 
 Slash Commands, Pomodoro Timer, Reading List, Writing Metrics, Excalidraw, Kanban Board, Mass Upload, Publish/Export, Flashcards, Presentation Mode, Calendar Journal, RSS Reader
 
@@ -212,20 +212,20 @@ Plugin APIs are automatically exposed as MCP tools — install a plugin and your
 ```yaml
 # docker-compose.yml
 services:
-  mnemo:
-    image: ghcr.io/azrtydxb/mnemo/mnemo:latest
+  kryton:
+    image: ghcr.io/azrtydxb/kryton/kryton:latest
     ports:
       - "3100:3000"
     volumes:
       - ./notes:/notes
-      - mnemo-data:/data
+      - kryton-data:/data
     environment:
-      - DATABASE_URL=file:/data/mnemo.db
+      - DATABASE_URL=file:/data/kryton.db
       - BETTER_AUTH_SECRET=change-me-use-openssl-rand-hex-32
       - APP_URL=http://localhost:3100
 
 volumes:
-  mnemo-data:
+  kryton-data:
 ```
 
 ```bash
@@ -237,8 +237,8 @@ Open http://localhost:3100 — the first user to register becomes admin.
 ### From Source
 
 ```bash
-git clone https://github.com/azrtydxb/mnemo.git
-cd mnemo
+git clone https://github.com/azrtydxb/kryton.git
+cd kryton
 npm install
 npm run dev
 ```
@@ -253,7 +253,7 @@ npm run dev
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `DATABASE_URL` | Yes | SQLite path: `file:/data/mnemo.db` |
+| `DATABASE_URL` | Yes | SQLite path: `file:/data/kryton.db` |
 | `BETTER_AUTH_SECRET` | Yes | Auth secret (min 32 chars). Generate: `openssl rand -hex 32` |
 | `APP_URL` | No | Public URL (default: `http://localhost:5173`) |
 | `PORT` | No | Server port (default: `3001`) |
@@ -277,7 +277,7 @@ The React Native mobile app lives in `packages/mobile/` and syncs with the serve
 
 ### Install on Android
 
-Download the latest APK from [EAS Build](https://expo.dev/accounts/piwi3910/projects/mnemo/builds).
+Download the latest APK from [EAS Build](https://expo.dev/accounts/piwi3910/projects/kryton/builds).
 
 ### Build from Source
 
@@ -350,12 +350,12 @@ npx eas build --platform android --profile preview
 
 ## Database Migrations
 
-Mnemo uses Prisma Migrate for safe schema updates. Migrations run automatically on container startup with automatic backup.
+Kryton uses Prisma Migrate for safe schema updates. Migrations run automatically on container startup with automatic backup.
 
 For developers:
 ```bash
 # After changing prisma/schema.prisma:
-DATABASE_URL="file:./data/mnemo.db" npx prisma migrate dev --name describe_change
+DATABASE_URL="file:./data/kryton.db" npx prisma migrate dev --name describe_change
 ```
 
 See [MIGRATIONS.md](packages/server/MIGRATIONS.md) for details.

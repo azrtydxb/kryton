@@ -1,13 +1,13 @@
 services:
-  mnemo:
+  kryton:
     build: .
     ports:
       - "3000:3000"
     volumes:
       - ./notes:/notes
-      - mnemo-data:/data
+      - kryton-data:/data
     environment:
-      - DATABASE_URL=file:/data/mnemo.db
+      - DATABASE_URL=file:/data/kryton.db
       # Required: generate with: openssl rand -hex 32
       - BETTER_AUTH_SECRET=change-me-use-openssl-rand-hex-32
       # Optional: set to your public URL for OAuth/passkey support
@@ -15,4 +15,4 @@ services:
       - BETTER_AUTH_URL=http://localhost:3000
 
 volumes:
-  mnemo-data:
+  kryton-data:

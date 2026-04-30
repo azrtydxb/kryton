@@ -1,10 +1,10 @@
 # API Keys & AI Agent Access
 
-Mnemo supports programmatic access via API keys and a built-in MCP (Model Context Protocol) server. This allows AI agents like Claude Code, Cursor, and custom scripts to read and write your notes.
+Kryton supports programmatic access via API keys and a built-in MCP (Model Context Protocol) server. This allows AI agents like Claude Code, Cursor, and custom scripts to read and write your notes.
 
 ## Creating an API Key
 
-1. Open Mnemo in your browser and log in
+1. Open Kryton in your browser and log in
 2. Click your avatar (top-right) and select **Account Settings**
 3. Go to the **API Keys** tab
 4. Click **Create API Key**
@@ -15,7 +15,7 @@ Mnemo supports programmatic access via API keys and a built-in MCP (Model Contex
 6. Click **Create Key**
 7. **Copy the key immediately** — it is shown only once and cannot be retrieved later
 
-The key looks like: `mnemo_a1b2c3d4e5f6...` (70 characters total).
+The key looks like: `kryton_a1b2c3d4e5f6...` (70 characters total).
 
 ## Revoking an API Key
 
@@ -37,8 +37,8 @@ Admin operations (user management, invites, settings) are never accessible via A
 All API endpoints accept bearer token authentication:
 
 ```bash
-curl -H "Authorization: Bearer mnemo_your_key_here" \
-  https://your-mnemo-instance/api/notes
+curl -H "Authorization: Bearer kryton_your_key_here" \
+  https://your-kryton-instance/api/notes
 ```
 
 ### Key Endpoints
@@ -59,19 +59,19 @@ curl -H "Authorization: Bearer mnemo_your_key_here" \
 | `GET` | `/api/daily` | read-only | Get today's daily note |
 | `GET` | `/api/templates` | read-only | List templates |
 
-Full OpenAPI documentation is available at `/api/docs` on your Mnemo instance.
+Full OpenAPI documentation is available at `/api/docs` on your Kryton instance.
 
 ### Examples
 
 **List all notes:**
 ```bash
-curl -H "Authorization: Bearer mnemo_..." https://localhost:3001/api/notes
+curl -H "Authorization: Bearer kryton_..." https://localhost:3001/api/notes
 ```
 
 **Create a note:**
 ```bash
 curl -X POST \
-  -H "Authorization: Bearer mnemo_..." \
+  -H "Authorization: Bearer kryton_..." \
   -H "Content-Type: application/json" \
   -d '{"path": "ideas/new-idea.md", "content": "# New Idea\n\nThis is my note."}' \
   https://localhost:3001/api/notes
@@ -79,7 +79,7 @@ curl -X POST \
 
 **Search notes:**
 ```bash
-curl -H "Authorization: Bearer mnemo_..." \
+curl -H "Authorization: Bearer kryton_..." \
   "https://localhost:3001/api/search?q=kubernetes"
 ```
 
@@ -87,7 +87,7 @@ curl -H "Authorization: Bearer mnemo_..." \
 
 ## Connecting AI Agents via MCP
 
-Mnemo includes a built-in [MCP server](https://modelcontextprotocol.io/) at `/api/mcp` using the Streamable HTTP transport. This allows MCP-compatible AI agents to interact with your notes directly.
+Kryton includes a built-in [MCP server](https://modelcontextprotocol.io/) at `/api/mcp` using the Streamable HTTP transport. This allows MCP-compatible AI agents to interact with your notes directly.
 
 ### Claude Code / Claude Desktop
 
@@ -96,11 +96,11 @@ Add to your MCP configuration (`~/.claude/claude_desktop_config.json` or Claude 
 ```json
 {
   "mcpServers": {
-    "mnemo": {
+    "kryton": {
       "type": "streamable-http",
-      "url": "https://your-mnemo-instance/api/mcp",
+      "url": "https://your-kryton-instance/api/mcp",
       "headers": {
-        "Authorization": "Bearer mnemo_your_key_here"
+        "Authorization": "Bearer kryton_your_key_here"
       }
     }
   }
@@ -114,11 +114,11 @@ Add to your Cursor MCP settings:
 ```json
 {
   "mcpServers": {
-    "mnemo": {
+    "kryton": {
       "type": "streamable-http",
-      "url": "https://your-mnemo-instance/api/mcp",
+      "url": "https://your-kryton-instance/api/mcp",
       "headers": {
-        "Authorization": "Bearer mnemo_your_key_here"
+        "Authorization": "Bearer kryton_your_key_here"
       }
     }
   }
@@ -152,7 +152,7 @@ Write tools (`create_note`, `update_note`, `delete_note`, `create_folder`, `crea
 
 | URI | Description |
 |-----|-------------|
-| `mnemo://notes` | The full note tree structure (JSON) |
+| `kryton://notes` | The full note tree structure (JSON) |
 
 ### Plugin Tools
 
@@ -174,8 +174,8 @@ Each API key has its own independent rate limit bucket.
 ## Security Notes
 
 - API keys are stored as SHA-256 hashes -- the raw key is never persisted
-- Keys use 256-bit entropy (`mnemo_` prefix + 64 hex characters)
-- The `mnemo_` prefix enables secret scanning tools (like GitHub's) to detect leaked keys
+- Keys use 256-bit entropy (`kryton_` prefix + 64 hex characters)
+- The `kryton_` prefix enables secret scanning tools (like GitHub's) to detect leaked keys
 - API keys cannot access admin endpoints or manage other API keys
 - Revoking a user account immediately invalidates all their API keys
 - The MCP server operates in stateless mode (no server-side session state)

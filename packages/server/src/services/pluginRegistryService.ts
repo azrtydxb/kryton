@@ -19,9 +19,9 @@ function validateDownloadUrl(url: string): void {
 }
 
 const REGISTRY_OWNER = "azrtydxb";
-const REGISTRY_REPO = "mnemo-plugins";
+const REGISTRY_REPO = "kryton-plugins";
 const GITHUB_API_BASE = "https://api.github.com";
-const USER_AGENT = "mnemo-app/1.0";
+const USER_AGENT = "kryton-app/1.0";
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 export interface RegistryPlugin {
@@ -30,7 +30,7 @@ export interface RegistryPlugin {
   description: string;
   author: string;
   version: string;
-  minMnemoVersion: string;
+  minKrytonVersion: string;
   tags: string[];
   icon: string;
 }

@@ -178,7 +178,7 @@ export type AppState = ReturnType<typeof useAppState>;
 
 - [ ] **Step 2: Verify types compile**
 
-Run: `cd /Users/pascal/Development/mnemo && npx tsc --noEmit --project packages/client/tsconfig.json`
+Run: `cd /Users/pascal/Development/kryton && npx tsc --noEmit --project packages/client/tsconfig.json`
 Expected: No errors.
 
 - [ ] **Step 3: Commit**
@@ -336,7 +336,7 @@ export function useAppCallbacks(state: AppState) {
 
   const handleRenameNote = useCallback(() => {
     if (!notes.activeNote) return;
-    window.dispatchEvent(new CustomEvent('mnemo:rename-note', { detail: { path: notes.activeNote.path } }));
+    window.dispatchEvent(new CustomEvent('kryton:rename-note', { detail: { path: notes.activeNote.path } }));
   }, [notes.activeNote]);
 
   const handlePdfExport = useCallback(async () => {
@@ -421,7 +421,7 @@ export type AppCallbacks = ReturnType<typeof useAppCallbacks>;
 
 - [ ] **Step 2: Verify types compile**
 
-Run: `cd /Users/pascal/Development/mnemo && npx tsc --noEmit --project packages/client/tsconfig.json`
+Run: `cd /Users/pascal/Development/kryton && npx tsc --noEmit --project packages/client/tsconfig.json`
 Expected: No errors.
 
 - [ ] **Step 3: Commit**
@@ -474,7 +474,7 @@ export function Header({
           <Menu size={18} />
         </button>
         <div className="flex items-center ml-1">
-          <img src="/logo.png" alt="Mnemo" className="h-11 w-auto" />
+          <img src="/logo.png" alt="Kryton" className="h-11 w-auto" />
         </div>
       </div>
 
@@ -502,7 +502,7 @@ export function Header({
 
 - [ ] **Step 2: Verify types compile**
 
-Run: `cd /Users/pascal/Development/mnemo && npx tsc --noEmit --project packages/client/tsconfig.json`
+Run: `cd /Users/pascal/Development/kryton && npx tsc --noEmit --project packages/client/tsconfig.json`
 Expected: No errors.
 
 - [ ] **Step 3: Commit**
@@ -631,7 +631,7 @@ export function SidebarLayout({
 
 - [ ] **Step 2: Verify types compile**
 
-Run: `cd /Users/pascal/Development/mnemo && npx tsc --noEmit --project packages/client/tsconfig.json`
+Run: `cd /Users/pascal/Development/kryton && npx tsc --noEmit --project packages/client/tsconfig.json`
 Expected: No errors.
 
 - [ ] **Step 3: Commit**
@@ -872,7 +872,7 @@ export function EmptyStateView() {
 
 - [ ] **Step 4: Verify types compile**
 
-Run: `cd /Users/pascal/Development/mnemo && npx tsc --noEmit --project packages/client/tsconfig.json`
+Run: `cd /Users/pascal/Development/kryton && npx tsc --noEmit --project packages/client/tsconfig.json`
 Expected: No errors.
 
 - [ ] **Step 5: Commit**
@@ -950,7 +950,7 @@ export function RightPanel({
 
 - [ ] **Step 2: Verify types compile**
 
-Run: `cd /Users/pascal/Development/mnemo && npx tsc --noEmit --project packages/client/tsconfig.json`
+Run: `cd /Users/pascal/Development/kryton && npx tsc --noEmit --project packages/client/tsconfig.json`
 Expected: No errors.
 
 - [ ] **Step 3: Commit**
@@ -1044,7 +1044,7 @@ export function ModalsContainer({
 
 - [ ] **Step 3: Verify types compile**
 
-Run: `cd /Users/pascal/Development/mnemo && npx tsc --noEmit --project packages/client/tsconfig.json`
+Run: `cd /Users/pascal/Development/kryton && npx tsc --noEmit --project packages/client/tsconfig.json`
 Expected: No errors.
 
 - [ ] **Step 4: Commit**
@@ -1236,22 +1236,22 @@ function AppContent() {
 
 - [ ] **Step 2: Verify the app builds**
 
-Run: `cd /Users/pascal/Development/mnemo && npm run build`
+Run: `cd /Users/pascal/Development/kryton && npm run build`
 Expected: No errors.
 
 - [ ] **Step 3: Verify linting passes**
 
-Run: `cd /Users/pascal/Development/mnemo && npm run lint`
+Run: `cd /Users/pascal/Development/kryton && npm run lint`
 Expected: No lint errors.
 
 - [ ] **Step 4: Verify typecheck passes**
 
-Run: `cd /Users/pascal/Development/mnemo && npm run typecheck`
+Run: `cd /Users/pascal/Development/kryton && npm run typecheck`
 Expected: No type errors.
 
 - [ ] **Step 5: Manual smoke test**
 
-Run: `cd /Users/pascal/Development/mnemo && npm run dev`
+Run: `cd /Users/pascal/Development/kryton && npm run dev`
 Verify in browser:
 - App loads, login works
 - Sidebar opens/closes, resizes

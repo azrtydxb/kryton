@@ -33,7 +33,7 @@ export function Header({
           <Menu size={18} />
         </button>
         <div className="flex items-center ml-1">
-          <img src="/logo.png" alt="Mnemo" className="h-11 w-auto" />
+          <img src="/logo.png" alt="Kryton" className="h-11 w-auto" />
         </div>
       </div>
 

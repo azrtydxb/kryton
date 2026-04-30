@@ -43,7 +43,7 @@ import { ForbiddenError, ValidationError } from "../lib/errors.js";
  *         required: true
  *         schema:
  *           type: string
- *         description: Relative path to the note (e.g., "Projects/Mnemo Roadmap")
+ *         description: Relative path to the note (e.g., "Projects/Kryton Roadmap")
  *     responses:
  *       200:
  *         description: Note content
@@ -54,10 +54,10 @@ import { ForbiddenError, ValidationError } from "../lib/errors.js";
  *               properties:
  *                 path:
  *                   type: string
- *                   example: Projects/Mnemo Roadmap.md
+ *                   example: Projects/Kryton Roadmap.md
  *                 content:
  *                   type: string
- *                   example: "# Mnemo Roadmap\n..."
+ *                   example: "# Kryton Roadmap\n..."
  *       400:
  *         description: Path is required or invalid
  *       404:

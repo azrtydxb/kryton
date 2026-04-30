@@ -134,7 +134,7 @@ export function useAppCallbacks(state: AppState) {
 
   const handleRenameNote = useCallback(() => {
     if (!notes.activeNote) return;
-    window.dispatchEvent(new CustomEvent('mnemo:rename-note', { detail: { path: notes.activeNote.path } }));
+    window.dispatchEvent(new CustomEvent('kryton:rename-note', { detail: { path: notes.activeNote.path } }));
   }, [notes.activeNote]);
 
   const handlePdfExport = useCallback(async () => {

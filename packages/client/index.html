@@ -4,11 +4,11 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Mnemo</title>
+    <title>Kryton</title>
     <script>
       // Apply theme before first paint to prevent FOUC
       (function() {
-        var theme = localStorage.getItem('mnemo-theme') || 'system';
+        var theme = localStorage.getItem('kryton-theme') || 'system';
         var dark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
         if (dark) document.documentElement.classList.add('dark');
         else document.documentElement.classList.remove('dark');

@@ -1,7 +1,7 @@
 # Authentication — Multi-User Sub-Project 1 of 3
 
 **Date:** 2026-03-23
-**Scope:** Add user authentication to Mnemo — email/password + OAuth (Google, GitHub), JWT with refresh tokens, admin role, invite system. No changes to note storage or sharing yet (those are sub-projects 2 and 3).
+**Scope:** Add user authentication to Kryton — email/password + OAuth (Google, GitHub), JWT with refresh tokens, admin role, invite system. No changes to note storage or sharing yet (those are sub-projects 2 and 3).
 
 ## Goals
 
@@ -87,7 +87,7 @@ Add row: `registration_mode` = `open` (default). Admin can toggle to `invite-onl
 6. If invite code was used, mark it as `usedBy` this user
 7. Generate JWT access token (15min expiry, payload: `{ sub: user.id, email, role }`)
 8. Generate refresh token (random 64-byte hex string), hash with SHA-256, store in RefreshToken table with 30-day expiry
-9. Set refresh token cookie as `tokenId:rawToken` (where `tokenId` is the RefreshToken row's UUID) in httpOnly secure cookie (`mnemo_refresh`)
+9. Set refresh token cookie as `tokenId:rawToken` (where `tokenId` is the RefreshToken row's UUID) in httpOnly secure cookie (`kryton_refresh`)
 10. Return `{ user: { id, email, name, role, avatarUrl }, accessToken }`
 
 ### Email/Password Login
@@ -124,7 +124,7 @@ Same as Google but:
 ### Token Refresh
 
 1. `POST /api/auth/refresh`
-2. Read `mnemo_refresh` cookie, parse as `tokenId:rawToken`
+2. Read `kryton_refresh` cookie, parse as `tokenId:rawToken`
 3. Look up RefreshToken by `tokenId` (single DB query). If not found or expired, return 401 and clear cookie
 4. SHA-256 hash `rawToken` and compare to stored `tokenHash`. If mismatch, return 401 and clear cookie
 5. If valid: generate new access token. Rotate refresh token (delete old row, create new one, set new cookie)
@@ -133,8 +133,8 @@ Same as Google but:
 ### Logout
 
 1. `POST /api/auth/logout`
-2. Read `mnemo_refresh` cookie, delete matching RefreshToken from DB
-3. Clear the `mnemo_refresh` cookie
+2. Read `kryton_refresh` cookie, delete matching RefreshToken from DB
+3. Clear the `kryton_refresh` cookie
 4. Return 200
 
 ### Get Current User

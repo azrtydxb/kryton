@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Mnemo",
-    "slug": "mnemo",
-    "scheme": "mnemo",
+    "name": "Kryton",
+    "slug": "kryton",
+    "scheme": "kryton",
     "version": "4.3.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -14,7 +14,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.mnemo.app"
+      "bundleIdentifier": "com.kryton.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -24,7 +24,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.mnemo.app"
+      "package": "com.kryton.app"
     },
     "web": {
       "favicon": "./assets/favicon.png",

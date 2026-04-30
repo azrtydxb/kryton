@@ -14,7 +14,7 @@ describe("PluginManager", () => {
   let pluginsDir: string;
 
   beforeEach(() => {
-    pluginsDir = fs.mkdtempSync(path.join(os.tmpdir(), "mnemo-plugins-"));
+    pluginsDir = fs.mkdtempSync(path.join(os.tmpdir(), "kryton-plugins-"));
     const app = express();
     const eventBus = new PluginEventBus();
     const pluginRouter = new PluginRouter(app);
@@ -51,7 +51,7 @@ describe("PluginManager", () => {
         version: "1.0.0",
         description: "A test plugin",
         author: "Test",
-        minMnemoVersion: "2.0.0",
+        minKrytonVersion: "2.0.0",
         server: "server/index.js",
       })
     );

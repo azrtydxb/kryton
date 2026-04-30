@@ -1,6 +1,6 @@
 # Plugin Development Guide
 
-Mnemo supports server-side and client-side plugins. Plugins are installed into the server's `plugins/` directory and loaded at startup.
+Kryton supports server-side and client-side plugins. Plugins are installed into the server's `plugins/` directory and loaded at startup.
 
 ## Plugin Directory Structure
 
@@ -21,7 +21,7 @@ plugins/
   "version": "1.0.0",
   "description": "What this plugin does",
   "author": "Your Name",
-  "minMnemoVersion": "3.0.0",
+  "minKrytonVersion": "3.0.0",
   "server": "server.js",
   "client": "client.js",
   "settings": [
@@ -39,7 +39,7 @@ plugins/
 **Fields:**
 - `id` — unique plugin identifier
 - `name` / `version` / `description` / `author` — metadata
-- `minMnemoVersion` — minimum compatible Mnemo version
+- `minKrytonVersion` — minimum compatible Kryton version
 - `server` — path to server entry point (optional)
 - `client` — path to client entry point (optional)
 - `settings` — user-configurable settings; `type` is `"string"`, `"boolean"`, or `"number"`; `perUser` controls whether the setting is global or per-user
@@ -129,4 +129,4 @@ React hooks for accessing app state:
 
 ## Installation
 
-Plugins can be installed from the Mnemo plugin registry or manually by placing the plugin directory in the `plugins/` folder. Use the admin panel to manage installed plugins.
+Plugins can be installed from the Kryton plugin registry or manually by placing the plugin directory in the `plugins/` folder. Use the admin panel to manage installed plugins.

@@ -147,7 +147,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="flex justify-center mb-8">
-          <img src="/logo.png" alt="Mnemo" className="h-12" />
+          <img src="/logo.png" alt="Kryton" className="h-12" />
         </div>
 
         {/* Card */}

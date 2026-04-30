@@ -62,7 +62,7 @@ export default function RegisterScreen() {
       >
         <View style={styles.header}>
           <Text style={styles.title}>Create account</Text>
-          <Text style={styles.subtitle}>Get started with Mnemo</Text>
+          <Text style={styles.subtitle}>Get started with Kryton</Text>
         </View>
 
         <View style={styles.form}>

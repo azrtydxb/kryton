@@ -16,7 +16,7 @@ export interface PluginManifest {
   version: string;
   description: string;
   author: string;
-  minMnemoVersion: string;
+  minKrytonVersion: string;
   server?: string;
   client?: string;
   settings?: PluginSettingDefinition[];
@@ -81,7 +81,7 @@ export interface SearchResult {
 
 // --- Plugin API (injected into activate()) ---
 //
-// NOTE FOR PLUGIN AUTHORS (azrtydxb/mnemo-plugins repo):
+// NOTE FOR PLUGIN AUTHORS (azrtydxb/kryton-plugins repo):
 // The old `database.registerEntity()` and `database.getRepository()` methods
 // have been removed as part of the TypeORM → Prisma migration (Task 5).
 // Plugins must use `api.storage` for persistent key-value storage instead.

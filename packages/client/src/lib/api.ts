@@ -104,7 +104,7 @@ export interface RegistryPlugin {
   description: string;
   author: string;
   version: string;
-  minMnemoVersion: string;
+  minKrytonVersion: string;
   tags: string[];
   icon: string;
 }

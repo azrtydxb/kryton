@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add pull/push sync endpoints to the Mnemo server so the mobile app can synchronize notes, settings, shares, and trash bidirectionally using WatermelonDB.
+**Goal:** Add pull/push sync endpoints to the Kryton server so the mobile app can synchronize notes, settings, shares, and trash bidirectionally using WatermelonDB.
 
 **Architecture:** Two POST endpoints (`/api/sync/pull` and `/api/sync/push`) that return/accept changes in WatermelonDB's required format (created/updated/deleted arrays per table). Server tracks modifications via timestamps and deletions via a new SyncDeletion table. Only 4 tables are synced: notes, settings, note_shares, trash_items. Graph edges, tags, and folders are computed client-side from note content.
 
@@ -73,7 +73,7 @@ model Settings {
 - [ ] **Step 2: Push schema to database**
 
 ```bash
-DATABASE_URL="file:./data/mnemo.db" npx prisma db push
+DATABASE_URL="file:./data/kryton.db" npx prisma db push
 ```
 Expected: Schema synced successfully
 
@@ -455,11 +455,11 @@ const syncLimiter = rateLimit({
 app.use("/api/sync", authMiddleware, syncLimiter, createSyncRouter(NOTES_DIR));
 ```
 
-- [ ] **Step 2: Add mnemo:// to trustedOrigins**
+- [ ] **Step 2: Add kryton:// to trustedOrigins**
 
 In `packages/server/src/auth.ts`, update the `trustedOrigins` array:
 ```typescript
-trustedOrigins: [APP_URL, "mnemo://"],
+trustedOrigins: [APP_URL, "kryton://"],
 ```
 
 - [ ] **Step 3: Test manually**
@@ -473,13 +473,13 @@ Then test with curl:
 # Pull (first sync)
 curl -X POST http://localhost:3001/api/sync/pull \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer mnemo_<your-api-key>" \
+  -H "Authorization: Bearer kryton_<your-api-key>" \
   -d '{"last_pulled_at": 0}'
 
 # Push
 curl -X POST http://localhost:3001/api/sync/push \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer mnemo_<your-api-key>" \
+  -H "Authorization: Bearer kryton_<your-api-key>" \
   -d '{"changes":{"notes":{"created":[{"id":"test.md","path":"test.md","title":"Test","content":"# Test"}],"updated":[],"deleted":[]}}}'
 ```
 
@@ -494,7 +494,7 @@ Expected: All tests pass
 
 ```bash
 git add packages/server/src/index.ts packages/server/src/auth.ts
-git commit -m "feat(sync): mount sync routes with rate limiting, add mnemo:// to trustedOrigins"
+git commit -m "feat(sync): mount sync routes with rate limiting, add kryton:// to trustedOrigins"
 ```
 
 ---

@@ -1,13 +1,13 @@
 # Database Migrations
 
-Mnemo uses [Prisma Migrate](https://www.prisma.io/docs/concepts/components/prisma-migrate) for database schema versioning.
+Kryton uses [Prisma Migrate](https://www.prisma.io/docs/concepts/components/prisma-migrate) for database schema versioning.
 
 ## For developers
 
 When you change `prisma/schema.prisma`, create a new migration:
 
 ```bash
-DATABASE_URL="file:./data/mnemo.db" npx prisma migrate dev --name describe_your_change
+DATABASE_URL="file:./data/kryton.db" npx prisma migrate dev --name describe_your_change
 ```
 
 This generates a new migration file in `prisma/migrations/`. Commit it alongside your schema change.

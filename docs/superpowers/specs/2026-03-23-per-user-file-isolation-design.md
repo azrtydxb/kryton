@@ -28,7 +28,7 @@ notes/
   {userId-1}/          # UUID directory per user
     Welcome.md
     Projects/
-      Mnemo Roadmap.md
+      Kryton Roadmap.md
     Daily/
       2026-03-23.md
   {userId-2}/

@@ -1,4 +1,4 @@
-export const DB_NAME = "mnemo.db";
+export const DB_NAME = "kryton.db";
 
 export const CREATE_TABLES_SQL = `
   CREATE TABLE IF NOT EXISTS notes (

@@ -5,7 +5,7 @@ import App from './App';
 import './styles/globals.css';
 
 // Expose dependencies for runtime-loaded plugins
-(window as unknown as Record<string, unknown>).__mnemoPluginDeps = { React, vim, getCM };
+(window as unknown as Record<string, unknown>).__krytonPluginDeps = { React, vim, getCM };
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

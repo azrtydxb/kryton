@@ -31,10 +31,10 @@ import { ValidationError } from "../lib/errors.js";
  *                 properties:
  *                   path:
  *                     type: string
- *                     example: Projects/Mnemo Roadmap.md
+ *                     example: Projects/Kryton Roadmap.md
  *                   title:
  *                     type: string
- *                     example: Mnemo Roadmap
+ *                     example: Kryton Roadmap
  *       400:
  *         description: Path is required
  *       500:

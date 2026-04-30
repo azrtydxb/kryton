@@ -27,8 +27,8 @@ interface SettingDecl {
   perUser: boolean;
 }
 
-// Mnemo app version — bump here when the server version changes (currently v3.2.0)
-const MNEMO_VERSION = '3.2.0';
+// Kryton app version — bump here when the server version changes (currently v3.2.0)
+const KRYTON_VERSION = '3.2.0';
 
 function semverGt(a: string, b: string): boolean {
   const pa = a.split('.').map(Number);
@@ -242,7 +242,7 @@ function RegistryBrowse({
             const isInstalled = installedIds.has(plugin.id);
             const isInstalling = installing.has(plugin.id);
             const err = installError[plugin.id];
-            const incompatible = semverGt(plugin.minMnemoVersion, MNEMO_VERSION);
+            const incompatible = semverGt(plugin.minKrytonVersion, KRYTON_VERSION);
 
             return (
               <div
@@ -267,7 +267,7 @@ function RegistryBrowse({
                       {incompatible && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/20 text-amber-300">
                           <AlertCircle size={10} />
-                          Requires v{plugin.minMnemoVersion}
+                          Requires v{plugin.minKrytonVersion}
                         </span>
                       )}
                     </div>

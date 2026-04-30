@@ -29,6 +29,6 @@ COPY --from=builder /tmp/COMMIT_SHA /COMMIT_SHA
 COPY --chown=app:app entrypoint.sh ./entrypoint.sh
 USER app
 ENV PORT=3000
-ENV DATABASE_URL=file:/data/mnemo.db
+ENV DATABASE_URL=file:/data/kryton.db
 EXPOSE 3000
 ENTRYPOINT ["./entrypoint.sh"]

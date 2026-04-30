@@ -50,8 +50,8 @@ packages/server/plugins/mass-upload/server/__tests__/
   "name": "Mass Upload",
   "version": "1.0.0",
   "description": "Bulk import .md files with validation and duplicate detection",
-  "author": "Mnemo",
-  "minMnemoVersion": "3.0.0",
+  "author": "Kryton",
+  "minKrytonVersion": "3.0.0",
   "server": "server/index.js",
   "client": "client/index.js",
   "settings": [
@@ -1038,7 +1038,7 @@ git commit -m "feat(mass-upload): wire routes through plugin API"
 ```typescript
 // packages/server/plugins/mass-upload/client/index.ts
 
-const { React } = (window as any).__mnemoPluginDeps;
+const { React } = (window as any).__krytonPluginDeps;
 const { createElement: h, useState, useRef, useCallback } = React;
 
 function UploadModal({ api, onClose }: { api: any; onClose: () => void }) {
@@ -1578,7 +1578,7 @@ echo "" > /tmp/mass-upload-test/empty.md
 
 - [ ] **Step 2: Test the full workflow in the browser**
 
-1. Open mnemo in the browser
+1. Open kryton in the browser
 2. Click the "Upload" toolbar button
 3. Select the test files from `/tmp/mass-upload-test/`
 4. Set target folder to "Imported"

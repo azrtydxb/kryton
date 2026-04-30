@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { prisma } from "../prisma.js";
 import { AppError, NotFoundError } from "../lib/errors.js";
 
-const KEY_PREFIX = "mnemo_";
+const KEY_PREFIX = "kryton_";
 const KEY_BYTES = 32; // 256 bits of entropy
 const MAX_KEYS_PER_USER = 10;
 
@@ -15,7 +15,7 @@ export function hashApiKey(key: string): string {
 }
 
 export function buildKeyPrefix(key: string): string {
-  // "mnemo_" (6 chars) + first 8 hex chars
+  // "kryton_" (6 chars) + first 8 hex chars
   return key.substring(0, 6 + 8);
 }
 

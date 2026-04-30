@@ -52,7 +52,7 @@
 - [ ] **Step 1: Install rehype-sanitize**
 
 ```bash
-cd /Users/pascal/Development/mnemo
+cd /Users/pascal/Development/kryton
 npm install rehype-sanitize --workspace=packages/client
 ```
 
@@ -355,7 +355,7 @@ Read `.env.example` first, then replace with:
 
 ```env
 # Required
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/mnemo
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/kryton
 BETTER_AUTH_SECRET=change-me-to-a-random-64-char-string-use-openssl-rand-hex-32
 APP_URL=http://localhost:5173
 BETTER_AUTH_URL=http://localhost:3001
@@ -850,15 +850,15 @@ Read `docker-compose.prod.yml`. Replace hardcoded passwords with environment var
 
 ```yaml
 services:
-  mnemo:
+  kryton:
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-mnemo}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-kryton}
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET}
       - APP_URL=${APP_URL:-http://localhost:3100}
       - NOTES_DIR=/notes
   db:
     environment:
-      - POSTGRES_DB=${POSTGRES_DB:-mnemo}
+      - POSTGRES_DB=${POSTGRES_DB:-kryton}
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
 ```

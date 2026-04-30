@@ -20,7 +20,7 @@ export async function authMiddleware(
   try {
     // Check for bearer token first
     const authHeader = req.headers.authorization;
-    if (authHeader?.startsWith("Bearer mnemo_")) {
+    if (authHeader?.startsWith("Bearer kryton_")) {
       const rawKey = authHeader.slice(7); // Remove "Bearer "
       const keyData = await validateApiKey(rawKey);
 

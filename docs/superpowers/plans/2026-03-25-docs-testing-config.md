@@ -292,11 +292,11 @@ Read `SPEC.md` fully.
 Replace with an accurate specification reflecting the current multi-user app:
 
 ```markdown
-# Mnemo Technical Specification
+# Kryton Technical Specification
 
 ## Overview
 
-Mnemo is a multi-user, web-based note-taking application with Markdown editing, knowledge graph visualization, note sharing, and an extensible plugin system.
+Kryton is a multi-user, web-based note-taking application with Markdown editing, knowledge graph visualization, note sharing, and an extensible plugin system.
 
 ## Tech Stack
 
@@ -355,7 +355,7 @@ Closes #32"
 - [ ] **Step 1: Create contributing guide**
 
 ```markdown
-# Contributing to Mnemo
+# Contributing to Kryton
 
 ## Development Setup
 
@@ -468,7 +468,7 @@ git log --oneline --since="2026-03-01" | head -50
 ```markdown
 # Changelog
 
-All notable changes to Mnemo are documented here.
+All notable changes to Kryton are documented here.
 
 ## [3.0.0] - 2026-03-25
 

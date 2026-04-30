@@ -235,7 +235,7 @@ async function main(): Promise<void> {
 
   app.use("/api/auth", authLimiter);
   app.use("/api", (req, res, next) => {
-    if (req.headers.authorization?.startsWith("Bearer mnemo_")) {
+    if (req.headers.authorization?.startsWith("Bearer kryton_")) {
       return apiKeyLimiter(req, res, next);
     }
     return sessionLimiter(req, res, next);
@@ -247,7 +247,7 @@ async function main(): Promise<void> {
   // Swagger API docs (unauthenticated, GET-only)
   app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
     customCss: '.swagger-ui .topbar { display: none }',
-    customSiteTitle: 'Mnemo API Docs',
+    customSiteTitle: 'Kryton API Docs',
   }));
   app.get('/api/docs.json', (_req, res) => res.json(swaggerSpec));
 
@@ -462,7 +462,7 @@ async function main(): Promise<void> {
   pluginManager.setPluginWebSocket(pluginWebSocket);
 
   httpServer.listen(PORT, () => {
-    log.info(`Mnemo server listening on port ${PORT}`);
+    log.info(`Kryton server listening on port ${PORT}`);
     log.info(`Notes directory: ${NOTES_DIR}`);
   });
 }

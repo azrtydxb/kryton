@@ -98,7 +98,7 @@ packages/client/
 - [ ] **Step 1: Install vitest in server package**
 
 ```bash
-cd /Users/pascal/Development/mnemo && npm install -D vitest @vitest/coverage-v8 --workspace=packages/server
+cd /Users/pascal/Development/kryton && npm install -D vitest @vitest/coverage-v8 --workspace=packages/server
 ```
 
 - [ ] **Step 2: Create server vitest config**
@@ -127,7 +127,7 @@ Add to `packages/server/package.json` scripts:
 - [ ] **Step 4: Install vitest in client package**
 
 ```bash
-cd /Users/pascal/Development/mnemo && npm install -D vitest @vitest/coverage-v8 jsdom @testing-library/react @testing-library/jest-dom --workspace=packages/client
+cd /Users/pascal/Development/kryton && npm install -D vitest @vitest/coverage-v8 jsdom @testing-library/react @testing-library/jest-dom --workspace=packages/client
 ```
 
 - [ ] **Step 5: Create client vitest config**
@@ -181,7 +181,7 @@ describe("test infrastructure", () => {
 });
 ```
 
-Run: `cd /Users/pascal/Development/mnemo && npm run test:server`
+Run: `cd /Users/pascal/Development/kryton && npm run test:server`
 Expected: 1 test passing.
 
 - [ ] **Step 9: Commit**
@@ -220,7 +220,7 @@ export interface PluginManifest {
   version: string;
   description: string;
   author: string;
-  minMnemoVersion: string;
+  minKrytonVersion: string;
   server?: string;
   client?: string;
   settings?: PluginSettingDefinition[];
@@ -367,7 +367,7 @@ export interface PluginInstance {
 
 - [ ] **Step 2: Verify types compile**
 
-Run: `cd /Users/pascal/Development/mnemo && npx tsc --noEmit --project packages/server/tsconfig.json`
+Run: `cd /Users/pascal/Development/kryton && npx tsc --noEmit --project packages/server/tsconfig.json`
 Expected: No errors.
 
 - [ ] **Step 3: Commit**
@@ -464,7 +464,7 @@ describe("PluginEventBus", () => {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd /Users/pascal/Development/mnemo && npm run test:server`
+Run: `cd /Users/pascal/Development/kryton && npm run test:server`
 Expected: All tests FAIL (module not found).
 
 - [ ] **Step 3: Implement PluginEventBus**
@@ -528,7 +528,7 @@ export class PluginEventBus {
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd /Users/pascal/Development/mnemo && npm run test:server`
+Run: `cd /Users/pascal/Development/kryton && npm run test:server`
 Expected: All PluginEventBus tests PASS.
 
 - [ ] **Step 5: Commit**
@@ -623,7 +623,7 @@ describe("PluginHealthMonitor", () => {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd /Users/pascal/Development/mnemo && npm run test:server`
+Run: `cd /Users/pascal/Development/kryton && npm run test:server`
 Expected: FAIL (module not found).
 
 - [ ] **Step 3: Implement PluginHealthMonitor**
@@ -670,7 +670,7 @@ export class PluginHealthMonitor {
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd /Users/pascal/Development/mnemo && npm run test:server`
+Run: `cd /Users/pascal/Development/kryton && npm run test:server`
 Expected: All PluginHealthMonitor tests PASS.
 
 - [ ] **Step 5: Commit**
@@ -848,7 +848,7 @@ export async function listStorageEntries(
 
 - [ ] **Step 5: Verify types compile**
 
-Run: `cd /Users/pascal/Development/mnemo && npx tsc --noEmit --project packages/server/tsconfig.json`
+Run: `cd /Users/pascal/Development/kryton && npx tsc --noEmit --project packages/server/tsconfig.json`
 Expected: No errors.
 
 - [ ] **Step 6: Commit**
@@ -921,7 +921,7 @@ describe("PluginRouter", () => {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd /Users/pascal/Development/mnemo && npm run test:server`
+Run: `cd /Users/pascal/Development/kryton && npm run test:server`
 Expected: FAIL (module not found).
 
 - [ ] **Step 3: Implement PluginRouter**
@@ -983,7 +983,7 @@ export class PluginRouter {
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd /Users/pascal/Development/mnemo && npm run test:server`
+Run: `cd /Users/pascal/Development/kryton && npm run test:server`
 Expected: All PluginRouter tests PASS.
 
 - [ ] **Step 5: Commit**
@@ -1040,7 +1040,7 @@ describe("PluginApiFactory", () => {
       version: "1.0.0",
       description: "A test plugin",
       author: "Test",
-      minMnemoVersion: "2.0.0",
+      minKrytonVersion: "2.0.0",
     });
 
     expect(api.plugin.id).toBe("test-plugin");
@@ -1059,7 +1059,7 @@ describe("PluginApiFactory", () => {
       version: "1.0.0",
       description: "A test plugin",
       author: "Test",
-      minMnemoVersion: "2.0.0",
+      minKrytonVersion: "2.0.0",
     });
 
     const handler = vi.fn();
@@ -1079,7 +1079,7 @@ describe("PluginApiFactory", () => {
       version: "1.0.0",
       description: "A test plugin",
       author: "Test",
-      minMnemoVersion: "2.0.0",
+      minKrytonVersion: "2.0.0",
     });
 
     api.log.info("hello");
@@ -1091,7 +1091,7 @@ describe("PluginApiFactory", () => {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd /Users/pascal/Development/mnemo && npm run test:server`
+Run: `cd /Users/pascal/Development/kryton && npm run test:server`
 Expected: FAIL (module not found).
 
 - [ ] **Step 3: Implement PluginApiFactory**
@@ -1310,7 +1310,7 @@ export class PluginApiFactory {
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd /Users/pascal/Development/mnemo && npm run test:server`
+Run: `cd /Users/pascal/Development/kryton && npm run test:server`
 Expected: All PluginApiFactory tests PASS.
 
 - [ ] **Step 5: Commit**
@@ -1347,7 +1347,7 @@ describe("PluginManager", () => {
   let pluginsDir: string;
 
   beforeEach(() => {
-    pluginsDir = fs.mkdtempSync(path.join(os.tmpdir(), "mnemo-plugins-"));
+    pluginsDir = fs.mkdtempSync(path.join(os.tmpdir(), "kryton-plugins-"));
     const app = express();
     const eventBus = new PluginEventBus();
     const pluginRouter = new PluginRouter(app);
@@ -1384,7 +1384,7 @@ describe("PluginManager", () => {
         version: "1.0.0",
         description: "A test plugin",
         author: "Test",
-        minMnemoVersion: "2.0.0",
+        minKrytonVersion: "2.0.0",
         server: "server/index.js",
       })
     );
@@ -1490,7 +1490,7 @@ describe("PluginManager", () => {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd /Users/pascal/Development/mnemo && npm run test:server`
+Run: `cd /Users/pascal/Development/kryton && npm run test:server`
 Expected: FAIL (module not found).
 
 - [ ] **Step 3: Implement PluginManager**
@@ -1658,7 +1658,7 @@ export class PluginManager {
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd /Users/pascal/Development/mnemo && npm run test:server`
+Run: `cd /Users/pascal/Development/kryton && npm run test:server`
 Expected: All PluginManager tests PASS.
 
 - [ ] **Step 5: Commit**
@@ -1803,7 +1803,7 @@ app.use("/api/plugins", authMiddleware, createPluginsRouter(pluginManager));
 
 - [ ] **Step 3: Verify server starts without errors**
 
-Run: `cd /Users/pascal/Development/mnemo/packages/server && npm run build`
+Run: `cd /Users/pascal/Development/kryton/packages/server && npm run build`
 Expected: No TypeScript errors.
 
 - [ ] **Step 4: Commit**
@@ -1985,7 +1985,7 @@ export interface ActivePluginInfo {
 
 - [ ] **Step 2: Verify types compile**
 
-Run: `cd /Users/pascal/Development/mnemo && npx tsc --noEmit --project packages/client/tsconfig.json`
+Run: `cd /Users/pascal/Development/kryton && npx tsc --noEmit --project packages/client/tsconfig.json`
 Expected: No errors.
 
 - [ ] **Step 3: Commit**
@@ -2113,7 +2113,7 @@ describe("PluginSlotRegistry", () => {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd /Users/pascal/Development/mnemo && npm run test:client`
+Run: `cd /Users/pascal/Development/kryton && npm run test:client`
 Expected: FAIL (module not found).
 
 - [ ] **Step 3: Implement PluginSlotRegistry**
@@ -2332,7 +2332,7 @@ export class PluginSlotRegistry {
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd /Users/pascal/Development/mnemo && npm run test:client`
+Run: `cd /Users/pascal/Development/kryton && npm run test:client`
 Expected: All PluginSlotRegistry tests PASS.
 
 - [ ] **Step 5: Commit**
@@ -2417,7 +2417,7 @@ describe("PluginErrorBoundary", () => {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd /Users/pascal/Development/mnemo && npm run test:client`
+Run: `cd /Users/pascal/Development/kryton && npm run test:client`
 Expected: FAIL (module not found).
 
 - [ ] **Step 3: Implement PluginErrorBoundary**
@@ -2494,7 +2494,7 @@ export class PluginErrorBoundary extends Component<Props, State> {
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd /Users/pascal/Development/mnemo && npm run test:client`
+Run: `cd /Users/pascal/Development/kryton && npm run test:client`
 Expected: All PluginErrorBoundary tests PASS.
 
 - [ ] **Step 5: Commit**
@@ -2764,7 +2764,7 @@ export class ClientPluginManager {
 
 - [ ] **Step 4: Verify types compile**
 
-Run: `cd /Users/pascal/Development/mnemo && npx tsc --noEmit --project packages/client/tsconfig.json`
+Run: `cd /Users/pascal/Development/kryton && npx tsc --noEmit --project packages/client/tsconfig.json`
 Expected: No errors.
 
 - [ ] **Step 5: Commit**
@@ -2828,7 +2828,7 @@ Add `<PluginSlot slot="statusbar-left" />` and `<PluginSlot slot="statusbar-righ
 
 - [ ] **Step 3: Verify the app builds**
 
-Run: `cd /Users/pascal/Development/mnemo && npm run build`
+Run: `cd /Users/pascal/Development/kryton && npm run build`
 Expected: No errors in both server and client builds.
 
 - [ ] **Step 4: Commit**
@@ -2857,8 +2857,8 @@ Create `plugins/sample-wordcount/manifest.json`:
   "name": "Word Count",
   "version": "1.0.0",
   "description": "Displays word count statistics for notes",
-  "author": "Mnemo",
-  "minMnemoVersion": "2.0.0",
+  "author": "Kryton",
+  "minKrytonVersion": "2.0.0",
   "server": "server/index.js",
   "settings": [
     {
@@ -2909,7 +2909,7 @@ exports.deactivate = function () {
 This will be done manually for now. Add a note in the README about inserting:
 ```sql
 INSERT INTO installed_plugin (id, name, version, description, author, state, enabled, manifest)
-VALUES ('sample-wordcount', 'Word Count', '1.0.0', 'Displays word count statistics', 'Mnemo', 'installed', true, '{}');
+VALUES ('sample-wordcount', 'Word Count', '1.0.0', 'Displays word count statistics', 'Kryton', 'installed', true, '{}');
 ```
 
 Or add a startup script that auto-registers plugins found in the `plugins/` directory.
@@ -2941,7 +2941,7 @@ Update `packages/server/src/index.ts` to call `pluginManager.discoverAndLoadPlug
 
 - [ ] **Step 5: Start the server and verify the plugin loads**
 
-Run: `cd /Users/pascal/Development/mnemo/packages/server && npm run dev`
+Run: `cd /Users/pascal/Development/kryton/packages/server && npm run dev`
 Expected: Console shows `[plugins] Loaded plugin: sample-wordcount` and `[plugin:sample-wordcount] Word Count plugin activated`.
 
 - [ ] **Step 6: Test the custom route**
@@ -2965,28 +2965,28 @@ git add plugins/sample-wordcount/ packages/server/src/plugins/PluginManager.ts p
 - [ ] **Step 1: Run all tests**
 
 ```bash
-cd /Users/pascal/Development/mnemo && npm run test
+cd /Users/pascal/Development/kryton && npm run test
 ```
 Expected: All server and client tests pass.
 
 - [ ] **Step 2: Run linting**
 
 ```bash
-cd /Users/pascal/Development/mnemo && npm run lint
+cd /Users/pascal/Development/kryton && npm run lint
 ```
 Expected: No lint errors.
 
 - [ ] **Step 3: Run type checking**
 
 ```bash
-cd /Users/pascal/Development/mnemo && npm run typecheck
+cd /Users/pascal/Development/kryton && npm run typecheck
 ```
 Expected: No type errors.
 
 - [ ] **Step 4: Run full build**
 
 ```bash
-cd /Users/pascal/Development/mnemo && npm run build
+cd /Users/pascal/Development/kryton && npm run build
 ```
 Expected: Both server and client build successfully.
 

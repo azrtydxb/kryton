@@ -34,7 +34,7 @@ describe("PluginApiFactory", () => {
       version: "1.0.0",
       description: "A test plugin",
       author: "Test",
-      minMnemoVersion: "2.0.0",
+      minKrytonVersion: "2.0.0",
     });
 
     expect(api.plugin.id).toBe("test-plugin");
@@ -53,7 +53,7 @@ describe("PluginApiFactory", () => {
       version: "1.0.0",
       description: "A test plugin",
       author: "Test",
-      minMnemoVersion: "2.0.0",
+      minKrytonVersion: "2.0.0",
     });
 
     const handler = vi.fn();
@@ -73,7 +73,7 @@ describe("PluginApiFactory", () => {
       version: "1.0.0",
       description: "A test plugin",
       author: "Test",
-      minMnemoVersion: "2.0.0",
+      minKrytonVersion: "2.0.0",
     });
 
     api.log.info("hello");

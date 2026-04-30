@@ -27,13 +27,13 @@ function applyTheme(theme: Theme) {
 export function useTheme() {
   const [theme, setThemeState] = useState<Theme>(() => {
     if (typeof window === 'undefined') return 'system';
-    const saved = localStorage.getItem('mnemo-theme') as Theme | null;
+    const saved = localStorage.getItem('kryton-theme') as Theme | null;
     return saved || 'system';
   });
 
   const setTheme = useCallback((newTheme: Theme) => {
     setThemeState(newTheme);
-    localStorage.setItem('mnemo-theme', newTheme);
+    localStorage.setItem('kryton-theme', newTheme);
     // Apply immediately — don't wait for the effect
     applyTheme(newTheme);
   }, []);

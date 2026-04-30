@@ -1,5 +1,5 @@
 interface BreadcrumbsProps {
-  path: string; // e.g. "Projects/Mnemo/Tasks.md"
+  path: string; // e.g. "Projects/Kryton/Tasks.md"
   onFolderClick: (folderPath: string) => void;
 }
 

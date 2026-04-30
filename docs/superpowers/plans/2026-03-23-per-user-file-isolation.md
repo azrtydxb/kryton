@@ -17,7 +17,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-03-23-per-user-file-isolation-design.md`
 
-**Working directory:** All paths relative to `/Users/pascal/Development/mnemo`.
+**Working directory:** All paths relative to `/Users/pascal/Development/kryton`.
 
 ---
 
@@ -59,7 +59,7 @@ This avoids the nullable-PK issue while still enforcing uniqueness.
 - [ ] **Step 4: Verify build**
 
 ```bash
-cd /Users/pascal/Development/mnemo
+cd /Users/pascal/Development/kryton
 npm run typecheck
 npm run build
 ```
@@ -91,7 +91,7 @@ Import `indexNote` from `searchService`, graph building from `graphService`.
 - [ ] **Step 2: Verify build**
 
 ```bash
-cd /Users/pascal/Development/mnemo
+cd /Users/pascal/Development/kryton
 npm run typecheck
 npm run build
 ```
@@ -159,7 +159,7 @@ Read the file. Add `userId` parameter to ALL functions that call search/graph se
 - [ ] **Step 4: Verify build**
 
 ```bash
-cd /Users/pascal/Development/mnemo
+cd /Users/pascal/Development/kryton
 npm run typecheck
 npm run build
 ```
@@ -222,7 +222,7 @@ Resolve `userDir` for canvas file operations. The canvas directory is `path.join
 - [ ] **Step 6: Verify build**
 
 ```bash
-cd /Users/pascal/Development/mnemo
+cd /Users/pascal/Development/kryton
 npm run typecheck
 npm run build
 ```
@@ -278,7 +278,7 @@ Pass `req.user!.id` to `getAllTags(userId)` and `getNotesByTag(tag, userId)`.
 - [ ] **Step 6: Verify build**
 
 ```bash
-cd /Users/pascal/Development/mnemo
+cd /Users/pascal/Development/kryton
 npm run typecheck
 npm run build
 ```
@@ -315,7 +315,7 @@ Modify `resolveOAuthUser` to return `{ user, isNewUser }` instead of just `User`
 - [ ] **Step 4: Verify build**
 
 ```bash
-cd /Users/pascal/Development/mnemo
+cd /Users/pascal/Development/kryton
 npm run typecheck
 npm run build
 ```
@@ -363,7 +363,7 @@ Do NOT delete the `notes/{userId}/` directory (soft delete per spec).
 - [ ] **Step 3: Verify full pipeline**
 
 ```bash
-cd /Users/pascal/Development/mnemo
+cd /Users/pascal/Development/kryton
 npm run typecheck
 npm run lint
 npm run build
@@ -383,7 +383,7 @@ git commit -m "feat: remove global note creation, add startup cleanup, update ad
 - [ ] **Step 1: Full build check**
 
 ```bash
-cd /Users/pascal/Development/mnemo
+cd /Users/pascal/Development/kryton
 npm run typecheck
 npm run lint
 npm run build

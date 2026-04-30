@@ -6,7 +6,7 @@
 
 ## Overview
 
-Enable AI agents to interact with Mnemo's API by adding:
+Enable AI agents to interact with Kryton's API by adding:
 1. API key creation and revocation via a new Account Settings page
 2. Bearer token authentication alongside existing session-based auth
 3. Complete OpenAPI documentation with security schemes
@@ -39,12 +39,12 @@ Add `apiKeys ApiKey[]` relation to the `User` model.
 **Fields:**
 - `name` — user-chosen label (e.g. "Claude Code", "My Script")
 - `keyHash` — SHA-256 hash of the full API key (the raw key is never stored)
-- `keyPrefix` — `mnemo_` + first 8 hex chars, displayed in the UI for identification
+- `keyPrefix` — `kryton_` + first 8 hex chars, displayed in the UI for identification
 - `scope` — `"read-only"` or `"read-write"`
 - `expiresAt` — optional; null means never expires
 - `lastUsedAt` — updated on each authenticated request for usage tracking
 
-**Key format:** `mnemo_<64 random hex chars>` (total length: 70 chars). Generated server-side using `crypto.randomBytes(32).toString('hex')` (256 bits of entropy). The full key is returned exactly once at creation time.
+**Key format:** `kryton_<64 random hex chars>` (total length: 70 chars). Generated server-side using `crypto.randomBytes(32).toString('hex')` (256 bits of entropy). The full key is returned exactly once at creation time.
 
 **No update endpoint.** To change scope or expiration, revoke and create a new key.
 
@@ -56,7 +56,7 @@ Extend `authMiddleware` in `packages/server/src/middleware/auth.ts`:
 
 ```
 Request arrives
-  → Has "Authorization: Bearer mnemo_..." header?
+  → Has "Authorization: Bearer kryton_..." header?
     → YES: SHA-256 hash the token, look up ApiKey by keyHash (DB WHERE clause)
       → Found:
         → Check expiresAt (if set and in the past → 401)
@@ -128,8 +128,8 @@ New router at `/api/api-keys`, guarded by `authMiddleware` + `requireSession`.
 {
   "id": "uuid",
   "name": "Claude Code",
-  "key": "mnemo_a1b2c3d4e5f6...",
-  "keyPrefix": "mnemo_a1b2c3d4",
+  "key": "kryton_a1b2c3d4e5f6...",
+  "keyPrefix": "kryton_a1b2c3d4",
   "scope": "read-only",
   "expiresAt": "2026-06-25T00:00:00.000Z",
   "createdAt": "2026-03-25T12:00:00.000Z"
@@ -148,7 +148,7 @@ The `key` field is returned **only in this response**. It is never stored or ret
   {
     "id": "uuid",
     "name": "Claude Code",
-    "keyPrefix": "mnemo_a1b2c3d4",
+    "keyPrefix": "kryton_a1b2c3d4",
     "scope": "read-only",
     "expiresAt": "2026-06-25T00:00:00.000Z",
     "lastUsedAt": "2026-03-25T10:30:00.000Z",
@@ -178,7 +178,7 @@ components: {
     bearerAuth: {
       type: 'http',
       scheme: 'bearer',
-      description: 'API key with mnemo_ prefix',
+      description: 'API key with kryton_ prefix',
     },
   },
 },
@@ -224,7 +224,7 @@ Each annotation includes: summary, tags, parameters, request body schema, respon
 
 ### Authentication
 
-Same bearer token mechanism as the REST API. The MCP client sends `Authorization: Bearer mnemo_...` in the HTTP headers. The MCP handler authenticates via the same API key lookup and populates a user context.
+Same bearer token mechanism as the REST API. The MCP client sends `Authorization: Bearer kryton_...` in the HTTP headers. The MCP handler authenticates via the same API key lookup and populates a user context.
 
 **CORS note:** MCP clients (Claude Code, Cursor) are not browsers, so CORS is irrelevant for them. The existing CORS config (allowing only `APP_URL`) is sufficient and correctly restrictive for any browser-based access attempts.
 
@@ -285,7 +285,7 @@ Example: A "summarize" plugin that exposes `POST /api/plugins/summarize/run` wit
 
 | Resource URI | Description |
 |-------------|-------------|
-| `mnemo://notes` | The full note tree structure (JSON) |
+| `kryton://notes` | The full note tree structure (JSON) |
 
 ### Tool input/output schemas
 
@@ -324,7 +324,7 @@ A full-screen modal (same pattern as `AdminPage`) managed by `showAccountSetting
 **Key list:** Each row shows:
 - Name (bold)
 - Scope badge: "Read Only" (gray) or "Read Write" (violet)
-- Prefix: `mnemo_a1b2c3d4...` in monospace
+- Prefix: `kryton_a1b2c3d4...` in monospace
 - Last used: relative time ("2 hours ago") or "Never"
 - Expires: date or "Never"
 - Revoke button → confirm step (same pattern as PasskeyManager delete)
@@ -381,4 +381,4 @@ export const apiKeyApi = {
 - **Admin isolation:** Admin routes remain session-only
 - **Cascade delete:** Deleting a user cascades to all their API keys
 - **Expiration:** Expired keys are rejected at auth time (not garbage-collected, but could add cleanup later)
-- **Prefix identification:** `mnemo_` prefix allows key scanning tools (like GitHub's secret scanning) to identify leaked keys
+- **Prefix identification:** `kryton_` prefix allows key scanning tools (like GitHub's secret scanning) to identify leaked keys

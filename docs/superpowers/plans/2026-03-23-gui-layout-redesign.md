@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-03-23-gui-layout-redesign.md`
 
-**Working directory:** All paths relative to `/Users/pascal/Development/mnemo`.
+**Working directory:** All paths relative to `/Users/pascal/Development/kryton`.
 
 ---
 
@@ -24,7 +24,7 @@
 - [ ] **Step 1: Delete CanvasView component**
 
 ```bash
-rm /Users/pascal/Development/mnemo/packages/client/src/components/Canvas/CanvasView.tsx
+rm /Users/pascal/Development/kryton/packages/client/src/components/Canvas/CanvasView.tsx
 ```
 
 - [ ] **Step 2: Remove Canvas from App.tsx**
@@ -39,14 +39,14 @@ In `packages/client/src/App.tsx`:
 - [ ] **Step 3: Remove @xyflow/react dependency**
 
 ```bash
-cd /Users/pascal/Development/mnemo/packages/client
+cd /Users/pascal/Development/kryton/packages/client
 npm uninstall @xyflow/react
 ```
 
 - [ ] **Step 4: Verify build**
 
 ```bash
-cd /Users/pascal/Development/mnemo
+cd /Users/pascal/Development/kryton
 npm run build
 ```
 
@@ -177,7 +177,7 @@ export function GraphPanel({ graphData, loading, activeNotePath, onNoteSelect }:
 - [ ] **Step 3: Verify build**
 
 ```bash
-cd /Users/pascal/Development/mnemo
+cd /Users/pascal/Development/kryton
 npm run typecheck
 npm run build
 ```
@@ -248,7 +248,7 @@ This correctly adds `id` attributes to rendered headings without interfering wit
 - [ ] **Step 2: Verify build**
 
 ```bash
-cd /Users/pascal/Development/mnemo
+cd /Users/pascal/Development/kryton
 npm run build
 ```
 
@@ -327,7 +327,7 @@ Changes: `toggleOutline` → `toggleEdit`, `Ctrl+O` → `Ctrl+E`.
 - [ ] **Step 2: Verify build**
 
 ```bash
-cd /Users/pascal/Development/mnemo
+cd /Users/pascal/Development/kryton
 npm run typecheck
 ```
 
@@ -757,7 +757,7 @@ const handleNoteSelect = useCallback((path: string) => {
 - [ ] **Step 10: Verify full build pipeline**
 
 ```bash
-cd /Users/pascal/Development/mnemo
+cd /Users/pascal/Development/kryton
 npm run typecheck
 npm run lint
 npm run build
@@ -779,7 +779,7 @@ git commit -m "feat: rewrite App layout - preview default, inline graph, edit to
 - [ ] **Step 1: Clean install and full check**
 
 ```bash
-cd /Users/pascal/Development/mnemo
+cd /Users/pascal/Development/kryton
 npm ci
 npm run typecheck
 npm run lint

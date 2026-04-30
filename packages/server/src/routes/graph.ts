@@ -38,7 +38,7 @@ import { requireUser } from "../middleware/auth.js";
  *                         example: Welcome.md
  *                       target:
  *                         type: string
- *                         example: Projects/Mnemo Roadmap.md
+ *                         example: Projects/Kryton Roadmap.md
  *       500:
  *         description: Failed to fetch graph data
  */

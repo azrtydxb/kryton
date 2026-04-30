@@ -1,21 +1,21 @@
 # Plugin Ecosystem Design
 
-Comprehensive design for an Obsidian-like plugin ecosystem in Mnemo, covering the Plugin API, runtime, distribution, and management UI.
+Comprehensive design for an Obsidian-like plugin ecosystem in Kryton, covering the Plugin API, runtime, distribution, and management UI.
 
 ## Overview
 
-Mnemo's plugin system allows the admin to install community plugins that extend every aspect of the application — custom markdown renderers, new UI panels, workflow automation, data integrations, and full custom pages. Plugins are admin-installed and server-wide, but can expose per-user settings and store per-user data.
+Kryton's plugin system allows the admin to install community plugins that extend every aspect of the application — custom markdown renderers, new UI panels, workflow automation, data integrations, and full custom pages. Plugins are admin-installed and server-wide, but can expose per-user settings and store per-user data.
 
 ### Design Principles
 
 - **Admin is the trust boundary** — plugins run with full access, installed by the admin for all users
-- **Structured API over direct access** — plugins interact through a defined `PluginAPI`, not Mnemo internals
+- **Structured API over direct access** — plugins interact through a defined `PluginAPI`, not Kryton internals
 - **Defensive guardrails, not sandboxing** — error boundaries, health monitoring, and clean lifecycle hooks protect reliability without the complexity of process isolation
 - **Hot-swappable** — individual plugins can be loaded/unloaded without server restart
 
 ### Architecture: Monolithic + Defensive Guardrails
 
-Plugins run in the same Node.js process as the Mnemo server. This is the simplest execution model and avoids IPC overhead. Reliability is ensured through:
+Plugins run in the same Node.js process as the Kryton server. This is the simplest execution model and avoids IPC overhead. Reliability is ensured through:
 
 - React error boundaries wrapping all plugin UI components
 - Server-side try/catch around all plugin event handlers and route handlers
@@ -58,7 +58,7 @@ plugins/
   "version": "1.0.0",
   "description": "Turn notes into Kanban boards",
   "author": "Pascal",
-  "minMnemoVersion": "2.1.0",
+  "minKrytonVersion": "2.1.0",
   "server": "server/index.ts",
   "client": "client/index.tsx",
   "settings": [
@@ -87,7 +87,7 @@ Field descriptions:
 - **`version`** — semver version string
 - **`description`** — short description for the registry browser
 - **`author`** — plugin author name
-- **`minMnemoVersion`** — minimum Mnemo version required for compatibility
+- **`minKrytonVersion`** — minimum Kryton version required for compatibility
 - **`server`** — path to backend entry point (optional, omit for frontend-only plugins)
 - **`client`** — path to frontend entry point (optional, omit for backend-only plugins)
 - **`settings`** — array of setting declarations with type, default, label, and `perUser` flag
@@ -96,7 +96,7 @@ Field descriptions:
 
 ## 2. Plugin API (Backend)
 
-When a plugin's `activate()` function is called, it receives a scoped `PluginAPI` object — the only interface between the plugin and Mnemo's internals.
+When a plugin's `activate()` function is called, it receives a scoped `PluginAPI` object — the only interface between the plugin and Kryton's internals.
 
 ### Plugin Entry Point
 
@@ -185,9 +185,9 @@ interface PluginAPI {
 
 `before` handlers receive a mutable context object and can cancel the operation by throwing. `after` handlers are fire-and-forget.
 
-**Routes get auth for free.** Plugin routes are mounted at `/api/plugins/{pluginId}/...` with Mnemo's auth middleware already applied. The handler receives `req.user` like any Mnemo route. The plugin just writes the handler logic.
+**Routes get auth for free.** Plugin routes are mounted at `/api/plugins/{pluginId}/...` with Kryton's auth middleware already applied. The handler receives `req.user` like any Kryton route. The plugin just writes the handler logic.
 
-**Database entities are auto-namespaced.** When a plugin registers a TypeORM entity, the table name is automatically prefixed with `plugin_{pluginId}_` (e.g., `plugin_kanban_boards`). Mnemo runs migrations on plugin install/update.
+**Database entities are auto-namespaced.** When a plugin registers a TypeORM entity, the table name is automatically prefixed with `plugin_{pluginId}_` (e.g., `plugin_kanban_boards`). Kryton runs migrations on plugin install/update.
 
 **Logger is auto-prefixed.** All log output is prefixed with `[plugin:{pluginId}]` for easy filtering.
 
@@ -294,7 +294,7 @@ interface ClientPluginAPI {
 
 **Commands integrate with the quick switcher.** Plugins can register commands that appear in the Ctrl+P command palette with optional keyboard shortcuts.
 
-**`context` provides React hooks.** Plugins read app state reactively (current user, current note, theme, plugin settings) without coupling to Mnemo's internal state management.
+**`context` provides React hooks.** Plugins read app state reactively (current user, current note, theme, plugin settings) without coupling to Kryton's internal state management.
 
 **`api.fetch` is a thin wrapper.** It prefixes the URL to `/api/plugins/{pluginId}/...` and injects auth headers automatically. Plugins just call `api.fetch('/boards')`.
 
@@ -314,13 +314,13 @@ Installed → Loaded → Active → Deactivating → Unloaded
 
 ### Server-Side Lifecycle
 
-1. **Install** — Mnemo downloads the plugin directory from the registry repo into a local `plugins/` directory. Manifest is validated. Database entities are registered and migrations run.
+1. **Install** — Kryton downloads the plugin directory from the registry repo into a local `plugins/` directory. Manifest is validated. Database entities are registered and migrations run.
 
 2. **Load** — Plugin's server entry is `require()`'d. The module is parsed but `activate()` is not yet called.
 
-3. **Activate** — `activate(api)` is called with a scoped `PluginAPI` instance. The plugin registers event handlers, routes, storage schemas, and database entities. All registrations go through the scoped API, so Mnemo tracks what each plugin has registered.
+3. **Activate** — `activate(api)` is called with a scoped `PluginAPI` instance. The plugin registers event handlers, routes, storage schemas, and database entities. All registrations go through the scoped API, so Kryton tracks what each plugin has registered.
 
-4. **Deactivate** — `deactivate()` is called. The plugin cleans up timers, connections, etc. Then Mnemo automatically:
+4. **Deactivate** — `deactivate()` is called. The plugin cleans up timers, connections, etc. Then Kryton automatically:
    - Removes all Express routes the plugin registered
    - Removes all event listeners the plugin registered
    - Clears the Node `require` cache for the plugin's modules
@@ -329,7 +329,7 @@ Installed → Loaded → Active → Deactivating → Unloaded
 
 ### Frontend Lifecycle
 
-1. On page load, Mnemo serves a plugin manifest endpoint (`GET /api/plugins/active`) listing active plugins and their client bundle URLs.
+1. On page load, Kryton serves a plugin manifest endpoint (`GET /api/plugins/active`) listing active plugins and their client bundle URLs.
 2. The app dynamically `import()`s each plugin's client bundle.
 3. Each plugin's `activate(clientApi)` is called, registering UI components into slots.
 4. On hot-swap, the frontend receives a WebSocket event, unmounts the old plugin's components, loads the new bundle, and re-activates.
@@ -339,7 +339,7 @@ Installed → Loaded → Active → Deactivating → Unloaded
 - **Error boundaries** — each plugin's UI components are wrapped in React error boundaries. A crash shows a fallback message with a retry button.
 - **Activation timeout** — if `activate()` doesn't return within 10 seconds, the plugin is marked as failed and disabled.
 - **Health monitor** — if a plugin's event handlers or route handlers throw more than 5 errors in 60 seconds, the plugin is auto-disabled and the admin is notified via the dashboard.
-- **Graceful degradation** — if a plugin fails to load, the rest of Mnemo works normally. Failed plugins show a warning in the admin dashboard with the error details.
+- **Graceful degradation** — if a plugin fails to load, the rest of Kryton works normally. Failed plugins show a warning in the admin dashboard with the error details.
 
 ---
 
@@ -347,10 +347,10 @@ Installed → Loaded → Active → Deactivating → Unloaded
 
 ### Registry Repository
 
-The plugin registry is a single git repository: **`piwi3910/mnemo-plugins`** (hardcoded in the Mnemo server source).
+The plugin registry is a single git repository: **`piwi3910/kryton-plugins`** (hardcoded in the Kryton server source).
 
 ```
-mnemo-plugins/
+kryton-plugins/
   registry.json
   plugins/
     kanban/
@@ -376,7 +376,7 @@ mnemo-plugins/
       "description": "Turn notes into interactive Kanban boards",
       "author": "Pascal",
       "version": "1.0.0",
-      "minMnemoVersion": "2.1.0",
+      "minKrytonVersion": "2.1.0",
       "tags": ["productivity", "organization"],
       "icon": "layout-grid"
     }
@@ -386,7 +386,7 @@ mnemo-plugins/
 
 ### Build Pipeline
 
-The registry repo has a CI pipeline that builds each plugin's TypeScript source into ready-to-run JavaScript bundles on merge. Mnemo downloads pre-built bundles, not source code.
+The registry repo has a CI pipeline that builds each plugin's TypeScript source into ready-to-run JavaScript bundles on merge. Kryton downloads pre-built bundles, not source code.
 
 - Server entry → bundled to a single CommonJS file
 - Client entry → bundled to a single ESM file (for dynamic `import()`)
@@ -394,16 +394,16 @@ The registry repo has a CI pipeline that builds each plugin's TypeScript source 
 
 ### Fetch & Install Flow
 
-1. Mnemo fetches `registry.json` from the GitHub repo (via GitHub API) when the admin opens the plugin browser.
+1. Kryton fetches `registry.json` from the GitHub repo (via GitHub API) when the admin opens the plugin browser.
 2. The admin searches/browses, picks a plugin, clicks "Install."
-3. Mnemo downloads the plugin's built bundle (via GitHub API), validates the manifest, and places it in the local `plugins/` directory.
+3. Kryton downloads the plugin's built bundle (via GitHub API), validates the manifest, and places it in the local `plugins/` directory.
 4. The plugin is activated via the lifecycle described in Section 4.
 
 ### Update Flow
 
-- Mnemo periodically checks the registry for version bumps (or the admin clicks "Check for updates").
+- Kryton periodically checks the registry for version bumps (or the admin clicks "Check for updates").
 - When an update is available, the admin sees it in the dashboard and clicks "Update."
-- Mnemo downloads the new version and runs the hot-swap lifecycle: deactivate old → replace files → activate new.
+- Kryton downloads the new version and runs the hot-swap lifecycle: deactivate old → replace files → activate new.
 
 ---
 
@@ -416,7 +416,7 @@ A new **Plugins** tab in the existing Admin Dashboard with three views:
 - Search bar with tag filtering (productivity, learning, integrations, etc.)
 - Plugin cards showing name, description, version, author
 - "Install" button per plugin
-- Compatibility warnings when `minMnemoVersion` exceeds the current Mnemo version
+- Compatibility warnings when `minKrytonVersion` exceeds the current Kryton version
 
 ### Installed Plugins
 
@@ -480,7 +480,7 @@ A new `PluginStorage` entity:
 
 - Plugin defines TypeORM entities via `api.database.registerEntity()`
 - Table names auto-prefixed: `plugin_{pluginId}_{tableName}`
-- Mnemo manages the connection and runs migrations on plugin install/update
+- Kryton manages the connection and runs migrations on plugin install/update
 - Plugin queries via `api.database.getRepository(entity)`
 - Good for: structured data with relationships and complex queries (Kanban boards, spaced repetition schedules)
 
@@ -526,9 +526,9 @@ The plugin ecosystem will be implemented as four sequential sub-projects:
 
 ### Phase 3: Registry & Distribution
 
-- Set up the `piwi3910/mnemo-plugins` repository structure with `registry.json`
+- Set up the `piwi3910/kryton-plugins` repository structure with `registry.json`
 - Implement CI pipeline to build plugin TypeScript → JS bundles
-- Implement registry fetching in Mnemo (GitHub API integration)
+- Implement registry fetching in Kryton (GitHub API integration)
 - Implement plugin download and installation from registry
 - Implement update checking and update flow
 - Build a sample plugin in the registry to validate the full pipeline

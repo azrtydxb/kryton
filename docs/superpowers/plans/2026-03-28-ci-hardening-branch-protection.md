@@ -192,7 +192,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}/mnemo
+  IMAGE_NAME: ${{ github.repository }}/kryton
 
 jobs:
   ci:
@@ -335,13 +335,13 @@ git commit -m "ci: add release workflow with multi-arch Docker and auto release 
 - [ ] **Step 1: Enable auto-merge on the repository**
 
 ```bash
-gh repo edit piwi3910/mnemo --enable-auto-merge --delete-branch-on-merge --enable-squash-merge --disable-merge-commit --disable-rebase-merge
+gh repo edit piwi3910/kryton --enable-auto-merge --delete-branch-on-merge --enable-squash-merge --disable-merge-commit --disable-rebase-merge
 ```
 
 - [ ] **Step 2: Set branch protection rules**
 
 ```bash
-gh api repos/piwi3910/mnemo/branches/master/protection \
+gh api repos/piwi3910/kryton/branches/master/protection \
   --method PUT \
   --input - <<'EOF'
 {
@@ -363,7 +363,7 @@ This requires PRs (no direct push), requires the `build` check to pass, requires
 - [ ] **Step 3: Verify protection is active**
 
 ```bash
-gh api repos/piwi3910/mnemo/branches/master/protection --jq '.required_status_checks.contexts'
+gh api repos/piwi3910/kryton/branches/master/protection --jq '.required_status_checks.contexts'
 ```
 
 Expected: `["build"]`

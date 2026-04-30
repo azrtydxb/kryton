@@ -4,7 +4,7 @@ Unified migration: TypeORM → Prisma, hand-rolled auth → better-auth, and add
 
 ## Overview
 
-Mnemo's authentication system is currently hand-rolled (custom JWT tokens, manual OAuth flows, bcrypt password hashing) on TypeORM with PostgreSQL. This migration replaces the entire data access layer and auth system in one pass:
+Kryton's authentication system is currently hand-rolled (custom JWT tokens, manual OAuth flows, bcrypt password hashing) on TypeORM with PostgreSQL. This migration replaces the entire data access layer and auth system in one pass:
 
 1. **TypeORM → Prisma** — all 12 entities migrate to Prisma models
 2. **Custom auth → better-auth** — OAuth, email/password, sessions managed by better-auth
@@ -279,7 +279,7 @@ export const auth = betterAuth({
   },
   plugins: [
     passkey({
-      rpName: "Mnemo",
+      rpName: "Kryton",
       rpID: process.env.WEBAUTHN_RP_ID || "localhost",
       origin: process.env.APP_URL || "http://localhost:5173",
     }),

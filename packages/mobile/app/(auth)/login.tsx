@@ -60,7 +60,7 @@ export default function LoginScreen() {
       >
         <View style={styles.header}>
           <Text style={styles.title}>Welcome back</Text>
-          <Text style={styles.subtitle}>Sign in to your Mnemo account</Text>
+          <Text style={styles.subtitle}>Sign in to your Kryton account</Text>
         </View>
 
         <View style={styles.form}>

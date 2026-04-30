@@ -1,9 +1,9 @@
 import * as SecureStore from "expo-secure-store";
 
 const KEYS = {
-  serverUrl: "mnemo_server_url",
-  apiKey: "mnemo_api_key",
-  lastSyncAt: "mnemo_last_sync_at",
+  serverUrl: "kryton_server_url",
+  apiKey: "kryton_api_key",
+  lastSyncAt: "kryton_last_sync_at",
 };
 
 export const storage = {

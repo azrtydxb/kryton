@@ -85,8 +85,8 @@ export function Sidebar({
         setNewName(name);
       }
     };
-    window.addEventListener('mnemo:rename-note', handler);
-    return () => window.removeEventListener('mnemo:rename-note', handler);
+    window.addEventListener('kryton:rename-note', handler);
+    return () => window.removeEventListener('kryton:rename-note', handler);
   }, []);
 
   const toggleExpand = useCallback((path: string) => {

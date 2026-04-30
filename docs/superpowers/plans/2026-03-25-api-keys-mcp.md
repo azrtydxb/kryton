@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Enable AI agents to interact with Mnemo via API keys (bearer auth), a complete OpenAPI spec, and a built-in MCP server.
+**Goal:** Enable AI agents to interact with Kryton via API keys (bearer auth), a complete OpenAPI spec, and a built-in MCP server.
 
 **Architecture:** New `ApiKey` Prisma model with hashed keys. Auth middleware extended to accept bearer tokens alongside session cookies. Scope enforcement (read-only / read-write) on all mutating routes. MCP server at `/api/mcp` using `@modelcontextprotocol/sdk` Streamable HTTP transport, calling the service layer directly. New Account Settings page consolidating password, passkeys, and API key management.
 
@@ -146,9 +146,9 @@ import { generateApiKey, hashApiKey, buildKeyPrefix } from "../apiKeyService.js"
 
 describe("apiKeyService", () => {
   describe("generateApiKey", () => {
-    it("returns a key starting with mnemo_ prefix", () => {
+    it("returns a key starting with kryton_ prefix", () => {
       const key = generateApiKey();
-      expect(key).toMatch(/^mnemo_[a-f0-9]{64}$/);
+      expect(key).toMatch(/^kryton_[a-f0-9]{64}$/);
     });
 
     it("generates unique keys", () => {
@@ -160,24 +160,24 @@ describe("apiKeyService", () => {
 
   describe("hashApiKey", () => {
     it("returns a hex SHA-256 hash", () => {
-      const hash = hashApiKey("mnemo_abcdef1234567890");
+      const hash = hashApiKey("kryton_abcdef1234567890");
       expect(hash).toMatch(/^[a-f0-9]{64}$/);
     });
 
     it("produces consistent hashes for the same input", () => {
-      const key = "mnemo_test1234";
+      const key = "kryton_test1234";
       expect(hashApiKey(key)).toBe(hashApiKey(key));
     });
 
     it("produces different hashes for different inputs", () => {
-      expect(hashApiKey("mnemo_aaa")).not.toBe(hashApiKey("mnemo_bbb"));
+      expect(hashApiKey("kryton_aaa")).not.toBe(hashApiKey("kryton_bbb"));
     });
   });
 
   describe("buildKeyPrefix", () => {
-    it("returns mnemo_ plus first 8 hex chars of the key body", () => {
-      const key = "mnemo_a1b2c3d4e5f6a7b8remaining";
-      expect(buildKeyPrefix(key)).toBe("mnemo_a1b2c3d4");
+    it("returns kryton_ plus first 8 hex chars of the key body", () => {
+      const key = "kryton_a1b2c3d4e5f6a7b8remaining";
+      expect(buildKeyPrefix(key)).toBe("kryton_a1b2c3d4");
     });
   });
 });
@@ -198,7 +198,7 @@ import crypto from "node:crypto";
 import { prisma } from "../prisma.js";
 import { AppError, NotFoundError } from "../lib/errors.js";
 
-const KEY_PREFIX = "mnemo_";
+const KEY_PREFIX = "kryton_";
 const KEY_BYTES = 32; // 256 bits of entropy
 const MAX_KEYS_PER_USER = 10;
 
@@ -211,7 +211,7 @@ export function hashApiKey(key: string): string {
 }
 
 export function buildKeyPrefix(key: string): string {
-  // "mnemo_" (6 chars) + first 8 hex chars
+  // "kryton_" (6 chars) + first 8 hex chars
   return key.substring(0, 6 + 8);
 }
 
@@ -401,7 +401,7 @@ export async function authMiddleware(
   try {
     // Check for bearer token first
     const authHeader = req.headers.authorization;
-    if (authHeader?.startsWith("Bearer mnemo_")) {
+    if (authHeader?.startsWith("Bearer kryton_")) {
       const rawKey = authHeader.slice(7); // Remove "Bearer "
       const keyData = await validateApiKey(rawKey);
 
@@ -578,8 +578,8 @@ describe("apiKey routes (unit)", () => {
     const mockCreate = vi.mocked(apiKeyService.createApiKey);
     mockCreate.mockResolvedValue({
       id: "key-1",
-      key: "mnemo_abc123",
-      keyPrefix: "mnemo_ab",
+      key: "kryton_abc123",
+      keyPrefix: "kryton_ab",
       name: "Test",
       scope: "read-only",
       expiresAt: null,
@@ -587,7 +587,7 @@ describe("apiKey routes (unit)", () => {
     });
 
     const result = await apiKeyService.createApiKey("user-1", "Test", "read-only", null);
-    expect(result.key).toBe("mnemo_abc123");
+    expect(result.key).toBe("kryton_abc123");
     expect(mockCreate).toHaveBeenCalledWith("user-1", "Test", "read-only", null);
   });
 
@@ -781,7 +781,7 @@ import { createApiKeysRouter } from "./routes/apiKeys.js";
 3. Replace the existing `app.use("/api", apiLimiter);` (~line 176) with a conditional limiter that routes API key requests to the higher-limit rate limiter and regular requests to the standard one:
 ```typescript
   app.use("/api", (req, res, next) => {
-    if (req.headers.authorization?.startsWith("Bearer mnemo_")) {
+    if (req.headers.authorization?.startsWith("Bearer kryton_")) {
       return apiKeyLimiter(req, res, next);
     }
     return apiLimiter(req, res, next);
@@ -886,9 +886,9 @@ const options: swaggerJsdoc.Options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'Mnemo API',
+      title: 'Kryton API',
       version: '3.1.0',
-      description: 'API for Mnemo - a personal knowledge base with wiki-style linking, graph visualization, and markdown editing.',
+      description: 'API for Kryton - a personal knowledge base with wiki-style linking, graph visualization, and markdown editing.',
     },
     servers: [
       { url: '/api', description: 'API server' },
@@ -904,7 +904,7 @@ const options: swaggerJsdoc.Options = {
         bearerAuth: {
           type: 'http',
           scheme: 'bearer',
-          description: 'API key with mnemo_ prefix (e.g. mnemo_a1b2c3d4...)',
+          description: 'API key with kryton_ prefix (e.g. kryton_a1b2c3d4...)',
         },
       },
     },
@@ -1306,7 +1306,7 @@ const log = createLogger("mcp");
  */
 function createMcpServerInstance(userId: string, keyScope: string): McpServer {
   const server = new McpServer({
-    name: "Mnemo",
+    name: "Kryton",
     version: "3.1.0",
   });
 
@@ -1349,7 +1349,7 @@ function createMcpServerInstance(userId: string, keyScope: string): McpServer {
   // Register resources
   server.resource(
     "notes",
-    "mnemo://notes",
+    "kryton://notes",
     { description: "The full note tree structure" },
     async () => {
       const userDir = await getUserNotesDir(
@@ -1358,7 +1358,7 @@ function createMcpServerInstance(userId: string, keyScope: string): McpServer {
       );
       const tree = await scanDirectory(userDir);
       return {
-        contents: [{ uri: "mnemo://notes", mimeType: "application/json", text: JSON.stringify(tree, null, 2) }],
+        contents: [{ uri: "kryton://notes", mimeType: "application/json", text: JSON.stringify(tree, null, 2) }],
       };
     },
   );
@@ -1373,7 +1373,7 @@ export function createMcpRouter(): Router {
   router.all("/", async (req: Request, res: Response) => {
     // Authenticate via bearer token
     const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith("Bearer mnemo_")) {
+    if (!authHeader?.startsWith("Bearer kryton_")) {
       res.status(401).json({ error: "API key required for MCP access" });
       return;
     }
@@ -2449,7 +2449,7 @@ Start the dev server and verify:
 3. Copy the key, dismiss the display
 4. Key appears in list with prefix, scope, "Never" for last used
 5. Revoke the key → confirm → key disappears
-6. Test the key via curl: `curl -H "Authorization: Bearer mnemo_..." http://localhost:3001/api/notes`
+6. Test the key via curl: `curl -H "Authorization: Bearer kryton_..." http://localhost:3001/api/notes`
 7. Test scope enforcement: read-only key should fail POST requests
 8. Open `/api/docs` → verify security schemes visible
 9. Open `/api/docs.json` → verify complete paths and security definitions

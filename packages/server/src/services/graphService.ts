@@ -16,8 +16,8 @@ export function parseLinks(content: string): string[] {
 }
 
 /**
- * Convert a link target (e.g. "Projects/Mnemo Roadmap") to a note path
- * relative to NOTES_DIR (e.g. "Projects/Mnemo Roadmap.md").
+ * Convert a link target (e.g. "Projects/Kryton Roadmap") to a note path
+ * relative to NOTES_DIR (e.g. "Projects/Kryton Roadmap.md").
  */
 function linkToPath(link: string): string {
   if (link.endsWith(".md")) {

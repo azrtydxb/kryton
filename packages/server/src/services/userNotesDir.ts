@@ -16,9 +16,9 @@ const knownDirs = new Set<string>();
  * Moved here from index.ts so that provisionUserNotes can reuse them.
  */
 export const SAMPLE_NOTES: Record<string, string> = {
-  "Welcome.md": `# Welcome to Mnemo
+  "Welcome.md": `# Welcome to Kryton
 
-Mnemo is your personal knowledge base. Write notes in **Markdown**, link them with [[wiki-links]], and explore your knowledge graph.
+Kryton is your personal knowledge base. Write notes in **Markdown**, link them with [[wiki-links]], and explore your knowledge graph.
 
 ## Getting Started
 
@@ -37,12 +37,12 @@ Mnemo is your personal knowledge base. Write notes in **Markdown**, link them wi
 - **Graph View** showing connections
 - **Dark/Light Mode** following system preference
 
-Check out the [[Projects/Mnemo Roadmap]] for what's coming next!
+Check out the [[Projects/Kryton Roadmap]] for what's coming next!
 
 #welcome #getting-started
 `,
 
-  "Projects/Mnemo Roadmap.md": `# Mnemo Roadmap
+  "Projects/Kryton Roadmap.md": `# Kryton Roadmap
 
 ## Current Version (MVP)
 
@@ -85,7 +85,7 @@ The space includes tools like:
 - Obsidian (local-first, plugin ecosystem)
 - Notion (cloud-based, collaborative)
 - Roam Research (graph-first)
-- **Mnemo** (self-hosted, open source) — see [[Welcome]]
+- **Kryton** (self-hosted, open source) — see [[Welcome]]
 
 ## The Zettelkasten Method
 
@@ -95,7 +95,7 @@ Each note should be:
 - **Autonomous** — Understandable on its own
 - **Connected** — Linked to related notes
 
-See the [[Projects/Mnemo Roadmap]] for how we're building this into Mnemo.
+See the [[Projects/Kryton Roadmap]] for how we're building this into Kryton.
 
 #ideas #knowledge-management #zettelkasten
 `,
@@ -143,16 +143,16 @@ See the [[Projects/Mnemo Roadmap]] for how we're building this into Mnemo.
   "Daily/2026-03-23.md": `# Daily Note — 2026-03-23
 
 ## Tasks
-- [x] Set up Mnemo development environment
-- [x] Review the [[Projects/Mnemo Roadmap]]
+- [x] Set up Kryton development environment
+- [x] Review the [[Projects/Kryton Roadmap]]
 - [ ] Explore [[Ideas/Knowledge Management]] concepts
 
 ## Notes
-Started working with Mnemo today. The [[wiki-links]] make it easy to connect ideas across notes.
+Started working with Kryton today. The [[wiki-links]] make it easy to connect ideas across notes.
 
 ## Links
 - [[Welcome]] — Getting started guide
-- [[Projects/Mnemo Roadmap]] — What's planned
+- [[Projects/Kryton Roadmap]] — What's planned
 
 #daily
 `,

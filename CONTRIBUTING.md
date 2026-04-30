@@ -1,4 +1,4 @@
-# Contributing to Mnemo
+# Contributing to Kryton
 
 ## Prerequisites
 
@@ -9,7 +9,7 @@
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/azrtydxb/mnemo.git && cd mnemo
+git clone https://github.com/azrtydxb/kryton.git && cd kryton
 
 # 2. Copy environment template
 cp .env.example .env

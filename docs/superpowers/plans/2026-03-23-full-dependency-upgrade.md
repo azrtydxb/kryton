@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-03-23-full-dependency-upgrade-design.md`
 
-**Working directory:** All commands assume cwd is `/Users/pascal/Development/mnemo` (repo root). Relative paths like `packages/client` are relative to this root.
+**Working directory:** All commands assume cwd is `/Users/pascal/Development/kryton` (repo root). Relative paths like `packages/client` are relative to this root.
 
 ---
 
@@ -96,7 +96,7 @@ git commit -m "chore: upgrade Node to 24 and docker/build-push-action to v6"
 - [ ] **Step 1: Remove old deps, add new ones**
 
 ```bash
-cd /Users/pascal/Development/mnemo/packages/client
+cd /Users/pascal/Development/kryton/packages/client
 npm uninstall tailwindcss autoprefixer postcss
 npm install -D tailwindcss@latest @tailwindcss/vite@latest vite@latest @vitejs/plugin-react@latest
 ```
@@ -163,7 +163,7 @@ Keep ALL existing content below (the `@layer base`, `@layer components` blocks, 
 - [ ] **Step 5: Verify build**
 
 ```bash
-cd /Users/pascal/Development/mnemo
+cd /Users/pascal/Development/kryton
 npm run build
 ```
 
@@ -191,7 +191,7 @@ git commit -m "chore: upgrade Vite to 8, Tailwind to 4, remove PostCSS config"
 - [ ] **Step 1: Swap ESLint deps in client**
 
 ```bash
-cd /Users/pascal/Development/mnemo/packages/client
+cd /Users/pascal/Development/kryton/packages/client
 npm uninstall eslint @typescript-eslint/eslint-plugin @typescript-eslint/parser eslint-plugin-react-hooks eslint-plugin-react-refresh
 npm install -D eslint@latest @eslint/js@latest typescript-eslint@latest eslint-plugin-react-hooks@latest eslint-plugin-react-refresh@latest
 ```
@@ -199,7 +199,7 @@ npm install -D eslint@latest @eslint/js@latest typescript-eslint@latest eslint-p
 - [ ] **Step 2: Swap ESLint deps in server**
 
 ```bash
-cd /Users/pascal/Development/mnemo/packages/server
+cd /Users/pascal/Development/kryton/packages/server
 npm uninstall eslint @typescript-eslint/eslint-plugin @typescript-eslint/parser
 npm install -D eslint@latest @eslint/js@latest typescript-eslint@latest
 ```
@@ -286,7 +286,7 @@ to:
 - [ ] **Step 7: Run lint and fix any errors**
 
 ```bash
-cd /Users/pascal/Development/mnemo
+cd /Users/pascal/Development/kryton
 npm run lint
 ```
 
@@ -312,7 +312,7 @@ git commit -m "chore: upgrade ESLint to 10 with flat config, typescript-eslint t
 - [ ] **Step 1: Upgrade React and types**
 
 ```bash
-cd /Users/pascal/Development/mnemo/packages/client
+cd /Users/pascal/Development/kryton/packages/client
 npm install react@latest react-dom@latest
 npm install -D @types/react@latest @types/react-dom@latest
 ```
@@ -320,7 +320,7 @@ npm install -D @types/react@latest @types/react-dom@latest
 - [ ] **Step 2: Upgrade lucide-react**
 
 ```bash
-cd /Users/pascal/Development/mnemo/packages/client
+cd /Users/pascal/Development/kryton/packages/client
 npm install lucide-react@latest
 ```
 
@@ -338,7 +338,7 @@ In the root `package.json`, add after the `"workspaces"` field:
 - [ ] **Step 4: Upgrade react-markdown to latest 9.x**
 
 ```bash
-cd /Users/pascal/Development/mnemo/packages/client
+cd /Users/pascal/Development/kryton/packages/client
 npm install react-markdown@^9.1.0
 ```
 
@@ -347,7 +347,7 @@ Do NOT install v10 — it does not support React 19.
 - [ ] **Step 5: Upgrade remaining frontend deps**
 
 ```bash
-cd /Users/pascal/Development/mnemo/packages/client
+cd /Users/pascal/Development/kryton/packages/client
 npm install @codemirror/autocomplete@latest @codemirror/commands@latest @codemirror/lang-markdown@latest @codemirror/language@latest @codemirror/search@latest @codemirror/state@latest @codemirror/theme-one-dark@latest @codemirror/view@latest @replit/codemirror-vim@latest codemirror@latest
 npm install @xyflow/react@latest
 npm install d3@latest rehype-highlight@latest rehype-raw@latest remark-gfm@latest
@@ -358,7 +358,7 @@ npm install -D @types/d3@latest
 - [ ] **Step 6: Verify typecheck and build**
 
 ```bash
-cd /Users/pascal/Development/mnemo
+cd /Users/pascal/Development/kryton
 npm run typecheck
 npm run build
 ```
@@ -386,7 +386,7 @@ git commit -m "chore: upgrade React to 19, lucide-react, CodeMirror, and fronten
 - [ ] **Step 1: Upgrade Express and types**
 
 ```bash
-cd /Users/pascal/Development/mnemo/packages/server
+cd /Users/pascal/Development/kryton/packages/server
 npm install express@latest
 npm install -D @types/express@latest
 ```
@@ -394,7 +394,7 @@ npm install -D @types/express@latest
 - [ ] **Step 2: Upgrade remaining server deps**
 
 ```bash
-cd /Users/pascal/Development/mnemo/packages/server
+cd /Users/pascal/Development/kryton/packages/server
 npm install cors@latest pg@latest typeorm@latest reflect-metadata@latest
 npm install -D @types/cors@latest @types/node@latest tsx@latest typescript@latest
 ```
@@ -402,14 +402,14 @@ npm install -D @types/cors@latest @types/node@latest tsx@latest typescript@lates
 - [ ] **Step 3: Upgrade client TypeScript too**
 
 ```bash
-cd /Users/pascal/Development/mnemo/packages/client
+cd /Users/pascal/Development/kryton/packages/client
 npm install -D typescript@latest
 ```
 
 - [ ] **Step 4: Verify server builds**
 
 ```bash
-cd /Users/pascal/Development/mnemo
+cd /Users/pascal/Development/kryton
 npm run typecheck
 npm run build
 ```
@@ -434,7 +434,7 @@ git commit -m "chore: upgrade Express to 5, TypeScript to 5.9, and server deps"
 - [ ] **Step 1: Clean install**
 
 ```bash
-cd /Users/pascal/Development/mnemo
+cd /Users/pascal/Development/kryton
 rm -rf node_modules packages/client/node_modules packages/server/node_modules package-lock.json
 npm install
 ```
@@ -470,7 +470,7 @@ Expected: No packages with a newer major version (react-markdown 9.x showing 10.
 - [ ] **Step 5: Verify Docker build**
 
 ```bash
-docker build -t mnemo:test .
+docker build -t kryton:test .
 ```
 
 Expected: Build completes successfully with Node 24 base image.

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add multi-user authentication to Mnemo — email/password + OAuth (Google, GitHub), JWT with refresh tokens, admin role with invite system, and protected API routes.
+**Goal:** Add multi-user authentication to Kryton — email/password + OAuth (Google, GitHub), JWT with refresh tokens, admin role with invite system, and protected API routes.
 
 **Architecture:** Four new TypeORM entities (User, AuthProvider, RefreshToken, InviteCode), auth middleware protecting all existing routes, OAuth handled via direct strategy callbacks (not `passport.authenticate()` middleware — Express 5 compatibility), JWT access tokens + SHA-256 hashed refresh tokens in httpOnly cookies, React auth context wrapping the app with login/admin pages.
 
@@ -16,7 +16,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-03-23-authentication-design.md`
 
-**Working directory:** All paths relative to `/Users/pascal/Development/mnemo`.
+**Working directory:** All paths relative to `/Users/pascal/Development/kryton`.
 
 ---
 
@@ -33,7 +33,7 @@
 - [ ] **Step 1: Install dependencies**
 
 ```bash
-cd /Users/pascal/Development/mnemo/packages/server
+cd /Users/pascal/Development/kryton/packages/server
 npm install bcrypt jsonwebtoken cookie-parser
 npm install -D @types/bcrypt @types/jsonwebtoken @types/cookie-parser
 ```
@@ -180,7 +180,7 @@ Add them to the `entities` array: `entities: [GraphEdge, SearchIndex, Settings, 
 - [ ] **Step 7: Verify build**
 
 ```bash
-cd /Users/pascal/Development/mnemo
+cd /Users/pascal/Development/kryton
 npm run typecheck
 npm run build
 ```
@@ -277,7 +277,7 @@ export async function deleteAllUserRefreshTokens(userId: string): Promise<void> 
   await repo.delete({ userId });
 }
 
-export const REFRESH_COOKIE_NAME = "mnemo_refresh";
+export const REFRESH_COOKIE_NAME = "kryton_refresh";
 export const REFRESH_COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
@@ -348,7 +348,7 @@ export function csrfCheck(req: Request, res: Response, next: NextFunction): void
 - [ ] **Step 3: Verify build**
 
 ```bash
-cd /Users/pascal/Development/mnemo
+cd /Users/pascal/Development/kryton
 npm run typecheck
 npm run build
 ```
@@ -390,7 +390,7 @@ Key implementation details:
 - [ ] **Step 2: Verify build**
 
 ```bash
-cd /Users/pascal/Development/mnemo
+cd /Users/pascal/Development/kryton
 npm run typecheck
 npm run build
 ```
@@ -470,7 +470,7 @@ Error handling: if OAuth fails or invite required, redirect to `{APP_URL}/login?
 - [ ] **Step 3: Verify build**
 
 ```bash
-cd /Users/pascal/Development/mnemo
+cd /Users/pascal/Development/kryton
 npm run typecheck
 npm run build
 ```
@@ -507,7 +507,7 @@ All routes require auth + admin middleware (applied when mounting in index.ts).
 - [ ] **Step 2: Verify build**
 
 ```bash
-cd /Users/pascal/Development/mnemo
+cd /Users/pascal/Development/kryton
 npm run typecheck
 npm run build
 ```
@@ -606,7 +606,7 @@ Add `@swagger` JSDoc comments to `auth.ts` and `admin.ts` for all endpoints.
 - [ ] **Step 4: Verify build**
 
 ```bash
-cd /Users/pascal/Development/mnemo
+cd /Users/pascal/Development/kryton
 npm run typecheck
 npm run lint
 npm run build
@@ -683,7 +683,7 @@ The `useAuth` hook calls `setAccessToken()` when tokens are obtained/refreshed, 
 - [ ] **Step 3: Verify build**
 
 ```bash
-cd /Users/pascal/Development/mnemo
+cd /Users/pascal/Development/kryton
 npm run typecheck
 npm run build
 ```
@@ -711,14 +711,14 @@ Create `packages/client/src/pages/LoginPage.tsx`:
 - **Register tab:** name + email + password fields, invite code field (shown if registration mode is invite-only — fetched from `GET /api/auth/config`), submit button, OAuth buttons
 - Uses `useAuth()` hook for login/register actions
 - Shows error messages on failure
-- Uses the Mnemo logo at top
+- Uses the Kryton logo at top
 - Dark themed, consistent with app styling
 - On `?auth=success` URL param (after OAuth redirect): trigger refresh to get tokens
 
 - [ ] **Step 2: Verify build**
 
 ```bash
-cd /Users/pascal/Development/mnemo
+cd /Users/pascal/Development/kryton
 npm run typecheck
 npm run build
 ```
@@ -762,7 +762,7 @@ In `packages/client/src/App.tsx`:
 - [ ] **Step 3: Verify build**
 
 ```bash
-cd /Users/pascal/Development/mnemo
+cd /Users/pascal/Development/kryton
 npm run typecheck
 npm run lint
 npm run build
@@ -800,7 +800,7 @@ Add a state `showAdmin` and conditionally render `<AdminPage />` as a modal/over
 - [ ] **Step 3: Verify full pipeline**
 
 ```bash
-cd /Users/pascal/Development/mnemo
+cd /Users/pascal/Development/kryton
 npm run typecheck
 npm run lint
 npm run build
@@ -821,9 +821,9 @@ git commit -m "feat: add admin page with user management, invites, and settings"
 
 Verify `.env` is already in `.gitignore` (it is — line 3). Then create the example file:
 
-Create `/Users/pascal/Development/mnemo/.env.example`:
+Create `/Users/pascal/Development/kryton/.env.example`:
 ```
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/mnemo
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/kryton
 JWT_SECRET=change-me-to-a-random-64-char-string
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
@@ -835,7 +835,7 @@ APP_URL=http://localhost:5173
 - [ ] **Step 2: Full build and lint**
 
 ```bash
-cd /Users/pascal/Development/mnemo
+cd /Users/pascal/Development/kryton
 npm run typecheck
 npm run lint
 npm run build

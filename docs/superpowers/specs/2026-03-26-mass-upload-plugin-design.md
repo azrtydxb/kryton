@@ -2,7 +2,7 @@
 
 ## Overview
 
-A server+client plugin for Mnemo that lets users bulk-import `.md` files via a modal dialog. Files are uploaded to the server, validated, and presented for review before being committed as notes.
+A server+client plugin for Kryton that lets users bulk-import `.md` files via a modal dialog. Files are uploaded to the server, validated, and presented for review before being committed as notes.
 
 ## Plugin Structure
 
@@ -23,8 +23,8 @@ packages/server/plugins/mass-upload/
   "name": "Mass Upload",
   "version": "1.0.0",
   "description": "Bulk import .md files with validation and duplicate detection",
-  "author": "Mnemo",
-  "minMnemoVersion": "3.0.0",
+  "author": "Kryton",
+  "minKrytonVersion": "3.0.0",
   "client": "client/index.js",
   "server": "server/index.js",
   "settings": [

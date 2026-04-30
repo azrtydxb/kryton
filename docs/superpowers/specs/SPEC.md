@@ -1,8 +1,8 @@
-# Mnemo Technical Specification
+# Kryton Technical Specification
 
 ## Overview
 
-Mnemo is a multi-user, web-based note-taking application with Markdown editing, knowledge graph visualization, note sharing, and an extensible plugin system.
+Kryton is a multi-user, web-based note-taking application with Markdown editing, knowledge graph visualization, note sharing, and an extensible plugin system.
 
 ## Tech Stack
 

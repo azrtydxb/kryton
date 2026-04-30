@@ -1,8 +1,8 @@
-# Mnemo Mobile App — Design Spec
+# Kryton Mobile App — Design Spec
 
 ## Overview
 
-A React Native mobile app for Mnemo that provides full feature parity with the web app. Uses WatermelonDB for offline-first local storage with bidirectional sync to the Mnemo server. Lives in the monorepo at `packages/mobile`.
+A React Native mobile app for Kryton that provides full feature parity with the web app. Uses WatermelonDB for offline-first local storage with bidirectional sync to the Kryton server. Lives in the monorepo at `packages/mobile`.
 
 ## Tech Stack
 
@@ -240,13 +240,13 @@ Sync endpoints (`/api/sync/*`) are exempt from the general 100req/15min rate lim
 React Native does not have a browser cookie jar, so the mobile app uses a **two-step auth flow**: login via better-auth to get a session, then create an API key for persistent mobile access.
 
 ### Login flow
-1. First launch: "Enter your Mnemo server URL" (e.g., `https://mnemo.example.com`)
+1. First launch: "Enter your Kryton server URL" (e.g., `https://kryton.example.com`)
 2. Server URL validated via `GET /api/health`
 3. Email/password login form
 4. If 2FA required: TOTP code input screen
 5. On successful login, the app automatically creates an API key (`POST /api/api-keys`) with scope `read-write` and name `"Mobile App"`
 6. The API key is stored in `expo-secure-store` (encrypted device keychain)
-7. All subsequent API calls use `Authorization: Bearer mnemo_...` header
+7. All subsequent API calls use `Authorization: Bearer kryton_...` header
 8. The session cookie from login is discarded — only the API key persists
 
 ### Why API keys over cookies
@@ -258,8 +258,8 @@ React Native does not have a browser cookie jar, so the mobile app uses a **two-
 
 ### OAuth (Google/GitHub)
 - Open system browser via `WebBrowser.openAuthSessionAsync()`
-- Callback URL: `mnemo://auth-callback`
-- Server `trustedOrigins` must include `mnemo://`
+- Callback URL: `kryton://auth-callback`
+- Server `trustedOrigins` must include `kryton://`
 - On callback: extract temporary session, create API key, discard session
 
 ### Token management
@@ -274,7 +274,7 @@ React Native does not have a browser cookie jar, so the mobile app uses a **two-
 - After registration, same API key creation flow as login
 
 ### Server changes needed
-- Add `mnemo://` to `trustedOrigins` in `auth.ts`
+- Add `kryton://` to `trustedOrigins` in `auth.ts`
 - The API key auth middleware already supports `Authorization: Bearer` headers — no changes needed
 
 ## UI & Navigation

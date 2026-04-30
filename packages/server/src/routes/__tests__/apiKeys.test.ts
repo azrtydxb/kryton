@@ -12,8 +12,8 @@ describe("apiKey routes (unit)", () => {
     const mockCreate = vi.mocked(apiKeyService.createApiKey);
     mockCreate.mockResolvedValue({
       id: "key-1",
-      key: "mnemo_abc123",
-      keyPrefix: "mnemo_ab",
+      key: "kryton_abc123",
+      keyPrefix: "kryton_ab",
       name: "Test",
       scope: "read-only",
       expiresAt: null,
@@ -21,7 +21,7 @@ describe("apiKey routes (unit)", () => {
     });
 
     const result = await apiKeyService.createApiKey("user-1", "Test", "read-only", null);
-    expect(result.key).toBe("mnemo_abc123");
+    expect(result.key).toBe("kryton_abc123");
     expect(mockCreate).toHaveBeenCalledWith("user-1", "Test", "read-only", null);
   });
 

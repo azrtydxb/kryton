@@ -42,7 +42,7 @@ function jsonSchemaToZod(props: Record<string, { type: string; description?: str
 }
 
 function createMcpServerInstance(userId: string, keyScope: string, rawKey: string): McpServer {
-  const server = new McpServer({ name: "Mnemo", version: "3.1.0" });
+  const server = new McpServer({ name: "Kryton", version: "3.1.0" });
 
   // Register 14 core tools
   const toolDefs = getToolDefinitions();
@@ -180,10 +180,10 @@ function createMcpServerInstance(userId: string, keyScope: string, rawKey: strin
     }
   }
 
-  // Register mnemo://notes resource
+  // Register kryton://notes resource
   server.resource(
     "notes",
-    "mnemo://notes",
+    "kryton://notes",
     { description: "The full note tree structure" },
     async (uri) => {
       const userDir = await getUserNotesDir(NOTES_DIR, userId);
@@ -207,7 +207,7 @@ export function createMcpRouter(): Router {
   router.all("/", async (req: Request, res: Response) => {
     // Authenticate via API key
     const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith("Bearer mnemo_")) {
+    if (!authHeader?.startsWith("Bearer kryton_")) {
       res.status(401).json({ error: "API key required for MCP access" });
       return;
     }

@@ -9,7 +9,7 @@ import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
-const DB_URL = process.env.DATABASE_URL || 'file:./data/mnemo.db';
+const DB_URL = process.env.DATABASE_URL || 'file:./data/kryton.db';
 const DB_PATH = DB_URL.replace('file:', '');
 const resolvedPath = path.resolve(DB_PATH);
 

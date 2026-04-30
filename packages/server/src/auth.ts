@@ -31,7 +31,7 @@ export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: "postgresql" }),
   basePath: "/api/auth",
   baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3001",
-  trustedOrigins: [APP_URL, "mnemo://"],
+  trustedOrigins: [APP_URL, "kryton://"],
 
   emailAndPassword: {
     enabled: true,
@@ -56,9 +56,9 @@ export const auth = betterAuth({
           },
         });
         await transporter.sendMail({
-          from: process.env.SMTP_FROM || `"Mnemo" <noreply@${process.env.SMTP_HOST}>`,
+          from: process.env.SMTP_FROM || `"Kryton" <noreply@${process.env.SMTP_HOST}>`,
           to: user.email,
-          subject: "Mnemo - Password Reset",
+          subject: "Kryton - Password Reset",
           text: `You requested a password reset.\n\nClick here to reset your password:\n${url}\n\nThis link expires in 1 hour.\n\nIf you didn't request this, ignore this email.`,
           html: `<p>You requested a password reset.</p><p><a href="${url}">Click here to reset your password</a></p><p>This link expires in 1 hour.</p><p>If you didn't request this, ignore this email.</p>`,
         });
@@ -89,12 +89,12 @@ export const auth = betterAuth({
 
   plugins: [
     passkey({
-      rpName: "Mnemo",
+      rpName: "Kryton",
       rpID: process.env.WEBAUTHN_RP_ID || "localhost",
       origin: APP_URL,
     }),
     twoFactor({
-      issuer: "Mnemo",
+      issuer: "Kryton",
       totpOptions: {
         period: 30,
         digits: 6,

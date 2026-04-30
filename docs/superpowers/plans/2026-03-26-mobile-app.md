@@ -1,4 +1,4 @@
-# Mnemo Mobile App Implementation Plan
+# Kryton Mobile App Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -126,10 +126,10 @@ module.exports = function (api) {
 ```json
 {
   "expo": {
-    "name": "Mnemo",
-    "slug": "mnemo",
+    "name": "Kryton",
+    "slug": "kryton",
     "version": "1.0.0",
-    "scheme": "mnemo",
+    "scheme": "kryton",
     "platforms": ["ios", "android"],
     "icon": "./assets/icon.png",
     "splash": { "image": "./assets/splash.png", "backgroundColor": "#0d1117" },
@@ -211,9 +211,9 @@ export const borderRadius = { sm: 6, md: 8, lg: 12 };
 import * as SecureStore from "expo-secure-store";
 
 const KEYS = {
-  serverUrl: "mnemo_server_url",
-  apiKey: "mnemo_api_key",
-  lastSyncAt: "mnemo_last_sync_at",
+  serverUrl: "kryton_server_url",
+  apiKey: "kryton_api_key",
+  lastSyncAt: "kryton_last_sync_at",
 };
 
 export const storage = {
@@ -727,7 +727,7 @@ git commit -m "feat(mobile): add image upload and toast notifications"
 
 - [ ] **Step 1: Add app icons and splash screen**
 
-Create icon (1024x1024) and splash using the Mnemo logo. Dark background (#0d1117).
+Create icon (1024x1024) and splash using the Kryton logo. Dark background (#0d1117).
 
 - [ ] **Step 2: Test on iOS simulator**
 

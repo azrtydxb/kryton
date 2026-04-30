@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Migrate Mnemo from TypeORM to Prisma, replace hand-rolled JWT auth with better-auth (adding passkey support), and convert the server from CommonJS to ESM — all in one unified migration.
+**Goal:** Migrate Kryton from TypeORM to Prisma, replace hand-rolled JWT auth with better-auth (adding passkey support), and convert the server from CommonJS to ESM — all in one unified migration.
 
 **Architecture:** Prisma replaces TypeORM as the ORM (13 entities → Prisma schema). better-auth replaces custom auth routes, JWT tokens, and OAuth flows with session-based auth, adding passkey/WebAuthn support. The server module system changes from CommonJS to ESM (required by better-auth). The client auth hook and API client are simplified from manual token management to cookie-based sessions.
 
@@ -395,7 +395,7 @@ export const auth = betterAuth({
   },
   plugins: [
     passkey({
-      rpName: "Mnemo",
+      rpName: "Kryton",
       rpID: process.env.WEBAUTHN_RP_ID || "localhost",
       origin: process.env.APP_URL || "http://localhost:5173",
     }),
@@ -585,7 +585,7 @@ A component that:
 - Name input dialog before registration
 - "Remove" button per passkey with confirmation
 - Error and loading states
-- Styled with Tailwind, consistent with Mnemo's dark theme
+- Styled with Tailwind, consistent with Kryton's dark theme
 
 - [ ] **Step 2: Wire PasskeyManager into the app**
 
@@ -642,7 +642,7 @@ git add scripts/migrate-auth-data.ts && git commit -m "feat: add auth data migra
 ## Task 11: Update Plugin API Types in Registry
 
 **Files:**
-- Modify: `types/server.d.ts` in `piwi3910/mnemo-plugins` repo
+- Modify: `types/server.d.ts` in `piwi3910/kryton-plugins` repo
 
 - [ ] **Step 1: Remove database methods from PluginAPI type**
 

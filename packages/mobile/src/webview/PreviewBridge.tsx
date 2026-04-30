@@ -11,7 +11,7 @@ interface PreviewBridgeProps {
 }
 
 /**
- * Resolve a wiki-link target (e.g. "Welcome", "Projects/Mnemo Roadmap") to an
+ * Resolve a wiki-link target (e.g. "Welcome", "Projects/Kryton Roadmap") to an
  * actual note path in the local SQLite database. Uses the same fuzzy matching
  * as the graph view and web client: tries exact match, with/without .md suffix,
  * and suffix matching for nested paths. Case-insensitive.

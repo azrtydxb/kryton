@@ -1,4 +1,4 @@
-// Prisma schema for Mnemo
+// Prisma schema for Kryton
 // Better-auth managed tables + domain tables
 
 generator client {

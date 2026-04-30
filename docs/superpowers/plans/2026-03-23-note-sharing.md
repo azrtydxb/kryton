@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-03-23-note-sharing-design.md`
 
-**Working directory:** All paths relative to `/Users/pascal/Development/mnemo`.
+**Working directory:** All paths relative to `/Users/pascal/Development/kryton`.
 
 **Critical security notes:**
 - Shared note routes validate ownerUserId as UUID, check NoteShare permission BEFORE filesystem access, and verify path traversal against owner's directory
@@ -64,7 +64,7 @@ Add NoteShare and AccessRequest to the entities array.
 - [ ] **Step 4: Verify and commit**
 
 ```bash
-cd /Users/pascal/Development/mnemo && npm run typecheck && npm run build
+cd /Users/pascal/Development/kryton && npm run typecheck && npm run build
 git add -A && git commit -m "feat: add NoteShare and AccessRequest entities"
 ```
 
@@ -99,7 +99,7 @@ Create `packages/server/src/services/shareService.ts` with:
 - [ ] **Step 2: Verify and commit**
 
 ```bash
-cd /Users/pascal/Development/mnemo && npm run typecheck && npm run build
+cd /Users/pascal/Development/kryton && npm run typecheck && npm run build
 git add -A && git commit -m "feat: add shareService with permission checks"
 ```
 
@@ -138,7 +138,7 @@ Create `packages/server/src/routes/users.ts` exporting `createUsersRouter()`:
 - [ ] **Step 3: Verify and commit**
 
 ```bash
-cd /Users/pascal/Development/mnemo && npm run typecheck && npm run build
+cd /Users/pascal/Development/kryton && npm run typecheck && npm run build
 git add -A && git commit -m "feat: add share, access-request, and user search routes"
 ```
 
@@ -189,7 +189,7 @@ app.use("/api/users", authMiddleware, createUsersRouter());
 - [ ] **Step 3: Verify and commit**
 
 ```bash
-cd /Users/pascal/Development/mnemo && npm run typecheck && npm run lint && npm run build
+cd /Users/pascal/Development/kryton && npm run typecheck && npm run lint && npm run build
 git add -A && git commit -m "feat: add shared note read/write routes, mount share routes"
 ```
 
@@ -215,7 +215,7 @@ Update the `SearchResult` interface to include optional `isShared` and `ownerUse
 - [ ] **Step 2: Verify and commit**
 
 ```bash
-cd /Users/pascal/Development/mnemo && npm run typecheck && npm run build
+cd /Users/pascal/Development/kryton && npm run typecheck && npm run build
 git add -A && git commit -m "feat: include shared notes in search results"
 ```
 
@@ -244,7 +244,7 @@ Pass the response with the new node format. The client already handles node rend
 - [ ] **Step 3: Verify and commit**
 
 ```bash
-cd /Users/pascal/Development/mnemo && npm run typecheck && npm run build
+cd /Users/pascal/Development/kryton && npm run typecheck && npm run build
 git add -A && git commit -m "feat: include shared nodes in graph with access filtering"
 ```
 
@@ -279,7 +279,7 @@ await AppDataSource.getRepository(AccessRequest).delete({ ownerUserId: deletedId
 - [ ] **Step 4: Verify and commit**
 
 ```bash
-cd /Users/pascal/Development/mnemo && npm run typecheck && npm run lint && npm run build
+cd /Users/pascal/Development/kryton && npm run typecheck && npm run lint && npm run build
 git add -A && git commit -m "feat: backlink access filtering, share cascade on rename/delete"
 ```
 
@@ -347,7 +347,7 @@ export interface SearchResult {
 - [ ] **Step 3: Verify and commit**
 
 ```bash
-cd /Users/pascal/Development/mnemo && npm run typecheck && npm run build
+cd /Users/pascal/Development/kryton && npm run typecheck && npm run build
 git add -A && git commit -m "feat: add share and access-request client API methods"
 ```
 
@@ -377,7 +377,7 @@ Use `createPortal` to body. Dark themed matching existing modals.
 - [ ] **Step 2: Verify and commit**
 
 ```bash
-cd /Users/pascal/Development/mnemo && npm run typecheck && npm run build
+cd /Users/pascal/Development/kryton && npm run typecheck && npm run build
 git add -A && git commit -m "feat: add ShareDialog component"
 ```
 
@@ -400,7 +400,7 @@ Modal showing pending access requests for the current user (as owner).
 - [ ] **Step 2: Verify and commit**
 
 ```bash
-cd /Users/pascal/Development/mnemo && npm run typecheck && npm run build
+cd /Users/pascal/Development/kryton && npm run typecheck && npm run build
 git add -A && git commit -m "feat: add AccessRequestsModal component"
 ```
 
@@ -423,7 +423,7 @@ Below the file tree and above the Tags section, add a "Shared" section:
 - [ ] **Step 2: Verify and commit**
 
 ```bash
-cd /Users/pascal/Development/mnemo && npm run typecheck && npm run build
+cd /Users/pascal/Development/kryton && npm run typecheck && npm run build
 git add -A && git commit -m "feat: add Shared section to sidebar"
 ```
 
@@ -452,7 +452,7 @@ Also update `GraphPanel.tsx` to pass the shared data through to GraphView if the
 - [ ] **Step 2: Verify and commit**
 
 ```bash
-cd /Users/pascal/Development/mnemo && npm run typecheck && npm run build
+cd /Users/pascal/Development/kryton && npm run typecheck && npm run build
 git add -A && git commit -m "feat: render shared nodes as orange in graph"
 ```
 
@@ -489,7 +489,7 @@ In SearchBar.tsx, if a search result has `isShared: true`, show a Share2 icon ne
 - [ ] **Step 5: Verify full pipeline**
 
 ```bash
-cd /Users/pascal/Development/mnemo && npm run typecheck && npm run lint && npm run build
+cd /Users/pascal/Development/kryton && npm run typecheck && npm run lint && npm run build
 ```
 
 - [ ] **Step 6: Commit**
@@ -505,7 +505,7 @@ git add -A && git commit -m "feat: integrate sharing into App — toolbar, menu,
 - [ ] **Step 1: Full build**
 
 ```bash
-cd /Users/pascal/Development/mnemo
+cd /Users/pascal/Development/kryton
 npm run typecheck && npm run lint && npm run build
 ```
 
