@@ -1,0 +1,28 @@
+{
+  "bench": "yjs-two-client-convergence",
+  "timestamp": "2026-04-30T17:50:11.745Z",
+  "serverNote": "Uses in-process stress server on port 3099 due to production WS routing conflict (PluginWebSocket intercepts /ws/yjs/* with 400)",
+  "docId": "stress-convergence-1777571350052",
+  "editsPerClient": 1000,
+  "interEditDelayMs": {
+    "min": 10,
+    "max": 100
+  },
+  "settleMs": 2000,
+  "totalElapsedMs": 61692,
+  "results": {
+    "clientA": {
+      "editsMade": 1000,
+      "errors": 0,
+      "finalTextLength": 17191
+    },
+    "clientB": {
+      "editsMade": 1000,
+      "errors": 0,
+      "finalTextLength": 17191
+    },
+    "stateMergeConverged": true,
+    "liveConverged": true
+  },
+  "passed": true
+}

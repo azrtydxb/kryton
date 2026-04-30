@@ -1,0 +1,35 @@
+{
+  "bench": "yjs-op-rate-ceiling",
+  "timestamp": "2026-04-30T18:07:27.706Z",
+  "serverNote": "Uses in-process stress server on port 3099 due to production WS routing conflict",
+  "durationPerRateMs": 30000,
+  "results": [
+    {
+      "targetOpsPerSec": 200,
+      "durationMs": 30000,
+      "totalOpsSent": 6000,
+      "achievedOpsPerSec": 200,
+      "throughputRatio": 1,
+      "errors": 0,
+      "disconnections": 0,
+      "finalDocTextLength": 34890,
+      "passed": true
+    },
+    {
+      "targetOpsPerSec": 500,
+      "durationMs": 30000,
+      "totalOpsSent": 15000,
+      "achievedOpsPerSec": 500,
+      "throughputRatio": 1,
+      "errors": 0,
+      "disconnections": 0,
+      "finalDocTextLength": 87780,
+      "passed": true
+    }
+  ],
+  "ceiling": {
+    "passesBelow": 500,
+    "degradesAt": null,
+    "note": "All tested rates passed: throughput is rate-limited only by client CPU"
+  }
+}

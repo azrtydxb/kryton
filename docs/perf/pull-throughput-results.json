@@ -1,0 +1,37 @@
+{
+  "bench": "pull-throughput",
+  "timestamp": "2026-04-30T17:45:11.631Z",
+  "hardware": "Darwin Pascals-MacBook-Air.local 25.3.0 Darwin Kernel Version 25.3.0: Wed Jan 28 20:49:24 PST 2026; root:xnu-12377.81.4~5/RELEASE_ARM64_T8132 arm64",
+  "serverUrl": "http://localhost:3001",
+  "iterations": 25,
+  "results": [
+    {
+      "n": 100,
+      "iterations": 25,
+      "latencyMs": {
+        "p50": 140.27516699999978,
+        "p95": 155.09637499999917,
+        "p99": 157.75683300000037,
+        "mean": 142.15,
+        "min": 130.1020420000001,
+        "max": 157.75683300000037
+      },
+      "payloadSizeBytes": 678576,
+      "totalEntities": 3990
+    },
+    {
+      "n": 1000,
+      "iterations": 25,
+      "latencyMs": {
+        "p50": 162.09862500000054,
+        "p95": 164.56779199999983,
+        "p99": 167.72441700000036,
+        "mean": 162,
+        "min": 153.18824999999924,
+        "max": 167.72441700000036
+      },
+      "payloadSizeBytes": 835996,
+      "totalEntities": 4890
+    }
+  ]
+}

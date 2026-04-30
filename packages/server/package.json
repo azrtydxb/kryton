@@ -12,7 +12,14 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "build:tsc": "tsc"
+    "build:tsc": "tsc",
+    "bench:pull": "tsx scripts/bench/pull-throughput.ts",
+    "bench:push": "tsx scripts/bench/push-throughput.ts",
+    "bench:tier2": "tsx scripts/bench/tier2-history.ts",
+    "bench:attachments": "tsx scripts/bench/attachments.ts",
+    "stress:yjs:converge": "tsx scripts/yjs-stress/two-client-convergence.ts",
+    "stress:yjs:reconnect": "tsx scripts/yjs-stress/reconnect-storm.ts",
+    "stress:yjs:rate": "tsx scripts/yjs-stress/op-rate-ceiling.ts"
   },
   "dependencies": {
     "@better-auth/passkey": "^1.5.6",

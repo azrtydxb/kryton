@@ -1,0 +1,17 @@
+{
+  "bench": "yjs-reconnect-storm",
+  "timestamp": "2026-04-30T18:06:19.608Z",
+  "serverNote": "Uses in-process stress server on port 3099 due to production WS routing conflict",
+  "docId": "stress-reconnect-1777572376161",
+  "offlineEdits": 100,
+  "settleMs": 1000,
+  "results": {
+    "editMarkersSeen": 100,
+    "missingEdits": 0,
+    "allEditsPresent": true,
+    "textLengthExpected": 1690,
+    "textLengthObserved": 1690,
+    "textMatches": true
+  },
+  "passed": true
+}

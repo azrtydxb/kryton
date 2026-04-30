@@ -1,0 +1,64 @@
+{
+  "bench": "push-throughput",
+  "timestamp": "2026-04-30T17:46:14.478Z",
+  "hardware": "Darwin Pascals-MacBook-Air.local 25.3.0 Darwin Kernel Version 25.3.0: Wed Jan 28 20:49:24 PST 2026; root:xnu-12377.81.4~5/RELEASE_ARM64_T8132 arm64",
+  "serverUrl": "http://localhost:3001",
+  "iterations": 20,
+  "createBurst": {
+    "scenario": "create-burst",
+    "latencyMs": {
+      "p50": 3.643207999999987,
+      "p95": 13.22591700000001,
+      "p99": 13.22591700000001,
+      "mean": 4.12,
+      "min": 2.624666999999988,
+      "max": 13.22591700000001
+    },
+    "accepted": 20,
+    "conflicts": 0
+  },
+  "conflictMeasurements": [
+    {
+      "skew": 0,
+      "accepted": 20,
+      "conflicts": 0,
+      "conflictRate": 0,
+      "latencyMs": {
+        "p50": 2.2816250000000196,
+        "p95": 2.7229169999999954,
+        "p99": 2.7229169999999954,
+        "mean": 2.33,
+        "min": 2.0538329999999974,
+        "max": 2.7229169999999954
+      }
+    },
+    {
+      "skew": 1,
+      "accepted": 0,
+      "conflicts": 20,
+      "conflictRate": 1,
+      "latencyMs": {
+        "p50": 1.212959000000012,
+        "p95": 1.582708000000025,
+        "p99": 1.582708000000025,
+        "mean": 1.22,
+        "min": 1.02716700000002,
+        "max": 1.582708000000025
+      }
+    },
+    {
+      "skew": 3,
+      "accepted": 0,
+      "conflicts": 20,
+      "conflictRate": 1,
+      "latencyMs": {
+        "p50": 0.9829169999999863,
+        "p95": 2.702374999999961,
+        "p99": 2.702374999999961,
+        "mean": 1.08,
+        "min": 0.87824999999998,
+        "max": 2.702374999999961
+      }
+    }
+  ]
+}
