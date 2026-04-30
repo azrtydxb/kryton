@@ -46,4 +46,12 @@ describe("generateFromString", () => {
     expect(out.entities).toContain('"Settings"');
     expect(out.entities).toContain('"NoteRevision"');
   });
+
+  it("includes core-internal tables in sql output", () => {
+    const out = generateFromString(PRISMA);
+    expect(out.sql).toContain("CREATE TABLE IF NOT EXISTS sync_state");
+    expect(out.sql).toContain("CREATE TABLE IF NOT EXISTS yjs_documents");
+    expect(out.sql).toContain("CREATE TABLE IF NOT EXISTS yjs_pending_updates");
+    expect(out.sql).toContain("CREATE TABLE IF NOT EXISTS tier2_cache_meta");
+  });
 });
