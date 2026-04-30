@@ -1,0 +1,78 @@
+import { Router, Request, Response } from "express";
+import { z } from "zod";
+import { prisma } from "../prisma.js";
+import { requireUser } from "../middleware/auth.js";
+import { pullChanges, pushChanges } from "../services/sync-v2.js";
+
+export function createSyncV2Router(): Router {
+  const router = Router();
+
+  // POST /api/sync/v2/pull
+  router.post("/pull", async (req: Request, res: Response) => {
+    try {
+      const user = requireUser(req);
+      const body = z.object({ cursor: z.string().default("0") }).parse(req.body);
+      const result = await pullChanges(user.id, BigInt(body.cursor));
+      res.json(result);
+    } catch (err) {
+      res.status(400).json({ error: err instanceof Error ? err.message : "Pull failed" });
+    }
+  });
+
+  // POST /api/sync/v2/push
+  router.post("/push", async (req: Request, res: Response) => {
+    try {
+      const user = requireUser(req);
+      const body = z.object({
+        changes: z.record(z.string(), z.array(z.any())),
+      }).parse(req.body);
+      const result = await pushChanges(user.id, body.changes as Record<string, Array<{ op: string; id: string; fields?: Record<string, unknown>; base_version?: number }>>);
+      res.json(result);
+    } catch (err) {
+      res.status(400).json({ error: err instanceof Error ? err.message : "Push failed" });
+    }
+  });
+
+  // GET /api/sync/v2/tier2/:entityType/:parentId
+  router.get("/tier2/:entityType/:parentId", async (req: Request, res: Response) => {
+    try {
+      const user = requireUser(req);
+      const { entityType, parentId } = req.params;
+      const limit = Math.min(parseInt((req.query.limit as string) || "50", 10) || 50, 200);
+
+      if (entityType === "history") {
+        const rows = await prisma.noteRevision.findMany({
+          where: { userId: user.id, notePath: parentId },
+          orderBy: { createdAt: "desc" },
+          take: limit,
+        });
+        res.json({ entities: rows });
+        return;
+      }
+
+      if (entityType === "access_requests") {
+        const rows = await prisma.accessRequest.findMany({
+          where: { ownerUserId: user.id, notePath: parentId },
+          take: limit,
+        });
+        res.json({ entities: rows });
+        return;
+      }
+
+      if (entityType === "plugin_storage") {
+        const rows = await prisma.pluginStorage.findMany({
+          where: { pluginId: parentId },
+          take: limit,
+        });
+        res.json({ entities: rows });
+        return;
+      }
+
+      res.status(404).json({ error: "unknown entity type" });
+    } catch (err) {
+      res.status(400).json({ error: err instanceof Error ? err.message : "Tier2 fetch failed" });
+    }
+  });
+
+  return router;
+}
