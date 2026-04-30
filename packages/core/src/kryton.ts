@@ -112,13 +112,13 @@ export class Kryton {
       authToken: opts.agentToken ?? opts.authToken,
     });
 
-    const tier2Fetch = async (entityType: string, parentId: string) => {
+    const tier2Fetch = async <T>(entityType: string, parentId: string): Promise<T> => {
       const tok = await (opts.agentToken ?? opts.authToken)();
       const url = `${opts.serverUrl}/api/sync/v2/tier2/${entityType}/${encodeURIComponent(parentId)}`;
       const f = opts.fetch ?? fetch;
       const res = await f(url, { headers: { Authorization: `Bearer ${tok ?? ""}` } });
       if (!res.ok) throw new KrytonSyncError(`tier2 fetch ${url} failed: ${res.status}`, { retryable: res.status >= 500 });
-      return res.json();
+      return (await res.json()) as T;
     };
 
     k.history = new HistoryFetcher({
