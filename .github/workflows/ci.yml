@@ -29,6 +29,9 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate --schema=packages/server/prisma/schema.prisma
 
+      - name: Verify @azrtydxb/core generated files are up to date
+        run: npm run verify-generated --workspace=packages/core
+
       - name: TypeCheck
         run: npm run typecheck
 
