@@ -32,16 +32,25 @@ model User {
   twoFactors TwoFactor[]
 
   // Domain relations
-  noteShares              NoteShare[]    @relation("owner")
-  sharedWith              NoteShare[]    @relation("sharedWith")
+  noteShares              NoteShare[]     @relation("owner")
+  sharedWith              NoteShare[]     @relation("sharedWith")
   accessRequestsOwner     AccessRequest[] @relation("arOwner")
   accessRequestsRequester AccessRequest[] @relation("arRequester")
-  inviteCodesCreated      InviteCode[]   @relation("createdBy")
-  inviteCodesUsed         InviteCode[]   @relation("usedBy")
+  inviteCodesCreated      InviteCode[]    @relation("createdBy")
+  inviteCodesUsed         InviteCode[]    @relation("usedBy")
   searchIndices           SearchIndex[]
   graphEdges              GraphEdge[]
   pluginStorage           PluginStorage[]
   apiKeys                 ApiKey[]
+  folders                 Folder[]
+  tags                    Tag[]
+  noteTags                NoteTag[]
+  noteVersions            NoteVersion[]
+  noteRevisions           NoteRevision[]
+  attachments             Attachment[]
+  agents                  Agent[]
+  yjsDocuments            YjsDocument[]
+  syncCursor              SyncCursor?
 }
 
 model Session {
@@ -57,20 +66,20 @@ model Session {
 }
 
 model Account {
-  id                   String    @id
-  userId               String
-  accountId            String
-  providerId           String
-  accessToken          String?
-  refreshToken         String?
-  accessTokenExpiresAt DateTime?
+  id                    String    @id
+  userId                String
+  accountId             String
+  providerId            String
+  accessToken           String?
+  refreshToken          String?
+  accessTokenExpiresAt  DateTime?
   refreshTokenExpiresAt DateTime?
-  scope                String?
-  idToken              String?
-  password             String?
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
-  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scope                 String?
+  idToken               String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([providerId, accountId])
 }
@@ -112,11 +121,14 @@ model TwoFactor {
 // Domain tables
 // ---------------------------------------------------------------------------
 
+/// @sync tier1
 model Settings {
   key       String
   userId    String
   value     String
   updatedAt DateTime @default(now()) @updatedAt
+  version   Int      @default(0)
+  cursor    BigInt   @default(0)
 
   @@id([key, userId])
 }
@@ -126,7 +138,7 @@ model SearchIndex {
   userId     String
   title      String
   content    String
-  tags       String    @default("")
+  tags       String   @default("")
   modifiedAt DateTime
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -134,6 +146,7 @@ model SearchIndex {
   @@index([userId])
 }
 
+/// @sync tier1
 model GraphEdge {
   id         String @id @default(uuid())
   fromPath   String
@@ -141,6 +154,8 @@ model GraphEdge {
   fromNoteId String
   toNoteId   String
   userId     String
+  version    Int    @default(0)
+  cursor     BigInt @default(0)
   user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
@@ -148,6 +163,7 @@ model GraphEdge {
   @@index([toNoteId])
 }
 
+/// @sync tier1
 model NoteShare {
   id               String   @id @default(uuid())
   ownerUserId      String
@@ -157,6 +173,8 @@ model NoteShare {
   permission       String
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+  version          Int      @default(0)
+  cursor           BigInt   @default(0)
   owner            User     @relation("owner", fields: [ownerUserId], references: [id], onDelete: Cascade)
   sharedWith       User     @relation("sharedWith", fields: [sharedWithUserId], references: [id], onDelete: Cascade)
 
@@ -164,6 +182,7 @@ model NoteShare {
   @@index([sharedWithUserId])
 }
 
+/// @sync tier2 parent=NoteShare
 model AccessRequest {
   id              String   @id @default(uuid())
   requesterUserId String
@@ -187,6 +206,7 @@ model InviteCode {
   usedBy      User?     @relation("usedBy", fields: [usedById], references: [id])
 }
 
+/// @sync tier2 parent=InstalledPlugin
 model PluginStorage {
   pluginId  String
   key       String
@@ -198,41 +218,47 @@ model PluginStorage {
   @@id([pluginId, key, userId])
 }
 
+/// @sync tier1
 model InstalledPlugin {
-  id          String   @id
-  name        String
-  version     String
-  description String
-  author      String
-  state       String   @default("installed")
-  error       String?
-  manifest    Json?
-  enabled     Boolean  @default(true)
-  installedAt DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id
+  name          String
+  version       String
+  description   String
+  author        String
+  state         String   @default("installed")
+  error         String?
+  manifest      Json?
+  enabled       Boolean  @default(true)
+  installedAt   DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  schemaVersion Int      @default(0)
+  cursor        BigInt   @default(0)
 }
 
 model ApiKey {
-  id          String    @id @default(uuid())
-  userId      String
-  name        String
-  keyHash     String    @unique
-  keyPrefix   String
-  scope       String    @default("read-only")
-  expiresAt   DateTime?
-  lastUsedAt  DateTime?
-  createdAt   DateTime  @default(now())
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String    @id @default(uuid())
+  userId     String
+  name       String
+  keyHash    String    @unique
+  keyPrefix  String
+  scope      String    @default("read-only")
+  expiresAt  DateTime?
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([keyHash])
 }
 
+/// @sync tier1
 model TrashItem {
   id           String   @id @default(uuid())
   originalPath String
   userId       String
   trashedAt    DateTime @default(now())
+  version      Int      @default(0)
+  cursor       BigInt   @default(0)
 
   @@index([userId, trashedAt])
 }
@@ -245,4 +271,145 @@ model SyncDeletion {
   deletedAt DateTime @default(now())
 
   @@index([userId, deletedAt])
+}
+
+// ---------------------------------------------------------------------------
+// New sync v2 models
+// ---------------------------------------------------------------------------
+
+/// @sync tier1
+model Folder {
+  id        String   @id @default(cuid())
+  userId    String
+  path      String
+  parentId  String?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent    Folder?  @relation("FolderHierarchy", fields: [parentId], references: [id])
+  children  Folder[] @relation("FolderHierarchy")
+  version   Int      @default(0)
+  cursor    BigInt   @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, path])
+}
+
+/// @sync tier1
+model Tag {
+  id        String    @id @default(cuid())
+  userId    String
+  name      String
+  color     String?
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notes     NoteTag[]
+  version   Int       @default(0)
+  cursor    BigInt    @default(0)
+  updatedAt DateTime  @updatedAt
+
+  @@unique([userId, name])
+}
+
+/// @sync tier1
+model NoteTag {
+  notePath  String
+  tagId     String
+  userId    String
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  version   Int      @default(0)
+  cursor    BigInt   @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@id([userId, notePath, tagId])
+}
+
+model NoteVersion {
+  userId    String
+  notePath  String
+  version   Int      @default(0)
+  cursor    BigInt   @default(0)
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, notePath])
+}
+
+/// @sync tier2 parent=Note
+model NoteRevision {
+  id        String   @id @default(cuid())
+  userId    String
+  notePath  String
+  content   String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, notePath, createdAt])
+}
+
+/// @sync tier2 parent=Note
+model Attachment {
+  id          String   @id @default(cuid())
+  userId      String
+  notePath    String
+  filename    String
+  contentHash String
+  sizeBytes   Int
+  mimeType    String
+  storagePath String
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, notePath])
+  @@index([contentHash])
+}
+
+model SyncCursor {
+  userId String @id
+  cursor BigInt @default(0)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Agent {
+  id          String       @id @default(cuid())
+  ownerUserId String
+  name        String
+  label       String
+  policyText  String?
+  createdAt   DateTime     @default(now())
+  lastSeenAt  DateTime?
+  owner       User         @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  tokens      AgentToken[]
+
+  @@unique([ownerUserId, name])
+}
+
+model AgentToken {
+  id        String    @id @default(cuid())
+  agentId   String
+  tokenHash String
+  scope     String?
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  agent     Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([tokenHash])
+}
+
+model YjsDocument {
+  docId       String   @id
+  userId      String
+  snapshot    Bytes
+  stateVector Bytes
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model YjsUpdate {
+  id        BigInt   @id @default(autoincrement())
+  docId     String
+  update    Bytes
+  agentId   String?
+  createdAt DateTime @default(now())
+
+  @@index([docId, createdAt])
 }

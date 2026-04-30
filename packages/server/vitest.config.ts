@@ -4,6 +4,9 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
+    // Disable file-level parallelism to prevent SQLite BUSY lock errors
+    // when multiple test files share the same better-sqlite3 database.
+    fileParallelism: false,
     include: ["src/**/__tests__/**/*.test.ts"],
     coverage: {
       provider: "v8",
