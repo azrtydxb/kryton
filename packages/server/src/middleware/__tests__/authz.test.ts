@@ -41,7 +41,10 @@ describe("requirePermission middleware", () => {
     vi.clearAllMocks();
   });
 
-  it("returns 401 when no auth on request", async () => {
+  it("passes through when no agentAuth (auth handled upstream by authMiddleware)", async () => {
+    // requirePermission layers on top of authMiddleware. If req.agentAuth is undefined,
+    // it means the request came from a human user (session-authenticated upstream).
+    // Authentication is the authMiddleware's job; this middleware only does authorization for agents.
     const middleware = requirePermission("Kryton::Action::\"read\"", () => ({
       type: "Kryton::Note",
       id: "n1",
@@ -51,8 +54,8 @@ describe("requirePermission middleware", () => {
 
     await middleware(req, res, next);
 
-    expect(res.status).toHaveBeenCalledWith(401);
-    expect(next).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalled();
+    expect(res.status).not.toHaveBeenCalled();
   });
 
   it("passes through when agentId is null (human user)", async () => {

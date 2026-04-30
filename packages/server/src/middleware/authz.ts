@@ -19,15 +19,10 @@ export function requirePermission(
   resourceFn: (req: Request) => CedarResource | Promise<CedarResource>,
 ) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    // Human users (authenticated via session, no agent context) bypass policy checks.
+    // Only agent-token requests carry req.agentAuth.
     const auth = req.agentAuth;
-
-    if (!auth) {
-      res.status(401).end();
-      return;
-    }
-
-    // Human users bypass policy checks
-    if (auth.agentId === null) {
+    if (!auth || auth.agentId === null) {
       next();
       return;
     }

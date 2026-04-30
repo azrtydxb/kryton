@@ -1,12 +1,4 @@
 // packages/core/src/kryton.ts
-//
-// COORDINATION NOTE (Stream 2A → 2B merge):
-//   The `yjs` field is intentionally left as `null` here.
-//   Stream 2B (YjsManager) will add the YjsManager wiring at merge time.
-//   When 2B merges, they should:
-//     1. Import YjsManager from "./yjs/manager"
-//     2. Add `yjs: YjsManager | null` to KrytonInitOpts and the Kryton class
-//     3. Instantiate YjsManager in Kryton.init() and assign to k.yjs
 import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -27,6 +19,11 @@ import { InstalledPluginsRepository } from "./query/installed-plugins";
 import { KrytonSyncError } from "./errors";
 import { isCompatibleVersion } from "./version-check";
 import { KRYTON_CORE_VERSION } from "./version";
+import { YjsManager } from "./yjs/manager";
+import { HistoryFetcher } from "./tier2/history";
+import { AttachmentsFetcher } from "./tier2/attachments";
+import { PluginDataFetcher } from "./tier2/plugin-data";
+import { readYjsContent } from "./yjs/read-content";
 
 export interface KrytonInitOpts {
   adapter: SqliteAdapter;
@@ -55,8 +52,10 @@ export class Kryton {
   trashItems: TrashItemsRepository;
   graphEdges: GraphEdgesRepository;
   installedPlugins: InstalledPluginsRepository;
-
-  // Stream 2B will add: yjs: YjsManager | null = null;
+  yjs!: YjsManager;
+  history!: HistoryFetcher;
+  attachments!: AttachmentsFetcher;
+  pluginData!: PluginDataFetcher;
 
   private constructor(public adapter: SqliteAdapter) {
     this.bus = new EventBus();
@@ -106,7 +105,56 @@ export class Kryton {
       },
     });
 
+    const wsUrl = opts.serverUrl.replace(/^http/, "ws") + "/ws/yjs";
+    k.yjs = new YjsManager({
+      db: opts.adapter,
+      wsUrl: () => wsUrl,
+      authToken: opts.agentToken ?? opts.authToken,
+    });
+
+    const tier2Fetch = async (entityType: string, parentId: string) => {
+      const tok = await (opts.agentToken ?? opts.authToken)();
+      const url = `${opts.serverUrl}/api/sync/v2/tier2/${entityType}/${encodeURIComponent(parentId)}`;
+      const f = opts.fetch ?? fetch;
+      const res = await f(url, { headers: { Authorization: `Bearer ${tok ?? ""}` } });
+      if (!res.ok) throw new KrytonSyncError(`tier2 fetch ${url} failed: ${res.status}`, { retryable: res.status >= 500 });
+      return res.json();
+    };
+
+    k.history = new HistoryFetcher({
+      db: opts.adapter,
+      fetchTier2: async (_t, parentId) => tier2Fetch("history", parentId),
+      ttlMs: 3600_000,
+    });
+
+    k.attachments = new AttachmentsFetcher({
+      db: opts.adapter,
+      fetchAttachment: async (id) => {
+        const tok = await (opts.agentToken ?? opts.authToken)();
+        const f = opts.fetch ?? fetch;
+        const res = await f(`${opts.serverUrl}/api/attachments/${id}`, {
+          headers: { Authorization: `Bearer ${tok ?? ""}` },
+        });
+        if (!res.ok) throw new KrytonSyncError(`attachment ${id} failed: ${res.status}`, { retryable: res.status >= 500 });
+        const blob = new Uint8Array(await res.arrayBuffer());
+        const mimeType = res.headers.get("Content-Type") ?? "application/octet-stream";
+        const contentHash = res.headers.get("ETag")?.replace(/"/g, "") ?? "";
+        return { blob, mimeType, contentHash };
+      },
+    });
+
+    k.pluginData = new PluginDataFetcher({
+      db: opts.adapter,
+      fetchTier2: async (_t, parentId) => tier2Fetch("plugin_storage", parentId),
+      ttlMs: 5 * 60_000,
+    });
+
     return k;
+  }
+
+  /** Synchronous helper: read the current Yjs body text for a note without opening a websocket. */
+  readNoteContent(noteId: string): string | null {
+    return readYjsContent(this.adapter, noteId);
   }
 
   private static loadSchemaSql(): string {
@@ -131,6 +179,7 @@ export class Kryton {
 
   async close(): Promise<void> {
     this.sync?.stopAuto();
+    await this.yjs?.closeAll();
     this.adapter.close();
   }
 }

@@ -46,6 +46,7 @@ import { createSyncRouter } from "./routes/sync.js";
 import { createSyncV2Router } from "./routes/sync-v2.js";
 import { createAttachmentsRouter } from "./routes/attachments.js";
 import { createVersionRouter } from "./routes/version.js";
+import { createAgentsRouter } from "./routes/agents.js";
 import { APP_VERSION, APP_COMMIT, APP_MAJOR_VERSION } from "./lib/version.js";
 import { backfillFolders } from "./services/backfill/folders-backfill.js";
 import { backfillTags } from "./services/backfill/tags-backfill.js";
@@ -257,6 +258,7 @@ async function main(): Promise<void> {
   app.use("/api/sync", authMiddleware, syncLimiter, createSyncRouter(NOTES_DIR));
   app.use("/api/sync/v2", authMiddleware, syncLimiter, createSyncV2Router());
   app.use("/api/attachments", authMiddleware, createAttachmentsRouter(NOTES_DIR));
+  app.use("/api/agents", authMiddleware, createAgentsRouter());
   app.use("/api", createVersionRouter());
 
   app.use("/api/auth", authLimiter);
@@ -501,19 +503,23 @@ async function main(): Promise<void> {
   const yjsWss = new WebSocketServer({ noServer: true });
   setupYjsWss(httpServer, yjsWss, {
     authenticate: async (token) => {
-      // Session auth: token is the better-auth session token
-      // Agent auth will be wired in at merge time (Stream 2D, SRV-28/29)
+      // First try session auth (better-auth bearer/cookie)
       try {
-        const session = await import("better-auth/node").then(({ fromNodeHeaders }) => {
-          // Reconstruct a minimal headers object for auth lookup
-          const headers = new Headers({ authorization: `Bearer ${token}`, cookie: `better-auth.session_token=${token}` });
-          return auth.api.getSession({ headers });
-        });
-        if (!session) return null;
-        return { userId: session.user.id, agentId: null };
+        const headers = new Headers({ authorization: `Bearer ${token}`, cookie: `better-auth.session_token=${token}` });
+        const session = await auth.api.getSession({ headers });
+        if (session) return { userId: session.user.id, agentId: null };
       } catch {
-        return null;
+        // fall through to agent token
       }
+      // Fall back to agent token validation
+      try {
+        const { validateToken } = await import("./services/agent.js");
+        const result = await validateToken(token);
+        if (result) return { userId: result.ownerUserId, agentId: result.agentId };
+      } catch {
+        // ignore
+      }
+      return null;
     },
   });
 

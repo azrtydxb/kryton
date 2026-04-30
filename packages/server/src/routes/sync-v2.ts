@@ -2,13 +2,16 @@ import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { prisma } from "../prisma.js";
 import { requireUser } from "../middleware/auth.js";
+import { requirePermission } from "../middleware/authz.js";
 import { pullChanges, pushChanges } from "../services/sync-v2.js";
+
+const SYNC_RESOURCE = { type: "Kryton::Sync", id: "*" };
 
 export function createSyncV2Router(): Router {
   const router = Router();
 
   // POST /api/sync/v2/pull
-  router.post("/pull", async (req: Request, res: Response) => {
+  router.post("/pull", requirePermission('Kryton::Action::"sync"', () => SYNC_RESOURCE), async (req: Request, res: Response) => {
     try {
       const user = requireUser(req);
       const body = z.object({ cursor: z.string().default("0") }).parse(req.body);
@@ -20,7 +23,7 @@ export function createSyncV2Router(): Router {
   });
 
   // POST /api/sync/v2/push
-  router.post("/push", async (req: Request, res: Response) => {
+  router.post("/push", requirePermission('Kryton::Action::"sync"', () => SYNC_RESOURCE), async (req: Request, res: Response) => {
     try {
       const user = requireUser(req);
       const body = z.object({
