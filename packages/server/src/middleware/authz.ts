@@ -3,18 +3,6 @@ import { prisma } from "../prisma.js";
 import { evaluatePolicy } from "../services/cedar.js";
 import type { AuthzResource as CedarResource } from "../services/cedar.js";
 
-export interface AgentAuth {
-  userId: string;
-  agentId: string | null;
-}
-
-declare module "express-serve-static-core" {
-  interface Request {
-    /** Set by authMiddleware when an agent bearer token is used. */
-    auth?: AgentAuth;
-  }
-}
-
 export type { CedarResource as AuthzResource };
 
 /**
