@@ -1,6 +1,12 @@
 // packages/core/scripts/generate-schema.ts
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { resolve } from "node:path";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+// Resolve paths relative to monorepo root regardless of cwd
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const MONOREPO_ROOT = resolve(__dirname, "../../..");
 import { walkPrismaSchema } from "./lib/prisma-walker.js";
 import { parseAnnotations } from "./lib/annotation-parser.js";
 import { parseField } from "./lib/field-parser.js";
@@ -63,14 +69,14 @@ export function generateFromString(prismaSource: string): GeneratedOutput {
 }
 
 export function generate(): void {
-  const prismaPath = resolve("packages/server/prisma/schema.prisma");
-  const outDir = resolve("packages/core/src/generated");
+  const prismaPath = resolve(MONOREPO_ROOT, "packages/server/prisma/schema.prisma");
+  const outDir = resolve(MONOREPO_ROOT, "packages/core/src/generated");
   const source = readFileSync(prismaPath, "utf8");
   const out = generateFromString(source);
   mkdirSync(outDir, { recursive: true });
-  writeFileSync(resolve(outDir, "schema.sql"), out.sql);
-  writeFileSync(resolve(outDir, "types.ts"), out.types);
-  writeFileSync(resolve(outDir, "entities.ts"), out.entities);
+  writeFileSync(resolve(outDir, "schema.sql"), out.sql, "utf8");
+  writeFileSync(resolve(outDir, "types.ts"), out.types, "utf8");
+  writeFileSync(resolve(outDir, "entities.ts"), out.entities, "utf8");
   console.log(`Generated ${outDir}/{schema.sql,types.ts,entities.ts}`);
 }
 
