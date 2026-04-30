@@ -18,7 +18,7 @@ function validateDownloadUrl(url: string): void {
   }
 }
 
-const REGISTRY_OWNER = "piwi3910";
+const REGISTRY_OWNER = "azrtydxb";
 const REGISTRY_REPO = "mnemo-plugins";
 const GITHUB_API_BASE = "https://api.github.com";
 const USER_AGENT = "mnemo-app/1.0";

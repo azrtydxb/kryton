@@ -15,9 +15,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/piwi3910/mnemo/actions"><img src="https://github.com/piwi3910/mnemo/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/piwi3910/mnemo/releases"><img src="https://img.shields.io/github/v/release/piwi3910/mnemo" alt="Release"></a>
-  <a href="https://github.com/piwi3910/mnemo/blob/master/LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License"></a>
+  <a href="https://github.com/azrtydxb/mnemo/actions"><img src="https://github.com/azrtydxb/mnemo/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/azrtydxb/mnemo/releases"><img src="https://img.shields.io/github/v/release/azrtydxb/mnemo" alt="Release"></a>
+  <a href="https://github.com/azrtydxb/mnemo/blob/master/LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License"></a>
 </p>
 
 <p align="center">
@@ -181,7 +181,7 @@ See [API Keys & MCP docs](docs/API-ACCESS.md) for the full reference.
 </p>
 
 ### Plugin Ecosystem
-12 plugins available via [mnemo-plugins](https://github.com/piwi3910/mnemo-plugins):
+12 plugins available via [mnemo-plugins](https://github.com/azrtydxb/mnemo-plugins):
 
 Slash Commands, Pomodoro Timer, Reading List, Writing Metrics, Excalidraw, Kanban Board, Mass Upload, Publish/Export, Flashcards, Presentation Mode, Calendar Journal, RSS Reader
 
@@ -213,7 +213,7 @@ Plugin APIs are automatically exposed as MCP tools — install a plugin and your
 # docker-compose.yml
 services:
   mnemo:
-    image: ghcr.io/piwi3910/mnemo/mnemo:latest
+    image: ghcr.io/azrtydxb/mnemo/mnemo:latest
     ports:
       - "3100:3000"
     volumes:
@@ -237,7 +237,7 @@ Open http://localhost:3100 — the first user to register becomes admin.
 ### From Source
 
 ```bash
-git clone https://github.com/piwi3910/mnemo.git
+git clone https://github.com/azrtydxb/mnemo.git
 cd mnemo
 npm install
 npm run dev

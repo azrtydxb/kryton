@@ -9,7 +9,7 @@
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/piwi3910/mnemo.git && cd mnemo
+git clone https://github.com/azrtydxb/mnemo.git && cd mnemo
 
 # 2. Copy environment template
 cp .env.example .env
