@@ -41,6 +41,6 @@ describe("SettingsRepository", () => {
     repo.set("u2", "b", "2");
     const result = repo.listForUser("u1");
     expect(result).toHaveLength(1);
-    expect(result[0].key).toBe("a");
+    expect(result[0]?.key).toBe("a");
   });
 });

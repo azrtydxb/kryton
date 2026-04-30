@@ -2,9 +2,12 @@
 import type { Conflict } from "./sync/protocol";
 
 export class KrytonError extends Error {
-  constructor(message: string, public cause?: unknown) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  override cause?: unknown;
+  constructor(message: string, cause?: unknown) {
     super(message);
     this.name = "KrytonError";
+    this.cause = cause;
   }
 }
 

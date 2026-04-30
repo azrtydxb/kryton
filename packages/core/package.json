@@ -20,6 +20,10 @@
     "./adapters/expo-sqlite": {
       "types": "./dist/adapters/expo-sqlite.d.ts",
       "import": "./dist/adapters/expo-sqlite.js"
+    },
+    "./sync/protocol": {
+      "types": "./dist/sync/protocol.d.ts",
+      "import": "./dist/sync/protocol.js"
     }
   },
   "peerDependencies": {

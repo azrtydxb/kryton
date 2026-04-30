@@ -14,7 +14,7 @@ export interface BaseRepoOpts<T> {
   columns: ReadonlyArray<keyof T & string>;
 }
 
-export class BaseRepository<T extends { id: string; version: number }> {
+export class BaseRepository<T extends { id: string; version: number | string }> {
   constructor(protected opts: BaseRepoOpts<T>) {}
 
   protected get db() { return this.opts.db; }

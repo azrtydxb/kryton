@@ -2,10 +2,11 @@
 import { describe, it, expect, vi } from "vitest";
 import { EventBus } from "../events";
 
-interface Events {
+type Events = {
   change: { entityType: string; ids: string[] };
   "sync:start": void;
-}
+  [key: string]: unknown;
+};
 
 describe("EventBus", () => {
   it("calls handlers in order", () => {

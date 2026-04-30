@@ -1,7 +1,8 @@
 // packages/core/src/events.ts
 type Handler<T> = (payload: T) => void;
 
-export class EventBus<E extends Record<string, unknown> = Record<string, unknown>> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export class EventBus<E extends Record<string, any> = Record<string, any>> {
   private handlers = new Map<keyof E, Set<Handler<unknown>>>();
 
   on<K extends keyof E>(event: K, handler: Handler<E[K]>): () => void {
