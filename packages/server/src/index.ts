@@ -44,9 +44,27 @@ import { createTrashRouter, createTrashEmptyRouter, purgeOldTrash } from "./rout
 import { createHistoryRouter, createHistoryTimestampRouter, createHistoryRestoreRouter } from "./routes/history.js";
 import { createSyncRouter } from "./routes/sync.js";
 import { APP_VERSION, APP_COMMIT, APP_MAJOR_VERSION } from "./lib/version.js";
+import { backfillFolders } from "./services/backfill/folders-backfill.js";
+import { backfillTags } from "./services/backfill/tags-backfill.js";
 
 const log = createLogger("server");
 const PORT = parseInt(process.env.PORT || "3001", 10);
+
+// Track users whose backfill has already been triggered this session (in-memory guard)
+const backfilledUsers = new Set<string>();
+
+async function ensureBackfilled(userId: string, notesRoot: string): Promise<void> {
+  if (backfilledUsers.has(userId)) return;
+  backfilledUsers.add(userId);
+  try {
+    await backfillFolders(notesRoot, userId);
+    await backfillTags(userId);
+  } catch (err) {
+    // Non-fatal: log and continue
+    log.warn("backfill failed for user", userId, err);
+    backfilledUsers.delete(userId); // Allow retry on next request
+  }
+}
 const NOTES_DIR = path.resolve(
   process.env.NOTES_DIR || path.join(import.meta.dirname, "../../notes")
 );
@@ -277,6 +295,16 @@ async function main(): Promise<void> {
   // Health check (unauthenticated, GET-only)
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok", version: APP_VERSION, commit: APP_COMMIT, majorVersion: APP_MAJOR_VERSION });
+  });
+
+  // Lazy backfill middleware — fires once per user session (fire-and-forget, non-blocking)
+  app.use("/api", (req, _res, next) => {
+    if (req.user?.id) {
+      ensureBackfilled(req.user.id, NOTES_DIR).catch((e) =>
+        log.warn("ensureBackfilled error", e)
+      );
+    }
+    next();
   });
 
   // Admin routes (auth + admin middleware)
