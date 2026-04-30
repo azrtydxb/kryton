@@ -164,7 +164,7 @@ See [API Keys & MCP docs](docs/API-ACCESS.md) for the full reference.
 ### REST API
 - **Swagger/OpenAPI docs** at `/api/docs` — interactive API explorer
 - **30+ REST endpoints** — notes, search, graph, settings, sharing, auth, admin, sync
-- **Sync API** — pull/push endpoints for mobile synchronization
+- **Sync v2 API** — `/api/sync/v2/pull` and `/api/sync/v2/push` (primary); legacy `/api/sync` deprecated
 - **Version endpoint** — `GET /api/version` for compatibility checks
 
 ### UI & Layout
@@ -273,11 +273,66 @@ npm run dev
 
 ## Mobile App
 
-The React Native mobile app lives in its own repository: [azrtydxb/kryton-mobile](https://github.com/azrtydxb/kryton-mobile). It syncs with the server via the `/api/sync` endpoints.
+The React Native mobile app lives in its own repository: **[azrtydxb/kryton-mobile](https://github.com/azrtydxb/kryton-mobile)**. It consumes `@azrtydxb/core` and `@azrtydxb/core-react` (see [Consumer Libraries](#consumer-libraries) below) and syncs with the server via the Sync v2 API.
 
 ### Install on Android
 
 Download the latest APK from [EAS Build](https://expo.dev/accounts/piwi3910/projects/kryton/builds).
+
+---
+
+## Sync v2 Architecture
+
+Kryton v4.4 ships a redesigned synchronisation layer that supports offline-first clients (mobile, and future desktop) with reliable conflict detection.
+
+### Cursor-based delta sync
+
+Every tier 1 entity (folders, tags, notes, settings, graph edges, shares, trash items, installed plugins) carries two extra columns: a `version` integer and an `updatedCursor` bigint. The server maintains a single monotonically-increasing global cursor. On every write, the cursor is incremented and stamped onto each modified row in the same transaction.
+
+Clients store the last-seen cursor value. A `POST /api/sync/v2/pull` request returns only rows with `updatedCursor > clientCursor` — a deterministic, clock-skew-immune delta. Push requests include the client's `base_version` per row; if the server's version for that row is higher, a conflict response is returned instead of a silent overwrite.
+
+### Yjs for note content
+
+Note bodies are stored and synced as [Yjs](https://yjs.dev) CRDT documents rather than plain text columns. Concurrent edits from multiple devices or collaborators merge automatically with no data loss. The server exposes a WebSocket endpoint (`/ws/yjs/:docId`) for live collaboration; offline clients queue pending Yjs updates locally and flush them on reconnect. Everything that is not note body content (relational metadata) continues to use LWW delta sync.
+
+### Cedar for agent identity
+
+AI agents are first-class database entities with short-lived tokens and optional [Cedar](https://www.cedarpolicy.com) policy documents. The server evaluates the Cedar policy on every agent request — `(principal, action, resource)` — before executing the handler. Agents default to deny-all; permissions are granted explicitly per note, folder, or tag. Agent actions are attributed to `Agent::<id>` in audit logs, distinct from the owning user's actions.
+
+### Endpoint summary
+
+| Method | Path | Status |
+|--------|------|--------|
+| `POST` | `/api/sync/v2/pull` | **Primary** |
+| `POST` | `/api/sync/v2/push` | **Primary** |
+| `GET` | `/api/sync/v2/tier2/:entityType/:parentId` | **Primary** |
+| `WS` | `/ws/yjs/:docId` | **Primary** |
+| `POST` | `/api/sync/pull` | Deprecated — kept for legacy clients |
+| `POST` | `/api/sync/push` | Deprecated — kept for legacy clients |
+
+See `docs/superpowers/specs/2026-04-30-server-sync-v2-design.md` for the full endpoint reference and wire format.
+
+---
+
+## Consumer Libraries
+
+Two npm packages are published from this monorepo to [GitHub Packages](https://github.com/features/packages) under the `@azrtydxb` scope:
+
+| Package | Description |
+|---------|-------------|
+| `@azrtydxb/core` | Platform-agnostic offline-first data layer. Local SQLite + Sync v2 + Yjs. Adapters for `expo-sqlite` and `better-sqlite3`. |
+| `@azrtydxb/core-react` | React hooks wrapping `@azrtydxb/core`. Typed hooks per entity type: `useNotes`, `useFolders`, `useTags`, `useNoteShares`, etc. |
+
+These packages are consumed by `kryton-mobile` today and by a future desktop sub-project. The Kryton web client (`packages/client`) does not consume them — it stays online-only against the server's REST API.
+
+To install in a consumer project, add to `.npmrc`:
+
+```
+@azrtydxb:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
+```
+
+A GitHub Personal Access Token with `read:packages` scope is required. See `docs/superpowers/specs/2026-04-30-core-publishing-design.md` and [ADR-006](docs/superpowers/adrs/ADR-006-pat-publish-token.md) for details.
 
 ---
 
@@ -314,7 +369,7 @@ Download the latest APK from [EAS Build](https://expo.dev/accounts/piwi3910/proj
 │  ├── Auth (better-auth + OAuth + passkeys + 2FA)              │
 │  ├── Notes, Search, Graph, Tags, Trash, History               │
 │  ├── Sharing & Access Requests                                │
-│  ├── Sync (pull/push for mobile)                              │
+│  ├── Sync v2 (cursor + Yjs for mobile/desktop)                │
 │  ├── MCP Server (AI agent access — 14 tools + plugin tools)   │
 │  ├── Plugin system (server + client)                          │
 │  └── Swagger API Docs                                         │
@@ -327,14 +382,14 @@ Download the latest APK from [EAS Build](https://expo.dev/accounts/piwi3910/proj
 │   sync tracking)│  └── attachments/                           │
 └─────────────────┴────────────────────────────────────────────┘
          ▲                           ▲
-         │ Sync API (pull/push)      │ MCP Protocol (streamable HTTP)
+         │ Sync v2 API + WS/Yjs      │ MCP Protocol (streamable HTTP)
 ┌────────┴────────────────┐  ┌───────┴──────────────────────────┐
 │  React Native Mobile    │  │  AI Agents                        │
-│  (Expo SDK 55)          │  │  ├── Claude Code / Claude Desktop │
-│  ├── expo-sqlite        │  │  ├── Cursor / Windsurf            │
-│  ├── WebView editor     │  │  ├── Custom MCP clients           │
-│  ├── D3 graph           │  │  └── Any MCP-compatible tool      │
-│  └── 5-tab navigation   │  └──────────────────────────────────┘
+│  azrtydxb/kryton-mobile │  │  ├── Claude Code / Claude Desktop │
+│  ├── @azrtydxb/core     │  │  ├── Cursor / Windsurf            │
+│  ├── @azrtydxb/core-    │  │  ├── Custom MCP clients           │
+│  │   react hooks        │  │  └── Any MCP-compatible tool      │
+│  └── Expo SDK 55        │  └──────────────────────────────────┘
 └─────────────────────────┘
 ```
 
@@ -372,6 +427,7 @@ npm test             # Run all tests
 - [API Keys & MCP](docs/API-ACCESS.md) — API key setup, MCP configuration, full tool reference
 - [Plugin Development](docs/PLUGINS.md) — plugin API reference
 - [Migrations](packages/server/MIGRATIONS.md) — database migration guide
+- [Architecture Decision Records](docs/superpowers/adrs/) — ADR-001 through ADR-006 covering scope, sync, Yjs, Cedar, schema gen, and publishing tokens
 
 ## License
 
