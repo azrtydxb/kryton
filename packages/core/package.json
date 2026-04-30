@@ -59,7 +59,8 @@
   },
   "dependencies": {
     "yjs": "^13.6.0",
-    "y-protocols": "^1.0.6"
+    "y-protocols": "^1.0.6",
+    "lib0": "^0.2.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
