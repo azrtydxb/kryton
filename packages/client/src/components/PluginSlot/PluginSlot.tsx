@@ -1,11 +1,16 @@
 import React from "react";
+import { usePluginSlots } from "@azrtydxb/ui";
 import { PluginErrorBoundary } from "../../plugins/PluginErrorBoundary";
-import { usePluginSlots } from "../../plugins/PluginContext";
 
 interface PluginSlotProps {
   slot: "sidebar" | "statusbar-left" | "statusbar-right" | "editor-toolbar";
 }
 
+/**
+ * Renders components registered by plugins into a named slot.
+ * Uses @azrtydxb/ui usePluginSlots (ui's PluginProvider must be an ancestor).
+ * Error isolation per plugin is provided by the client's PluginErrorBoundary.
+ */
 export function PluginSlot({ slot }: PluginSlotProps) {
   const plugins = usePluginSlots();
 
