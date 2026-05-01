@@ -17,3 +17,9 @@ export * from "./data/hooks";
 
 // Notes business components
 export * from "./notes/index";
+
+// Search business components
+export * from "./search/index";
+
+// Tags business components
+export * from "./tags/index";

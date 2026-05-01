@@ -2,3 +2,9 @@
 # that would otherwise swallow packages/ui/src/notes/).
 !src/notes/
 !src/notes/**
+
+# Un-ignore search/ and tags/ in case root patterns cover them.
+!src/search/
+!src/search/**
+!src/tags/
+!src/tags/**
