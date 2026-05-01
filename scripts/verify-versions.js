@@ -8,6 +8,7 @@ const expected = root.version;
 const packages = [
   "packages/core/package.json",
   "packages/core-react/package.json",
+  "packages/ui/package.json",
 ];
 
 const mismatches = [];

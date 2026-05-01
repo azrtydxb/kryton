@@ -24,7 +24,7 @@ exec("npm run typecheck --workspace=packages/core --workspace=packages/core-reac
 exec("npm run test:core");
 
 console.log(`Step 4/5: publish (version=${root.version}, prerelease=${isPrerelease}${tagFlag ? `, tag=${tagFlag}` : ""})`);
-const baseCmd = `npm publish --workspace=packages/core --workspace=packages/core-react ${tagFlag}`.trim();
+const baseCmd = `npm publish --workspace=packages/core --workspace=packages/core-react --workspace=packages/ui ${tagFlag}`.trim();
 const publishCmd = dryRun ? `${baseCmd} --dry-run` : baseCmd;
 exec(publishCmd);
 

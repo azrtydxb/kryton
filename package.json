@@ -22,8 +22,8 @@
     "test:server": "npm run test --workspace=packages/server",
     "test:client": "npm run test --workspace=packages/client",
     "prepare": "husky",
-    "build:core": "npm run build --workspace=packages/core --workspace=packages/core-react",
-    "test:core": "npm run test --workspace=packages/core --workspace=packages/core-react",
+    "build:core": "npm run build --workspace=packages/core --workspace=packages/core-react --workspace=packages/ui",
+    "test:core": "npm run test --workspace=packages/core --workspace=packages/core-react --workspace=packages/ui",
     "verify-versions": "node scripts/verify-versions.js",
     "release": "node scripts/release.js"
   },
