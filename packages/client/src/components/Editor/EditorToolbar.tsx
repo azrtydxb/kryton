@@ -1,11 +1,11 @@
-import { useCallback } from 'react';
+import { useCallback, type MutableRefObject } from 'react';
 import { EditorToolbar as UiEditorToolbar } from '@azrtydxb/ui';
 import type { EditorView } from '@codemirror/view';
 import { undo, redo } from '@codemirror/commands';
 import { api } from '../../lib/api';
 
 interface EditorToolbarProps {
-  viewRef: React.MutableRefObject<EditorView | undefined>;
+  viewRef: MutableRefObject<EditorView | undefined>;
 }
 
 /**

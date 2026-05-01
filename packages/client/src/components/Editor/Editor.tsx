@@ -1,3 +1,4 @@
+import type { MutableRefObject } from 'react';
 import { NoteEditorReact, type EditorCursorState } from '@azrtydxb/ui';
 import type { EditorView } from '@codemirror/view';
 import type { Extension } from '@codemirror/state';
@@ -12,7 +13,7 @@ interface EditorProps {
   darkMode: boolean;
   allNotes: FileNode[];
   onCursorStateChange?: (state: EditorCursorState) => void;
-  viewRef?: React.MutableRefObject<EditorView | undefined>;
+  viewRef?: MutableRefObject<EditorView | undefined>;
   pluginExtensions?: Extension[];
 }
 
