@@ -30,6 +30,7 @@ const packageFiles = [
   "package.json",
   "packages/core/package.json",
   "packages/core-react/package.json",
+  "packages/ui/package.json",
 ];
 
 for (const file of packageFiles) {
@@ -38,6 +39,9 @@ for (const file of packageFiles) {
   pkg.version = newVersion;
   if (pkg.peerDependencies?.["@azrtydxb/core"]) {
     pkg.peerDependencies["@azrtydxb/core"] = newVersion;
+  }
+  if (pkg.peerDependencies?.["@azrtydxb/core-react"]) {
+    pkg.peerDependencies["@azrtydxb/core-react"] = newVersion;
   }
   writeFileSync(path, JSON.stringify(pkg, null, 2) + "\n");
   console.log(`bumped ${file} → ${newVersion}`);
