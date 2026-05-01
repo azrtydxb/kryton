@@ -38,3 +38,12 @@ export * from "./templates/index";
 
 // Settings components
 export * from "./settings/index";
+
+// Layout components
+export * from "./layout/index";
+
+// Editor components
+export * from "./editor/index";
+
+// Graph components
+export * from "./graph/index";
