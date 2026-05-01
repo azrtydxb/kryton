@@ -8,3 +8,13 @@
 !src/search/**
 !src/tags/
 !src/tags/**
+
+# Un-ignore new module directories.
+!src/sharing/
+!src/sharing/**
+!src/trash/
+!src/trash/**
+!src/daily/
+!src/daily/**
+!src/templates/
+!src/templates/**

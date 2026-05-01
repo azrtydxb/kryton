@@ -60,7 +60,8 @@
     "clsx": "^2.1.1",
     "lucide-react": "^0.460.0",
     "sonner": "^1.7.4",
-    "tailwind-merge": "^2.5.0"
+    "tailwind-merge": "^2.5.0",
+    "use-debounce": "^10.1.0"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",

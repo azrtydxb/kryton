@@ -23,3 +23,15 @@ export * from "./search/index";
 
 // Tags business components
 export * from "./tags/index";
+
+// Sharing components
+export * from "./sharing/index";
+
+// Trash components
+export * from "./trash/index";
+
+// Daily notes components
+export * from "./daily/index";
+
+// Templates components
+export * from "./templates/index";
