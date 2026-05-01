@@ -1,6 +1,6 @@
 {
   "name": "@azrtydxb/core-react",
-  "version": "4.4.0-pre.7",
+  "version": "4.4.0-pre.8",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -32,7 +32,7 @@
     "access": "restricted"
   },
   "peerDependencies": {
-    "@azrtydxb/core": "4.4.0-pre.7",
+    "@azrtydxb/core": "4.4.0-pre.8",
     "react": ">=18"
   },
   "devDependencies": {
