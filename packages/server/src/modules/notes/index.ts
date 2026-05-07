@@ -110,7 +110,7 @@ export const notesModule: FastifyPluginAsync = async (app) => {
   await app.register(notesRoutes(deps), { prefix: "/api/notes" });
   await app.register(notesRenameRoutes(deps), { prefix: "/api/notes-rename" });
 
-  await app.register(foldersRoutes({ notesDir, ensureBackfilled }), {
+  await app.register(foldersRoutes({ notesDir, ensureBackfilled, noteService }), {
     prefix: "/api/folders",
   });
   await app.register(foldersRenameRoutes({ notesDir, ensureBackfilled }), {

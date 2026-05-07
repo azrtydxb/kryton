@@ -11,6 +11,7 @@ import {
   renameFolderBodySchema,
 } from "../schemas/folders.schemas.js";
 import { wildcardPathParamsSchema } from "../schemas/notes.schemas.js";
+import type { NoteService } from "../services/note.service.js";
 import { getUserNotesDir } from "../services/user-notes-dir.service.js";
 
 function decodePathParam(raw: string): string {
@@ -30,6 +31,33 @@ function validatePathWithinBase(fullPath: string, baseDir: string): void {
 export interface FoldersRoutesDeps {
   notesDir: string;
   ensureBackfilled: (userId: string) => Promise<void>;
+  /** Optional — when present, folder DELETE recursively trashes notes
+   *  inside the folder before removing the directory. */
+  noteService?: NoteService;
+}
+
+/** Walk a directory and yield every .md file path RELATIVE to baseDir. */
+async function collectMarkdownFiles(
+  baseDir: string,
+  relPath: string,
+): Promise<string[]> {
+  const out: string[] = [];
+  const fullPath = path.join(baseDir, relPath);
+  let entries: Array<{ name: string; isDirectory(): boolean; isFile(): boolean }>;
+  try {
+    entries = await fs.readdir(fullPath, { withFileTypes: true });
+  } catch {
+    return out;
+  }
+  for (const entry of entries) {
+    const childRel = relPath ? `${relPath}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) {
+      out.push(...(await collectMarkdownFiles(baseDir, childRel)));
+    } else if (entry.isFile() && entry.name.endsWith(".md")) {
+      out.push(childRel);
+    }
+  }
+  return out;
 }
 
 /**
@@ -40,7 +68,7 @@ export interface FoldersRoutesDeps {
  *   DELETE /api/folders/:path*         delete an empty folder
  */
 export function foldersRoutes(deps: FoldersRoutesDeps): FastifyPluginAsync {
-  const { notesDir, ensureBackfilled } = deps;
+  const { notesDir, ensureBackfilled, noteService } = deps;
 
   return async (app) => {
     const typed = app.withTypeProvider<ZodTypeProvider>();
@@ -79,7 +107,7 @@ export function foldersRoutes(deps: FoldersRoutesDeps): FastifyPluginAsync {
       {
         schema: {
           tags: ["notes"],
-          summary: "Delete an empty folder",
+          summary: "Delete a folder (recursively trashes any notes inside)",
           params: wildcardPathParamsSchema,
           response: { 200: folderDeletedResponseSchema },
         },
@@ -98,12 +126,20 @@ export function foldersRoutes(deps: FoldersRoutesDeps): FastifyPluginAsync {
         const fullPath = path.join(userDir, folderPath);
         validatePathWithinBase(fullPath, userDir);
 
-        const entries = await fs.readdir(fullPath);
-        if (entries.length > 0) {
-          throw new ValidationError("Folder is not empty");
+        // Trash every .md file inside (recursively) so the user can
+        // restore individual notes from trash, then remove the now-
+        // empty directory tree. Non-md files (if any) are dropped.
+        if (noteService) {
+          const markdownFiles = await collectMarkdownFiles(userDir, folderPath);
+          for (const relPath of markdownFiles) {
+            await noteService.deleteNote(userDir, relPath, ctx.user.id);
+          }
         }
 
-        await fs.rmdir(fullPath);
+        // Remove the directory tree (any leftover non-md files + empty
+        // sub-directories). `force: true` makes this a no-op if the
+        // directory was already cleaned up.
+        await fs.rm(fullPath, { recursive: true, force: true });
         return { message: "Folder deleted" };
       },
     );
