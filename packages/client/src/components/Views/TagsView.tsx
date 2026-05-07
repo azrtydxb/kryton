@@ -23,17 +23,18 @@ const headerStyle: CSSProperties = {
   flexShrink: 0,
 };
 
+/** Per prototype/app/sidebar.jsx kr-tag styling. */
 const tagChip = (active: boolean): CSSProperties => ({
   display: 'inline-flex',
   alignItems: 'center',
-  gap: 6,
-  padding: '5px 10px 5px 9px',
-  borderRadius: 5,
+  gap: 4,
+  padding: '3px 7px 3px 6px',
+  borderRadius: 4,
   background: active ? 'var(--accent-soft)' : 'var(--bg-2)',
   border: `1px solid ${active ? 'var(--accent)' : 'var(--line)'}`,
   color: active ? 'var(--accent)' : 'var(--fg-1)',
   fontFamily: 'var(--font-mono)',
-  fontSize: 12,
+  fontSize: 11.5,
   cursor: 'pointer',
   transition: 'background 120ms, border-color 120ms, color 120ms',
 });
@@ -126,11 +127,11 @@ export function TagsView({ onNoteSelect }: TagsViewProps) {
             flex: 1,
             minWidth: 0,
             overflow: 'auto',
-            padding: '18px 20px',
+            padding: '16px 18px',
             display: 'flex',
             flexWrap: 'wrap',
             alignContent: 'flex-start',
-            gap: 8,
+            gap: 6,
             borderRight: selectedTag ? '1px solid var(--line)' : 'none',
           }}
         >

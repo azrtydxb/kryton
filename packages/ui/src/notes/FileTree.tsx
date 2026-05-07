@@ -286,15 +286,17 @@ export function FileTree({
               aria-expanded={node.type === "folder" ? isExpanded : undefined}
               tabIndex={0}
               className={cn(
-                "group w-full flex items-center gap-1 px-2 py-1 text-sm rounded-md mx-1 transition-colors duration-100",
-                isDragging ? "opacity-50" : "",
-                isDragOver
-                  ? "bg-violet-500/10 border border-violet-500/30 text-violet-600 dark:text-violet-400"
-                  : isActive
-                    ? "bg-violet-500/10 text-violet-600 dark:text-violet-400 font-medium"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-200/60 dark:hover:bg-gray-700/40",
+                "group w-full flex items-center gap-2 py-1 text-sm rounded-md mx-1 transition-colors duration-100 kryton-tree-row relative",
+                isDragging && "opacity-50",
+                isDragOver && "kryton-tree-row--dragover",
+                isActive && "kryton-tree-row--active",
               )}
-              style={{ paddingLeft: `${depth * 16 + 8}px` }}
+              style={{
+                paddingLeft: `${depth * 14 + 8}px`,
+                paddingRight: 8,
+                color: isActive ? "var(--fg)" : "var(--fg-1)",
+                background: isActive ? "var(--accent-soft)" : "transparent",
+              }}
               onClick={() => {
                 if (node.type === "folder") toggleExpand(node.path);
                 else onSelect(node.path);
@@ -305,33 +307,63 @@ export function FileTree({
               onDragOver={(e) => handleDragOver(e, node)}
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, node)}
+              onMouseEnter={(e) => {
+                if (!isActive) e.currentTarget.style.background = "var(--bg-hover)";
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive) e.currentTarget.style.background = "transparent";
+              }}
             >
+              {/* Active 2px accent left bar — per prototype Row */}
+              {isActive && (
+                <span
+                  aria-hidden="true"
+                  style={{
+                    position: "absolute",
+                    left: 0,
+                    top: 4,
+                    bottom: 4,
+                    width: 2,
+                    background: "var(--accent)",
+                    borderRadius: 2,
+                  }}
+                />
+              )}
               {node.type === "folder" ? (
                 <>
                   <ChevronRight
-                    size={14}
+                    size={11}
                     aria-hidden="true"
                     className={cn(
-                      "flex-shrink-0 text-gray-400 transition-transform duration-150",
-                      isExpanded ? "rotate-90" : "",
+                      "flex-shrink-0 transition-transform duration-150",
+                      isExpanded && "rotate-90",
                     )}
+                    style={{ color: "var(--fg-4)" }}
                   />
                   {isExpanded ? (
-                    <FolderOpen size={15} aria-hidden="true" className="flex-shrink-0 text-violet-500/70" />
+                    <FolderOpen
+                      size={14}
+                      aria-hidden="true"
+                      className="flex-shrink-0"
+                      style={{ color: isActive ? "var(--accent)" : "var(--fg-3)" }}
+                    />
                   ) : (
-                    <Folder size={15} aria-hidden="true" className="flex-shrink-0 text-gray-400 dark:text-gray-500" />
+                    <Folder
+                      size={14}
+                      aria-hidden="true"
+                      className="flex-shrink-0"
+                      style={{ color: isActive ? "var(--accent)" : "var(--fg-3)" }}
+                    />
                   )}
                 </>
               ) : (
                 <>
-                  <span className="w-3.5" />
+                  <span style={{ width: 11, flexShrink: 0 }} />
                   <FileText
-                    size={15}
+                    size={13}
                     aria-hidden="true"
-                    className={cn(
-                      "flex-shrink-0",
-                      isActive ? "text-violet-500" : "text-gray-400 dark:text-gray-500",
-                    )}
+                    className="flex-shrink-0"
+                    style={{ color: isActive ? "var(--accent)" : "var(--fg-3)" }}
                   />
                 </>
               )}

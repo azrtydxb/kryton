@@ -9,12 +9,8 @@ import {
   historyKeymap,
 } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import {
-  syntaxHighlighting,
-  defaultHighlightStyle,
-  bracketMatching,
-} from "@codemirror/language";
-import { oneDark } from "@codemirror/theme-one-dark";
+import { bracketMatching } from "@codemirror/language";
+import { krytonCmTheme } from "./krytonCmTheme";
 import {
   autocompletion,
   type CompletionContext,
@@ -131,9 +127,11 @@ export function NoteEditorReact({
       doc: content,
       extensions: [
         ...pluginExtensions,
-        ...(darkMode ? [oneDark] : []),
+        // Kryton design-token theme — see krytonCmTheme.ts. Light/dark
+        // is driven by data-theme on <html>, so a single theme works
+        // for both modes (the `darkMode` prop is now informational only).
+        ...krytonCmTheme,
         markdown({ base: markdownLanguage }),
-        syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
         bracketMatching(),
         history(),
         cmSearch(),
