@@ -136,7 +136,6 @@ function AppContent() {
     mobileMenuOpen, setMobileMenuOpen,
     sidebarWidth,
     rightPanelWidth,
-    graphHeight,
     graphData, graphLoading,
     setCursorState,
     starredPaths,
@@ -161,7 +160,6 @@ function AppContent() {
     handleDailyNote,
     handleCreateFromTemplate,
     handleTemplateSelected,
-    handleOutlineJump,
     handleNewNote,
     handleRenameNote,
     handlePdfExport,
@@ -171,7 +169,6 @@ function AppContent() {
     cancelEdit,
     handleSidebarResize,
     handleRightPanelResize,
-    handleGraphResize,
     handleShare,
   } = callbacks;
 
@@ -229,6 +226,7 @@ function AppContent() {
         onToggleSidebar={() => setSidebarOpen(prev => !prev)}
         onOpenPalette={() => setShowQuickSwitcher(true)}
         activeNotePath={notes.activeNote?.path ?? null}
+        onNewNote={handleNewNote}
       />
 
       <div className="flex-1 flex overflow-hidden relative">
@@ -331,16 +329,12 @@ function AppContent() {
           <>
             <RightPanel
               rightPanelWidth={rightPanelWidth}
-              graphHeight={graphHeight}
               graphData={graphData}
               graphLoading={graphLoading}
               activeNotePath={notes.activeNote?.path ?? null}
-              activeNoteContent={notes.activeNote?.content ?? null}
               starredPaths={starredPaths}
               onRightPanelResize={handleRightPanelResize}
-              onGraphResize={handleGraphResize}
               onNoteSelect={handleNoteSelect}
-              onOutlineJump={handleOutlineJump}
             />
             <MobileGraphOverlay
               graphData={graphData}

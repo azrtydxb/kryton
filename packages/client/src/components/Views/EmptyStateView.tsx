@@ -1,4 +1,11 @@
+/**
+ * EmptyStateView — matches design handoff `prototype/app/editor.jsx`
+ * EmptyState. A 96×96 accent-soft logo card with the K-glyph + "idle"
+ * badge, display heading "Ready when you are.", subtitle, and a
+ * shortcut grid below.
+ */
 import type { CSSProperties } from 'react';
+import { Icons } from '../Icons';
 
 const monoFamily = 'var(--font-mono)';
 
@@ -7,6 +14,31 @@ interface Shortcut {
   label: string;
 }
 
+const cardStyle: CSSProperties = {
+  position: 'relative',
+  width: 96,
+  height: 96,
+  borderRadius: 18,
+  background: 'var(--accent-soft)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  border: '1px solid var(--accent)',
+};
+
+const idleBadge: CSSProperties = {
+  position: 'absolute',
+  top: -8,
+  right: -8,
+  padding: '2px 7px',
+  borderRadius: 10,
+  background: 'var(--bg)',
+  border: '1px solid var(--accent)',
+  color: 'var(--accent)',
+  fontSize: 10,
+  fontFamily: monoFamily,
+};
+
 export function EmptyStateView() {
   const isMac =
     typeof navigator !== 'undefined' && navigator.platform.toLowerCase().includes('mac');
@@ -14,21 +46,11 @@ export function EmptyStateView() {
 
   const shortcuts: Shortcut[] = [
     { keys: [mod, 'N'], label: 'new note' },
-    { keys: [mod, 'K'], label: 'command palette' },
     { keys: [mod, 'P'], label: 'quick switcher' },
-    { keys: [mod, 'G'], label: 'graph' },
+    { keys: [mod, 'K'], label: 'search' },
     { keys: [mod, 'B'], label: 'toggle sidebar' },
+    { keys: [mod, 'G'], label: 'graph view' },
   ];
-
-  const eyebrow: CSSProperties = {
-    fontFamily: monoFamily,
-    fontSize: 11,
-    color: 'var(--fg-4)',
-    letterSpacing: '0.08em',
-    textTransform: 'uppercase',
-    marginBottom: 22,
-    textAlign: 'center',
-  };
 
   return (
     <div
@@ -37,29 +59,50 @@ export function EmptyStateView() {
         flex: 1,
         minHeight: 0,
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
+        gap: 18,
+        padding: 40,
         background: 'var(--bg)',
-        position: 'relative',
-        overflow: 'hidden',
       }}
     >
-      <div style={{ position: 'relative', zIndex: 1 }}>
-        <div style={eyebrow}>// no note selected</div>
+      <div style={cardStyle}>
+        <Icons.Logo size={56} />
+        <span style={idleBadge}>idle</span>
+      </div>
 
+      <div style={{ textAlign: 'center' }}>
         <div
           style={{
-            display: 'grid',
-            gridTemplateColumns: 'auto 1fr',
-            columnGap: 16,
-            rowGap: 10,
-            alignItems: 'center',
+            fontFamily: 'var(--font-display)',
+            fontSize: 22,
+            color: 'var(--fg)',
+            marginBottom: 4,
           }}
         >
-          {shortcuts.map((s) => (
-            <ShortcutRow key={s.label} keys={s.keys} label={s.label} />
-          ))}
+          Ready when you are.
         </div>
+        <div style={{ color: 'var(--fg-2)', fontSize: 13 }}>
+          Open a note from the sidebar, or start a new one.
+        </div>
+      </div>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'auto auto',
+          columnGap: 14,
+          rowGap: 6,
+          marginTop: 10,
+          fontFamily: monoFamily,
+          fontSize: 12,
+          color: 'var(--fg-2)',
+        }}
+      >
+        {shortcuts.map((s) => (
+          <ShortcutRow key={s.label} keys={s.keys} label={s.label} />
+        ))}
       </div>
     </div>
   );
@@ -68,22 +111,10 @@ export function EmptyStateView() {
 function ShortcutRow({ keys, label }: { keys: string[]; label: string }) {
   return (
     <>
-      <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-        {keys.map((k, i) => (
-          <span key={i} className="kbd">
-            {k}
-          </span>
-        ))}
-      </div>
-      <span
-        style={{
-          fontFamily: monoFamily,
-          fontSize: 12,
-          color: 'var(--fg-2)',
-        }}
-      >
-        {label}
+      <span style={{ textAlign: 'right' }}>
+        <span className="kbd">{keys.join('')}</span>
       </span>
+      <span>{label}</span>
     </>
   );
 }

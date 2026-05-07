@@ -4,6 +4,7 @@ import { FileTree, FavoritesSection, TrashList, Resizer } from '@azrtydxb/ui';
 import type { TrashItem as UiTrashItem } from '@azrtydxb/ui';
 import { TagPane } from '../Tags/TagPane';
 import { useToastStore } from '../../stores/toastStore';
+import { useUIStore } from '../../stores/uiStore';
 import { Icons } from '../Icons';
 
 interface SharedNote {
@@ -185,7 +186,8 @@ export function Sidebar({
   onDeleteFolder,
   onRenameFolder,
   onDailyNote,
-  onCreateFromTemplate,
+  // onCreateFromTemplate kept on the SidebarProps surface but the
+  // primary-nav row was replaced by Graph per design spec.
   starredPaths,
   onToggleStar,
   sharedNotes,
@@ -250,9 +252,19 @@ export function Sidebar({
     }
   }, [refreshTrash, addToast]);
 
-  const handleNewRootNote = useCallback(() => {
-    window.dispatchEvent(new CustomEvent('kryton:new-note-root'));
-  }, []);
+  // Reserved for a future "+ new note" affordance; the redesign nav
+  // dropped the root-create row in favour of the Graph entry.
+  // const handleNewRootNote = useCallback(() => {
+  //   window.dispatchEvent(new CustomEvent('kryton:new-note-root'));
+  // }, []);
+
+  // Top-level main-pane view (note | all | graph) — used by primary nav.
+  const view = useUIStore(s => s.view);
+  const setView = useUIStore(s => s.setView);
+  const handleAllNotesClick = useCallback(() => setView('all'), [setView]);
+  const handleGraphClick = useCallback(() => {
+    setView(view === 'graph' ? 'note' : 'graph');
+  }, [setView, view]);
 
   const uiTrashItems = trashItems.map(item => ({ path: item.path }));
 
@@ -313,13 +325,14 @@ export function Sidebar({
         )}
       </div>
 
-      {/* 2. Primary nav */}
+      {/* 2. Primary nav (per prototype/app/sidebar.jsx) */}
       <div style={{ padding: '0 8px 8px', display: 'flex', flexDirection: 'column', gap: 1 }}>
         <NavRow
           icon={<Icons.Inbox size={14} />}
           label="All notes"
           hint={noteCount}
-          onClick={handleNewRootNote}
+          active={view === 'all'}
+          onClick={handleAllNotesClick}
         />
         <NavRow
           icon={<Icons.Calendar size={14} />}
@@ -328,9 +341,10 @@ export function Sidebar({
           onClick={onDailyNote}
         />
         <NavRow
-          icon={<Icons.Layout size={14} />}
-          label="From template"
-          onClick={onCreateFromTemplate}
+          icon={<Icons.Network size={14} />}
+          label="Graph"
+          active={view === 'graph'}
+          onClick={handleGraphClick}
         />
         <NavRow
           icon={<Icons.Hash size={14} />}

@@ -92,34 +92,6 @@ const legendStrip: CSSProperties = {
   flexShrink: 0,
 };
 
-function LegendDot({ fill, hollow }: { fill: string; hollow?: boolean }) {
-  return (
-    <span
-      style={{
-        width: 8,
-        height: 8,
-        borderRadius: '50%',
-        background: hollow ? 'transparent' : fill,
-        border: hollow ? `1px solid ${fill}` : 'none',
-        flexShrink: 0,
-      }}
-    />
-  );
-}
-
-function LegendBar() {
-  return (
-    <span
-      style={{
-        width: 14,
-        height: 1,
-        background: 'var(--line-strong)',
-        flexShrink: 0,
-      }}
-    />
-  );
-}
-
 export function GraphPanel({
   graphData,
   loading,
@@ -210,14 +182,15 @@ export function GraphPanel({
   // ---- Header ----
   const renderHeader = (onExpand: (() => void) | null) => (
     <div style={railHeader}>
-      <Icons.Network size={14} style={{ color: 'var(--fg-3)' }} />
+      <Icons.Network size={13} style={{ color: 'var(--accent)' }} />
       <span
         className="mono"
         style={{
-          fontSize: 12,
-          color: 'var(--fg-2)',
+          fontSize: 11,
+          color: 'var(--fg-3)',
           fontFamily: 'var(--font-mono)',
-          letterSpacing: '0.04em',
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
         }}
       >
         graph
@@ -274,24 +247,29 @@ export function GraphPanel({
   );
 
   // ---- Legend ----
+  // Per prototype/app/graph.jsx: active (accent dot) · note (bg-2 dot
+  // with fg-3 ring) · link (14×1 accent bar) · spacer · zoom %.
   const renderLegend = () => (
     <div style={legendStrip}>
       <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-        <LegendDot fill="var(--accent)" />
-        this note
+        <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)' }} />
+        active
       </span>
       <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-        <LegendDot fill="var(--accent-2)" />
-        linked
+        <span
+          style={{
+            width: 8, height: 8, borderRadius: '50%',
+            background: 'var(--bg-2)', border: '1px solid var(--fg-3)',
+          }}
+        />
+        note
       </span>
       <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-        <LegendDot fill="var(--fg-3)" hollow />
-        tagged
+        <span style={{ width: 14, height: 1, background: 'var(--accent)' }} />
+        link
       </span>
-      <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-        <LegendBar />
-        backlinks
-      </span>
+      <div style={{ flex: 1 }} />
+      <span style={{ color: 'var(--fg-4)' }}>{nodeCount}n {edgeCount}e</span>
     </div>
   );
 

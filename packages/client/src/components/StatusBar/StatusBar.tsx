@@ -1,105 +1,76 @@
 /**
- * EditorMeta — bottom rail under the editor surface.
- * (Filename retained as `StatusBar.tsx` to avoid touching unowned imports.)
+ * EditorMeta — bottom rail under the editor, per design handoff
+ * prototype/app/editor.jsx EditorMeta. (Filename kept as `StatusBar.tsx`
+ * to avoid touching unowned imports.)
  *
- * Layout: 28px tall, mono 11px, single row of meta tokens separated by
- * middle dots. Plugin slots `statusbar-left` / `statusbar-right` are
- * rendered by App.tsx (parent), not here — the layout there is preserved.
+ * Layout (28px, bg-1, border-top line, mono 11):
+ *   <n> outgoing · <n> backlinks · <n> tags  …  <n> words · Ln L, Col C · UTF-8 · Markdown
  */
-import { useEffect, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 
 interface StatusBarProps {
   notePath: string | null;
   line: number;
   col: number;
   wordCount: number;
+  /** Optional link counts surfaced when the parent has them. */
+  outgoingCount?: number;
+  backlinksCount?: number;
+  tagsCount?: number;
+  encoding?: string;
 }
 
-function relativeTime(ts: number | null): string {
-  if (ts === null) return 'never';
-  const seconds = Math.floor((Date.now() - ts) / 1000);
-  if (seconds < 5) return 'just now';
-  if (seconds < 60) return `${seconds}s ago`;
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-  return `${Math.floor(seconds / 86400)}d ago`;
-}
+const dotStyle: CSSProperties = { color: 'var(--fg-4)' };
 
-function fileExt(path: string | null): string {
-  if (!path) return '–';
-  const dot = path.lastIndexOf('.');
-  if (dot === -1) return path;
-  return path.slice(dot + 1);
-}
+const railStyle: CSSProperties = {
+  flex: 1,
+  height: 28,
+  display: 'flex',
+  alignItems: 'center',
+  gap: 14,
+  padding: '0 12px',
+  background: 'var(--bg-1)',
+  borderTop: '1px solid var(--line)',
+  fontSize: 11,
+  color: 'var(--fg-3)',
+  userSelect: 'none',
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+};
 
-const READ_WPM = 160;
-
-export function StatusBar({ notePath, wordCount }: StatusBarProps) {
-  const [lastSaved, setLastSaved] = useState<number | null>(null);
-  const [, forceTick] = useState(0);
-  const lastWordCount = useRef<number>(wordCount);
-
-  // Treat each wordCount delta as evidence of a save (approximate; the real
-  // autosave lives in EditModeView, but we don't have a wire to it from here).
-  useEffect(() => {
-    if (wordCount !== lastWordCount.current) {
-      lastWordCount.current = wordCount;
-      setLastSaved(Date.now());
-    }
-  }, [wordCount]);
-
-  // Reset on note change.
-  useEffect(() => {
-    lastWordCount.current = wordCount;
-    setLastSaved(notePath ? Date.now() : null);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notePath]);
-
-  // Tick once a minute so the relative timestamp stays fresh.
-  useEffect(() => {
-    const id = setInterval(() => forceTick((n) => n + 1), 30_000);
-    return () => clearInterval(id);
-  }, []);
-
-  const readMin = Math.max(1, Math.round(wordCount / READ_WPM));
-  const wcDisplay = wordCount.toLocaleString();
-  const ext = fileExt(notePath);
-
-  const dot = (
-    <span style={{ color: 'var(--fg-4)' }}>·</span>
-  );
+export function StatusBar({
+  notePath,
+  line,
+  col,
+  wordCount,
+  outgoingCount = 0,
+  backlinksCount = 0,
+  tagsCount = 0,
+  encoding = 'UTF-8',
+}: StatusBarProps) {
+  if (!notePath) {
+    return <div className="mono" style={railStyle} />;
+  }
 
   return (
-    <div
-      className="mono"
-      style={{
-        flex: 1,
-        height: 28,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        padding: '0 12px',
-        background: 'var(--bg-1)',
-        borderTop: '1px solid var(--line)',
-        fontFamily: 'var(--font-mono)',
-        fontSize: 11,
-        color: 'var(--fg-3)',
-        userSelect: 'none',
-        whiteSpace: 'nowrap',
-        overflow: 'hidden',
-      }}
-    >
+    <div className="mono" style={railStyle}>
       <span>
-        wc <span style={{ color: 'var(--fg-1)' }}>{wcDisplay}</span>
+        <span style={{ color: 'var(--accent)' }}>{outgoingCount}</span> outgoing
       </span>
-      {dot}
+      <span style={dotStyle}>·</span>
       <span>
-        <span style={{ color: 'var(--fg-1)' }}>{readMin}</span> min
+        <span style={{ color: 'var(--accent-2)' }}>{backlinksCount}</span> backlinks
       </span>
-      {dot}
-      <span>{ext}</span>
-      {dot}
-      <span>last saved {relativeTime(lastSaved)}</span>
+      <span style={dotStyle}>·</span>
+      <span>{tagsCount} tags</span>
+      <div style={{ flex: 1 }} />
+      <span>{wordCount.toLocaleString()} words</span>
+      <span style={dotStyle}>·</span>
+      <span>Ln {line}, Col {col}</span>
+      <span style={dotStyle}>·</span>
+      <span>{encoding}</span>
+      <span style={dotStyle}>·</span>
+      <span>Markdown</span>
     </div>
   );
 }

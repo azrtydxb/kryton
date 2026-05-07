@@ -110,7 +110,7 @@ export function EditorTabStrip({ activePath, activeTitle, dirty, onClose }: Edit
           maxWidth: 280,
         }}
       >
-        <Icons.FileText size={12} style={{ color: 'var(--fg-3)' }} />
+        <Icons.FileText size={13} style={{ color: 'var(--accent)' }} />
         <span
           className="mono"
           style={{
@@ -123,7 +123,10 @@ export function EditorTabStrip({ activePath, activeTitle, dirty, onClose }: Edit
           }}
           title={activePath}
         >
-          {activeTitle}
+          {(() => {
+            const basename = activePath.split('/').filter(Boolean).pop() || activeTitle;
+            return basename.endsWith('.md') ? basename : `${activeTitle}.md`;
+          })()}
         </span>
         {showPulse && (
           <span
@@ -207,9 +210,9 @@ export function ModePills({ value, onChange }: ModePillsProps) {
         border: '1px solid var(--line)',
       }}
     >
-      <ModePill icon={<Icons.Edit size={11} />} label="EDIT" active={current === 'edit'} onClick={() => handle('edit')} />
-      <ModePill icon={<Icons.Layout size={11} />} label="SPLIT" active={current === 'split'} onClick={() => handle('split')} />
-      <ModePill icon={<Icons.Eye size={11} />} label="PREVIEW" active={current === 'preview'} onClick={() => handle('preview')} />
+      <ModePill icon={<Icons.Edit size={11} />} label="Edit" active={current === 'edit'} onClick={() => handle('edit')} />
+      <ModePill icon={<Icons.Layout size={11} />} label="Split" active={current === 'split'} onClick={() => handle('split')} />
+      <ModePill icon={<Icons.Eye size={11} />} label="Preview" active={current === 'preview'} onClick={() => handle('preview')} />
     </div>
   );
 }
@@ -233,9 +236,7 @@ function ModePill({
     borderRadius: 5,
     fontFamily: 'var(--font-mono)',
     fontSize: 11.5,
-    letterSpacing: '0.04em',
-    textTransform: 'uppercase',
-    color: active ? 'var(--accent)' : 'var(--fg-3)',
+    color: active ? 'var(--accent)' : 'var(--fg-2)',
     background: active ? 'var(--accent-soft)' : 'transparent',
     transition: 'background 120ms ease, color 120ms ease',
   };

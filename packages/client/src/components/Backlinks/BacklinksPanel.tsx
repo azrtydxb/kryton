@@ -46,12 +46,12 @@ export function BacklinksPanel({ notePath, onNoteSelect, rail = false }: Backlin
         fontSize: 10.5,
         letterSpacing: '0.08em',
         textTransform: 'uppercase',
-        color: 'var(--fg-4)',
+        color: 'var(--fg-3)',
         padding: rail ? '14px 14px 8px' : '10px 16px 6px',
       }}
     >
-      <span style={{ color: 'var(--fg-3)' }}>//</span>
-      <span>linked from</span>
+      <Icons.Link size={10} />
+      <span>Backlinks</span>
       <span style={{ color: 'var(--fg-4)' }}>· {backlinks.length}</span>
     </div>
   );

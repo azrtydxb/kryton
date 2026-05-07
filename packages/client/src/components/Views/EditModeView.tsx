@@ -6,7 +6,9 @@ import { FileNode } from '../../lib/api';
 import { Editor, EditorCursorState, EditorTabStrip, ModePills } from '../Editor/Editor';
 import { EditorToolbar } from '../Editor/EditorToolbar';
 import { Preview } from '../Preview/Preview';
-import { OutgoingLinksPanel } from '../OutgoingLinks/OutgoingLinksPanel';
+// OutgoingLinksPanel intentionally removed to match design handoff: the
+// editor surface has only the tab strip + body + EditorMeta (28px). Outgoing
+// link metadata is surfaced through EditorMeta's `N outgoing` token.
 import { BacklinksPanel } from '../Backlinks/BacklinksPanel';
 import { Icons } from '../Icons';
 import { usePrefs } from '../../stores/prefsStore';
@@ -190,12 +192,6 @@ export function EditModeView({
                 pluginExtensions={pluginExtensions}
               />
             </div>
-            <OutgoingLinksPanel
-              content={activeNote.content}
-              allNotes={allNotes}
-              onNoteSelect={onNoteSelect}
-              onCreateNote={onCreateNote}
-            />
           </div>
         )}
         {showPreview && (

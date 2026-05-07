@@ -2,7 +2,9 @@ import { MutableRefObject, ComponentType, useState, useEffect, useRef } from 're
 import { FileNode } from '../../lib/api';
 import { api, NoteVersion } from '../../lib/api';
 import { Preview } from '../Preview/Preview';
-import { OutgoingLinksPanel } from '../OutgoingLinks/OutgoingLinksPanel';
+// OutgoingLinksPanel intentionally removed to match design handoff —
+// outgoing-link metadata is exposed through EditorMeta's `N outgoing`
+// token instead of a dedicated bottom panel.
 import { BacklinksPanel } from '../Backlinks/BacklinksPanel';
 import { EditorTabStrip, ModePills } from '../Editor/Editor';
 import { Icons } from '../Icons';
@@ -350,8 +352,6 @@ export function PreviewModeView({
         </div>
         <BacklinksPanel rail notePath={activeNote.path} onNoteSelect={onNoteSelect} />
       </div>
-
-      <OutgoingLinksPanel content={activeNote.content} allNotes={allNotes} onNoteSelect={onNoteSelect} onCreateNote={onCreateNote} />
 
       {previewVersion && (
         <VersionPreviewModal

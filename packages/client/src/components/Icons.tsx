@@ -253,42 +253,38 @@ export const Icons = {
   ),
   Menu: (p: IconProps) => <IconBase {...p} d="M3 6h18M3 12h18M3 18h18" />,
   /**
-   * Kryton wordmark/logo glyph — the K-mark from the brand pack.
-   * Sized via `size` prop. Uses brand gradient (violet → orange).
+   * Kryton in-app logomark — the graph-glyph (3 connected nodes forming
+   * a triangle) per design handoff prototype/app/icons.jsx. Uses the
+   * theme's accent + accent-2 tokens so it tracks the user's chosen
+   * accent and stays legible in both light and dark themes.
    */
   Logo: ({ size = 24, className, style }: IconProps) => (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 64 64"
+      viewBox="0 0 24 24"
       fill="none"
       style={{ flexShrink: 0, ...style }}
       className={className}
       aria-hidden="true"
     >
       <defs>
-        <linearGradient id="kg" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#a78bfa" />
-          <stop offset="100%" stopColor="#fb923c" />
+        <linearGradient id="kg" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="var(--accent)" />
+          <stop offset="1" stopColor="var(--accent-2)" />
         </linearGradient>
       </defs>
-      <circle
-        cx="32"
-        cy="32"
-        r="26"
-        fill="none"
-        stroke="url(#kg)"
-        strokeWidth="1.5"
-        opacity="0.7"
-      />
+      <rect x="2" y="2" width="20" height="20" rx="5" fill="url(#kg)" opacity="0.15" />
+      <rect x="2.5" y="2.5" width="19" height="19" rx="4.5" stroke="url(#kg)" strokeWidth="1" />
+      <circle cx="7" cy="8" r="2" fill="url(#kg)" />
+      <circle cx="17" cy="8" r="2" fill="url(#kg)" />
+      <circle cx="12" cy="17" r="2" fill="url(#kg)" />
       <path
-        d="M22 16 L22 48 M22 32 L42 16 M22 32 L42 48"
+        d="M7 8 L17 8 M7 8 L12 17 M17 8 L12 17"
         stroke="url(#kg)"
-        strokeWidth="3"
-        strokeLinecap="round"
-        fill="none"
+        strokeWidth="1"
+        opacity="0.6"
       />
-      <circle cx="32" cy="32" r="3" fill="#fb923c" />
     </svg>
   ),
 } as const;
