@@ -62,7 +62,7 @@
   --shadow-md: 0 4px 24px -6px oklch(0 0 0 / 0.5), 0 1px 2px oklch(0 0 0 / 0.4);
   --shadow-lg: 0 12px 48px -12px oklch(0 0 0 / 0.6);
 
-  --grid: oklch(0.42 0.014 280 / 0.42);
+  --grid: oklch(0.32 0.012 280 / 0.18);
 }
 
 /* LIGHT */
@@ -101,7 +101,7 @@
   --shadow-md: 0 4px 24px -6px oklch(0 0 0 / 0.12), 0 1px 2px oklch(0 0 0 / 0.06);
   --shadow-lg: 0 12px 48px -12px oklch(0 0 0 / 0.18);
 
-  --grid: oklch(0.4 0.012 280 / 0.18);
+  --grid: oklch(0.4 0.012 280 / 0.08);
 }
 
 /* Accent variants (overlay onto whatever base theme) */
