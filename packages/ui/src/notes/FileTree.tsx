@@ -89,6 +89,24 @@ export function FileTree({
     return () => window.removeEventListener("kryton:rename-note", handler);
   }, []);
 
+  // Listen for external root-create requests (sidebar Files section header buttons).
+  useEffect(() => {
+    const onCreateFile = () => {
+      setCreating({ type: "file", parentPath: "" });
+      setNewName("");
+    };
+    const onCreateFolderEvt = () => {
+      setCreating({ type: "folder", parentPath: "" });
+      setNewName("");
+    };
+    window.addEventListener("kryton:create-root-file", onCreateFile);
+    window.addEventListener("kryton:create-root-folder", onCreateFolderEvt);
+    return () => {
+      window.removeEventListener("kryton:create-root-file", onCreateFile);
+      window.removeEventListener("kryton:create-root-folder", onCreateFolderEvt);
+    };
+  }, []);
+
   const toggleExpand = useCallback((path: string) => {
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -427,28 +445,6 @@ export function FileTree({
 
   return (
     <div className="h-full flex flex-col" onClick={() => setContextMenu(null)}>
-      {/* File tree header actions */}
-      <div className="flex items-center justify-end gap-0.5 px-2 py-1">
-        <button
-          type="button"
-          onClick={() => handleCreate("file", "")}
-          className="btn-ghost p-1.5"
-          title="New note"
-          aria-label="New note"
-        >
-          <Plus size={15} />
-        </button>
-        <button
-          type="button"
-          onClick={() => handleCreate("folder", "")}
-          className="btn-ghost p-1.5"
-          title="New folder"
-          aria-label="New folder"
-        >
-          <FolderPlus size={15} />
-        </button>
-      </div>
-
       {/* File tree */}
       <div className="flex-1 overflow-y-auto py-1">
         {creating && creating.parentPath === "" && (

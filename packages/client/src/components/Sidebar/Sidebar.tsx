@@ -1,9 +1,7 @@
-import { useState, useCallback, useEffect, useMemo, ReactNode } from 'react';
-import { FileNode, TrashItem, api } from '../../lib/api';
-import { FileTree, FavoritesSection, TrashList, Resizer } from '@azrtydxb/ui';
-import type { TrashItem as UiTrashItem } from '@azrtydxb/ui';
+import { useCallback, useMemo, useState, ReactNode } from 'react';
+import { FileNode } from '../../lib/api';
+import { FileTree, FavoritesSection, Resizer } from '@azrtydxb/ui';
 import { TagPane } from '../Tags/TagPane';
-import { useToastStore } from '../../stores/toastStore';
 import { useUIStore } from '../../stores/uiStore';
 import { Icons } from '../Icons';
 
@@ -95,6 +93,33 @@ function SectionHeader({
       <div style={{ flex: 1 }} />
       {actions}
     </div>
+  );
+}
+
+/** 22×22 ghost icon button used for section-header actions (per prototype IconBtn). */
+function IconBtn({
+  onClick, title, children,
+}: {
+  onClick?: () => void;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+      style={{
+        width: 22, height: 22, borderRadius: 4,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        color: 'var(--fg-3)',
+        transition: 'background 120ms, color 120ms',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--fg)'; }}
+      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-3)'; }}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -196,67 +221,23 @@ export function Sidebar({
   version = DEFAULT_VERSION,
   beforeFooter,
 }: SidebarProps) {
-  const [trashItems, setTrashItems] = useState<TrashItem[]>([]);
-  const [trashLoadingKey, setTrashLoadingKey] = useState<string | null>(null);
   const [tagPaneHeight, setTagPaneHeight] = useState(180);
   const [favOpen, setFavOpen] = useState(true);
   const [filesOpen, setFilesOpen] = useState(true);
   const [tagsOpen, setTagsOpen] = useState(true);
-  const addToast = useToastStore(s => s.addToast);
 
   const noteCount = useMemo(() => countNotes(tree), [tree]);
-
-  const refreshTrash = useCallback(() => {
-    api.listTrash().then(setTrashItems).catch(() => setTrashItems([]));
-  }, []);
-
-  useEffect(() => { refreshTrash(); }, [refreshTrash]);
 
   const handleTagResize = useCallback((delta: number) => {
     setTagPaneHeight(h => Math.max(60, Math.min(500, h - delta)));
   }, []);
 
-  const handleTrashRestore = useCallback(async (item: UiTrashItem) => {
-    setTrashLoadingKey(`restore:${item.path}`);
-    try {
-      await api.restoreFromTrash(item.path);
-      refreshTrash();
-    } catch (err) {
-      addToast('error', `Failed to restore: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    } finally {
-      setTrashLoadingKey(null);
-    }
-  }, [refreshTrash, addToast]);
-
-  const handleTrashDelete = useCallback(async (item: UiTrashItem) => {
-    setTrashLoadingKey(`delete:${item.path}`);
-    try {
-      await api.permanentlyDelete(item.path);
-      refreshTrash();
-    } catch (err) {
-      addToast('error', `Failed to delete: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    } finally {
-      setTrashLoadingKey(null);
-    }
-  }, [refreshTrash, addToast]);
-
-  const handleEmptyTrash = useCallback(async () => {
-    setTrashLoadingKey('empty');
-    try {
-      await api.emptyTrash();
-      refreshTrash();
-    } catch (err) {
-      addToast('error', `Failed to empty trash: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    } finally {
-      setTrashLoadingKey(null);
-    }
-  }, [refreshTrash, addToast]);
-
-  // Reserved for a future "+ new note" affordance; the redesign nav
-  // dropped the root-create row in favour of the Graph entry.
-  // const handleNewRootNote = useCallback(() => {
-  //   window.dispatchEvent(new CustomEvent('kryton:new-note-root'));
-  // }, []);
+  const dispatchCreateRootFile = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('kryton:create-root-file'));
+  }, []);
+  const dispatchCreateRootFolder = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('kryton:create-root-folder'));
+  }, []);
 
   // Top-level main-pane view (note | all | graph) — used by primary nav.
   const view = useUIStore(s => s.view);
@@ -265,8 +246,6 @@ export function Sidebar({
   const handleGraphClick = useCallback(() => {
     setView(view === 'graph' ? 'note' : 'graph');
   }, [setView, view]);
-
-  const uiTrashItems = trashItems.map(item => ({ path: item.path }));
 
   return (
     <div
@@ -396,6 +375,16 @@ export function Sidebar({
             setOpen={setFilesOpen}
             label="Files"
             count={noteCount}
+            actions={
+              <div style={{ display: 'flex', gap: 2 }}>
+                <IconBtn onClick={dispatchCreateRootFile} title="New note (Ctrl+Shift+N)">
+                  <Icons.Plus size={12} />
+                </IconBtn>
+                <IconBtn onClick={dispatchCreateRootFolder} title="New folder">
+                  <Icons.FolderPlus size={12} />
+                </IconBtn>
+              </div>
+            }
           />
         </div>
         {filesOpen && (
@@ -429,15 +418,6 @@ export function Sidebar({
             <TagPane onNoteSelect={onSelect} />
           </div>
         )}
-
-        {/* Trash */}
-        <TrashList
-          items={uiTrashItems}
-          loadingKey={trashLoadingKey}
-          onRestore={handleTrashRestore}
-          onPermanentDelete={handleTrashDelete}
-          onEmptyTrash={handleEmptyTrash}
-        />
       </div>
 
       {/* plugin slot — sits between sections and the agents footer */}
