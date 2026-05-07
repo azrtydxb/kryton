@@ -1,0 +1,30 @@
+{
+  "name": "@azrtydxb/sdk",
+  "version": "4.4.0-pre.9",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "generate": "openapi-typescript ../server/openapi.snapshot.json -o src/types.gen.ts",
+    "build": "npm run generate && tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist src/types.gen.ts"
+  },
+  "dependencies": {
+    "openapi-fetch": "^0.13.0"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.5.0",
+    "typescript": "^5.9.3"
+  }
+}

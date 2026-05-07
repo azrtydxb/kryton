@@ -1,9 +1,13 @@
 import fp from "fastify-plugin";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
-import { jsonSchemaTransform } from "fastify-type-provider-zod";
+import {
+  createJsonSchemaTransform,
+  createJsonSchemaTransformObject,
+} from "fastify-type-provider-zod";
 import type { AppConfig } from "../config/index.js";
 import { APP_VERSION } from "../lib/version.js";
+import { sharedSchemaRegistry } from "../shared-schemas/index.js";
 
 interface OpenApiOptions {
   config: AppConfig;
@@ -31,7 +35,8 @@ export const openapiPlugin = fp<OpenApiOptions>(async (app, { config }) => {
         { name: "plugins", description: "Plugin runtime" },
       ],
     },
-    transform: jsonSchemaTransform,
+    transform: createJsonSchemaTransform({ schemaRegistry: sharedSchemaRegistry }),
+    transformObject: createJsonSchemaTransformObject({ schemaRegistry: sharedSchemaRegistry }),
   });
 
   await app.register(swaggerUi, {

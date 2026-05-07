@@ -1,18 +1,25 @@
 import { z } from "zod";
+import { sharedSchemaRegistry } from "../../../shared-schemas/index.js";
 
 // Note CRUD
-export const createNoteBodySchema = z.object({
-  path: z.string().min(1).max(500),
-  content: z.string().max(1_000_000).optional(),
-});
+export const createNoteBodySchema = z
+  .object({
+    path: z.string().min(1).max(500),
+    content: z.string().max(1_000_000).optional(),
+  })
+  .register(sharedSchemaRegistry, { id: "CreateNoteBody" });
 
-export const updateNoteBodySchema = z.object({
-  content: z.string().max(1_000_000),
-});
+export const updateNoteBodySchema = z
+  .object({
+    content: z.string().max(1_000_000),
+  })
+  .register(sharedSchemaRegistry, { id: "UpdateNoteBody" });
 
-export const renameNoteBodySchema = z.object({
-  newPath: z.string().min(1).max(500),
-});
+export const renameNoteBodySchema = z
+  .object({
+    newPath: z.string().min(1).max(500),
+  })
+  .register(sharedSchemaRegistry, { id: "RenameNoteBody" });
 
 export const wildcardPathParamsSchema = z.object({
   "*": z.string(),
@@ -30,22 +37,27 @@ type FileTreeNode = {
   type: "file" | "folder";
   children?: FileTreeNode[];
 };
-export const fileTreeNodeSchema: z.ZodType<FileTreeNode> = z.lazy(() =>
+const fileTreeNodeBase: z.ZodType<FileTreeNode> = z.lazy(() =>
   z.object({
     name: z.string(),
     path: z.string(),
     type: z.enum(["file", "folder"]),
-    children: z.array(fileTreeNodeSchema).optional(),
+    children: z.array(fileTreeNodeBase).optional(),
   }),
 );
+export const fileTreeNodeSchema = fileTreeNodeBase.register(sharedSchemaRegistry, {
+  id: "FileTreeNode",
+});
 export const fileTreeResponseSchema = z.array(fileTreeNodeSchema);
 
-export const noteDataResponseSchema = z.object({
-  path: z.string(),
-  content: z.string(),
-  title: z.string(),
-  modifiedAt: z.union([z.string(), z.date()]),
-});
+export const noteDataResponseSchema = z
+  .object({
+    path: z.string(),
+    content: z.string(),
+    title: z.string(),
+    modifiedAt: z.union([z.string(), z.date()]),
+  })
+  .register(sharedSchemaRegistry, { id: "NoteDataResponse" });
 
 export const noteCreatedResponseSchema = z.object({
   path: z.string(),

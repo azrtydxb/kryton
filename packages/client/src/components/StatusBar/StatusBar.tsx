@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { krytonClient } from '../../lib/kryton-client';
 
 interface StatusBarProps {
   notePath: string | null;
@@ -16,10 +17,10 @@ export function StatusBar({ notePath, line, col, wordCount }: StatusBarProps) {
   const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
 
   useEffect(() => {
-    fetch('/api/version')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data?.version) {
+    krytonClient
+      .GET('/version')
+      .then(({ data }) => {
+        if (data) {
           setVersionInfo({ version: data.version, commit: data.commit });
         }
       })

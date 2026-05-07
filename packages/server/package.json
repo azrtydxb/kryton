@@ -20,7 +20,9 @@
     "stress:yjs:converge": "tsx scripts/yjs-stress/two-client-convergence.ts",
     "stress:yjs:reconnect": "tsx scripts/yjs-stress/reconnect-storm.ts",
     "stress:yjs:rate": "tsx scripts/yjs-stress/op-rate-ceiling.ts",
-    "verify:migration": "tsx scripts/migration-verify.ts"
+    "verify:migration": "tsx scripts/migration-verify.ts",
+    "openapi:dump": "tsx scripts/dump-openapi.ts",
+    "openapi:check": "tsx scripts/dump-openapi.ts --check"
   },
   "dependencies": {
     "@better-auth/passkey": "^1.5.6",

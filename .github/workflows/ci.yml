@@ -58,6 +58,16 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: OpenAPI snapshot drift check
+        run: npm run openapi:check --workspace=packages/server
+        env:
+          NODE_ENV: test
+          DATABASE_URL: file:./data/openapi-dump.db
+          BETTER_AUTH_SECRET: ci-test-secret-must-be-at-least-32-characters-long
+          BETTER_AUTH_URL: http://localhost:3001
+          APP_URL: http://localhost:5173
+          OPENAPI_ENABLED: "true"
+
       - name: Upload client dist
         uses: actions/upload-artifact@v4
         with:
