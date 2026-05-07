@@ -43,6 +43,12 @@ jobs:
 
       - name: Test
         run: npm run test
+        env:
+          NODE_ENV: test
+          DATABASE_URL: file:./data/kryton-test.db
+          BETTER_AUTH_SECRET: ci-test-secret-must-be-at-least-32-characters-long
+          BETTER_AUTH_URL: http://localhost:3001
+          APP_URL: http://localhost:5173
 
       - name: Build
         run: npm run build
