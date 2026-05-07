@@ -16,6 +16,12 @@ import { websocketPlugin } from "./plugins/websocket.js";
 import { openapiPlugin } from "./plugins/openapi.js";
 
 import { platformModule } from "./modules/platform/index.js";
+import { identityModule } from "./modules/identity/index.js";
+import { notesModule } from "./modules/notes/index.js";
+import { knowledgeModule } from "./modules/knowledge/index.js";
+import { collabModule } from "./modules/collab/index.js";
+import { agentsModule } from "./modules/agents/index.js";
+import { pluginsModule } from "./modules/plugins/index.js";
 
 interface BuildAppOptions {
   config: AppConfig;
@@ -50,8 +56,22 @@ export async function buildApp({ config }: BuildAppOptions): Promise<FastifyInst
   await app.register(websocketPlugin);
   await app.register(openapiPlugin, { config });
 
-  // Modules
+  // Modules — registration order matters because of cross-module decorators:
+  // knowledge exposes app.knowledge (used by notes), notes exposes app.notes
+  // (used by collab + plugins), collab exposes app.collab (used by notes via
+  // optional chaining). Identity stays near the top because plugins/auth
+  // already mounts the better-auth catch-all; identity adds /api/users and
+  // /api/api-keys plus the apiKey decorator.
   await app.register(platformModule);
+  await app.register(identityModule);
+  await app.register(knowledgeModule);
+  await app.register(notesModule);
+  await app.register(collabModule);
+  await app.register(agentsModule);
+  // pluginsModule accepts an optional notesOps; we leave it at default for
+  // now and wire it up in a follow-up once the notes module exposes
+  // readNote/writeNote/deleteNote/scanDirectory on its decorator.
+  await app.register(pluginsModule());
 
   return app;
 }
