@@ -144,6 +144,29 @@ export class PluginApiFactory {
     return {
       register: (method, routePath, handler: PluginRouteHandler) => {
         const wrapped: PluginRouteHandler = async (req, reply) => {
+          // Express-compat shim: Kryton plugins written for the old Express
+          // server use `res.status(n).json(obj)` and `res.send(obj)`. Add
+          // those as proxies onto Fastify's reply so plugins keep working
+          // without modification.
+          const replyWithExpressShim = reply as unknown as Record<string, unknown>;
+          if (typeof replyWithExpressShim.status !== "function") {
+            replyWithExpressShim.status = (code: number): unknown => {
+              reply.code(code);
+              return replyWithExpressShim;
+            };
+          }
+          if (typeof replyWithExpressShim.json !== "function") {
+            replyWithExpressShim.json = (body: unknown): unknown => {
+              reply.send(body);
+              return replyWithExpressShim;
+            };
+          }
+          if (typeof replyWithExpressShim.sendStatus !== "function") {
+            replyWithExpressShim.sendStatus = (code: number): unknown => {
+              reply.code(code).send();
+              return replyWithExpressShim;
+            };
+          }
           try {
             return await handler(req, reply);
           } catch (err) {

@@ -38,15 +38,18 @@ const stateResponseSchema = z.object({
   uninstalled: z.boolean().optional(),
 });
 
+// Lenient — the registry is hosted in a third-party GitHub repo; entries
+// may omit optional metadata. Coerce missing/null fields to defaults so
+// response serialization doesn't 500 on a stale registry entry.
 const registryPluginSchema = z.object({
   id: z.string(),
   name: z.string(),
-  description: z.string(),
-  author: z.string(),
+  description: z.string().nullish().transform((v) => v ?? ""),
+  author: z.string().nullish().transform((v) => v ?? ""),
   version: z.string(),
-  minKrytonVersion: z.string(),
-  tags: z.array(z.string()),
-  icon: z.string(),
+  minKrytonVersion: z.string().nullish().transform((v) => v ?? ""),
+  tags: z.array(z.string()).nullish().transform((v) => v ?? []),
+  icon: z.string().nullish().transform((v) => v ?? ""),
 });
 
 const updateInfoSchema = z.object({

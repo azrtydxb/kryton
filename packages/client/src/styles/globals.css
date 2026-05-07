@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+/* Scan workspace UI package so its Tailwind classes survive purge.
+   Without this, classes inside @azrtydxb/ui (e.g. pl-8 in SearchInput)
+   resolve to 0px because Tailwind v4 doesn't follow workspace symlinks
+   into node_modules by default. */
+@source "../../../ui/src";
+@source "../../../ui/dist";
+
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {

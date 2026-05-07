@@ -88,8 +88,11 @@ const pluginsModuleImpl = (options: PluginsModuleOptions = {}): FastifyPluginAsy
     // ── Construct services ─────────────────────────────────────────────
     const eventBus = new PluginEventBus();
 
+    // Attach user to req so legacy plugin code reading `req.user?.id`
+    // (Express convention) keeps working.
     const authPreHandler: preHandlerHookHandler = async (req) => {
-      await app.auth.requireUser(req);
+      const user = await app.auth.requireUser(req);
+      (req as unknown as { user: typeof user }).user = user;
     };
     const pluginRouter = new PluginRouter(app, authPreHandler);
 
@@ -172,6 +175,20 @@ const pluginsModuleImpl = (options: PluginsModuleOptions = {}): FastifyPluginAsy
       pluginsRoutes({ pluginManager: manager, registry, pluginsDir }),
       { prefix: "/api/plugins" },
     );
+
+    // ── Static plugin assets ───────────────────────────────────────────
+    // Plugin client bundles live on disk under <pluginsDir>/<id>/client/...
+    // The active-plugins API advertises them as /plugins/<id>/client/index.js
+    // (see /api/plugins/active response). Serve those files here so the
+    // browser's dynamic `await import()` succeeds.
+    const fastifyStatic = await import("@fastify/static");
+    await app.register(fastifyStatic.default, {
+      root: pluginsDir,
+      prefix: "/plugins/",
+      decorateReply: false,
+      // Allow serving deeply nested plugin subpaths.
+      list: false,
+    });
 
     // ── Discover plugins on disk ───────────────────────────────────────
     if (options.autoDiscover !== false) {

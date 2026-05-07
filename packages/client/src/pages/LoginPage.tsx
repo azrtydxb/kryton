@@ -146,8 +146,8 @@ export default function LoginPage() {
     <div className="min-h-screen bg-surface-950 flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         {/* Logo */}
-        <div className="flex justify-center mb-8">
-          <img src="/logo.png" alt="Kryton" className="h-12" />
+        <div className="flex justify-center mb-10">
+          <img src="/logo.png" alt="Kryton" className="h-20 w-auto" />
         </div>
 
         {/* Card */}
