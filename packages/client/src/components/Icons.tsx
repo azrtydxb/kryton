@@ -62,6 +62,7 @@ export const Icons = {
     </IconBase>
   ),
   Plus: (p: IconProps) => <IconBase {...p} d="M12 5v14M5 12h14" />,
+  Minus: (p: IconProps) => <IconBase {...p} d="M5 12h14" />,
   FolderPlus: (p: IconProps) => (
     <IconBase {...p}>
       <path d="M4 6a2 2 0 0 1 2-2h3l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" />

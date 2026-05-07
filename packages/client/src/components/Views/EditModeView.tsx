@@ -26,7 +26,8 @@ interface EditModeViewProps {
   previewRef: MutableRefObject<HTMLDivElement | null>;
   pluginExtensions?: Extension[];
   getCodeFenceRenderer?: (language: string) => { component: ComponentType<{ content: string; notePath: string }> } | undefined;
-  onSave: () => void;
+  /** retained for parent API compatibility; auto-save handles persistence. */
+  onSave?: () => void;
   onAutoSave: () => Promise<void>;
   onCancel: () => void;
   onToggleStar: () => void;
@@ -43,7 +44,7 @@ export function EditModeView({
   isStarred, resolvedTheme, allNotes,
   editorViewRef, previewRef, pluginExtensions,
   getCodeFenceRenderer,
-  onSave, onAutoSave, onCancel, onToggleStar, onPdfExport,
+  onAutoSave, onCancel, onToggleStar, onPdfExport,
   onContentChange, onCursorStateChange,
   onNoteSelect, onLinkClick, onCreateNote,
 }: EditModeViewProps) {
@@ -140,18 +141,17 @@ export function EditModeView({
           />
         </div>
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          padding: '0 12px', height: 32,
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '0 8px 0 4px', height: 32,
         }}>
           <ModePills />
-          <span className="mono" style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: saveStatusLabel.color, minWidth: 64, textAlign: 'right' }}>
-            {saveStatusLabel.text}
-          </span>
-          {headerBtn({
-            onClick: onSave,
-            title: 'Save changes (Ctrl+S)',
-            children: <Icons.Save size={13} />,
-          })}
+          {/* tiny inline saved/saving indicator (mono, accent-good when 'saved') */}
+          {(saveStatus === 'saving' || saveStatus === 'saved' || saveStatus === 'error' || saveStatus === 'unsaved') && (
+            <span className="mono" style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: saveStatusLabel.color, minWidth: 56, textAlign: 'right' }}>
+              {saveStatusLabel.text}
+            </span>
+          )}
+          {/* Star / Share / More — per prototype/app/editor.jsx EditorTabBar */}
           {headerBtn({
             onClick: onToggleStar,
             title: isStarred ? 'Unstar' : 'Star',
@@ -160,13 +160,13 @@ export function EditModeView({
           })}
           {headerBtn({
             onClick: onPdfExport,
-            title: 'Export as PDF',
-            children: <Icons.Download size={13} />,
+            title: 'Share / Export',
+            children: <Icons.Share size={13} />,
           })}
           {headerBtn({
             onClick: onCancel,
-            title: 'Cancel editing',
-            children: <Icons.X size={13} />,
+            title: 'More',
+            children: <Icons.More size={13} />,
           })}
         </div>
       </div>

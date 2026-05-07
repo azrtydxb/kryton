@@ -99,10 +99,11 @@ function HeaderBtn({
 }
 
 export function Header({
-  mobileMenuOpen, setMobileMenuOpen,
+  // mobileMenuOpen/setMobileMenuOpen and onToggleSidebar are accepted for
+  // API compatibility but no longer rendered — the prototype TopBar starts
+  // with the breadcrumb and sidebar collapse lives in the sidebar itself.
   searchInputRef,
   onAdminClick, onAccessRequestsClick,
-  onToggleSidebar,
   onOpenPalette,
   activeNotePath,
   onNewNote,
@@ -132,30 +133,8 @@ export function Header({
         color: 'var(--fg-1)',
       }}
     >
-      {/* mobile menu */}
-      <button
-        onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-        aria-label="Toggle menu"
-        className="md:hidden"
-        style={{
-          width: 28, height: 28, borderRadius: 5,
-          color: 'var(--fg-3)',
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        }}
-      >
-        <Icons.Menu size={14} />
-      </button>
-
-      {/* sidebar toggle (desktop) */}
-      {onToggleSidebar && (
-        <div className="hidden md:inline-flex">
-          <HeaderBtn onClick={onToggleSidebar} title="Toggle sidebar (Ctrl+B)" ariaLabel="Toggle sidebar">
-            <Icons.PanelLeft size={14} />
-          </HeaderBtn>
-        </div>
-      )}
-
-      {/* breadcrumb */}
+      {/* breadcrumb (per prototype TopBar — no menu / sidebar-toggle here;
+         sidebar collapse lives inside the sidebar's own brand row) */}
       <Breadcrumb activeNotePath={activeNotePath ?? null} />
 
       {/* spacer + centred command-palette button + spacer (per prototype) */}

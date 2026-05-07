@@ -157,7 +157,24 @@ function NavRow({
   );
 }
 
-function AgentsFooter() {
+function AgentAvatar({ label, title }: { label: string; title: string }) {
+  return (
+    <span
+      title={title}
+      className="mono"
+      style={{
+        width: 16, height: 16, borderRadius: '50%',
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        background: 'var(--bg-2)', border: '1px solid var(--line)',
+        fontSize: 9.5, color: 'var(--fg-2)',
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
+function AgentsFooter({ agents = 0 }: { agents?: number }) {
   return (
     <div
       className="mono"
@@ -187,8 +204,10 @@ function AgentsFooter() {
         />
         MCP
       </span>
-      <span style={{ color: 'var(--fg-3)' }}>0 agents online</span>
+      <span style={{ color: 'var(--fg-3)' }}>{agents} agents online</span>
       <div style={{ flex: 1 }} />
+      <AgentAvatar label="C" title="Claude" />
+      <AgentAvatar label="↗" title="Cursor" />
     </div>
   );
 }

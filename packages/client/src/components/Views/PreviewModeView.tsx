@@ -18,7 +18,8 @@ interface PreviewModeViewProps {
   onEdit: () => void;
   onShare: () => void;
   onToggleStar: () => void;
-  onPdfExport: () => void;
+  /** retained for parent API compatibility; not surfaced in the prototype topbar. */
+  onPdfExport?: () => void;
   onNoteSelect: (path: string) => void;
   onLinkClick: (name: string) => void;
   onCreateNote: (name: string) => void;
@@ -137,7 +138,7 @@ function VersionPreviewModal({ notePath, version, allNotes, onClose, onRestore }
 
 export function PreviewModeView({
   activeNote, isStarred, allNotes, previewRef,
-  onEdit, onShare, onToggleStar, onPdfExport,
+  onEdit, onShare, onToggleStar,
   onNoteSelect, onLinkClick, onCreateNote, onRestored, getCodeFenceRenderer,
 }: PreviewModeViewProps) {
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -233,16 +234,7 @@ export function PreviewModeView({
           padding: '0 12px', height: 32,
         }}>
           <ModePills value="preview" onChange={handleModeChange} />
-          {headerBtn({
-            onClick: onEdit,
-            title: 'Edit note (Ctrl+E)',
-            children: <Icons.Edit size={13} />,
-          })}
-          {headerBtn({
-            onClick: onShare,
-            title: 'Share note',
-            children: <Icons.Share size={13} />,
-          })}
+          {/* Star / Share / More — per prototype/app/editor.jsx EditorTabBar */}
           {headerBtn({
             onClick: onToggleStar,
             title: isStarred ? 'Unstar' : 'Star',
@@ -250,16 +242,16 @@ export function PreviewModeView({
             children: isStarred ? <Icons.StarOn size={13} /> : <Icons.Star size={13} />,
           })}
           {headerBtn({
-            onClick: onPdfExport,
-            title: 'Export as PDF',
-            children: <Icons.Download size={13} />,
+            onClick: onShare,
+            title: 'Share',
+            children: <Icons.Share size={13} />,
           })}
           <div style={{ position: 'relative' }} ref={historyPanelRef}>
             {headerBtn({
               onClick: () => setHistoryOpen((o) => !o),
-              title: 'Version history',
+              title: 'More',
               active: historyOpen,
-              children: <Icons.History size={13} />,
+              children: <Icons.More size={13} />,
             })}
             {historyOpen && (
               <div

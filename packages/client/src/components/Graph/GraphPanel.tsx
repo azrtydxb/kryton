@@ -54,10 +54,8 @@ function segmentBtn(active: boolean): CSSProperties {
   return {
     padding: '3px 8px',
     borderRadius: 4,
-    fontSize: 11.5,
+    fontSize: 11,
     fontFamily: 'var(--font-mono)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.06em',
     color: active ? 'var(--accent)' : 'var(--fg-2)',
     background: active ? 'var(--accent-soft)' : 'transparent',
     border: 'none',
@@ -65,10 +63,11 @@ function segmentBtn(active: boolean): CSSProperties {
   };
 }
 
-const zoomBtn: CSSProperties = {
-  width: 22,
-  height: 22,
-  borderRadius: 4,
+/** Corner-control button per prototype/app/graph.jsx GfxBtn (26×26, bg-2, line border). */
+const gfxBtn: CSSProperties = {
+  width: 26,
+  height: 26,
+  borderRadius: 5,
   background: 'var(--bg-2)',
   border: '1px solid var(--line)',
   color: 'var(--fg-2)',
@@ -76,6 +75,7 @@ const zoomBtn: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   cursor: 'pointer',
+  transition: 'color 120ms, border-color 120ms',
 };
 
 const legendStrip: CSSProperties = {
@@ -180,7 +180,7 @@ export function GraphPanel({
   const edgeCount = graphData?.edges.length ?? 0;
 
   // ---- Header ----
-  const renderHeader = (onExpand: (() => void) | null) => (
+  const renderHeader = (_onExpand: (() => void) | null) => (
     <div style={railHeader}>
       <Icons.Network size={13} style={{ color: 'var(--accent)' }} />
       <span
@@ -221,28 +221,54 @@ export function GraphPanel({
           global
         </button>
       </div>
-      <div style={{ display: 'flex', gap: 4, marginLeft: 4 }}>
+    </div>
+  );
+
+  // Canvas overlay corner controls — per prototype/app/graph.jsx,
+  // a vertical stack at top-right of the canvas: Center, Zoom in, Zoom out.
+  const renderCornerControls = (onExpand: (() => void) | null) => (
+    <div
+      style={{
+        position: 'absolute',
+        top: 10, right: 10,
+        display: 'flex', flexDirection: 'column', gap: 4,
+        zIndex: 5,
+      }}
+    >
+      <button
+        type="button"
+        style={gfxBtn}
+        onClick={() => (fullscreen ? expandedRecenterRef.current?.() : recenterRef.current?.())}
+        aria-label="Recenter graph"
+        title="Center"
+        onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent)'; e.currentTarget.style.borderColor = 'var(--accent)'; }}
+        onMouseLeave={e => { e.currentTarget.style.color = 'var(--fg-2)'; e.currentTarget.style.borderColor = 'var(--line)'; }}
+      >
+        <Icons.Crosshair size={12} />
+      </button>
+      {onExpand && (
         <button
           type="button"
-          style={zoomBtn}
-          onClick={() => (fullscreen ? expandedRecenterRef.current?.() : recenterRef.current?.())}
-          aria-label="Recenter graph"
-          title="Recenter"
+          style={gfxBtn}
+          onClick={onExpand}
+          aria-label="Expand graph"
+          title="Expand"
+          onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent)'; e.currentTarget.style.borderColor = 'var(--accent)'; }}
+          onMouseLeave={e => { e.currentTarget.style.color = 'var(--fg-2)'; e.currentTarget.style.borderColor = 'var(--line)'; }}
         >
-          <Icons.Crosshair size={12} />
+          <Icons.Plus size={12} />
         </button>
-        {onExpand && (
-          <button
-            type="button"
-            style={zoomBtn}
-            onClick={onExpand}
-            aria-label="Expand graph"
-            title="Expand"
-          >
-            <Icons.Plus size={12} />
-          </button>
-        )}
-      </div>
+      )}
+      <button
+        type="button"
+        style={gfxBtn}
+        aria-label="Zoom out"
+        title="Zoom out"
+        onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent)'; e.currentTarget.style.borderColor = 'var(--accent)'; }}
+        onMouseLeave={e => { e.currentTarget.style.color = 'var(--fg-2)'; e.currentTarget.style.borderColor = 'var(--line)'; }}
+      >
+        <Icons.Minus size={12} />
+      </button>
     </div>
   );
 
@@ -269,7 +295,7 @@ export function GraphPanel({
         link
       </span>
       <div style={{ flex: 1 }} />
-      <span style={{ color: 'var(--fg-4)' }}>{nodeCount}n {edgeCount}e</span>
+      <span style={{ color: 'var(--fg-4)' }}>100%</span>
     </div>
   );
 
@@ -378,7 +404,7 @@ export function GraphPanel({
       <div style={containerStyle}>
         {renderHeader(fullscreen ? null : () => setExpanded(true))}
         {!expanded && (
-          <div style={{ flex: 1, position: 'relative', overflow: 'hidden', background: 'var(--bg)' }}>
+          <div className="bg-grid" style={{ flex: 1, position: 'relative', overflow: 'hidden', background: 'var(--bg)' }}>
             <GraphView
               graphData={graphData}
               loading={loading}
@@ -389,6 +415,7 @@ export function GraphPanel({
               recenterRef={recenterRef}
               starredPaths={starredPaths}
             />
+            {renderCornerControls(fullscreen ? null : () => setExpanded(true))}
             {tooltip && renderHoverCard(tooltip)}
           </div>
         )}
@@ -473,29 +500,20 @@ export function GraphPanel({
                     global
                   </button>
                 </div>
-                <div style={{ display: 'flex', gap: 4, marginLeft: 4 }}>
-                  <button
-                    type="button"
-                    style={zoomBtn}
-                    onClick={() => expandedRecenterRef.current?.()}
-                    aria-label="Recenter graph"
-                  >
-                    <Icons.Crosshair size={12} />
-                  </button>
-                  <button
-                    type="button"
-                    style={zoomBtn}
-                    onClick={() => {
-                      setExpanded(false);
-                      setTooltip(null);
-                    }}
-                    aria-label="Close fullscreen"
-                  >
-                    <Icons.X size={12} />
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  style={gfxBtn}
+                  onClick={() => {
+                    setExpanded(false);
+                    setTooltip(null);
+                  }}
+                  aria-label="Close fullscreen"
+                  title="Close"
+                >
+                  <Icons.X size={12} />
+                </button>
               </div>
-              <div style={{ flex: 1, position: 'relative', background: 'var(--bg)' }}>
+              <div className="bg-grid" style={{ flex: 1, position: 'relative', background: 'var(--bg)' }}>
                 <GraphView
                   graphData={graphData}
                   loading={loading}
@@ -506,6 +524,7 @@ export function GraphPanel({
                   recenterRef={expandedRecenterRef}
                   starredPaths={starredPaths}
                 />
+                {renderCornerControls(null)}
                 {tooltip && renderHoverCard(tooltip)}
               </div>
               {renderLegend()}
