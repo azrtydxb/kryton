@@ -253,15 +253,14 @@ export function useD3Graph(
         .force("center", d3.forceCenter(cx, cy))
         .force("collision", d3.forceCollide().radius(globalCfg.collisionRadius));
 
+      // Pin the active node to the canvas centre regardless of mode — per
+      // the design guide the selected note always sits dead-centre with
+      // its neighbours radiating around it.
       if (activeNode) {
-        simulation.force(
-          "activeRadial",
-          d3
-            .forceRadial<SimNode>(0, cx, cy)
-            .strength((d) =>
-              d.path === activeNotePath ? globalCfg.activeRadialStrength : 0,
-            ),
-        );
+        activeNode.fx = cx;
+        activeNode.fy = cy;
+        activeNode.x = cx;
+        activeNode.y = cy;
       }
     }
 
@@ -484,7 +483,8 @@ export function useD3Graph(
 
     const handleMouseUp = () => {
       if (dragNode) {
-        if (!(useLocalLayout && dragNode.path === activeNotePath)) {
+        // Active node stays pinned (centred); other nodes return to free.
+        if (dragNode.path !== activeNotePath) {
           dragNode.fx = null;
           dragNode.fy = null;
         }
@@ -529,16 +529,8 @@ export function useD3Graph(
       } else {
         simulation.force("center", d3.forceCenter(newCx, newCy));
         if (activeNode) {
-          simulation.force(
-            "activeRadial",
-            d3
-              .forceRadial<SimNode>(0, newCx, newCy)
-              .strength((d) =>
-                d.path === activeNotePath
-                  ? cfg.simulation.global.activeRadialStrength
-                  : 0,
-              ),
-          );
+          activeNode.fx = newCx;
+          activeNode.fy = newCy;
         }
       }
       simulation.alpha(cfg.simulation.resizeAlpha).restart();
