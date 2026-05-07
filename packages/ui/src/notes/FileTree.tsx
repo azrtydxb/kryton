@@ -526,12 +526,16 @@ export function FileTree({
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
+      // INTENTIONALLY OMITTED: draggedPath / draggedType / dragOverPath.
+      // These all change DURING a drag. If they were in this dep list,
+      // the useMemo factory would rebuild the memoized SidebarNode
+      // component, React would unmount every row mid-drag, and the
+      // in-flight HTML5 drag would die — which is exactly what made
+      // the first drag attempt appear to do nothing.
       activeNotePath,
       expanded,
       renaming,
       starredPaths,
-      draggedPath,
-      dragOverPath,
       newName,
       toggleExpand,
       onSelect,
