@@ -256,11 +256,11 @@ function AppContent() {
           <PluginSlot slot="sidebar" />
         </SidebarLayout>
 
-        <main className="flex-1 flex flex-col overflow-hidden">
+        <main className="flex-1 flex flex-col overflow-hidden min-w-0">
           <div className="hidden md:block">
             <PluginSlot slot="editor-toolbar" />
           </div>
-          <div className="flex-1 flex overflow-hidden">
+          <div className="flex-1 flex overflow-hidden min-h-0">
             {view === 'all' ? (
               <AllNotesView
                 tree={notes.tree}
@@ -323,6 +323,10 @@ function AppContent() {
               <EmptyStateView />
             )}
           </div>
+          {/* EditorMeta — per prototype, the editor pane's own bottom rail
+             (28px, bg-1) so it shares the baseline with the sidebar
+             AgentsFooter and the graph legend. */}
+          <AppStatusBar notePath={notes.activeNote?.path ?? null} />
         </main>
 
         {!editing && (
@@ -346,8 +350,6 @@ function AppContent() {
           </>
         )}
       </div>
-
-      <AppStatusBar notePath={notes.activeNote?.path ?? null} />
 
       <ErrorToast message={notes.error} onDismiss={() => notes.setError(null)} />
 
