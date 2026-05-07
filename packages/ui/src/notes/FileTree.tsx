@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useState, useCallback, useEffect, memo, useMemo } from "react";
+import { useState, useCallback, useEffect, memo, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import {
   FileText,
@@ -79,8 +79,15 @@ export function FileTree({
   const [renaming, setRenaming] = useState<{ path: string; type: "file" | "folder" } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; node: FileTreeNode } | null>(null);
   const [newName, setNewName] = useState("");
+  // State *and* ref pair for the in-flight drag. State drives re-renders
+  // (so `isDragging` styling flips on visually). The refs are read inside
+  // dragover/drop handlers — React batches setState, so the first dragover
+  // immediately after dragstart would otherwise see a stale null and the
+  // drop zone would silently reject the first drag attempt.
   const [draggedPath, setDraggedPath] = useState<string | null>(null);
   const [draggedType, setDraggedType] = useState<"file" | "folder" | null>(null);
+  const draggedPathRef = useRef<string | null>(null);
+  const draggedTypeRef = useRef<"file" | "folder" | null>(null);
   const [dragOverPath, setDragOverPath] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<FileTreeNode | null>(null);
   const [sharedCollapsed, setSharedCollapsed] = useState(false);
@@ -198,6 +205,10 @@ export function FileTree({
   const handleDragStart = useCallback((e: React.DragEvent, node: FileTreeNode) => {
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", node.path);
+    // Refs first (sync) so the very next dragover sees the active drag;
+    // setState is async and would race the first event.
+    draggedPathRef.current = node.path;
+    draggedTypeRef.current = node.type;
     setDraggedPath(node.path);
     setDraggedType(node.type);
   }, []);
@@ -205,13 +216,15 @@ export function FileTree({
   const handleDragOver = useCallback(
     (e: React.DragEvent, node: FileTreeNode) => {
       if (node.type !== "folder") return;
-      if (!draggedPath) return;
-      if (draggedType === "folder") {
-        const normalizedDragged = draggedPath.endsWith("/") ? draggedPath : draggedPath + "/";
-        if (node.path === draggedPath || node.path.startsWith(normalizedDragged)) return;
+      const dPath = draggedPathRef.current;
+      const dType = draggedTypeRef.current;
+      if (!dPath) return;
+      if (dType === "folder") {
+        const normalizedDragged = dPath.endsWith("/") ? dPath : dPath + "/";
+        if (node.path === dPath || node.path.startsWith(normalizedDragged)) return;
       }
-      const draggedParent = draggedPath.includes("/")
-        ? draggedPath.substring(0, draggedPath.lastIndexOf("/"))
+      const draggedParent = dPath.includes("/")
+        ? dPath.substring(0, dPath.lastIndexOf("/"))
         : "";
       if (node.path === draggedParent) return;
       e.preventDefault();
@@ -219,7 +232,7 @@ export function FileTree({
       e.dataTransfer.dropEffect = "move";
       setDragOverPath(node.path);
     },
-    [draggedPath, draggedType],
+    [],
   );
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
@@ -233,10 +246,11 @@ export function FileTree({
       e.preventDefault();
       e.stopPropagation();
       setDragOverPath(null);
-      const sourcePath = e.dataTransfer.getData("text/plain") || draggedPath;
+      const sourcePath = e.dataTransfer.getData("text/plain") || draggedPathRef.current;
+      const dType = draggedTypeRef.current;
       if (!sourcePath || targetNode.type !== "folder") return;
       if (sourcePath === targetNode.path) return;
-      if (draggedType === "folder") {
+      if (dType === "folder") {
         const normalizedDragged = sourcePath.endsWith("/") ? sourcePath : sourcePath + "/";
         if (targetNode.path.startsWith(normalizedDragged)) return;
       }
@@ -246,7 +260,7 @@ export function FileTree({
       if (targetNode.path === sourceParent) return;
       const filename = sourcePath.split("/").pop()!;
       const newPath = `${targetNode.path}/${filename}`;
-      if (draggedType === "folder") {
+      if (dType === "folder") {
         await onRenameFolder(sourcePath, newPath);
         setExpanded((prev) => {
           const next = new Set(prev);
@@ -258,30 +272,29 @@ export function FileTree({
       }
       setExpanded((prev) => new Set(prev).add(targetNode.path));
     },
-    [draggedPath, draggedType, onRenameNote, onRenameFolder],
+    [onRenameNote, onRenameFolder],
   );
 
   /** Drop on the tree's empty area → move source to the root. */
-  const handleRootDragOver = useCallback(
-    (e: React.DragEvent) => {
-      if (!draggedPath) return;
-      // Already at root → no-op (don't accept the drop)
-      if (!draggedPath.includes("/")) return;
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "move";
-      // Clear any folder hover highlight so the user sees we'll drop to root.
-      setDragOverPath(null);
-    },
-    [draggedPath],
-  );
+  const handleRootDragOver = useCallback((e: React.DragEvent) => {
+    const dPath = draggedPathRef.current;
+    if (!dPath) return;
+    // Already at root → no-op (don't accept the drop)
+    if (!dPath.includes("/")) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    // Clear any folder hover highlight so the user sees we'll drop to root.
+    setDragOverPath(null);
+  }, []);
 
   const handleRootDrop = useCallback(
     async (e: React.DragEvent) => {
       e.preventDefault();
-      const sourcePath = e.dataTransfer.getData("text/plain") || draggedPath;
+      const sourcePath = e.dataTransfer.getData("text/plain") || draggedPathRef.current;
+      const dType = draggedTypeRef.current;
       if (!sourcePath || !sourcePath.includes("/")) return;
       const filename = sourcePath.split("/").pop()!;
-      if (draggedType === "folder") {
+      if (dType === "folder") {
         await onRenameFolder(sourcePath, filename);
         setExpanded((prev) => {
           const next = new Set(prev);
@@ -294,10 +307,12 @@ export function FileTree({
       }
       setDragOverPath(null);
     },
-    [draggedPath, draggedType, onRenameNote, onRenameFolder],
+    [onRenameNote, onRenameFolder],
   );
 
   const handleDragEnd = useCallback(() => {
+    draggedPathRef.current = null;
+    draggedTypeRef.current = null;
     setDraggedPath(null);
     setDraggedType(null);
     setDragOverPath(null);
