@@ -1,4 +1,4 @@
-import { PluginSlotRegistry } from "./PluginSlotRegistry";
+import { PluginSlotRegistry } from "@azrtydxb/ui";
 import { ClientPluginAPI, ClientPluginModule, ActivePluginInfo } from "./types";
 import { request } from "../lib/api";
 

@@ -1,9 +1,9 @@
 import { useMemo, useEffect, useCallback } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { Extension } from '@codemirror/state';
 import { AuthProvider } from './hooks/useAuth';
-import { PluginSlotRegistry } from './plugins/PluginSlotRegistry';
+import { PluginSlotRegistry, PluginProvider, usePluginSlots } from '@azrtydxb/ui';
 import { ClientPluginManager } from './plugins/PluginManager';
-import { PluginProvider, usePluginSlots } from './plugins/PluginContext';
 import { PluginSlot } from './components/PluginSlot/PluginSlot';
 import { useUIStore } from './stores/uiStore';
 import { HttpAdapter } from './data/HttpAdapter';
@@ -264,7 +264,7 @@ function AppContent() {
                   allNotes={notes.tree}
                   editorViewRef={editorViewRef}
                   previewRef={previewRef}
-                  pluginExtensions={editorExtensions}
+                  pluginExtensions={editorExtensions as Extension[]}
                   getCodeFenceRenderer={getCodeFenceRenderer}
                   onSave={saveEdit}
                   onAutoSave={saveEditInPlace}
