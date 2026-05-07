@@ -61,7 +61,7 @@ export interface KnowledgeApi {
 // identical, so the literal shape is duplicated here on purpose.
 declare module "fastify" {
   interface FastifyInstance {
-    knowledge?: {
+    knowledge: {
       indexNote(notePath: string, content: string, userId: string): Promise<void>;
       removeFromIndex(notePath: string, userId: string): Promise<void>;
       renameInIndex(oldPath: string, newPath: string, userId: string): Promise<void>;
@@ -71,6 +71,11 @@ declare module "fastify" {
       extractTitle?(content: string, filePath: string): string;
       getAllTags(userId: string): Promise<{ tag: string; count: number }[]>;
       getNotesByTag(tag: string, userId: string): Promise<{ path: string; title: string }[]>;
+      search(query: string, userId: string): Promise<unknown[]>;
+      getBacklinks(notePath: string, userId: string): Promise<{ path: string; title: string }[]>;
+      getFullGraph(userId: string): Promise<unknown>;
+      incrementCursor(userId: string): Promise<bigint>;
+      getCursor(userId: string): Promise<bigint>;
     };
   }
 }

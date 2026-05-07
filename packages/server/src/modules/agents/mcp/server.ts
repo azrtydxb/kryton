@@ -1,20 +1,12 @@
-import * as path from "node:path";
-import type { FastifyPluginAsync } from "fastify";
+import type { FastifyInstance, FastifyPluginAsync } from "fastify";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
-import { validateApiKey } from "../../../services/apiKeyService.js";
-import { getToolDefinitions, executeTool } from "../../../mcp/mcpTools.js";
-import { generateDynamicTools } from "../../../mcp/dynamicTools.js";
-import { scanDirectory } from "../../../services/noteService.js";
-import { getUserNotesDir } from "../../../services/userNotesDir.js";
+import { getToolDefinitions, executeTool } from "./tools.js";
+import { generateDynamicTools } from "./dynamic-tools.js";
 import { createLogger } from "../../../lib/logger.js";
 
 const log = createLogger("mcp");
-
-const NOTES_DIR = path.resolve(
-  process.env.NOTES_DIR || path.join(import.meta.dirname, "../../../../../notes"),
-);
 
 /** Map a JSON Schema property record to a Zod shape. */
 function jsonSchemaToZod(
@@ -42,6 +34,7 @@ function jsonSchemaToZod(
 }
 
 function createMcpServerInstance(
+  app: FastifyInstance,
   userId: string,
   keyScope: string,
   rawKey: string,
@@ -69,7 +62,7 @@ function createMcpServerInstance(
         };
       }
       try {
-        const result = await executeTool(toolDef.name, args, userId);
+        const result = await executeTool(app, toolDef.name, args, userId);
         return {
           content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
         };
@@ -194,8 +187,7 @@ function createMcpServerInstance(
     "kryton://notes",
     { description: "The full note tree structure" },
     async (uri) => {
-      const userDir = await getUserNotesDir(NOTES_DIR, userId);
-      const tree = await scanDirectory(userDir);
+      const tree = await app.notes.scanDirectory(userId);
       return {
         contents: [
           {
@@ -231,7 +223,7 @@ export const mcpRoutes: FastifyPluginAsync = async (app) => {
       }
 
       const rawKey = authHeader.slice(7);
-      const keyData = await validateApiKey(rawKey);
+      const keyData = await app.identity.apiKey.validate(rawKey);
       if (!keyData) {
         reply.status(401);
         return { error: "Invalid or expired API key" };
@@ -257,6 +249,7 @@ export const mcpRoutes: FastifyPluginAsync = async (app) => {
           ? ((app as unknown as { swagger: () => unknown }).swagger() as Record<string, unknown>)
           : {};
       const server = createMcpServerInstance(
+        app,
         user.id,
         keyData.scope,
         rawKey,

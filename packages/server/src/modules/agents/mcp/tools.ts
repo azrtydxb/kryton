@@ -1,13 +1,6 @@
 import * as path from "path";
-import { validatePathWithinBase } from "../lib/pathUtils.js";
-import { scanDirectory, readNote, writeNote, deleteNote } from "../services/noteService.js";
-import { getUserNotesDir } from "../services/userNotesDir.js";
-import { search, getAllTags } from "../services/searchService.js";
-import { getBacklinks, getFullGraph } from "../services/graphService.js";
-
-const NOTES_DIR = path.resolve(
-  process.env.NOTES_DIR || path.join(import.meta.dirname, "../../../notes")
-);
+import type { FastifyInstance } from "fastify";
+import { validatePathWithinBase } from "../../../lib/pathUtils.js";
 
 interface ToolDefinition {
   name: string;
@@ -156,42 +149,50 @@ export function getToolDefinitions(): ToolDefinition[] {
   ];
 }
 
+interface FolderNode {
+  type: string;
+  name: string;
+  children?: FolderNode[];
+}
+
 export async function executeTool(
+  app: FastifyInstance,
   toolName: string,
   args: Record<string, unknown>,
   userId: string,
 ): Promise<unknown> {
-  const userDir = await getUserNotesDir(NOTES_DIR, userId);
-
   switch (toolName) {
     case "list_notes":
-      return scanDirectory(userDir);
+      return app.notes.scanDirectory(userId);
     case "read_note":
-      return readNote(userDir, args.path as string);
+      return app.notes.readNote(args.path as string, userId);
     case "create_note":
-      await writeNote(userDir, args.path as string, args.content as string, userId);
+      await app.notes.writeNote(args.path as string, args.content as string, userId);
       return { success: true, path: args.path };
     case "update_note":
-      await writeNote(userDir, args.path as string, args.content as string, userId);
+      await app.notes.writeNote(args.path as string, args.content as string, userId);
       return { success: true, path: args.path };
     case "delete_note":
-      await deleteNote(userDir, args.path as string, userId);
+      await app.notes.deleteNote(args.path as string, userId);
       return { success: true, path: args.path };
     case "search":
-      return search(args.query as string, userId);
+      return app.knowledge.search(args.query as string, userId);
     case "list_tags":
-      return getAllTags(userId);
+      return app.knowledge.getAllTags(userId);
     case "get_backlinks":
-      return getBacklinks(args.path as string, userId);
+      return app.knowledge.getBacklinks(args.path as string, userId);
     case "get_graph":
-      return getFullGraph(userId);
+      return app.knowledge.getFullGraph(userId);
     case "list_folders": {
-      const tree = await scanDirectory(userDir);
-      const filterFolders = (nodes: Awaited<ReturnType<typeof scanDirectory>>): typeof nodes =>
-        nodes.filter(n => n.type === "folder").map(n => ({ ...n, children: n.children ? filterFolders(n.children) : undefined }));
+      const tree = (await app.notes.scanDirectory(userId)) as FolderNode[];
+      const filterFolders = (nodes: FolderNode[]): FolderNode[] =>
+        nodes
+          .filter((n) => n.type === "folder")
+          .map((n) => ({ ...n, children: n.children ? filterFolders(n.children) : undefined }));
       return filterFolders(tree);
     }
     case "create_folder": {
+      const userDir = await app.notes.getUserNotesDir(userId);
       const folderPath = path.join(userDir, args.path as string);
       validatePathWithinBase(folderPath, userDir);
       const { mkdir } = await import("fs/promises");
@@ -202,24 +203,28 @@ export async function executeTool(
       const { format } = await import("date-fns");
       const dailyPath = `daily/${format(new Date(), "yyyy-MM-dd")}.md`;
       try {
-        return await readNote(userDir, dailyPath);
+        return await app.notes.readNote(dailyPath, userId);
       } catch {
         return { exists: false, expectedPath: dailyPath };
       }
     }
-    case "list_templates":
+    case "list_templates": {
+      const userDir = await app.notes.getUserNotesDir(userId);
       try {
-        return await scanDirectory(path.join(userDir, "templates"));
+        const noteSvc = await import("../../notes/services/note.service.js");
+        const svc = new noteSvc.NoteService(app);
+        return svc.scanDirectory(path.join(userDir, "templates"));
       } catch {
         return [];
       }
+    }
     case "create_note_from_template": {
       const templateName = args.templateName as string;
       if (templateName.includes("/") || templateName.includes("\\") || templateName.includes("..")) {
         throw new Error("Invalid template name");
       }
-      const templateContent = await readNote(userDir, `templates/${templateName}.md`);
-      await writeNote(userDir, args.notePath as string, templateContent.content, userId);
+      const templateContent = (await app.notes.readNote(`templates/${templateName}.md`, userId)) as { content: string };
+      await app.notes.writeNote(args.notePath as string, templateContent.content, userId);
       return { success: true, path: args.notePath };
     }
     default:

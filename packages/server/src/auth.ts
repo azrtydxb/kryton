@@ -211,11 +211,15 @@ export const auth = betterAuth({
             }
           }
 
-          // Provision user notes directory
-          const { provisionUserNotes } = await import("./services/userNotesDir.js");
+          // Provision user notes directory (delegated to notes module's service)
+          const { provisionUserNotes } = await import(
+            "./modules/notes/services/user-notes-dir.service.js"
+          );
           const NOTES_DIR = process.env.NOTES_DIR
             ? (await import("path")).resolve(process.env.NOTES_DIR)
-            : (await import("path")).resolve((await import("path")).join(import.meta.dirname, "../../notes"));
+            : (await import("path")).resolve(
+                (await import("path")).join(import.meta.dirname, "../../notes"),
+              );
           await provisionUserNotes(NOTES_DIR, user.id);
         },
       },

@@ -280,7 +280,7 @@ export function buildHandlers(notesRoot: string): Record<string, Handler> {
             update: {
               title: f.title ?? existingIdx?.title ?? f.path,
               tags: JSON.stringify(mergedTags),
-              modifiedAt: f.modifiedAt !== null ? new Date(f.modifiedAt) : new Date(),
+              modifiedAt: f.modifiedAt !== null && f.modifiedAt !== undefined ? new Date(f.modifiedAt) : new Date(),
               content: f.content ?? existingIdx?.content ?? "",
             },
             create: {
@@ -289,7 +289,7 @@ export function buildHandlers(notesRoot: string): Record<string, Handler> {
               title: f.title ?? f.path,
               content: f.content ?? "",
               tags: JSON.stringify(mergedTags),
-              modifiedAt: f.modifiedAt !== null ? new Date(f.modifiedAt) : new Date(),
+              modifiedAt: f.modifiedAt !== null && f.modifiedAt !== undefined ? new Date(f.modifiedAt) : new Date(),
             },
           });
 
