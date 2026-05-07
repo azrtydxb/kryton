@@ -41,6 +41,11 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Prepare test database
+        run: |
+          mkdir -p packages/server/data
+          npx prisma db push --schema=packages/server/prisma/schema.prisma --url=file:./packages/server/data/kryton-test.db
+
       - name: Test
         run: npm run test
         env:
