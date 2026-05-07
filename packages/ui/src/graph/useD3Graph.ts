@@ -118,8 +118,27 @@ export function useD3Graph(
       }
     }
 
-    const isDark = document.documentElement.classList.contains("dark");
-    const colors = isDark ? cfg.colors.dark : cfg.colors.light;
+    /**
+     * Resolve graph colours from the design-token CSS variables so the
+     * rendering tracks the user's theme (dark/light) and accent choice
+     * verbatim from prototype/styles/tokens.css. Recomputed each draw
+     * so live theme/accent toggles take effect immediately.
+     */
+    const tokens = () => {
+      const cs = getComputedStyle(document.documentElement);
+      const v = (name: string) => cs.getPropertyValue(name).trim();
+      return {
+        accent: v("--accent"),
+        accentSoft: v("--accent-soft"),
+        bg2: v("--bg-2"),
+        fg1: v("--fg-1"),
+        fg3: v("--fg-3"),
+        fg4: v("--fg-4"),
+        line: v("--line"),
+        starFill: v("--accent-warn"),
+      };
+    };
+    const colors = cfg.colors[document.documentElement.classList.contains("dark") ? "dark" : "light"];
 
     let currentWidth = 0;
     let currentHeight = 0;
@@ -252,6 +271,7 @@ export function useD3Graph(
       if (!ctx) return;
       const w = canvas.width / window.devicePixelRatio;
       const h = canvas.height / window.devicePixelRatio;
+      const c = tokens();
 
       ctx.save();
       ctx.clearRect(0, 0, w, h);
@@ -260,8 +280,10 @@ export function useD3Graph(
       ctx.translate(t.x, t.y);
       ctx.scale(t.k, t.k);
 
-      ctx.strokeStyle = colors.link;
-      ctx.lineWidth = 1;
+      // Edges — per prototype/app/graph.jsx: edges incident to the
+      // active/hovered node use var(--accent) at 0.9 opacity & width 1.5;
+      // all other edges use var(--fg-4) at 0.5 opacity & width 1.
+      const hovered = hoveredNodeRef.current;
       for (const link of links) {
         const source = link.source as SimNode;
         const target = link.target as SimNode;
@@ -272,12 +294,28 @@ export function useD3Graph(
           target.y === undefined
         )
           continue;
+        const incidentToActive =
+          activeNotePath != null &&
+          (source.path === activeNotePath || target.path === activeNotePath);
+        const incidentToHover =
+          hovered != null && (source === hovered || target === hovered);
+        const accented = incidentToActive || incidentToHover;
+        ctx.globalAlpha = accented ? 0.9 : 0.5;
+        ctx.strokeStyle = accented ? c.accent : c.fg4;
+        ctx.lineWidth = accented ? 1.5 : 1;
         ctx.beginPath();
         ctx.moveTo(source.x, source.y);
         ctx.lineTo(target.x, target.y);
         ctx.stroke();
       }
+      ctx.globalAlpha = 1;
 
+      // Nodes — per prototype:
+      //   active : fill var(--accent), stroke var(--accent), strokeWidth 2,
+      //            soft halo (r+6) at var(--accent) / 0.18 opacity
+      //   other  : fill var(--bg-2), stroke var(--fg-3), strokeWidth 1.2
+      //   hover  : same shape as default but stroke var(--accent)
+      //   label  : active → var(--accent); else var(--fg-1)
       for (const node of nodes) {
         if (node.x === undefined || node.y === undefined) continue;
         const isHovered = hoveredNodeRef.current === node;
@@ -303,45 +341,51 @@ export function useD3Graph(
             else ctx.lineTo(px, py);
           }
           ctx.closePath();
-          ctx.fillStyle = colors.star;
+          ctx.fillStyle = c.starFill;
           ctx.fill();
-          ctx.strokeStyle = colors.starStroke;
+          ctx.strokeStyle = c.fg3;
           ctx.lineWidth = 1;
           ctx.stroke();
         } else {
+          // Halo for active / hovered nodes (accent at 0.18 opacity).
+          if (isActive || isHovered) {
+            ctx.beginPath();
+            ctx.arc(node.x, node.y, radius + 6, 0, 2 * Math.PI);
+            ctx.globalAlpha = 0.18;
+            ctx.fillStyle = c.accent;
+            ctx.fill();
+            ctx.globalAlpha = 1;
+          }
           ctx.beginPath();
           ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
-          ctx.fillStyle = isActive
-            ? colors.nodeActive
-            : isShared
-              ? colors.nodeShared
-              : isHovered
-                ? colors.nodeHovered
-                : colors.node;
+          ctx.fillStyle = isActive ? c.accent : isShared ? colors.nodeShared : c.bg2;
           ctx.fill();
-
-          if (isHovered || isActive || isShared) {
-            ctx.strokeStyle = isActive
-              ? colors.strokeActive
+          ctx.strokeStyle = isActive
+            ? c.accent
+            : isHovered
+              ? c.accent
               : isShared
                 ? colors.strokeShared
-                : colors.strokeHovered;
-            ctx.lineWidth = 2;
-            ctx.stroke();
-          }
+                : c.fg3;
+          ctx.lineWidth = isActive ? 2 : 1.2;
+          ctx.stroke();
         }
 
-        const fontSize =
-          isHovered || isActive ? cfg.font.activeSize : cfg.font.defaultSize;
-        ctx.font = `${fontSize}px ${cfg.font.family}`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "top";
-        ctx.fillStyle = colors.label;
-        const label =
-          node.title.length > cfg.label.maxLength
-            ? node.title.slice(0, cfg.label.truncatedLength) + cfg.label.ellipsis
-            : node.title;
-        ctx.fillText(label, node.x, node.y + radius + cfg.node.labelOffset);
+        // Label — only render for active / hovered nodes per prototype
+        // (in fullscreen mode prototype shows all labels, but rail-mode
+        // hides them until interaction).
+        if (isActive || isHovered) {
+          const fontSize = cfg.font.activeSize;
+          ctx.font = `${fontSize}px ${cfg.font.family}`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "top";
+          ctx.fillStyle = isActive ? c.accent : c.fg1;
+          const label =
+            node.title.length > cfg.label.maxLength
+              ? node.title.slice(0, cfg.label.truncatedLength) + cfg.label.ellipsis
+              : node.title;
+          ctx.fillText(label, node.x, node.y + radius + cfg.node.labelOffset);
+        }
       }
 
       ctx.restore();
