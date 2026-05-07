@@ -4,8 +4,21 @@
  *   - Streamable HTTP (modern):  POST/GET/DELETE /api/mcp
  *   - SSE (legacy):              GET /api/mcp/sse + POST /api/mcp/messages
  *
- * A separate stdio shim (`@azrtydxb/mcp` in packages/mcp) wraps the
- * Streamable HTTP transport for clients that only speak stdio.
+ * For stdio-only host clients (Claude Desktop default, etc.), use the
+ * generic `mcp-remote` proxy:
+ *
+ *   {
+ *     "mcpServers": {
+ *       "kryton": {
+ *         "command": "npx",
+ *         "args": [
+ *           "-y", "mcp-remote",
+ *           "https://kryton.example.com/api/mcp",
+ *           "--header", "Authorization: Bearer kryton_xxx..."
+ *         ]
+ *       }
+ *     }
+ *   }
  */
 export { streamableMcpRoutes } from "./streamable.js";
 export { sseMcpRoutes } from "./sse.js";
