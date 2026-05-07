@@ -13,6 +13,9 @@ RUN npm install
 COPY . .
 RUN git rev-parse --short HEAD > /tmp/COMMIT_SHA || echo "unknown" > /tmp/COMMIT_SHA
 RUN npx prisma generate --schema=packages/server/prisma/schema.prisma
+# Shared workspace packages must be built before client typecheck since
+# the client imports from `@azrtydxb/ui` which resolves via dist/.
+RUN npm run build:core
 RUN npm run build
 # tsc with moduleResolution:"bundler" emits extensionless relative imports,
 # but Node ESM requires .js extensions. Patch all compiled .js files.
