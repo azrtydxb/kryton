@@ -47,7 +47,7 @@ export function EditModeView({
   getCodeFenceRenderer,
   onAutoSave, onCancel, onToggleStar, onPdfExport,
   onContentChange, onCursorStateChange,
-  onLinkClick, onCreateNote,
+  onLinkClick, onCreateNote, onNoteSelect,
 }: EditModeViewProps) {
   const hasChanges = editContent !== originalContent;
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('unchanged');
@@ -204,6 +204,7 @@ export function EditModeView({
                 allNotes={allNotes}
                 onCreateNote={onCreateNote}
                 notePath={activeNote.path}
+                onNoteSelect={onNoteSelect}
                 getCodeFenceRenderer={getCodeFenceRenderer}
               />
             </div>

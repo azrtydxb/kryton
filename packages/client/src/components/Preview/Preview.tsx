@@ -1,8 +1,9 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useEffect, useState } from 'react';
 import { NotePreviewReact } from '@azrtydxb/ui';
-import { api, FileNode } from '../../lib/api';
+import { api, BacklinkData, FileNode } from '../../lib/api';
 import { collectNoteNames } from '../../lib/noteTreeUtils';
 import { DataviewBlock } from './DataviewBlock';
+import { Icons } from '../Icons';
 
 interface PreviewProps {
   content: string;
@@ -10,6 +11,8 @@ interface PreviewProps {
   allNotes?: FileNode[];
   onCreateNote?: (name: string) => void;
   notePath?: string;
+  /** Open a backlink note. When provided, the inline backlinks tail is clickable. */
+  onNoteSelect?: (path: string) => void;
   getCodeFenceRenderer?: (language: string) => { component: React.ComponentType<{ content: string; notePath: string }> } | undefined;
   /** Current embed depth — kept for API compat; NotePreviewReact manages depth internally */
   embedDepth?: number;
@@ -187,12 +190,24 @@ export function Preview({
   allNotes,
   onCreateNote,
   notePath = '',
+  onNoteSelect,
   getCodeFenceRenderer,
 }: PreviewProps) {
   const existingNotes = useMemo(() => {
     if (!allNotes) return new Set<string>();
     return collectNoteNames(allNotes);
   }, [allNotes]);
+
+  const [backlinks, setBacklinks] = useState<BacklinkData[]>([]);
+  useEffect(() => {
+    if (!notePath) return;
+    let cancelled = false;
+    api
+      .getBacklinks(notePath)
+      .then((b) => { if (!cancelled) setBacklinks(b); })
+      .catch(() => { if (!cancelled) setBacklinks([]); });
+    return () => { cancelled = true; };
+  }, [notePath]);
 
   const handleFetchNoteContent = useCallback(async (name: string): Promise<string | null> => {
     try {
@@ -234,6 +249,98 @@ export function Preview({
       {dataviewBlocks.map(block => (
         <DataviewBlock key={block.id} query={block.query} onLinkClick={onLinkClick} />
       ))}
+
+      {notePath && backlinks.length > 0 && (
+        <div
+          style={{
+            maxWidth: 760,
+            margin: '0 auto',
+            padding: '0 36px 80px',
+            marginTop: 28,
+          }}
+        >
+          <div
+            style={{
+              borderTop: '1px dashed var(--line)',
+              paddingTop: 18,
+            }}
+          >
+            <div
+              className="mono"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                fontFamily: 'var(--font-mono)',
+                fontSize: 10.5,
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                color: 'var(--fg-3)',
+                marginBottom: 10,
+              }}
+            >
+              <Icons.Link size={10} />
+              Backlinks
+              <span style={{ color: 'var(--fg-4)' }}>· {backlinks.length}</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {backlinks.map((b) => (
+                <button
+                  key={b.path}
+                  onClick={() => onNoteSelect?.(b.path)}
+                  disabled={!onNoteSelect}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    width: '100%',
+                    padding: '8px 10px',
+                    borderRadius: 6,
+                    background: 'var(--bg-1)',
+                    border: '1px solid var(--line)',
+                    fontSize: 13,
+                    color: 'var(--fg-1)',
+                    textAlign: 'left',
+                    cursor: onNoteSelect ? 'pointer' : 'default',
+                    transition: 'background 120ms, border-color 120ms',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (onNoteSelect) {
+                      e.currentTarget.style.background = 'var(--bg-2)';
+                      e.currentTarget.style.borderColor = 'var(--line-strong)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (onNoteSelect) {
+                      e.currentTarget.style.background = 'var(--bg-1)';
+                      e.currentTarget.style.borderColor = 'var(--line)';
+                    }
+                  }}
+                >
+                  <Icons.FileText size={12} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {b.title}
+                  </span>
+                  <span
+                    className="mono"
+                    style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 11,
+                      color: 'var(--fg-4)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      maxWidth: 280,
+                    }}
+                  >
+                    {b.path}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -140,7 +140,7 @@ function VersionPreviewModal({ notePath, version, allNotes, onClose, onRestore }
 export function PreviewModeView({
   activeNote, isStarred, allNotes, previewRef,
   onEdit, onShare, onToggleStar,
-  onLinkClick, onCreateNote, onRestored, getCodeFenceRenderer,
+  onLinkClick, onCreateNote, onRestored, getCodeFenceRenderer, onNoteSelect,
 }: PreviewModeViewProps) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [versions, setVersions] = useState<NoteVersion[]>([]);
@@ -340,6 +340,7 @@ export function PreviewModeView({
             allNotes={allNotes}
             onCreateNote={onCreateNote}
             notePath={activeNote.path}
+            onNoteSelect={onNoteSelect}
             getCodeFenceRenderer={getCodeFenceRenderer}
           />
         </div>

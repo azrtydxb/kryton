@@ -1,7 +1,13 @@
 import * as React from "react";
 import { useEffect, useRef, useCallback } from "react";
 import { EditorState, type Extension } from "@codemirror/state";
-import { EditorView, keymap, placeholder, type ViewUpdate } from "@codemirror/view";
+import {
+  EditorView,
+  keymap,
+  lineNumbers,
+  placeholder,
+  type ViewUpdate,
+} from "@codemirror/view";
 import {
   defaultKeymap,
   indentWithTab,
@@ -131,6 +137,7 @@ export function NoteEditorReact({
         // is driven by data-theme on <html>, so a single theme works
         // for both modes (the `darkMode` prop is now informational only).
         ...krytonCmTheme,
+        lineNumbers(),
         markdown({ base: markdownLanguage }),
         bracketMatching(),
         history(),
