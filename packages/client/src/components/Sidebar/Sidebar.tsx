@@ -278,10 +278,10 @@ export function Sidebar({
         color: 'var(--fg-1)',
       }}
     >
-      {/* 1. Brand row (40px) */}
+      {/* 1. Brand row (44px to match prototype TopBar height) */}
       <div
         style={{
-          height: 40, flexShrink: 0,
+          height: 44, flexShrink: 0,
           padding: '10px 10px 6px',
           display: 'flex', alignItems: 'center', gap: 6,
         }}
