@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
-import { NoteQuickSwitcher } from '@azrtydxb/ui';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { FileNode } from '../../lib/api';
+import { Icons } from '../Icons';
 
 interface QuickSwitcherProps {
   notes: FileNode[];
@@ -8,8 +8,30 @@ interface QuickSwitcherProps {
   onClose: () => void;
 }
 
-function collectFiles(nodes: FileNode[]): { path: string; name: string }[] {
-  const files: { path: string; name: string }[] = [];
+interface NoteEntry {
+  path: string;
+  name: string;
+}
+
+interface ResultItem {
+  kind: 'command' | 'note' | 'tag';
+  icon: ReactNode;
+  label: string;
+  hint?: string;
+  /** Path for notes; command id otherwise. */
+  value?: string;
+  onActivate?: () => void;
+}
+
+interface Section {
+  title: string;
+  items: ResultItem[];
+}
+
+const monoFamily = 'var(--font-mono)';
+
+function collectFiles(nodes: FileNode[]): NoteEntry[] {
+  const files: NoteEntry[] = [];
   for (const node of nodes) {
     if (node.type === 'file') {
       files.push({ path: node.path, name: node.name.replace(/\.md$/, '') });
@@ -21,18 +43,298 @@ function collectFiles(nodes: FileNode[]): { path: string; name: string }[] {
   return files;
 }
 
-/**
- * Thin wrapper around @azrtydxb/ui NoteQuickSwitcher.
- * Flattens the FileNode tree into the flat NoteEntry list the ui component expects.
- */
 export function QuickSwitcher({ notes, onSelect, onClose }: QuickSwitcherProps) {
   const allFiles = useMemo(() => collectFiles(notes), [notes]);
+  const [q, setQ] = useState('');
+  const [idx, setIdx] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const isMac =
+    typeof navigator !== 'undefined' && navigator.platform.toLowerCase().includes('mac');
+  const mod = isMac ? '⌘' : 'Ctrl';
+
+  useEffect(() => {
+    const t = setTimeout(() => inputRef.current?.focus(), 30);
+    return () => clearTimeout(t);
+  }, []);
+
+  const sections = useMemo<Section[]>(() => {
+    const ql = q.trim().toLowerCase();
+
+    const noteHits = allFiles
+      .filter((n) => !ql || n.name.toLowerCase().includes(ql) || n.path.toLowerCase().includes(ql))
+      .slice(0, 20)
+      .map<ResultItem>((n) => ({
+        kind: 'note',
+        icon: <Icons.FileText size={14} />,
+        label: n.name,
+        hint: n.path,
+        value: n.path,
+      }));
+
+    if (ql) {
+      return [{ title: `Notes (${noteHits.length})`, items: noteHits }];
+    }
+
+    return [{ title: 'Notes', items: noteHits.slice(0, 8) }];
+  }, [q, allFiles]);
+
+  const flat = useMemo(() => sections.flatMap((s) => s.items), [sections]);
+
+  // Clamp idx when results change
+  useEffect(() => {
+    if (idx > flat.length - 1) setIdx(0);
+  }, [flat.length, idx]);
+
+  const activate = (item: ResultItem) => {
+    if (item.onActivate) {
+      item.onActivate();
+      onClose();
+      return;
+    }
+    if (item.kind === 'note' && item.value) {
+      onSelect(item.value);
+      onClose();
+    }
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      onClose();
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setIdx((i) => Math.min(flat.length - 1, i + 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setIdx((i) => Math.max(0, i - 1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const sel = flat[idx];
+      if (sel) activate(sel);
+    }
+  };
+
+  const sectionHeader: CSSProperties = {
+    padding: '10px 12px 6px',
+    fontSize: 10.5,
+    fontFamily: monoFamily,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    color: 'var(--fg-4)',
+  };
+
+  let runningIndex = 0;
 
   return (
-    <NoteQuickSwitcher
-      notes={allFiles}
-      onSelect={onSelect}
-      onClose={onClose}
-    />
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'oklch(0 0 0 / 0.5)',
+        zIndex: 100,
+        backdropFilter: 'blur(4px)',
+        display: 'flex',
+        alignItems: 'flex-start',
+        justifyContent: 'center',
+        paddingTop: 100,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: 560,
+          maxWidth: '90vw',
+          background: 'var(--bg-1)',
+          border: '1px solid var(--line-strong)',
+          borderRadius: 12,
+          boxShadow: 'var(--shadow-lg)',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        {/* Search input */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '14px 16px',
+            borderBottom: '1px solid var(--line)',
+          }}
+        >
+          <span
+            className="mono"
+            style={{
+              color: 'var(--accent)',
+              fontSize: 16,
+              fontWeight: 600,
+              userSelect: 'none',
+            }}
+          >
+            &gt;
+          </span>
+          <input
+            ref={inputRef}
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setIdx(0);
+            }}
+            onKeyDown={onKeyDown}
+            placeholder="search or type a command…"
+            style={{
+              flex: 1,
+              background: 'transparent',
+              border: 'none',
+              outline: 'none',
+              color: 'var(--fg)',
+              fontSize: 16,
+              fontFamily: monoFamily,
+            }}
+          />
+          <span className="kbd">esc</span>
+        </div>
+
+        {/* AI hint */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '8px 16px',
+            borderBottom: '1px solid var(--line)',
+            fontFamily: monoFamily,
+            fontSize: 11.5,
+            color: 'var(--fg-3)',
+            background: 'var(--bg-1)',
+          }}
+        >
+          <Icons.Sparkle size={12} style={{ color: 'var(--accent)' }} />
+          <span>
+            <span style={{ color: 'var(--accent)' }}>✦</span>{' '}
+            AI search ready · press <span className="kbd">↵</span> to ask Claude
+          </span>
+        </div>
+
+        {/* Results */}
+        <div style={{ maxHeight: 380, overflowY: 'auto', padding: '4px 6px 6px' }}>
+          {flat.length === 0 && (
+            <div
+              style={{
+                padding: 28,
+                textAlign: 'center',
+                color: 'var(--fg-3)',
+                fontFamily: monoFamily,
+                fontSize: 12,
+              }}
+            >
+              no matches.
+            </div>
+          )}
+
+          {sections.map((section) => {
+            if (section.items.length === 0) return null;
+            return (
+              <div key={section.title}>
+                <div style={sectionHeader}>{section.title}</div>
+                {section.items.map((item) => {
+                  const i = runningIndex++;
+                  const sel = i === idx;
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      onMouseEnter={() => setIdx(i)}
+                      onClick={() => activate(item)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        width: '100%',
+                        padding: '8px 10px',
+                        borderRadius: 6,
+                        border: 'none',
+                        background: sel ? 'var(--accent-soft)' : 'transparent',
+                        color: sel ? 'var(--accent)' : 'var(--fg-1)',
+                        fontSize: 13,
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <span
+                        style={{
+                          color: sel ? 'var(--accent)' : 'var(--fg-3)',
+                          width: 18,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        {item.icon}
+                      </span>
+                      <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {item.label}
+                      </span>
+                      {item.hint && (
+                        <span
+                          className="mono"
+                          style={{
+                            color: sel ? 'var(--accent)' : 'var(--fg-4)',
+                            fontSize: 11,
+                            opacity: 0.85,
+                            maxWidth: 220,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {item.hint}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Footer rail */}
+        <div
+          style={{
+            display: 'flex',
+            gap: 14,
+            alignItems: 'center',
+            padding: '0 14px',
+            height: 28,
+            background: 'var(--bg-1)',
+            borderTop: '1px solid var(--line)',
+            fontSize: 11,
+            fontFamily: monoFamily,
+            color: 'var(--fg-3)',
+            flexShrink: 0,
+          }}
+        >
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <span className="kbd">↑↓</span> navigate
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <span className="kbd">↵</span> open
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <span className="kbd">{mod}</span>
+            <span className="kbd">↵</span> open in split
+          </span>
+          <div style={{ flex: 1 }} />
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--accent)' }}>
+            <span className="dot pulse" style={{ background: 'var(--accent)' }} />
+            AI ready
+          </span>
+        </div>
+      </div>
+    </div>
   );
 }

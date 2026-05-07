@@ -3,6 +3,10 @@ import { create } from 'zustand';
 // Helper type for React-style setState that accepts value or updater function
 type SetState<T> = (valueOrUpdater: T | ((prev: T) => T)) => void;
 
+/** Top-level main-pane view selector. Drives whether the editor, all-notes,
+ *  or fullscreen graph is rendered between sidebar + right panel. */
+export type MainView = 'note' | 'all' | 'graph';
+
 interface UIState {
   // Layout
   sidebarOpen: boolean;
@@ -10,6 +14,7 @@ interface UIState {
   rightPanelWidth: number;
   graphHeight: number | null;
   mobileMenuOpen: boolean;
+  view: MainView;
 
   // Editing
   editing: boolean;
@@ -35,6 +40,7 @@ interface UIState {
   setRightPanelWidth: SetState<number>;
   setGraphHeight: SetState<number | null>;
   setMobileMenuOpen: SetState<boolean>;
+  setView: SetState<MainView>;
   setEditing: SetState<boolean>;
   setEditContent: SetState<string | null>;
   setOriginalContent: SetState<string | null>;
@@ -69,6 +75,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   rightPanelWidth: 320,
   graphHeight: null,
   mobileMenuOpen: false,
+  view: 'note',
   editing: false,
   editContent: null,
   originalContent: null,
@@ -88,6 +95,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   setRightPanelWidth: (v) => set({ rightPanelWidth: resolve(v, get().rightPanelWidth) }),
   setGraphHeight: (v) => set({ graphHeight: resolve(v, get().graphHeight) }),
   setMobileMenuOpen: (v) => set({ mobileMenuOpen: resolve(v, get().mobileMenuOpen) }),
+  setView: (v) => set({ view: resolve(v, get().view) }),
   setEditing: (v) => set({ editing: resolve(v, get().editing) }),
   setEditContent: (v) => set({ editContent: resolve(v, get().editContent) }),
   setOriginalContent: (v) => set({ originalContent: resolve(v, get().originalContent) }),

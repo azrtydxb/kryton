@@ -1,0 +1,73 @@
+/* global React */
+const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
+/* ============== ICON SET (lucide-style, stroke 1.5, currentColor) ============== */
+const Icon = ({ d, size = 14, stroke = 1.5, fill = 'none', children, style }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill={fill} stroke="currentColor"
+       strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, ...style }}>
+    {d ? <path d={d} /> : children}
+  </svg>
+);
+
+const I = {
+  Search:   (p) => <Icon {...p}><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></Icon>,
+  Plus:     (p) => <Icon {...p} d="M12 5v14M5 12h14"/>,
+  FolderPlus:(p)=> <Icon {...p}><path d="M4 6a2 2 0 0 1 2-2h3l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M12 11v6M9 14h6"/></Icon>,
+  Folder:   (p) => <Icon {...p} d="M4 6a2 2 0 0 1 2-2h3l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/>,
+  FolderOpen:(p)=> <Icon {...p}><path d="M4 6a2 2 0 0 1 2-2h3l2 2h7a2 2 0 0 1 2 2"/><path d="M3 10h18l-2.2 8a2 2 0 0 1-2 1.4H5.2a2 2 0 0 1-2-1.4z"/></Icon>,
+  Chevron:  (p) => <Icon {...p} d="m9 6 6 6-6 6"/>,
+  ChevronD: (p) => <Icon {...p} d="m6 9 6 6 6-6"/>,
+  File:     (p) => <Icon {...p}><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></Icon>,
+  FileText: (p) => <Icon {...p}><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></Icon>,
+  Star:     (p) => <Icon {...p} d="m12 3 2.7 5.5 6 .9-4.4 4.3 1 6.1L12 17l-5.4 2.8 1-6.1L3.3 9.4l6-.9z"/>,
+  StarOn:   (p) => <Icon {...p} fill="currentColor" d="m12 3 2.7 5.5 6 .9-4.4 4.3 1 6.1L12 17l-5.4 2.8 1-6.1L3.3 9.4l6-.9z"/>,
+  Tag:     (p) => <Icon {...p}><path d="M3 12V5a2 2 0 0 1 2-2h7l9 9-9 9z"/><circle cx="8" cy="8" r="1.5"/></Icon>,
+  Hash:    (p) => <Icon {...p} d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/>,
+  Calendar:(p)=> <Icon {...p}><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></Icon>,
+  Layout:  (p)=> <Icon {...p}><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></Icon>,
+  PanelLeft:(p)=> <Icon {...p}><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></Icon>,
+  PanelRight:(p)=> <Icon {...p}><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/></Icon>,
+  Network: (p)=> <Icon {...p}><circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><path d="M12 7v3M12 10 5.5 17M12 10l6.5 7"/></Icon>,
+  Eye:     (p)=> <Icon {...p}><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></Icon>,
+  Edit:    (p)=> <Icon {...p} d="M12 20h9M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4z"/>,
+  Save:    (p)=> <Icon {...p}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></Icon>,
+  Settings:(p)=> <Icon {...p}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></Icon>,
+  Command: (p)=> <Icon {...p} d="M18 3a3 3 0 0 0 0 6h-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3v3H6a3 3 0 1 0 3 3V9h6v3a3 3 0 1 0 3-3"/>,
+  Sun:     (p)=> <Icon {...p}><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M5 5l1.5 1.5M17.5 17.5 19 19M2 12h2M20 12h2M5 19l1.5-1.5M17.5 6.5 19 5"/></Icon>,
+  Moon:    (p)=> <Icon {...p} d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>,
+  Sparkle: (p)=> <Icon {...p} d="M12 3v6M12 15v6M3 12h6M15 12h6M5.5 5.5 9 9M15 15l3.5 3.5M5.5 18.5 9 15M15 9l3.5-3.5"/>,
+  Zap:     (p)=> <Icon {...p} d="M13 2 3 14h7l-1 8 10-12h-7z"/>,
+  Bot:     (p)=> <Icon {...p}><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 8V4M9 4h6"/><circle cx="9" cy="14" r="1" fill="currentColor"/><circle cx="15" cy="14" r="1" fill="currentColor"/></Icon>,
+  Link:    (p)=> <Icon {...p} d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 1 0-7-7l-1 1M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 1 0 7 7l1-1"/>,
+  Share:   (p)=> <Icon {...p}><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></Icon>,
+  History: (p)=> <Icon {...p} d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2"/>,
+  Download:(p)=> <Icon {...p} d="M12 3v12M7 10l5 5 5-5M5 21h14"/>,
+  More:    (p)=> <Icon {...p}><circle cx="5" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="19" cy="12" r="1.5" fill="currentColor"/></Icon>,
+  X:       (p)=> <Icon {...p} d="M18 6 6 18M6 6l12 12"/>,
+  Check:   (p)=> <Icon {...p} d="m5 13 4 4L19 7"/>,
+  Trash:   (p)=> <Icon {...p}><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M6 6v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6M10 11v6M14 11v6"/></Icon>,
+  Crosshair:(p)=> <Icon {...p}><circle cx="12" cy="12" r="9"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></Icon>,
+  Filter:  (p)=> <Icon {...p} d="M3 4h18l-7 9v6l-4 2v-8z"/>,
+  ArrowUp: (p)=> <Icon {...p} d="M12 19V5M5 12l7-7 7 7"/>,
+  ArrowDown:(p)=> <Icon {...p} d="M12 5v14M5 12l7 7 7-7"/>,
+  Inbox:   (p)=> <Icon {...p}><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5 4h14l3 8v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z"/></Icon>,
+  Logo:    ({ size = 24 }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <defs>
+        <linearGradient id="kg" x1="0" y1="0" x2="24" y2="24">
+          <stop offset="0" stopColor="var(--accent)"/>
+          <stop offset="1" stopColor="var(--accent-2)"/>
+        </linearGradient>
+      </defs>
+      <rect x="2" y="2" width="20" height="20" rx="5" fill="url(#kg)" opacity="0.15"/>
+      <rect x="2.5" y="2.5" width="19" height="19" rx="4.5" stroke="url(#kg)" strokeWidth="1"/>
+      <circle cx="7" cy="8" r="2" fill="url(#kg)"/>
+      <circle cx="17" cy="8" r="2" fill="url(#kg)"/>
+      <circle cx="12" cy="17" r="2" fill="url(#kg)"/>
+      <path d="M7 8 L17 8 M7 8 L12 17 M17 8 L12 17" stroke="url(#kg)" strokeWidth="1" opacity="0.6"/>
+    </svg>
+  ),
+};
+
+window.Icon = Icon;
+window.I = I;

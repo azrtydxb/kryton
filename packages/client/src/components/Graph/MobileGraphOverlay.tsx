@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Network } from 'lucide-react';
 import { GraphView } from '@azrtydxb/ui';
 import { GraphData } from '../../lib/api';
+import { Icons } from '../Icons';
 
 interface MobileGraphOverlayProps {
   graphData: GraphData | null;
@@ -12,7 +12,11 @@ interface MobileGraphOverlayProps {
 }
 
 export function MobileGraphOverlay({
-  graphData, loading, activeNotePath, onNoteSelect, starredPaths,
+  graphData,
+  loading,
+  activeNotePath,
+  onNoteSelect,
+  starredPaths,
 }: MobileGraphOverlayProps) {
   const [expanded, setExpanded] = useState(false);
 
@@ -21,49 +25,89 @@ export function MobileGraphOverlay({
       role={expanded ? 'region' : undefined}
       aria-label={expanded ? 'Graph view' : undefined}
       className={`
-        md:hidden fixed z-20 transition-all duration-300 ease-in-out
+        md:hidden fixed z-20 transition-all duration-300 ease-in-out overflow-hidden
         ${expanded
           ? 'top-14 right-0 w-full h-[50vh] rounded-none'
-          : 'top-16 right-2 w-24 h-24 rounded-xl'
+          : 'top-16 right-2 w-24 h-24 rounded-lg'
         }
-        bg-surface-900/95 backdrop-blur-sm border border-gray-700/50 shadow-lg overflow-hidden
       `}
+      style={{
+        background: 'var(--bg-1)',
+        border: '1px solid var(--line)',
+        boxShadow: 'var(--shadow-md)',
+      }}
     >
-      {/* Header - only visible when expanded */}
       {expanded && (
-        <div className="flex items-center justify-between px-3 py-2 border-b border-gray-700/50">
-          <div className="flex items-center gap-2">
-            <Network size={14} className="text-gray-400" />
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Graph</span>
-          </div>
-          <button
-            onClick={() => setExpanded(false)}
-            className="px-2 py-0.5 text-xs rounded bg-gray-700/50 text-gray-400 hover:text-gray-200"
-            aria-label="Minimize graph"
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            height: 38,
+            padding: '0 12px',
+            borderBottom: '1px solid var(--line)',
+            background: 'var(--bg-1)',
+          }}
+        >
+          <Icons.Network size={14} style={{ color: 'var(--fg-3)' }} />
+          <span
+            style={{
+              fontSize: 12,
+              color: 'var(--fg-2)',
+              fontFamily: 'var(--font-mono)',
+              letterSpacing: '0.04em',
+            }}
           >
-            Minimize
+            graph
+          </span>
+          <div style={{ flex: 1 }} />
+          <button
+            type="button"
+            onClick={() => setExpanded(false)}
+            aria-label="Minimize graph"
+            style={{
+              padding: '3px 8px',
+              borderRadius: 4,
+              fontSize: 11.5,
+              fontFamily: 'var(--font-mono)',
+              textTransform: 'uppercase',
+              color: 'var(--fg-2)',
+              background: 'var(--bg-2)',
+              border: '1px solid var(--line)',
+              cursor: 'pointer',
+            }}
+          >
+            close
           </button>
         </div>
       )}
-      {/* Mini icon overlay when collapsed — tappable button to expand */}
       {!expanded && (
         <button
           aria-label="Open graph view"
           className="absolute inset-0 w-full h-full z-10"
           onClick={() => setExpanded(true)}
+          style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}
         >
-          <div className="absolute top-1 right-1">
-            <Network size={10} className="text-violet-400/70" />
+          <div className="absolute top-1.5 right-1.5">
+            <Icons.Network size={12} style={{ color: 'var(--accent)' }} />
           </div>
         </button>
       )}
-      <div className={expanded ? 'flex-1 h-[calc(100%-36px)]' : 'w-full h-full'}>
+      <div
+        style={
+          expanded
+            ? { height: 'calc(100% - 38px)', background: 'var(--bg)' }
+            : { width: '100%', height: '100%', background: 'var(--bg)' }
+        }
+      >
         <GraphView
           graphData={graphData}
           loading={loading}
           activeNotePath={activeNotePath}
           mode={activeNotePath ? 'local' : 'full'}
-          onNoteSelect={(path) => { if (expanded) onNoteSelect(path); }}
+          onNoteSelect={(path) => {
+            if (expanded) onNoteSelect(path);
+          }}
           starredPaths={starredPaths}
         />
       </div>

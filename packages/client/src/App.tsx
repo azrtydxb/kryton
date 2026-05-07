@@ -35,6 +35,8 @@ import { RightPanel } from './components/Layout/RightPanel';
 import { MobileGraphOverlay } from './components/Graph/MobileGraphOverlay';
 import { EditModeView } from './components/Views/EditModeView';
 import { PreviewModeView } from './components/Views/PreviewModeView';
+import { AllNotesView } from './components/Views/AllNotesView';
+import { GraphPanel } from './components/Graph/GraphPanel';
 import { EmptyStateView } from './components/Views/EmptyStateView';
 import { ModalsContainer } from './components/Modals/ModalsContainer';
 import { ErrorToast } from './components/Toast/ErrorToast';
@@ -147,6 +149,8 @@ function AppContent() {
   const setShowAccessRequests = useUIStore((s) => s.setShowAccessRequests);
   const setShowQuickSwitcher = useUIStore((s) => s.setShowQuickSwitcher);
   const setEditContent = useUIStore((s) => s.setEditContent);
+  const view = useUIStore((s) => s.view);
+  const setView = useUIStore((s) => s.setView);
 
   const {
     toggleStar,
@@ -186,7 +190,9 @@ function AppContent() {
     createNote: handleNewNote,
     renameNote: handleRenameNote,
     toggleStar: toggleActiveNoteStar,
-  }), [handleNewNote, handleRenameNote, toggleActiveNoteStar, editing, cancelEdit, enterEditMode, setSidebarOpen, setShowQuickSwitcher, searchInputRef]);
+    openAllNotes: () => setView('all'),
+    toggleGraph: () => setView(view === 'graph' ? 'note' : 'graph'),
+  }), [handleNewNote, handleRenameNote, toggleActiveNoteStar, editing, cancelEdit, enterEditMode, setSidebarOpen, setShowQuickSwitcher, searchInputRef, setView, view]);
 
   useKeyboardShortcuts(shortcutActions);
 
@@ -219,6 +225,10 @@ function AppContent() {
         onNoteSelect={handleNoteSelect}
         onAdminClick={() => setShowAdmin(true)}
         onAccessRequestsClick={() => setShowAccessRequests(true)}
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={() => setSidebarOpen(prev => !prev)}
+        onOpenPalette={() => setShowQuickSwitcher(true)}
+        activeNotePath={notes.activeNote?.path ?? null}
       />
 
       <div className="flex-1 flex overflow-hidden relative">
@@ -253,7 +263,24 @@ function AppContent() {
             <PluginSlot slot="editor-toolbar" />
           </div>
           <div className="flex-1 flex overflow-hidden">
-            {notes.activeNote ? (
+            {view === 'all' ? (
+              <AllNotesView
+                tree={notes.tree}
+                starredPaths={starredPaths}
+                onSelect={(p) => { handleNoteSelect(p); setView('note'); }}
+                onToggleStar={toggleStar}
+              />
+            ) : view === 'graph' ? (
+              <GraphPanel
+                graphData={graphData}
+                loading={graphLoading}
+                activeNotePath={notes.activeNote?.path ?? null}
+                starredPaths={starredPaths}
+                onNoteSelect={(p) => { handleNoteSelect(p); setView('note'); }}
+                fullscreen
+                mode="global"
+              />
+            ) : notes.activeNote ? (
               editing ? (
                 <EditModeView
                   activeNote={notes.activeNote}

@@ -1,9 +1,9 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
-import { Network, Crosshair, Maximize2, Minimize2 } from 'lucide-react';
+import { useState, useRef, useCallback, useEffect, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { GraphView } from '@azrtydxb/ui';
-import { GraphData, api } from '../../lib/api';
 import type { HoveredNodeInfo } from '@azrtydxb/ui';
+import { GraphData, api } from '../../lib/api';
+import { Icons } from '../Icons';
 
 interface GraphPanelProps {
   graphData: GraphData | null;
@@ -11,6 +11,15 @@ interface GraphPanelProps {
   activeNotePath: string | null;
   onNoteSelect: (path: string) => void;
   starredPaths?: Set<string>;
+  /**
+   * `local` — 2-hop neighbourhood centred on `activeNotePath`.
+   * `global` — global force-layout (alias of GraphView's `full`).
+   * Controlled mode; if omitted the panel manages its own state.
+   */
+  mode?: 'local' | 'global';
+  onModeChange?: (m: 'local' | 'global') => void;
+  /** When true, render in fullscreen layout (no rounded corners, no rail border). */
+  fullscreen?: boolean;
 }
 
 interface TooltipState {
@@ -18,10 +27,119 @@ interface TooltipState {
   y: number;
   title: string;
   preview: string;
+  path: string;
 }
 
-export function GraphPanel({ graphData, loading, activeNotePath, onNoteSelect, starredPaths }: GraphPanelProps) {
-  const [mode, setMode] = useState<'local' | 'full'>('local');
+const railHeader: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  height: 38,
+  padding: '0 12px',
+  borderBottom: '1px solid var(--line)',
+  flexShrink: 0,
+  background: 'var(--bg-1)',
+};
+
+const segmentedWrap: CSSProperties = {
+  display: 'flex',
+  gap: 1,
+  padding: 2,
+  background: 'var(--bg-2)',
+  border: '1px solid var(--line)',
+  borderRadius: 6,
+};
+
+function segmentBtn(active: boolean): CSSProperties {
+  return {
+    padding: '3px 8px',
+    borderRadius: 4,
+    fontSize: 11.5,
+    fontFamily: 'var(--font-mono)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
+    color: active ? 'var(--accent)' : 'var(--fg-2)',
+    background: active ? 'var(--accent-soft)' : 'transparent',
+    border: 'none',
+    cursor: 'pointer',
+  };
+}
+
+const zoomBtn: CSSProperties = {
+  width: 22,
+  height: 22,
+  borderRadius: 4,
+  background: 'var(--bg-2)',
+  border: '1px solid var(--line)',
+  color: 'var(--fg-2)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  cursor: 'pointer',
+};
+
+const legendStrip: CSSProperties = {
+  height: 28,
+  padding: '0 12px',
+  borderTop: '1px solid var(--line)',
+  background: 'var(--bg-1)',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 14,
+  fontFamily: 'var(--font-mono)',
+  fontSize: 11,
+  color: 'var(--fg-3)',
+  flexShrink: 0,
+};
+
+function LegendDot({ fill, hollow }: { fill: string; hollow?: boolean }) {
+  return (
+    <span
+      style={{
+        width: 8,
+        height: 8,
+        borderRadius: '50%',
+        background: hollow ? 'transparent' : fill,
+        border: hollow ? `1px solid ${fill}` : 'none',
+        flexShrink: 0,
+      }}
+    />
+  );
+}
+
+function LegendBar() {
+  return (
+    <span
+      style={{
+        width: 14,
+        height: 1,
+        background: 'var(--line-strong)',
+        flexShrink: 0,
+      }}
+    />
+  );
+}
+
+export function GraphPanel({
+  graphData,
+  loading,
+  activeNotePath,
+  onNoteSelect,
+  starredPaths,
+  mode: controlledMode,
+  onModeChange,
+  fullscreen = false,
+}: GraphPanelProps) {
+  const [internalMode, setInternalMode] = useState<'local' | 'global'>('local');
+  const mode = controlledMode ?? internalMode;
+  const setMode = useCallback(
+    (m: 'local' | 'global') => {
+      if (onModeChange) onModeChange(m);
+      else setInternalMode(m);
+    },
+    [onModeChange],
+  );
+
   const [expanded, setExpanded] = useState(false);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const recenterRef = useRef<(() => void) | null>(null);
@@ -29,193 +147,394 @@ export function GraphPanel({ graphData, loading, activeNotePath, onNoteSelect, s
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewCacheRef = useRef<Map<string, string>>(new Map());
 
-  const effectiveMode = activeNotePath ? mode : 'full';
+  // If no active note, force global mode (local is meaningless)
+  const effectiveMode: 'local' | 'global' = activeNotePath ? mode : 'global';
+  // GraphView consumes "full" instead of "global"
+  const graphViewMode: 'local' | 'full' = effectiveMode === 'global' ? 'full' : 'local';
 
   // Close overlay on Escape
   useEffect(() => {
     if (!expanded) return;
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { setExpanded(false); setTooltip(null); }
+      if (e.key === 'Escape') {
+        setExpanded(false);
+        setTooltip(null);
+      }
     };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
   }, [expanded]);
 
-  // When clicking a node in overlay, navigate and close
-  const handleOverlayNoteSelect = useCallback((path: string) => {
-    onNoteSelect(path);
-    setExpanded(false);
-    setTooltip(null);
-  }, [onNoteSelect]);
+  const handleOverlayNoteSelect = useCallback(
+    (path: string) => {
+      onNoteSelect(path);
+      setExpanded(false);
+      setTooltip(null);
+    },
+    [onNoteSelect],
+  );
 
-  // Handle hover in overlay — fetch preview after short delay
-  const handleOverlayHover = useCallback((node: HoveredNodeInfo | null) => {
+  // Hover handler — fetches preview for the info card.
+  const handleHover = useCallback((node: HoveredNodeInfo | null) => {
     if (hoverTimerRef.current) {
       clearTimeout(hoverTimerRef.current);
       hoverTimerRef.current = null;
     }
-
     if (!node) {
       setTooltip(null);
       return;
     }
-
     const cached = previewCacheRef.current.get(node.path);
     if (cached !== undefined) {
-      setTooltip({ x: node.x, y: node.y, title: node.title, preview: cached });
+      setTooltip({ x: node.x, y: node.y, title: node.title, preview: cached, path: node.path });
       return;
     }
-
-    // Delay fetch to avoid hammering API on quick mouse passes
     hoverTimerRef.current = setTimeout(async () => {
       try {
         const note = await api.getNote(node.path);
-        // Strip frontmatter and take first 3 non-empty lines
         const body = note.content.replace(/^---[\s\S]*?---\n*/, '');
-        const lines = body.split('\n').filter(l => l.trim()).slice(0, 3);
+        const lines = body.split('\n').filter((l) => l.trim()).slice(0, 3);
         const preview = lines.join('\n').slice(0, 200);
         previewCacheRef.current.set(node.path, preview);
-        setTooltip({ x: node.x, y: node.y, title: node.title, preview });
+        setTooltip({ x: node.x, y: node.y, title: node.title, preview, path: node.path });
       } catch {
         previewCacheRef.current.set(node.path, '');
-        setTooltip(null);
+        setTooltip({ x: node.x, y: node.y, title: node.title, preview: '', path: node.path });
       }
-    }, 300);
+    }, 200);
   }, []);
+
+  const nodeCount = graphData?.nodes.length ?? 0;
+  const edgeCount = graphData?.edges.length ?? 0;
+
+  // ---- Header ----
+  const renderHeader = (onExpand: (() => void) | null) => (
+    <div style={railHeader}>
+      <Icons.Network size={14} style={{ color: 'var(--fg-3)' }} />
+      <span
+        className="mono"
+        style={{
+          fontSize: 12,
+          color: 'var(--fg-2)',
+          fontFamily: 'var(--font-mono)',
+          letterSpacing: '0.04em',
+        }}
+      >
+        graph
+      </span>
+      <span
+        className="mono"
+        style={{ fontSize: 11, color: 'var(--fg-4)', fontFamily: 'var(--font-mono)' }}
+      >
+        {nodeCount}n {edgeCount}e
+      </span>
+      <div style={{ flex: 1 }} />
+      <div style={segmentedWrap}>
+        <button
+          type="button"
+          onClick={() => setMode('local')}
+          style={segmentBtn(effectiveMode === 'local')}
+          disabled={!activeNotePath}
+          aria-pressed={effectiveMode === 'local'}
+        >
+          local
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode('global')}
+          style={segmentBtn(effectiveMode === 'global')}
+          aria-pressed={effectiveMode === 'global'}
+        >
+          global
+        </button>
+      </div>
+      <div style={{ display: 'flex', gap: 4, marginLeft: 4 }}>
+        <button
+          type="button"
+          style={zoomBtn}
+          onClick={() => (fullscreen ? expandedRecenterRef.current?.() : recenterRef.current?.())}
+          aria-label="Recenter graph"
+          title="Recenter"
+        >
+          <Icons.Crosshair size={12} />
+        </button>
+        {onExpand && (
+          <button
+            type="button"
+            style={zoomBtn}
+            onClick={onExpand}
+            aria-label="Expand graph"
+            title="Expand"
+          >
+            <Icons.Plus size={12} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
+  // ---- Legend ----
+  const renderLegend = () => (
+    <div style={legendStrip}>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+        <LegendDot fill="var(--accent)" />
+        this note
+      </span>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+        <LegendDot fill="var(--accent-2)" />
+        linked
+      </span>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+        <LegendDot fill="var(--fg-3)" hollow />
+        tagged
+      </span>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+        <LegendBar />
+        backlinks
+      </span>
+    </div>
+  );
+
+  // ---- Hover info card ----
+  const renderHoverCard = (t: TooltipState) => (
+    <div
+      style={{
+        position: 'absolute',
+        left: Math.min(t.x + 14, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 320),
+        top: Math.max(t.y - 70, 8),
+        maxWidth: 300,
+        background: 'var(--bg-1)',
+        border: '1px solid var(--line-strong)',
+        borderRadius: 8,
+        padding: 10,
+        boxShadow: 'var(--shadow-md)',
+        zIndex: 10,
+        pointerEvents: 'auto',
+        animation: 'kryton-fade-in 200ms ease-out',
+      }}
+    >
+      <div
+        style={{
+          fontFamily: 'var(--font-sans)',
+          fontSize: 13,
+          color: 'var(--fg)',
+          fontWeight: 500,
+          marginBottom: 4,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {t.title}
+      </div>
+      <div
+        className="mono"
+        style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 11,
+          color: 'var(--fg-3)',
+          marginBottom: 6,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {t.path}
+      </div>
+      {t.preview && (
+        <div
+          style={{
+            fontFamily: 'var(--font-sans)',
+            fontSize: 12,
+            color: 'var(--fg-2)',
+            lineHeight: 1.5,
+            marginBottom: 8,
+            display: '-webkit-box',
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}
+        >
+          {t.preview}
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={() => {
+          if (fullscreen) handleOverlayNoteSelect(t.path);
+          else onNoteSelect(t.path);
+        }}
+        className="mono"
+        style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 11,
+          letterSpacing: '0.06em',
+          textTransform: 'uppercase',
+          color: 'var(--accent)',
+          background: 'transparent',
+          border: 'none',
+          padding: 0,
+          cursor: 'pointer',
+          textDecoration: 'underline',
+          textDecorationStyle: 'dashed',
+          textUnderlineOffset: 3,
+        }}
+      >
+        open
+      </button>
+    </div>
+  );
+
+  // Render
+  const containerStyle: CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column',
+    height: '100%',
+    background: 'var(--bg-1)',
+    minWidth: 0,
+    overflow: 'hidden',
+  };
 
   return (
     <>
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between px-3 py-2 border-b">
-          <div className="flex items-center gap-2">
-            <Network size={14} className="text-gray-400" />
-            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Graph</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => recenterRef.current?.()}
-              className="p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 rounded transition-colors"
-              aria-label="Center graph"
-              title="Center graph"
-            >
-              <Crosshair size={13} />
-            </button>
-            <button
-              onClick={() => setMode('local')}
-              className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                effectiveMode === 'local'
-                  ? 'bg-violet-500/15 text-violet-500 font-medium'
-                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-              }`}
-            >
-              Local
-            </button>
-            <button
-              onClick={() => setMode('full')}
-              className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                effectiveMode === 'full'
-                  ? 'bg-violet-500/15 text-violet-500 font-medium'
-                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-              }`}
-            >
-              Full
-            </button>
-            <button
-              onClick={() => setExpanded(true)}
-              className="p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 rounded transition-colors"
-              aria-label="Expand graph"
-              title="Expand graph"
-            >
-              <Maximize2 size={13} />
-            </button>
-          </div>
-        </div>
+      <div style={containerStyle}>
+        {renderHeader(fullscreen ? null : () => setExpanded(true))}
         {!expanded && (
-          <GraphView
-            graphData={graphData}
-            loading={loading}
-            activeNotePath={activeNotePath}
-            mode={effectiveMode}
-            onNoteSelect={onNoteSelect}
-            recenterRef={recenterRef}
-            starredPaths={starredPaths}
-          />
+          <div style={{ flex: 1, position: 'relative', overflow: 'hidden', background: 'var(--bg)' }}>
+            <GraphView
+              graphData={graphData}
+              loading={loading}
+              activeNotePath={activeNotePath}
+              mode={graphViewMode}
+              onNoteSelect={fullscreen ? handleOverlayNoteSelect : onNoteSelect}
+              onNodeHover={handleHover}
+              recenterRef={recenterRef}
+              starredPaths={starredPaths}
+            />
+            {tooltip && renderHoverCard(tooltip)}
+          </div>
         )}
+        {renderLegend()}
       </div>
 
-      {/* Full-screen overlay */}
-      {expanded && createPortal(
-        <div
-          className="fixed inset-0 flex items-center justify-center p-6 backdrop-blur-sm"
-          style={{ zIndex: 100000, backgroundColor: 'rgba(0, 0, 0, 0.7)' }}
-          onClick={(e) => { if (e.target === e.currentTarget) { setExpanded(false); setTooltip(null); } }}
-        >
+      {/* Fullscreen portal overlay (only when used as side rail) */}
+      {expanded &&
+        !fullscreen &&
+        createPortal(
           <div
-            className="w-full h-full max-w-[1400px] max-h-[900px] flex flex-col rounded-xl border border-gray-700/50 bg-surface-950 shadow-2xl overflow-hidden"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="graph-overlay-title"
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 100000,
+              background: 'rgba(0,0,0,0.6)',
+              backdropFilter: 'blur(4px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 24,
+            }}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setExpanded(false);
+                setTooltip(null);
+              }
+            }}
           >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700/50 bg-surface-900 rounded-t-xl">
-              <div className="flex items-center gap-2">
-                <Network size={16} className="text-violet-400" />
-                <span id="graph-overlay-title" className="text-sm font-semibold text-gray-200">Knowledge Graph</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => expandedRecenterRef.current?.()}
-                  className="p-1.5 text-gray-400 hover:text-gray-200 rounded transition-colors"
-                  aria-label="Center graph"
-                  title="Center graph"
-                >
-                  <Crosshair size={16} />
-                </button>
-                <button
-                  onClick={() => setExpanded(false)}
-                  className="p-1.5 text-gray-400 hover:text-gray-200 rounded transition-colors"
-                  aria-label="Close overlay"
-                  title="Close overlay"
-                >
-                  <Minimize2 size={16} />
-                </button>
-              </div>
-            </div>
-            <div className="flex-1 bg-surface-950 relative">
-              <GraphView
-                graphData={graphData}
-                loading={loading}
-                activeNotePath={activeNotePath}
-                mode="full"
-                onNoteSelect={handleOverlayNoteSelect}
-                onNodeHover={handleOverlayHover}
-                recenterRef={expandedRecenterRef}
-                starredPaths={starredPaths}
-              />
-              {/* Hover tooltip */}
-              {tooltip && (
-                <div
-                  className="absolute pointer-events-none max-w-[320px] bg-surface-900 border border-gray-700/50 rounded-lg shadow-xl px-4 py-3"
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Graph fullscreen"
+              style={{
+                width: '100%',
+                height: '100%',
+                maxWidth: 1400,
+                maxHeight: 900,
+                display: 'flex',
+                flexDirection: 'column',
+                background: 'var(--bg-1)',
+                border: '1px solid var(--line)',
+                borderRadius: 12,
+                boxShadow: 'var(--shadow-lg)',
+                overflow: 'hidden',
+              }}
+            >
+              <div style={railHeader}>
+                <Icons.Network size={14} style={{ color: 'var(--fg-3)' }} />
+                <span
+                  className="mono"
                   style={{
-                    left: Math.min(tooltip.x + 16, window.innerWidth - 350),
-                    top: Math.max(tooltip.y - 80, 10),
-                    zIndex: 100001,
+                    fontSize: 12,
+                    color: 'var(--fg-2)',
+                    fontFamily: 'var(--font-mono)',
+                    letterSpacing: '0.04em',
                   }}
                 >
-                  <div className="text-sm font-semibold text-violet-400 mb-1 truncate">{tooltip.title}</div>
-                  {tooltip.preview ? (
-                    <div className="text-xs text-gray-400 whitespace-pre-line leading-relaxed line-clamp-3">
-                      {tooltip.preview}
-                    </div>
-                  ) : (
-                    <div className="text-xs text-gray-500 italic">No content</div>
-                  )}
+                  graph
+                </span>
+                <span
+                  className="mono"
+                  style={{ fontSize: 11, color: 'var(--fg-4)', fontFamily: 'var(--font-mono)' }}
+                >
+                  {nodeCount}n {edgeCount}e
+                </span>
+                <div style={{ flex: 1 }} />
+                <div style={segmentedWrap}>
+                  <button
+                    type="button"
+                    onClick={() => setMode('local')}
+                    style={segmentBtn(effectiveMode === 'local')}
+                    disabled={!activeNotePath}
+                  >
+                    local
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMode('global')}
+                    style={segmentBtn(effectiveMode === 'global')}
+                  >
+                    global
+                  </button>
                 </div>
-              )}
+                <div style={{ display: 'flex', gap: 4, marginLeft: 4 }}>
+                  <button
+                    type="button"
+                    style={zoomBtn}
+                    onClick={() => expandedRecenterRef.current?.()}
+                    aria-label="Recenter graph"
+                  >
+                    <Icons.Crosshair size={12} />
+                  </button>
+                  <button
+                    type="button"
+                    style={zoomBtn}
+                    onClick={() => {
+                      setExpanded(false);
+                      setTooltip(null);
+                    }}
+                    aria-label="Close fullscreen"
+                  >
+                    <Icons.X size={12} />
+                  </button>
+                </div>
+              </div>
+              <div style={{ flex: 1, position: 'relative', background: 'var(--bg)' }}>
+                <GraphView
+                  graphData={graphData}
+                  loading={loading}
+                  activeNotePath={activeNotePath}
+                  mode={graphViewMode}
+                  onNoteSelect={handleOverlayNoteSelect}
+                  onNodeHover={handleHover}
+                  recenterRef={expandedRecenterRef}
+                  starredPaths={starredPaths}
+                />
+                {tooltip && renderHoverCard(tooltip)}
+              </div>
+              {renderLegend()}
             </div>
-          </div>
-        </div>,
-        document.body
-      )}
+          </div>,
+          document.body,
+        )}
     </>
   );
 }

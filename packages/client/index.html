@@ -12,17 +12,30 @@
     <meta name="theme-color" content="#0f172a" />
     <title>Kryton</title>
     <script>
-      // Apply theme before first paint to prevent FOUC
+      // Apply prefs before first paint to prevent FOUC
       (function() {
-        var theme = localStorage.getItem('kryton-theme') || 'system';
-        var dark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-        if (dark) document.documentElement.classList.add('dark');
-        else document.documentElement.classList.remove('dark');
+        try {
+          var raw = localStorage.getItem('kryton-prefs');
+          var p = raw ? JSON.parse(raw).state : null;
+          var theme = (p && p.theme) || 'dark';
+          var accent = (p && p.accent) || 'violet';
+          var density = (p && p.density) || 'compact';
+          var root = document.documentElement;
+          root.dataset.theme = theme;
+          root.dataset.accent = accent;
+          root.dataset.density = density;
+          if (theme === 'dark') root.classList.add('dark'); else root.classList.remove('dark');
+        } catch (e) {
+          document.documentElement.dataset.theme = 'dark';
+          document.documentElement.dataset.accent = 'violet';
+          document.documentElement.dataset.density = 'compact';
+          document.documentElement.classList.add('dark');
+        }
       })();
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Serif&display=swap" rel="stylesheet" />
   </head>
   <body class="antialiased">
     <div id="root"></div>

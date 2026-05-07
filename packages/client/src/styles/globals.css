@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./tokens.css";
 
 /* Scan workspace UI package so its Tailwind classes survive purge.
    Without this, classes inside @azrtydxb/ui (e.g. pl-8 in SearchInput)
@@ -27,33 +28,10 @@
 @layer base {
   :root {
     --sidebar-width: 260px;
-    color-scheme: light;
   }
-  .dark {
-    color-scheme: dark;
-  }
-
-  body {
-    @apply bg-white text-gray-900 dark:bg-surface-950 dark:text-gray-100;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  }
-
+  /* Default border tracks the design-system line token. */
   * {
-    @apply border-gray-200 dark:border-gray-700/50;
-  }
-
-  /* Scrollbar styling */
-  ::-webkit-scrollbar {
-    @apply w-1.5;
-  }
-  ::-webkit-scrollbar-track {
-    @apply bg-transparent;
-  }
-  ::-webkit-scrollbar-thumb {
-    @apply bg-gray-300 dark:bg-gray-700 rounded-full;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    @apply bg-gray-400 dark:bg-gray-600;
+    border-color: var(--line);
   }
 }
 
@@ -90,193 +68,188 @@
 }
 
 .cm-editor .cm-gutters {
-  @apply !bg-transparent !border-r-0;
+  background: transparent !important;
+  border-right: 0 !important;
   min-width: 40px;
+  color: var(--fg-4);
+  font-size: 10.5px;
+  font-family: var(--font-mono);
 }
 
 .cm-editor .cm-activeLineGutter,
 .cm-editor .cm-activeLine {
-  @apply !bg-violet-500/5;
+  background-color: var(--accent-soft) !important;
 }
 
 .cm-editor.cm-focused {
   outline: none !important;
 }
 
-/* Light theme CodeMirror */
-.cm-editor .cm-gutters {
-  color: #9ca3af;
-}
+.cm-editor { background-color: var(--bg) !important; }
 
-/* Dark theme CodeMirror */
-.dark .cm-editor {
-  background-color: #0d1117 !important;
-}
-
-.dark .cm-editor .cm-gutters {
-  background-color: #0d1117 !important;
-  color: #4b5563;
-}
-
-/* Markdown preview styling */
+/* Markdown preview styling — token-driven. The .kryton-md wrapper in
+   Preview.tsx provides additional scoped overrides per the design spec. */
 .markdown-preview {
-  @apply text-base leading-relaxed;
+  font-size: 14.5px;
+  line-height: 1.7;
+  color: var(--fg-1);
 }
-
 .markdown-preview h1 {
-  @apply text-3xl font-bold mt-8 mb-4 pb-2 border-b first:mt-0;
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.4px;
+  margin: 32px 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
 }
-
+.markdown-preview h1:first-child { margin-top: 0; }
 .markdown-preview h2 {
-  @apply text-2xl font-semibold mt-6 mb-3;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  margin: 28px 0 10px;
 }
-
 .markdown-preview h3 {
-  @apply text-xl font-semibold mt-5 mb-2;
+  font-size: 16px;
+  font-weight: 600;
+  margin: 20px 0 8px;
 }
-
-.markdown-preview p {
-  @apply mb-4;
-}
-
-.markdown-preview ul,
-.markdown-preview ol {
-  @apply mb-4 pl-6;
-}
-
-.markdown-preview ul {
-  @apply list-disc;
-}
-
-.markdown-preview ol {
-  @apply list-decimal;
-}
-
-.markdown-preview li {
-  @apply mb-1;
-}
-
+.markdown-preview p { margin: 0 0 14px; }
+.markdown-preview ul, .markdown-preview ol { margin: 0 0 14px 20px; }
+.markdown-preview li { margin-bottom: 4px; }
 .markdown-preview code {
-  @apply bg-gray-100 dark:bg-gray-800 rounded px-1.5 py-0.5 text-sm font-mono text-pink-600 dark:text-pink-400;
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  background: var(--code-bg);
+  color: var(--code-fg);
+  padding: 1px 6px;
+  border-radius: 4px;
 }
-
 .markdown-preview pre {
-  @apply bg-gray-100 dark:bg-gray-800/80 rounded-lg p-4 mb-4 overflow-x-auto;
+  font-family: var(--font-mono);
+  background: var(--bg-2);
+  padding: 12px;
+  border-radius: 6px;
+  margin: 0 0 16px;
+  overflow-x: auto;
 }
-
 .markdown-preview pre code {
-  @apply bg-transparent p-0 text-gray-800 dark:text-gray-200;
+  background: transparent;
+  color: var(--fg-1);
+  padding: 0;
 }
-
 .markdown-preview blockquote {
-  @apply border-l-4 border-violet-500 pl-4 italic text-gray-600 dark:text-gray-400 my-4;
+  border-left: 2px solid var(--accent);
+  padding-left: 14px;
+  font-style: italic;
+  color: var(--fg-2);
+  margin: 12px 0;
 }
-
 .markdown-preview a {
-  @apply text-violet-500 dark:text-violet-400 hover:underline;
+  color: var(--link);
+  text-decoration: underline;
+  text-decoration-style: dashed;
+  text-underline-offset: 3px;
 }
-
-.markdown-preview strong {
-  @apply font-semibold;
-}
-
+.markdown-preview strong { font-weight: 600; }
 .markdown-preview hr {
-  @apply my-6 border-gray-200 dark:border-gray-700;
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 24px 0;
 }
-
-.markdown-preview table {
-  @apply w-full mb-4 border-collapse;
+.markdown-preview table { width: 100%; border-collapse: collapse; margin: 0 0 16px; }
+.markdown-preview th, .markdown-preview td {
+  border: 1px solid var(--line);
+  padding: 8px 12px;
+  text-align: left;
 }
-
-.markdown-preview th,
-.markdown-preview td {
-  @apply border px-3 py-2 text-left;
-}
-
-.markdown-preview th {
-  @apply bg-gray-50 dark:bg-gray-800 font-semibold;
-}
-
-.markdown-preview img {
-  @apply max-w-full rounded-lg;
-}
-
-/* Checkbox styling in markdown */
-.markdown-preview input[type="checkbox"] {
-  @apply mr-2 rounded;
-}
+.markdown-preview th { background: var(--bg-2); font-weight: 600; }
+.markdown-preview img { max-width: 100%; border-radius: 6px; }
+.markdown-preview input[type="checkbox"] { margin-right: 8px; }
 
 /* Wiki link styling in preview */
 .wiki-link {
-  @apply text-violet-500 dark:text-violet-400 hover:underline cursor-pointer font-medium;
+  color: var(--link);
+  text-decoration: underline;
+  text-decoration-style: dashed;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  font-weight: 500;
 }
+.wiki-link:hover { color: var(--accent); }
 
 /* Broken wiki link styling */
 .wiki-link-broken {
-  @apply text-red-500 dark:text-red-400;
-  text-decoration: underline wavy red;
+  color: var(--accent-danger);
+  text-decoration: underline wavy var(--accent-danger);
   text-underline-offset: 3px;
 }
 
 /* Embed styling in preview */
 .embed-note {
-  @apply my-4 border rounded-lg bg-gray-50 dark:bg-surface-900/50 overflow-hidden;
+  margin: 16px 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-1);
+  overflow: hidden;
 }
 
 .embed-note .embed-note-header {
-  @apply px-4 py-2 bg-gray-100 dark:bg-gray-800/50 border-b text-sm font-medium text-gray-600 dark:text-gray-400;
+  padding: 8px 14px;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--fg-3);
 }
 
 .embed-note .embed-note-header .wiki-link {
   @apply font-medium;
 }
 
-.embed-note > *:not(.embed-note-header) {
-  @apply px-4;
-}
-
-.embed-note > *:last-child {
-  @apply pb-3;
-}
-
-.embed-note.embed-loading {
-  @apply opacity-60;
-}
-
+.embed-note > *:not(.embed-note-header) { padding-left: 14px; padding-right: 14px; }
+.embed-note > *:last-child { padding-bottom: 12px; }
+.embed-note.embed-loading { opacity: 0.6; }
 .embed-note-loading-text {
-  @apply text-xs text-gray-400 italic px-4 py-2;
+  font-size: 11px;
+  color: var(--fg-4);
+  font-style: italic;
+  padding: 8px 14px;
+  font-family: var(--font-mono);
 }
 
-.embed-image {
-  @apply my-4 rounded-lg overflow-hidden;
-}
+.embed-image { margin: 16px 0; border-radius: 6px; overflow: hidden; }
+.embed-image img { max-width: 100%; border-radius: 6px; box-shadow: var(--shadow-md); }
 
-.embed-image img {
-  @apply max-w-full rounded-lg shadow-sm;
-}
-
-/* Keyboard shortcut badge */
-.kbd {
-  @apply inline-block bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-xs font-mono;
-}
-
-/* Vim command bar - show the : / ? input panel at bottom of editor */
+/* Vim command bar */
 .cm-vim-panel {
-  @apply bg-surface-900 border-t border-gray-700/50 text-gray-200 text-sm font-mono px-2 py-1;
+  background: var(--bg-1);
+  border-top: 1px solid var(--line);
+  color: var(--fg-1);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  padding: 4px 8px;
 }
 .cm-vim-panel input {
-  @apply bg-transparent text-gray-200 outline-none font-mono text-sm;
+  background: transparent;
+  color: var(--fg-1);
+  outline: none;
+  font-family: var(--font-mono);
+  font-size: 12px;
 }
 
 /* Autocomplete dropdown */
 .cm-tooltip-autocomplete {
-  @apply !bg-white dark:!bg-gray-800 !border !border-gray-200 dark:!border-gray-700 !rounded-lg !shadow-lg !overflow-hidden;
+  background: var(--bg-1) !important;
+  border: 1px solid var(--line-strong) !important;
+  border-radius: 8px !important;
+  box-shadow: var(--shadow-lg) !important;
+  overflow: hidden !important;
 }
-
-.cm-tooltip-autocomplete ul li {
-  @apply !px-3 !py-1.5 !text-sm;
-}
-
+.cm-tooltip-autocomplete ul li { padding: 6px 12px !important; font-size: 13px !important; }
 .cm-tooltip-autocomplete ul li[aria-selected="true"] {
-  @apply !bg-violet-500 !text-white;
+  background: var(--accent-soft) !important;
+  color: var(--accent) !important;
 }

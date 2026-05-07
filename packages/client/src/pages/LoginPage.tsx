@@ -1,9 +1,128 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent, type CSSProperties, type ReactNode, type InputHTMLAttributes } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { authApi } from '../lib/api';
 import { authClient } from '../lib/auth-client';
+import { Icons } from '../components/Icons';
 
 type Tab = 'signin' | 'register';
+
+const monoFamily = 'var(--font-mono)';
+const displayFamily = 'var(--font-display)';
+
+const labelStyle: CSSProperties = {
+  fontFamily: monoFamily,
+  fontSize: 11,
+  color: 'var(--fg-3)',
+  letterSpacing: '0.06em',
+  textTransform: 'lowercase',
+};
+
+const inputBaseStyle: CSSProperties = {
+  padding: '10px 12px',
+  borderRadius: 6,
+  background: 'var(--bg-input)',
+  border: '1px solid var(--line)',
+  color: 'var(--fg)',
+  fontSize: 13,
+  fontFamily: monoFamily,
+  outline: 'none',
+  width: '100%',
+  boxSizing: 'border-box',
+};
+
+function applyFocus(e: React.FocusEvent<HTMLInputElement>) {
+  e.currentTarget.style.borderColor = 'var(--accent)';
+  e.currentTarget.style.boxShadow = '0 0 0 3px var(--accent-soft)';
+}
+function applyBlur(e: React.FocusEvent<HTMLInputElement>) {
+  e.currentTarget.style.borderColor = 'var(--line)';
+  e.currentTarget.style.boxShadow = 'none';
+}
+
+interface FieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value' | 'style'> {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}
+
+function Field({ label, value, onChange, ...rest }: FieldProps) {
+  return (
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+      <span style={labelStyle}>{label}</span>
+      <input
+        {...rest}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        style={inputBaseStyle}
+        onFocus={applyFocus}
+        onBlur={applyBlur}
+      />
+    </label>
+  );
+}
+
+const primaryBtnStyle: CSSProperties = {
+  padding: '10px 16px',
+  borderRadius: 6,
+  background: 'var(--accent)',
+  color: 'var(--accent-fg)',
+  fontFamily: monoFamily,
+  fontSize: 12.5,
+  fontWeight: 600,
+  letterSpacing: '0.04em',
+  textTransform: 'uppercase',
+  border: 'none',
+  cursor: 'pointer',
+  width: '100%',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 8,
+};
+
+const secondaryBtnStyle: CSSProperties = {
+  padding: '10px 14px',
+  borderRadius: 6,
+  background: 'var(--bg-2)',
+  border: '1px solid var(--line)',
+  color: 'var(--fg-1)',
+  fontFamily: monoFamily,
+  fontSize: 12,
+  textTransform: 'uppercase',
+  letterSpacing: '0.04em',
+  cursor: 'pointer',
+  width: '100%',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 8,
+};
+
+function PrimaryButton({ disabled, children, type = 'submit', onClick }: { disabled?: boolean; children: ReactNode; type?: 'button' | 'submit'; onClick?: () => void }) {
+  return (
+    <button
+      type={type}
+      disabled={disabled}
+      onClick={onClick}
+      style={{ ...primaryBtnStyle, opacity: disabled ? 0.5 : 1, cursor: disabled ? 'not-allowed' : 'pointer' }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function SecondaryButton({ disabled, children, onClick, type = 'button' }: { disabled?: boolean; children: ReactNode; onClick?: () => void; type?: 'button' | 'submit' }) {
+  return (
+    <button
+      type={type}
+      disabled={disabled}
+      onClick={onClick}
+      style={{ ...secondaryBtnStyle, opacity: disabled ? 0.5 : 1, cursor: disabled ? 'not-allowed' : 'pointer' }}
+    >
+      {children}
+    </button>
+  );
+}
 
 export default function LoginPage() {
   const { login, register, loginWithGoogle, loginWithGithub } = useAuth();
@@ -13,7 +132,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [registrationMode, setRegistrationMode] = useState<string>('open');
 
-  // 2FA state — shown after successful password auth when 2FA is required
+  // 2FA state
   const [twoFactorRequired, setTwoFactorRequired] = useState(false);
   const [totpCode, setTotpCode] = useState('');
   const [useBackupCode, setUseBackupCode] = useState(false);
@@ -140,310 +259,340 @@ export default function LoginPage() {
     setError('');
     setTwoFactorRequired(false);
     setTotpCode('');
+    setForgotMode(false);
   };
 
+  const eyebrow = tab === 'signin' ? '// authenticate' : '// register';
+  const heading = tab === 'signin' ? 'Welcome back' : 'Create your account';
+
   return (
-    <div className="min-h-screen bg-surface-950 flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="flex justify-center mb-10">
-          <img src="/logo.png" alt="Kryton" className="h-20 w-auto" />
+    <div
+      className="bg-grid"
+      style={{
+        minHeight: '100vh',
+        width: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'var(--bg)',
+        position: 'relative',
+        overflow: 'hidden',
+        padding: '24px 16px',
+      }}
+    >
+      {/* glow orb */}
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute',
+          width: 600,
+          height: 600,
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, var(--accent-soft) 0%, transparent 70%)',
+          top: -200,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          pointerEvents: 'none',
+        }}
+      />
+
+      <div style={{ width: 380, maxWidth: '100%', position: 'relative', zIndex: 1 }}>
+        {/* Brand */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'center', marginBottom: 28 }}>
+          <Icons.Logo size={32} />
+          <span style={{ fontFamily: displayFamily, fontSize: 24, fontWeight: 600, color: 'var(--fg)', letterSpacing: -0.4 }}>
+            kryton
+          </span>
         </div>
 
         {/* Card */}
-        <div className="bg-surface-900 rounded-xl border border-gray-700/50 p-6">
-          {/* Tabs */}
-          <div className="flex mb-6 border-b border-gray-700/50">
-            <button
-              type="button"
-              onClick={() => switchTab('signin')}
-              className={`flex-1 pb-3 text-sm font-medium transition-colors ${
-                tab === 'signin'
-                  ? 'text-violet-400 border-b-2 border-violet-400'
-                  : 'text-gray-400 hover:text-gray-300'
-              }`}
-            >
-              Sign In
-            </button>
-            <button
-              type="button"
-              onClick={() => switchTab('register')}
-              className={`flex-1 pb-3 text-sm font-medium transition-colors ${
-                tab === 'register'
-                  ? 'text-violet-400 border-b-2 border-violet-400'
-                  : 'text-gray-400 hover:text-gray-300'
-              }`}
-            >
-              Register
-            </button>
+        <div
+          style={{
+            background: 'var(--bg-1)',
+            border: '1px solid var(--line)',
+            borderRadius: 12,
+            padding: 28,
+            boxShadow: 'var(--shadow-md)',
+          }}
+        >
+          {/* Eyebrow */}
+          <div
+            style={{
+              fontFamily: monoFamily,
+              fontSize: 11,
+              color: 'var(--fg-4)',
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              marginBottom: 4,
+            }}
+          >
+            {eyebrow}
           </div>
 
-          {/* Error message */}
+          {/* Heading */}
+          <h2
+            style={{
+              margin: 0,
+              fontFamily: displayFamily,
+              fontSize: 22,
+              color: 'var(--fg)',
+              letterSpacing: -0.3,
+              marginBottom: 22,
+              fontWeight: 600,
+            }}
+          >
+            {heading}
+          </h2>
+
+          {/* Tab strip */}
+          <div style={{ display: 'flex', gap: 0, marginBottom: 22, borderBottom: '1px solid var(--line)' }}>
+            {(['signin', 'register'] as Tab[]).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => switchTab(t)}
+                style={{
+                  flex: 1,
+                  padding: '8px 0',
+                  fontSize: 12,
+                  fontFamily: monoFamily,
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  color: tab === t ? 'var(--accent)' : 'var(--fg-3)',
+                  borderTop: 'none',
+                  borderLeft: 'none',
+                  borderRight: 'none',
+                  borderBottom: tab === t ? '2px solid var(--accent)' : '2px solid transparent',
+                  marginBottom: -1,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                }}
+              >
+                {t === 'signin' ? 'sign in' : 'register'}
+              </button>
+            ))}
+          </div>
+
+          {/* Error */}
           {error && (
-            <div className="mb-4 rounded-lg bg-red-500/10 border border-red-500/30 px-4 py-3 text-sm text-red-400">
+            <div
+              style={{
+                marginBottom: 14,
+                padding: '8px 10px',
+                border: '1px solid var(--accent-danger)',
+                background: 'oklch(0.7 0.2 25 / 0.12)',
+                borderRadius: 6,
+                color: 'var(--accent-danger)',
+                fontFamily: monoFamily,
+                fontSize: 11.5,
+              }}
+            >
               {error}
             </div>
           )}
 
-          {/* 2FA verification step */}
+          {/* 2FA */}
           {tab === 'signin' && twoFactorRequired && (
-            <form onSubmit={handleTwoFactorVerify} className="space-y-4">
-              <div className="text-center mb-2">
-                <p className="text-sm text-gray-300 font-medium">Two-Factor Authentication</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {useBackupCode
-                    ? 'Enter one of your backup recovery codes.'
-                    : 'Enter the 6-digit code from your authenticator app.'}
-                </p>
-              </div>
+            <form onSubmit={handleTwoFactorVerify} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
+                <div style={{ ...labelStyle, textTransform: 'uppercase', color: 'var(--fg-4)', letterSpacing: '0.08em', marginBottom: 4 }}>
+                  // two-factor
+                </div>
+                <div style={{ fontFamily: monoFamily, fontSize: 12, color: 'var(--fg-2)' }}>
+                  {useBackupCode ? 'enter one of your backup codes' : 'enter the 6-digit code from your authenticator'}
+                </div>
+              </div>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <span style={labelStyle}>{useBackupCode ? 'backup code' : 'code'}</span>
                 <input
                   type="text"
                   inputMode={useBackupCode ? 'text' : 'numeric'}
                   pattern={useBackupCode ? undefined : '[0-9]*'}
                   maxLength={useBackupCode ? 20 : 6}
                   value={totpCode}
-                  onChange={e => setTotpCode(useBackupCode ? e.target.value : e.target.value.replace(/\D/g, ''))}
+                  onChange={(e) => setTotpCode(useBackupCode ? e.target.value : e.target.value.replace(/\D/g, ''))}
                   required
                   autoFocus
-                  placeholder={useBackupCode ? 'Enter backup code' : '000000'}
-                  className={`w-full rounded-lg border border-gray-700/50 bg-surface-950 px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500 ${useBackupCode ? '' : 'tracking-widest text-center text-lg'}`}
+                  placeholder={useBackupCode ? 'enter backup code' : '000000'}
+                  style={{
+                    ...inputBaseStyle,
+                    letterSpacing: useBackupCode ? 'normal' : '0.4em',
+                    textAlign: useBackupCode ? 'left' : 'center',
+                    fontSize: useBackupCode ? 13 : 16,
+                  }}
+                  onFocus={applyFocus}
+                  onBlur={applyBlur}
                 />
-              </div>
-              <button
-                type="submit"
-                disabled={loading || totpCode.length < (useBackupCode ? 1 : 6)}
-                className="w-full rounded-lg bg-violet-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-violet-600 active:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {loading ? 'Verifying...' : 'Verify'}
-              </button>
-              <div className="flex justify-between items-center">
+              </label>
+              <PrimaryButton disabled={loading || totpCode.length < (useBackupCode ? 1 : 6)}>
+                {loading ? 'verifying…' : 'verify'}
+              </PrimaryButton>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: monoFamily, fontSize: 11 }}>
                 <button
                   type="button"
-                  onClick={() => { setUseBackupCode(v => !v); setTotpCode(''); setError(''); }}
-                  className="text-xs text-violet-400 hover:text-violet-300"
+                  onClick={() => { setUseBackupCode((v) => !v); setTotpCode(''); setError(''); }}
+                  style={{ background: 'transparent', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontFamily: monoFamily, fontSize: 11, textDecoration: 'underline', textDecorationStyle: 'dashed', textUnderlineOffset: 3 }}
                 >
-                  {useBackupCode ? 'Use authenticator code' : 'Use backup code instead'}
+                  {useBackupCode ? 'use authenticator code' : 'use backup code'}
                 </button>
                 <button
                   type="button"
                   onClick={() => { setTwoFactorRequired(false); setTotpCode(''); setError(''); }}
-                  className="text-xs text-gray-500 hover:text-gray-300"
+                  style={{ background: 'transparent', border: 'none', color: 'var(--fg-4)', cursor: 'pointer', fontFamily: monoFamily, fontSize: 11 }}
                 >
-                  Back
+                  back
                 </button>
               </div>
             </form>
           )}
 
-          {/* Sign In form */}
+          {/* Sign In */}
           {tab === 'signin' && !twoFactorRequired && !forgotMode && (
-            <form onSubmit={handleSignIn} className="space-y-4">
-              <div>
-                <label htmlFor="signin-email" className="block text-sm font-medium text-gray-300 mb-1">
-                  Email
-                </label>
-                <input
-                  id="signin-email"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-lg border border-gray-700/50 bg-surface-950 px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
-                  placeholder="you@example.com"
-                />
-              </div>
-              <div>
-                <label htmlFor="signin-password" className="block text-sm font-medium text-gray-300 mb-1">
-                  Password
-                </label>
-                <input
-                  id="signin-password"
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full rounded-lg border border-gray-700/50 bg-surface-950 px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
-                  placeholder="Enter your password"
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full rounded-lg bg-violet-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-violet-600 active:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {loading ? 'Signing in...' : 'Sign In'}
-              </button>
+            <form onSubmit={handleSignIn} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <Field label="email" type="email" required value={email} onChange={setEmail} placeholder="you@example.com" />
+              <Field label="password" type="password" required value={password} onChange={setPassword} placeholder="••••••••••••" />
 
-              {/* Passkey sign in */}
-              <button
-                type="button"
-                onClick={handlePasskeySignIn}
-                disabled={loading}
-                className="w-full flex items-center justify-center gap-2 rounded-lg border border-gray-700/50 bg-surface-950 px-4 py-2.5 text-sm font-medium text-gray-300 hover:bg-surface-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25z" />
-                </svg>
-                Sign in with Passkey
-              </button>
+              <PrimaryButton disabled={loading}>
+                {loading ? 'signing in…' : 'sign in'}
+                <Icons.Chevron size={12} />
+              </PrimaryButton>
 
-              {smtpEnabled && (
-                <button type="button" onClick={() => { setForgotMode(true); setForgotSent(false); setError(''); }}
-                  className="w-full text-center text-xs text-violet-400 hover:text-violet-300 mt-2">
-                  Forgot password?
-                </button>
+              {/* OR divider */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '2px 0' }}>
+                <div style={{ flex: 1, height: 1, background: 'var(--line)' }} />
+                <span style={{ fontFamily: monoFamily, fontSize: 10.5, color: 'var(--fg-4)', letterSpacing: '0.08em' }}>OR</span>
+                <div style={{ flex: 1, height: 1, background: 'var(--line)' }} />
+              </div>
+
+              <SecondaryButton onClick={handlePasskeySignIn} disabled={loading}>
+                <Icons.Sparkle size={13} style={{ color: 'var(--accent)' }} />
+                continue with passkey
+              </SecondaryButton>
+
+              {googleEnabled && (
+                <SecondaryButton onClick={handleOAuthGoogle} disabled={loading}>
+                  continue with google
+                </SecondaryButton>
               )}
-              {!smtpEnabled && (
-                <p className="text-center text-xs text-gray-500 mt-2">
-                  Forgot password? Contact your admin.
+              {githubEnabled && (
+                <SecondaryButton onClick={handleOAuthGithub} disabled={loading}>
+                  continue with github
+                </SecondaryButton>
+              )}
+
+              {smtpEnabled ? (
+                <button
+                  type="button"
+                  onClick={() => { setForgotMode(true); setForgotSent(false); setError(''); }}
+                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: monoFamily, fontSize: 11, color: 'var(--fg-3)', textAlign: 'center', textDecoration: 'underline', textDecorationStyle: 'dashed', textUnderlineOffset: 3 }}
+                >
+                  forgot password?
+                </button>
+              ) : (
+                <p style={{ margin: 0, textAlign: 'center', fontFamily: monoFamily, fontSize: 11, color: 'var(--fg-4)' }}>
+                  forgot password? contact your admin.
                 </p>
               )}
             </form>
           )}
 
-          {/* Forgot password form */}
+          {/* Forgot password */}
           {tab === 'signin' && forgotMode && !twoFactorRequired && (
-            <div className="mt-4 p-4 border border-gray-700/50 rounded-lg">
-              <h4 className="text-sm font-medium text-gray-200 mb-2">Reset Password</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ ...labelStyle, textTransform: 'uppercase', color: 'var(--fg-4)', letterSpacing: '0.08em' }}>
+                // reset password
+              </div>
               {forgotSent ? (
-                <p className="text-xs text-green-400">If an account exists with that email, a reset link has been sent.</p>
+                <p style={{ margin: 0, fontFamily: monoFamily, fontSize: 12, color: 'var(--accent-good)' }}>
+                  if an account exists with that email, a reset link has been sent.
+                </p>
               ) : (
-                <form onSubmit={handleForgotPassword} className="space-y-2">
-                  <input type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} required
-                    placeholder="Enter your email" className="w-full bg-surface-950 border border-gray-700/50 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500/50" />
-                  <div className="flex gap-2">
-                    <button type="submit" className="flex-1 bg-violet-500 text-white rounded-lg py-2 text-xs font-medium hover:bg-violet-600">Send Reset Link</button>
-                    <button type="button" onClick={() => setForgotMode(false)} className="text-xs text-gray-400 hover:text-gray-200">Cancel</button>
+                <form onSubmit={handleForgotPassword} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <Field label="email" type="email" required value={forgotEmail} onChange={setForgotEmail} placeholder="you@example.com" />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <PrimaryButton>send reset link</PrimaryButton>
                   </div>
                 </form>
               )}
+              <button
+                type="button"
+                onClick={() => setForgotMode(false)}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: monoFamily, fontSize: 11, color: 'var(--fg-3)', textAlign: 'center' }}
+              >
+                back to sign in
+              </button>
             </div>
           )}
 
-          {/* Register form */}
+          {/* Register */}
           {tab === 'register' && (
-            <form onSubmit={handleRegister} className="space-y-4">
-              <div>
-                <label htmlFor="reg-name" className="block text-sm font-medium text-gray-300 mb-1">
-                  Name
-                </label>
-                <input
-                  id="reg-name"
-                  type="text"
-                  required
-                  value={regName}
-                  onChange={(e) => setRegName(e.target.value)}
-                  className="w-full rounded-lg border border-gray-700/50 bg-surface-950 px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
-                  placeholder="Your name"
-                />
-              </div>
-              <div>
-                <label htmlFor="reg-email" className="block text-sm font-medium text-gray-300 mb-1">
-                  Email
-                </label>
-                <input
-                  id="reg-email"
-                  type="email"
-                  required
-                  value={regEmail}
-                  onChange={(e) => setRegEmail(e.target.value)}
-                  className="w-full rounded-lg border border-gray-700/50 bg-surface-950 px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
-                  placeholder="you@example.com"
-                />
-              </div>
-              <div>
-                <label htmlFor="reg-password" className="block text-sm font-medium text-gray-300 mb-1">
-                  Password
-                </label>
-                <input
-                  id="reg-password"
-                  type="password"
-                  required
-                  value={regPassword}
-                  onChange={(e) => setRegPassword(e.target.value)}
-                  className="w-full rounded-lg border border-gray-700/50 bg-surface-950 px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
-                  placeholder="Create a password"
-                />
-              </div>
+            <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <Field label="name" type="text" required value={regName} onChange={setRegName} placeholder="your name" />
+              <Field label="email" type="email" required value={regEmail} onChange={setRegEmail} placeholder="you@example.com" />
+              <Field label="password" type="password" required value={regPassword} onChange={setRegPassword} placeholder="create a password" />
               {registrationMode === 'invite-only' && (
-                <div>
-                  <label htmlFor="reg-invite" className="block text-sm font-medium text-gray-300 mb-1">
-                    Invite Code
-                  </label>
-                  <input
-                    id="reg-invite"
-                    type="text"
-                    required
-                    value={inviteCode}
-                    onChange={(e) => setInviteCode(e.target.value)}
-                    className="w-full rounded-lg border border-gray-700/50 bg-surface-950 px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
-                    placeholder="Enter your invite code"
-                  />
-                </div>
+                <Field label="invite code" type="text" required value={inviteCode} onChange={setInviteCode} placeholder="enter your invite code" />
               )}
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full rounded-lg bg-violet-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-violet-600 active:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {loading ? 'Creating account...' : 'Create Account'}
-              </button>
+              <PrimaryButton disabled={loading}>
+                {loading ? 'creating account…' : 'create account'}
+                <Icons.Chevron size={12} />
+              </PrimaryButton>
+
+              {(googleEnabled || githubEnabled) && (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '2px 0' }}>
+                    <div style={{ flex: 1, height: 1, background: 'var(--line)' }} />
+                    <span style={{ fontFamily: monoFamily, fontSize: 10.5, color: 'var(--fg-4)', letterSpacing: '0.08em' }}>OR</span>
+                    <div style={{ flex: 1, height: 1, background: 'var(--line)' }} />
+                  </div>
+                  {googleEnabled && (
+                    <SecondaryButton onClick={handleOAuthGoogle} disabled={loading}>
+                      continue with google
+                    </SecondaryButton>
+                  )}
+                  {githubEnabled && (
+                    <SecondaryButton onClick={handleOAuthGithub} disabled={loading}>
+                      continue with github
+                    </SecondaryButton>
+                  )}
+                </>
+              )}
             </form>
           )}
 
-          {/* OAuth divider */}
-          {(googleEnabled || githubEnabled) && <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-700/50" />
-            </div>
-            <div className="relative flex justify-center text-xs">
-              <span className="bg-surface-900 px-3 text-gray-500">or continue with</span>
-            </div>
-          </div>}
+          {/* Footer */}
+          <div
+            style={{
+              marginTop: 20,
+              paddingTop: 14,
+              borderTop: '1px dashed var(--line)',
+              fontFamily: monoFamily,
+              fontSize: 11.5,
+              color: 'var(--fg-4)',
+              textAlign: 'center',
+            }}
+          >
+            self-hosted · your notes, your server
+          </div>
+        </div>
 
-          {/* OAuth buttons -- only show if providers are configured */}
-          {(googleEnabled || githubEnabled) && <div className="space-y-3">
-            {googleEnabled && <button
-              type="button"
-              onClick={handleOAuthGoogle}
-              className="flex w-full items-center justify-center gap-3 rounded-lg border border-gray-700/50 bg-surface-950 px-4 py-2.5 text-sm font-medium text-gray-300 hover:bg-surface-800 transition-colors"
-            >
-              <svg className="h-5 w-5" viewBox="0 0 24 24">
-                <path
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
-                  fill="#4285F4"
-                />
-                <path
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                  fill="#34A853"
-                />
-                <path
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                  fill="#FBBC05"
-                />
-                <path
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                  fill="#EA4335"
-                />
-              </svg>
-              Sign in with Google
-            </button>}
-            {githubEnabled && <button
-              type="button"
-              onClick={handleOAuthGithub}
-              className="flex w-full items-center justify-center gap-3 rounded-lg border border-gray-700/50 bg-surface-950 px-4 py-2.5 text-sm font-medium text-gray-300 hover:bg-surface-800 transition-colors"
-            >
-              <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-                <path
-                  fillRule="evenodd"
-                  clipRule="evenodd"
-                  d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.522 2 12 2z"
-                />
-              </svg>
-              Sign in with GitHub
-            </button>}
-          </div>}
+        {/* Status row */}
+        <div
+          style={{
+            marginTop: 18,
+            display: 'flex',
+            gap: 14,
+            justifyContent: 'center',
+            fontFamily: monoFamily,
+            fontSize: 11,
+            color: 'var(--fg-3)',
+          }}
+        >
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span className="dot pulse" style={{ background: 'var(--accent-good)' }} />
+            server online
+          </span>
+          <span style={{ color: 'var(--fg-4)' }}>v4.4.0-pre.9</span>
         </div>
       </div>
     </div>

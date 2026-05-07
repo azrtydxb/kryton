@@ -1,7 +1,7 @@
 import { FileNode } from '../../lib/api';
 import { Sidebar } from '../Sidebar/Sidebar';
 import { ResizeHandle } from './ResizeHandle';
-import { PanelLeft } from 'lucide-react';
+import { Icons } from '../Icons';
 
 interface SharedNote {
   id: string;
@@ -52,20 +52,35 @@ export function SidebarLayout({
       {/* Mobile overlay */}
       {mobileMenuOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-30 md:hidden"
+          className="fixed inset-0 z-30 md:hidden"
+          style={{ background: 'oklch(0 0 0 / 0.5)' }}
           onClick={() => setMobileMenuOpen(false)}
         />
       )}
 
-      {/* Collapsed bar (desktop only) */}
-      <div className={`hidden ${sidebarOpen ? 'md:hidden' : 'md:flex'} flex-col items-center w-10 flex-shrink-0 border-r bg-gray-50 dark:bg-surface-900 py-2`}>
+      {/* Collapsed bar (desktop only) — shown when the full sidebar is closed */}
+      <div
+        className={`hidden ${sidebarOpen ? 'md:hidden' : 'md:flex'} flex-col items-center flex-shrink-0`}
+        style={{
+          width: 36,
+          background: 'var(--bg-1)',
+          borderRight: '1px solid var(--line)',
+          padding: '6px 0',
+        }}
+      >
         <button
           onClick={() => setSidebarOpen(true)}
-          className="btn-ghost p-2"
           aria-label="Open sidebar"
           title="Open sidebar (Ctrl+B)"
+          style={{
+            width: 28, height: 28, borderRadius: 5,
+            color: 'var(--fg-3)',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--fg)'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-3)'; }}
         >
-          <PanelLeft size={18} />
+          <Icons.PanelLeft size={14} />
         </button>
       </div>
 
@@ -76,39 +91,36 @@ export function SidebarLayout({
           md:translate-x-0
           ${sidebarOpen ? '' : 'md:!w-0 md:overflow-hidden md:border-r-0'}
           fixed md:relative inset-y-0 left-0 z-40 md:z-0
-          w-72 flex-shrink-0
-          bg-gray-50 dark:bg-surface-900 border-r
+          flex-shrink-0
         `}
-        style={sidebarOpen ? { width: `${sidebarWidth}px` } : undefined}
+        style={{
+          width: sidebarOpen ? `${sidebarWidth}px` : undefined,
+          background: 'var(--bg-1)',
+          borderRight: '1px solid var(--line)',
+          display: 'flex', flexDirection: 'column',
+        }}
       >
-        <div className="hidden md:flex items-center px-2 py-1.5 border-b">
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="btn-ghost p-1.5"
-            aria-label="Close sidebar"
-            title="Close sidebar (Ctrl+B)"
-          >
-            <PanelLeft size={16} />
-          </button>
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          <Sidebar
+            tree={tree}
+            activeNotePath={activeNotePath}
+            onSelect={onSelect}
+            onCreateNote={onCreateNote}
+            onDeleteNote={onDeleteNote}
+            onRenameNote={onRenameNote}
+            onCreateFolder={onCreateFolder}
+            onDeleteFolder={onDeleteFolder}
+            onRenameFolder={onRenameFolder}
+            onDailyNote={onDailyNote}
+            onCreateFromTemplate={onCreateFromTemplate}
+            starredPaths={starredPaths}
+            onToggleStar={onToggleStar}
+            sharedNotes={sharedNotes}
+            onShare={onShare}
+            onCollapse={() => setSidebarOpen(false)}
+            beforeFooter={children}
+          />
         </div>
-        <Sidebar
-          tree={tree}
-          activeNotePath={activeNotePath}
-          onSelect={onSelect}
-          onCreateNote={onCreateNote}
-          onDeleteNote={onDeleteNote}
-          onRenameNote={onRenameNote}
-          onCreateFolder={onCreateFolder}
-          onDeleteFolder={onDeleteFolder}
-          onRenameFolder={onRenameFolder}
-          onDailyNote={onDailyNote}
-          onCreateFromTemplate={onCreateFromTemplate}
-          starredPaths={starredPaths}
-          onToggleStar={onToggleStar}
-          sharedNotes={sharedNotes}
-          onShare={onShare}
-        />
-        {children}
       </aside>
 
       {/* Sidebar resize handle */}

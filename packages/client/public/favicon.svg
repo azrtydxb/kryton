@@ -1,11 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="512" height="512">
   <defs>
     <linearGradient id="kryton-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#a78bfa"/>
-      <stop offset="100%" stop-color="#fb923c"/>
+      <stop offset="0%" stop-color="#a78bfa"></stop>
+      <stop offset="100%" stop-color="#fb923c"></stop>
     </linearGradient>
   </defs>
-  <circle cx="32" cy="32" r="26" fill="none" stroke="url(#kryton-gradient)" stroke-width="1.5" opacity="0.7"/>
-  <path d="M22 16 L22 48 M22 32 L42 16 M22 32 L42 48" stroke="url(#kryton-gradient)" stroke-width="3" stroke-linecap="round" fill="none"/>
-  <circle cx="32" cy="32" r="3" fill="#fb923c"/>
+  <circle cx="32" cy="32" r="26" fill="none" stroke="url(#kryton-gradient)" stroke-width="1.5" opacity="0.7"></circle>
+  <path d="M22 16 L22 48 M22 32 L42 16 M22 32 L42 48" stroke="url(#kryton-gradient)" stroke-width="3" stroke-linecap="round" fill="none"></path>
+  <circle cx="32" cy="32" r="3" fill="#fb923c"></circle>
 </svg>

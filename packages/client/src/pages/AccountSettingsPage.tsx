@@ -1,14 +1,16 @@
 import { useState, useCallback, FormEvent } from 'react';
-import { Settings, User, Fingerprint, Key, Shield, X } from 'lucide-react';
+import { Settings, User, Fingerprint, Key, Shield, X, Palette } from 'lucide-react';
 import { authApi } from '../lib/api';
 import { PasskeyManagerContent } from '../components/Security/PasskeyManager';
 import { ApiKeyManager } from '../components/ApiKeys/ApiKeyManager';
 import { TwoFactorManager } from '../components/Security/TwoFactorManager';
+import { AppearanceSection } from '../components/Settings/AppearanceSection';
 
-type Tab = 'profile' | 'passkeys' | 'api-keys' | '2fa';
+type Tab = 'profile' | 'appearance' | 'passkeys' | 'api-keys' | '2fa';
 
 const TABS: { key: Tab; label: string; icon: typeof User }[] = [
   { key: 'profile', label: 'Profile', icon: User },
+  { key: 'appearance', label: 'Appearance', icon: Palette },
   { key: 'passkeys', label: 'Passkeys', icon: Fingerprint },
   { key: 'api-keys', label: 'API Keys', icon: Key },
   { key: '2fa', label: '2FA', icon: Shield },
@@ -150,6 +152,7 @@ export default function AccountSettingsPage({ onClose }: { onClose: () => void }
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
           {tab === 'profile' && <ProfileSection />}
+          {tab === 'appearance' && <AppearanceSection />}
           {tab === 'passkeys' && <PasskeyManagerContent />}
           {tab === 'api-keys' && <ApiKeyManager />}
           {tab === '2fa' && <TwoFactorManager />}

@@ -4,8 +4,9 @@ import { api, NoteVersion } from '../../lib/api';
 import { Preview } from '../Preview/Preview';
 import { OutgoingLinksPanel } from '../OutgoingLinks/OutgoingLinksPanel';
 import { BacklinksPanel } from '../Backlinks/BacklinksPanel';
-import { Breadcrumbs } from '@azrtydxb/ui';
-import { BookOpen, Pencil, Share2, Star, FileDown, History, X, RotateCcw, Eye } from 'lucide-react';
+import { EditorTabStrip, ModePills } from '../Editor/Editor';
+import { Icons } from '../Icons';
+import { usePrefs, type EditorLayout } from '../../stores/prefsStore';
 
 interface PreviewModeViewProps {
   activeNote: { path: string; title: string; content: string };
@@ -65,31 +66,58 @@ function VersionPreviewModal({ notePath, version, allNotes, onClose, onRestore }
   }, [notePath, version.timestamp]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 50,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(0,0,0,0.55)',
+      }}
+      onClick={onClose}
+    >
       <div
-        className="bg-white dark:bg-surface-800 rounded-lg shadow-xl w-[700px] max-w-[95vw] max-h-[80vh] flex flex-col"
+        style={{
+          width: 700, maxWidth: '95vw', maxHeight: '80vh',
+          display: 'flex', flexDirection: 'column',
+          background: 'var(--bg-1)', border: '1px solid var(--line)',
+          borderRadius: 12, boxShadow: 'var(--shadow-lg)',
+        }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b dark:border-surface-700">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            Version from {new Date(version.timestamp).toLocaleString()}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '10px 14px', borderBottom: '1px solid var(--line)',
+        }}>
+          <span className="mono" style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--fg-1)' }}>
+            version · {new Date(version.timestamp).toLocaleString()}
           </span>
-          <div className="flex items-center gap-2">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <button
               onClick={() => onRestore(version.timestamp)}
-              className="flex items-center gap-1 px-3 py-1 text-xs bg-violet-600 hover:bg-violet-700 text-white rounded transition-colors"
+              className="mono"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '4px 10px', borderRadius: 5,
+                background: 'var(--accent)', color: 'var(--accent-fg)',
+                fontFamily: 'var(--font-mono)', fontSize: 11.5, letterSpacing: '0.04em', textTransform: 'uppercase',
+              }}
             >
-              <RotateCcw size={12} />
-              Restore
+              <Icons.History size={12} /> restore
             </button>
-            <button onClick={onClose} className="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
-              <X size={16} />
+            <button
+              onClick={onClose}
+              style={{
+                width: 28, height: 28, borderRadius: 5,
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                color: 'var(--fg-3)',
+              }}
+            >
+              <Icons.X size={14} />
             </button>
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto p-4">
-          {loading && <p className="text-sm text-gray-400">Loading...</p>}
-          {error && <p className="text-sm text-red-500">{error}</p>}
+        <div style={{ flex: 1, overflowY: 'auto', padding: 4 }}>
+          {loading && <p className="mono" style={{ padding: 16, fontSize: 12, color: 'var(--fg-3)' }}>loading…</p>}
+          {error && <p className="mono" style={{ padding: 16, fontSize: 12, color: 'var(--accent-danger)' }}>{error}</p>}
           {content !== null && !loading && (
             <Preview
               content={content}
@@ -116,6 +144,7 @@ export function PreviewModeView({
   const [previewVersion, setPreviewVersion] = useState<NoteVersion | null>(null);
   const [restoring, setRestoring] = useState<number | null>(null);
   const historyPanelRef = useRef<HTMLDivElement | null>(null);
+  const setPref = usePrefs((s) => s.setPref);
 
   // Load versions when the panel opens
   useEffect(() => {
@@ -153,80 +182,149 @@ export function PreviewModeView({
     }
   }
 
-  return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2 border-b bg-gray-50/50 dark:bg-surface-900/50">
-        <div className="flex items-center">
-          <BookOpen size={14} className="text-gray-400 mr-2 shrink-0" />
-          <Breadcrumbs path={activeNote.path} onFolderClick={onNoteSelect} />
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={onEdit} className="p-1 rounded text-gray-400 hover:text-violet-500 transition-colors" title="Edit note (Ctrl+E)">
-            <Pencil size={14} />
-          </button>
-          <button onClick={onShare} className="p-1 rounded text-gray-400 hover:text-violet-500 transition-colors" title="Share note">
-            <Share2 size={14} />
-          </button>
-          <button
-            onClick={onToggleStar}
-            className={`p-1 rounded transition-colors ${isStarred ? 'text-yellow-500 hover:text-yellow-600' : 'text-gray-400 hover:text-yellow-500'}`}
-            title={isStarred ? 'Unstar (Ctrl+Shift+S)' : 'Star (Ctrl+Shift+S)'}
-          >
-            <Star size={14} fill={isStarred ? 'currentColor' : 'none'} />
-          </button>
-          <button onClick={onPdfExport} className="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors" title="Export as PDF">
-            <FileDown size={14} />
-          </button>
-          {/* History button */}
-          <div className="relative" ref={historyPanelRef}>
-            <button
-              onClick={() => setHistoryOpen((o) => !o)}
-              className={`p-1 rounded transition-colors ${historyOpen ? 'text-violet-500' : 'text-gray-400 hover:text-violet-500'}`}
-              title="Version history"
-            >
-              <History size={14} />
-            </button>
+  // Mode pill change: switching to "edit" or "split" enters edit mode.
+  // "preview" keeps the user here.
+  const handleModeChange = (next: EditorLayout) => {
+    setPref('layout', next);
+    if (next === 'edit' || next === 'split') {
+      onEdit();
+    }
+  };
 
+  const headerBtn = (props: { onClick: () => void; title: string; children: React.ReactNode; active?: boolean }) => (
+    <button
+      onClick={props.onClick}
+      title={props.title}
+      style={{
+        width: 28, height: 28, borderRadius: 5,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        color: props.active ? 'var(--accent-warn)' : 'var(--fg-3)',
+        background: 'transparent',
+        transition: 'background 120ms ease, color 120ms ease',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = 'var(--bg-hover)';
+        if (!props.active) e.currentTarget.style.color = 'var(--fg)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = 'transparent';
+        if (!props.active) e.currentTarget.style.color = 'var(--fg-3)';
+      }}
+    >
+      {props.children}
+    </button>
+  );
+
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, background: 'var(--bg)' }}>
+      {/* Tab strip + actions row */}
+      <div style={{ display: 'flex', alignItems: 'stretch', borderBottom: '1px solid var(--line)', background: 'var(--bg)' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <EditorTabStrip
+            activePath={activeNote.path}
+            activeTitle={activeNote.title}
+            dirty={false}
+          />
+        </div>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '0 12px', height: 32,
+        }}>
+          <ModePills value="preview" onChange={handleModeChange} />
+          {headerBtn({
+            onClick: onEdit,
+            title: 'Edit note (Ctrl+E)',
+            children: <Icons.Edit size={13} />,
+          })}
+          {headerBtn({
+            onClick: onShare,
+            title: 'Share note',
+            children: <Icons.Share size={13} />,
+          })}
+          {headerBtn({
+            onClick: onToggleStar,
+            title: isStarred ? 'Unstar' : 'Star',
+            active: isStarred,
+            children: isStarred ? <Icons.StarOn size={13} /> : <Icons.Star size={13} />,
+          })}
+          {headerBtn({
+            onClick: onPdfExport,
+            title: 'Export as PDF',
+            children: <Icons.Download size={13} />,
+          })}
+          <div style={{ position: 'relative' }} ref={historyPanelRef}>
+            {headerBtn({
+              onClick: () => setHistoryOpen((o) => !o),
+              title: 'Version history',
+              active: historyOpen,
+              children: <Icons.History size={13} />,
+            })}
             {historyOpen && (
-              <div className="absolute right-0 top-7 z-40 w-72 bg-white dark:bg-surface-800 border dark:border-surface-700 rounded-lg shadow-xl overflow-hidden">
-                <div className="flex items-center justify-between px-3 py-2 border-b dark:border-surface-700">
-                  <span className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">Version History</span>
-                  <button onClick={() => setHistoryOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-                    <X size={14} />
+              <div
+                style={{
+                  position: 'absolute', right: 0, top: 32, zIndex: 40,
+                  width: 280, background: 'var(--bg-1)', border: '1px solid var(--line)',
+                  borderRadius: 8, boxShadow: 'var(--shadow-md)', overflow: 'hidden',
+                }}
+              >
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '8px 10px', borderBottom: '1px solid var(--line)',
+                  fontFamily: 'var(--font-mono)', fontSize: 10.5,
+                  letterSpacing: '0.08em', textTransform: 'uppercase',
+                  color: 'var(--fg-4)',
+                }}>
+                  <span>// version history</span>
+                  <button onClick={() => setHistoryOpen(false)} style={{ color: 'var(--fg-3)' }}>
+                    <Icons.X size={12} />
                   </button>
                 </div>
-                <div className="max-h-64 overflow-y-auto">
+                <div style={{ maxHeight: 280, overflowY: 'auto' }}>
                   {loadingVersions && (
-                    <p className="text-xs text-gray-400 text-center py-4">Loading...</p>
+                    <p className="mono" style={{ padding: 14, fontSize: 11, color: 'var(--fg-4)', textAlign: 'center' }}>loading…</p>
                   )}
                   {!loadingVersions && versions.length === 0 && (
-                    <p className="text-xs text-gray-400 text-center py-4">No saved versions yet.</p>
+                    <p className="mono" style={{ padding: 14, fontSize: 11, color: 'var(--fg-4)', textAlign: 'center' }}>no saved versions yet.</p>
                   )}
                   {!loadingVersions && versions.map((v) => (
-                    <div key={v.timestamp} className="flex items-center justify-between px-3 py-2 hover:bg-gray-50 dark:hover:bg-surface-700 border-b dark:border-surface-700/50 last:border-0">
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate">
-                          {timeAgo(v.timestamp)}
-                        </span>
-                        <span className="text-[10px] text-gray-400">
-                          {new Date(v.timestamp).toLocaleString()} &middot; {(v.size / 1024).toFixed(1)} KB
+                    <div
+                      key={v.timestamp}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '8px 10px', borderBottom: '1px solid var(--line)',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                        <span style={{ fontSize: 12, color: 'var(--fg-1)' }}>{timeAgo(v.timestamp)}</span>
+                        <span className="mono" style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-4)' }}>
+                          {new Date(v.timestamp).toLocaleString()} · {(v.size / 1024).toFixed(1)} KB
                         </span>
                       </div>
-                      <div className="flex items-center gap-1 shrink-0 ml-2">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0, marginLeft: 8 }}>
                         <button
                           onClick={() => setPreviewVersion(v)}
-                          className="p-1 rounded text-gray-400 hover:text-violet-500 transition-colors"
                           title="Preview this version"
+                          style={{ width: 22, height: 22, borderRadius: 4, color: 'var(--fg-3)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--accent)'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--fg-3)'; }}
                         >
-                          <Eye size={12} />
+                          <Icons.Eye size={12} />
                         </button>
                         <button
                           onClick={() => handleRestore(v.timestamp)}
                           disabled={restoring === v.timestamp}
-                          className="p-1 rounded text-gray-400 hover:text-violet-500 transition-colors disabled:opacity-50"
                           title="Restore this version"
+                          style={{
+                            width: 22, height: 22, borderRadius: 4, color: 'var(--fg-3)',
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                            opacity: restoring === v.timestamp ? 0.5 : 1,
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--accent)'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--fg-3)'; }}
                         >
-                          <RotateCcw size={12} />
+                          <Icons.History size={12} />
                         </button>
                       </div>
                     </div>
@@ -237,18 +335,23 @@ export function PreviewModeView({
           </div>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto" ref={previewRef}>
-        <Preview
-          content={activeNote.content}
-          onLinkClick={onLinkClick}
-          allNotes={allNotes}
-          onCreateNote={onCreateNote}
-          notePath={activeNote.path}
-          getCodeFenceRenderer={getCodeFenceRenderer}
-        />
+
+      {/* Body + Backlinks rail */}
+      <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
+        <div style={{ flex: 1, overflowY: 'auto', minWidth: 0 }} ref={previewRef}>
+          <Preview
+            content={activeNote.content}
+            onLinkClick={onLinkClick}
+            allNotes={allNotes}
+            onCreateNote={onCreateNote}
+            notePath={activeNote.path}
+            getCodeFenceRenderer={getCodeFenceRenderer}
+          />
+        </div>
+        <BacklinksPanel rail notePath={activeNote.path} onNoteSelect={onNoteSelect} />
       </div>
+
       <OutgoingLinksPanel content={activeNote.content} allNotes={allNotes} onNoteSelect={onNoteSelect} onCreateNote={onCreateNote} />
-      <BacklinksPanel notePath={activeNote.path} onNoteSelect={onNoteSelect} />
 
       {previewVersion && (
         <VersionPreviewModal
