@@ -5,7 +5,6 @@ import { Preview } from '../Preview/Preview';
 // OutgoingLinksPanel intentionally removed to match design handoff —
 // outgoing-link metadata is exposed through EditorMeta's `N outgoing`
 // token instead of a dedicated bottom panel.
-import { BacklinksPanel } from '../Backlinks/BacklinksPanel';
 import { EditorTabStrip, ModePills } from '../Editor/Editor';
 import { Icons } from '../Icons';
 import { usePrefs, type EditorLayout } from '../../stores/prefsStore';
@@ -20,7 +19,9 @@ interface PreviewModeViewProps {
   onToggleStar: () => void;
   /** retained for parent API compatibility; not surfaced in the prototype topbar. */
   onPdfExport?: () => void;
-  onNoteSelect: (path: string) => void;
+  /** retained for parent API compatibility; backlinks live inline at the
+     bottom of the preview body, no separate rail. */
+  onNoteSelect?: (path: string) => void;
   onLinkClick: (name: string) => void;
   onCreateNote: (name: string) => void;
   onRestored?: () => void;
@@ -139,7 +140,7 @@ function VersionPreviewModal({ notePath, version, allNotes, onClose, onRestore }
 export function PreviewModeView({
   activeNote, isStarred, allNotes, previewRef,
   onEdit, onShare, onToggleStar,
-  onNoteSelect, onLinkClick, onCreateNote, onRestored, getCodeFenceRenderer,
+  onLinkClick, onCreateNote, onRestored, getCodeFenceRenderer,
 }: PreviewModeViewProps) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [versions, setVersions] = useState<NoteVersion[]>([]);
@@ -342,7 +343,6 @@ export function PreviewModeView({
             getCodeFenceRenderer={getCodeFenceRenderer}
           />
         </div>
-        <BacklinksPanel rail notePath={activeNote.path} onNoteSelect={onNoteSelect} />
       </div>
 
       {previewVersion && (

@@ -9,7 +9,6 @@ import { Preview } from '../Preview/Preview';
 // OutgoingLinksPanel intentionally removed to match design handoff: the
 // editor surface has only the tab strip + body + EditorMeta (28px). Outgoing
 // link metadata is surfaced through EditorMeta's `N outgoing` token.
-import { BacklinksPanel } from '../Backlinks/BacklinksPanel';
 import { Icons } from '../Icons';
 import { usePrefs } from '../../stores/prefsStore';
 
@@ -34,7 +33,9 @@ interface EditModeViewProps {
   onPdfExport: () => void;
   onContentChange: (content: string) => void;
   onCursorStateChange: (state: EditorCursorState) => void;
-  onNoteSelect: (path: string) => void;
+  /** retained for parent API compatibility; edit/split views don't render
+     a backlinks panel — backlinks live inside the preview body's tail. */
+  onNoteSelect?: (path: string) => void;
   onLinkClick: (name: string) => void;
   onCreateNote: (name: string) => void;
 }
@@ -46,7 +47,7 @@ export function EditModeView({
   getCodeFenceRenderer,
   onAutoSave, onCancel, onToggleStar, onPdfExport,
   onContentChange, onCursorStateChange,
-  onNoteSelect, onLinkClick, onCreateNote,
+  onLinkClick, onCreateNote,
 }: EditModeViewProps) {
   const hasChanges = editContent !== originalContent;
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('unchanged');
@@ -206,17 +207,12 @@ export function EditModeView({
                 getCodeFenceRenderer={getCodeFenceRenderer}
               />
             </div>
-            {layout === 'preview' && (
-              <BacklinksPanel rail notePath={activeNote.path} onNoteSelect={onNoteSelect} />
-            )}
           </div>
         )}
       </div>
-
-      {/* Backlinks (only when not shown as the rail) */}
-      {layout !== 'preview' && (
-        <BacklinksPanel notePath={activeNote.path} onNoteSelect={onNoteSelect} />
-      )}
+      {/* Per prototype/app/editor.jsx, edit & split views have no separate
+         backlinks panel — backlinks live inline at the bottom of the
+         preview body when rendered in preview mode. */}
     </div>
   );
 }

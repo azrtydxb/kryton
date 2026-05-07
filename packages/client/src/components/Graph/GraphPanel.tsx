@@ -404,7 +404,7 @@ export function GraphPanel({
       <div style={containerStyle}>
         {renderHeader(fullscreen ? null : () => setExpanded(true))}
         {!expanded && (
-          <div className="bg-grid" style={{ flex: 1, position: 'relative', overflow: 'hidden', background: 'var(--bg)' }}>
+          <div className="bg-grid" style={{ flex: 1, position: 'relative', overflow: 'hidden', backgroundColor: 'var(--bg)' }}>
             <GraphView
               graphData={graphData}
               loading={loading}
@@ -513,7 +513,7 @@ export function GraphPanel({
                   <Icons.X size={12} />
                 </button>
               </div>
-              <div className="bg-grid" style={{ flex: 1, position: 'relative', background: 'var(--bg)' }}>
+              <div className="bg-grid" style={{ flex: 1, position: 'relative', backgroundColor: 'var(--bg)' }}>
                 <GraphView
                   graphData={graphData}
                   loading={loading}
