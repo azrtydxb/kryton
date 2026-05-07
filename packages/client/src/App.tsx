@@ -36,6 +36,7 @@ import { MobileGraphOverlay } from './components/Graph/MobileGraphOverlay';
 import { EditModeView } from './components/Views/EditModeView';
 import { PreviewModeView } from './components/Views/PreviewModeView';
 import { AllNotesView } from './components/Views/AllNotesView';
+import { TagsView } from './components/Views/TagsView';
 import { GraphPanel } from './components/Graph/GraphPanel';
 import { EmptyStateView } from './components/Views/EmptyStateView';
 import { ModalsContainer } from './components/Modals/ModalsContainer';
@@ -278,6 +279,8 @@ function AppContent() {
                 fullscreen
                 mode="global"
               />
+            ) : view === 'tags' ? (
+              <TagsView onNoteSelect={(p) => { handleNoteSelect(p); setView('note'); }} />
             ) : notes.activeNote ? (
               editing ? (
                 <EditModeView

@@ -265,6 +265,9 @@ export function Sidebar({
   const handleGraphClick = useCallback(() => {
     setView(view === 'graph' ? 'note' : 'graph');
   }, [setView, view]);
+  const handleTagsClick = useCallback(() => {
+    setView(view === 'tags' ? 'note' : 'tags');
+  }, [setView, view]);
 
   return (
     <div
@@ -347,6 +350,8 @@ export function Sidebar({
         <NavRow
           icon={<Icons.Hash size={14} />}
           label="Tags"
+          active={view === 'tags'}
+          onClick={handleTagsClick}
         />
       </div>
 

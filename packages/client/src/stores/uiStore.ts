@@ -5,7 +5,7 @@ type SetState<T> = (valueOrUpdater: T | ((prev: T) => T)) => void;
 
 /** Top-level main-pane view selector. Drives whether the editor, all-notes,
  *  or fullscreen graph is rendered between sidebar + right panel. */
-export type MainView = 'note' | 'all' | 'graph';
+export type MainView = 'note' | 'all' | 'graph' | 'tags';
 
 interface UIState {
   // Layout
