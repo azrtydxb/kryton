@@ -650,9 +650,59 @@ export function FileTree({
       {/* Context menu portaled to body */}
       {contextMenu &&
         createPortal(
+          <>
+            <style>{`
+              .kryton-context-menu .kr-mi {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                width: 100%;
+                height: 28px;
+                padding: 0 10px;
+                border-radius: 5px;
+                font-family: var(--font-sans);
+                font-size: 13px;
+                color: var(--fg-1);
+                text-align: left;
+                background: transparent;
+                transition: background 100ms, color 100ms;
+              }
+              .kryton-context-menu .kr-mi svg {
+                color: var(--fg-3);
+                flex-shrink: 0;
+                transition: color 100ms;
+              }
+              .kryton-context-menu .kr-mi:hover { background: var(--bg-hover); color: var(--fg); }
+              .kryton-context-menu .kr-mi:hover svg { color: var(--fg-1); }
+              .kryton-context-menu .kr-mi--danger { color: var(--accent-danger); }
+              .kryton-context-menu .kr-mi--danger svg { color: var(--accent-danger); }
+              .kryton-context-menu .kr-mi--danger:hover {
+                background: color-mix(in oklab, var(--accent-danger) 12%, transparent);
+                color: var(--accent-danger);
+              }
+              .kryton-context-menu .kr-mi--danger:hover svg { color: var(--accent-danger); }
+              .kryton-context-menu .kr-sep {
+                height: 1px;
+                background: var(--line);
+                margin: 4px 4px;
+              }
+            `}</style>
           <div
-            className="fixed bg-white dark:bg-gray-800 border rounded-lg shadow-lg py-1 min-w-[160px]"
-            style={{ left: contextMenu.x, top: contextMenu.y, zIndex: 99999 }}
+            className="fixed kryton-context-menu"
+            style={{
+              left: contextMenu.x,
+              top: contextMenu.y,
+              zIndex: 99999,
+              minWidth: 180,
+              padding: 4,
+              borderRadius: 8,
+              background: "var(--bg-1)",
+              border: "1px solid var(--line-strong)",
+              boxShadow: "var(--shadow-md)",
+              fontFamily: "var(--font-sans)",
+              fontSize: 13,
+              color: "var(--fg-1)",
+            }}
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
@@ -664,7 +714,7 @@ export function FileTree({
                     handleCreate("file", contextMenu.node.path);
                     setContextMenu(null);
                   }}
-                  className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                  className="kr-mi"
                 >
                   <Plus size={14} /> New note here
                 </button>
@@ -674,7 +724,7 @@ export function FileTree({
                     handleCreate("folder", contextMenu.node.path);
                     setContextMenu(null);
                   }}
-                  className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                  className="kr-mi"
                 >
                   <FolderPlus size={14} /> New folder here
                 </button>
@@ -685,12 +735,12 @@ export function FileTree({
                       onShare(contextMenu.node.path, true);
                       setContextMenu(null);
                     }}
-                    className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                    className="kr-mi"
                   >
                     <Share2 size={14} /> Share folder...
                   </button>
                 )}
-                <div className="border-t my-1" />
+                <div className="kr-sep" />
               </>
             )}
             {contextMenu.node.type === "file" && (
@@ -701,7 +751,7 @@ export function FileTree({
                     onToggleStar(contextMenu.node.path);
                     setContextMenu(null);
                   }}
-                  className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                  className="kr-mi"
                 >
                   <Star size={14} /> {starredPaths.has(contextMenu.node.path) ? "Unstar" : "Star"}
                 </button>
@@ -712,12 +762,12 @@ export function FileTree({
                       onShare(contextMenu.node.path, false);
                       setContextMenu(null);
                     }}
-                    className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                    className="kr-mi"
                   >
                     <Share2 size={14} /> Share...
                   </button>
                 )}
-                <div className="border-t my-1" />
+                <div className="kr-sep" />
               </>
             )}
             <button
@@ -731,30 +781,58 @@ export function FileTree({
                 setNewName(name);
                 setContextMenu(null);
               }}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+              className="kr-mi"
             >
               <Pencil size={14} /> Rename
             </button>
             {pendingDelete?.path === contextMenu.node.path ? (
-              <div className="px-3 py-1.5">
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+              <div style={{ padding: "8px 10px" }}>
+                <p
+                  style={{
+                    fontSize: 12,
+                    color: "var(--fg-3)",
+                    marginBottom: 8,
+                    lineHeight: 1.4,
+                  }}
+                >
                   Delete &quot;{contextMenu.node.name}&quot;?
                 </p>
-                <div className="flex gap-2">
+                <div style={{ display: "flex", gap: 6 }}>
                   <button
                     type="button"
                     onClick={() => {
                       handleDeleteConfirmed(contextMenu.node);
                       setContextMenu(null);
                     }}
-                    className="flex-1 text-xs bg-red-500 text-white rounded px-2 py-1 hover:bg-red-600 transition-colors"
+                    style={{
+                      flex: 1,
+                      fontFamily: "var(--font-mono)",
+                      fontSize: 11.5,
+                      letterSpacing: "0.04em",
+                      textTransform: "uppercase",
+                      padding: "5px 8px",
+                      borderRadius: 4,
+                      background: "var(--accent-danger)",
+                      color: "var(--accent-fg)",
+                    }}
                   >
                     Delete
                   </button>
                   <button
                     type="button"
                     onClick={() => setPendingDelete(null)}
-                    className="flex-1 text-xs border rounded px-2 py-1 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    style={{
+                      flex: 1,
+                      fontFamily: "var(--font-mono)",
+                      fontSize: 11.5,
+                      letterSpacing: "0.04em",
+                      textTransform: "uppercase",
+                      padding: "5px 8px",
+                      borderRadius: 4,
+                      background: "var(--bg-2)",
+                      border: "1px solid var(--line)",
+                      color: "var(--fg-2)",
+                    }}
                   >
                     Cancel
                   </button>
@@ -763,15 +841,14 @@ export function FileTree({
             ) : (
               <button
                 type="button"
-                onClick={() => {
-                  setPendingDelete(contextMenu.node);
-                }}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400"
+                onClick={() => setPendingDelete(contextMenu.node)}
+                className="kr-mi kr-mi--danger"
               >
                 <Trash2 size={14} /> Delete
               </button>
             )}
-          </div>,
+          </div>
+          </>,
           document.body,
         )}
     </div>
