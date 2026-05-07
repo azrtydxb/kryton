@@ -25,6 +25,12 @@ import { pluginsModule } from "./modules/plugins/index.js";
 
 interface BuildAppOptions {
   config: AppConfig;
+  /**
+   * If false, the plugins module skips on-disk plugin discovery. Used by
+   * tests and by the OpenAPI snapshot dump so the spec is independent of
+   * which plugins happen to be installed locally.
+   */
+  discoverPlugins?: boolean;
 }
 
 /**
@@ -32,7 +38,10 @@ interface BuildAppOptions {
  * beyond the registered plugins. Used by the entrypoint and by `app.inject()`
  * tests.
  */
-export async function buildApp({ config }: BuildAppOptions): Promise<FastifyInstance> {
+export async function buildApp({
+  config,
+  discoverPlugins = true,
+}: BuildAppOptions): Promise<FastifyInstance> {
   const app = Fastify({
     logger: loggerOptions(config),
     bodyLimit: 10 * 1024 * 1024,
@@ -71,7 +80,7 @@ export async function buildApp({ config }: BuildAppOptions): Promise<FastifyInst
   // pluginsModule accepts an optional notesOps; we leave it at default for
   // now and wire it up in a follow-up once the notes module exposes
   // readNote/writeNote/deleteNote/scanDirectory on its decorator.
-  await app.register(pluginsModule());
+  await app.register(pluginsModule({ autoDiscover: discoverPlugins }));
 
   return app;
 }

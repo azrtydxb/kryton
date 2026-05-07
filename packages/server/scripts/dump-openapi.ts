@@ -42,7 +42,10 @@ async function main(): Promise<void> {
   process.env.OPENAPI_ENABLED = "true";
 
   const config = loadEnv();
-  const app = await buildApp({ config });
+  // discoverPlugins=false so the spec only reflects core, in-tree routes.
+  // Plugin-defined routes are environment-dependent and would cause the
+  // snapshot to drift between machines.
+  const app = await buildApp({ config, discoverPlugins: false });
   await app.ready();
 
   const spec = app.swagger() as Record<string, unknown>;
