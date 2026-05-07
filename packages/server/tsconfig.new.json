@@ -1,0 +1,27 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": [
+    "src/app.ts",
+    "src/server.ts",
+    "src/config/**/*.ts",
+    "src/plugins/zod.ts",
+    "src/plugins/logger.ts",
+    "src/plugins/errors.ts",
+    "src/plugins/prisma.ts",
+    "src/plugins/cedar.ts",
+    "src/plugins/auth.ts",
+    "src/plugins/security.ts",
+    "src/plugins/rate-limit.ts",
+    "src/plugins/multipart.ts",
+    "src/plugins/websocket.ts",
+    "src/plugins/openapi.ts",
+    "src/plugins/telemetry.ts",
+    "src/modules/**/*.ts",
+    "src/lib/errors.ts",
+    "src/lib/version.ts"
+  ],
+  "exclude": ["node_modules", "dist"]
+}

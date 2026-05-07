@@ -1,0 +1,196 @@
+import path from "node:path";
+import fs from "node:fs/promises";
+import fp from "fastify-plugin";
+import type { FastifyPluginAsync, preHandlerHookHandler } from "fastify";
+import { PluginEventBus } from "./services/event-bus.js";
+import { PluginHealthMonitor } from "./services/health-monitor.js";
+import { PluginRouter } from "./services/plugin-router.js";
+import { PluginApiFactory } from "./services/api-factory.js";
+import { PluginManager } from "./services/manager.js";
+import { PluginWebSocket } from "./services/plugin-websocket.js";
+import { PluginStorageService } from "./services/storage.service.js";
+import { PluginRegistryService } from "./services/registry.service.js";
+import { pluginsRoutes } from "./routes/plugins.routes.js";
+import type { NotesOps } from "./services/types.js";
+
+declare module "fastify" {
+  interface FastifyInstance {
+    plugins: {
+      eventBus: PluginEventBus;
+      manager: PluginManager;
+      router: PluginRouter;
+      healthMonitor: PluginHealthMonitor;
+      apiFactory: PluginApiFactory;
+      registry: PluginRegistryService;
+      storage: PluginStorageService;
+      websocket: PluginWebSocket;
+    };
+  }
+}
+
+export interface PluginsModuleOptions {
+  /**
+   * Directory containing plugin packages (each subdir has manifest.json).
+   * Defaults to `<cwd>/plugins`.
+   */
+  pluginsDir?: string;
+  /**
+   * Notes root directory used by the plugin notes API. Defaults to
+   * `<cwd>/notes`.
+   */
+  notesDir?: string;
+  /**
+   * Notes operations bridge. Plugins need read/write access to the notes
+   * tree via the `api.notes` API. The host injects the concrete service
+   * functions here so this module remains free of legacy `services/`
+   * imports.
+   */
+  notesOps?: NotesOps;
+  /**
+   * If true (default), discover plugins on the filesystem and load them
+   * before `app.ready()`. Tests may want to skip this.
+   */
+  autoDiscover?: boolean;
+}
+
+const noopNotesOps: NotesOps = {
+  async readNote() {
+    throw new Error("notesOps not configured");
+  },
+  async writeNote() {
+    throw new Error("notesOps not configured");
+  },
+  async deleteNote() {
+    throw new Error("notesOps not configured");
+  },
+  async scanDirectory() {
+    return [];
+  },
+};
+
+/**
+ * Plugins module — Kryton plugin runtime.
+ *
+ * Decorates `fastify.plugins` with the manager / event bus / etc., exposes
+ * REST endpoints under `/api/plugins`, and a WebSocket channel at
+ * `/ws/plugins` for lifecycle events.
+ */
+const pluginsModuleImpl = (options: PluginsModuleOptions = {}): FastifyPluginAsync =>
+  async (app) => {
+    const pluginsDir =
+      options.pluginsDir ?? path.resolve(process.cwd(), "plugins");
+    const notesDir =
+      options.notesDir ?? path.resolve(process.cwd(), "notes");
+    const notesOps = options.notesOps ?? noopNotesOps;
+
+    await fs.mkdir(pluginsDir, { recursive: true });
+
+    // ── Construct services ─────────────────────────────────────────────
+    const eventBus = new PluginEventBus();
+
+    const authPreHandler: preHandlerHookHandler = async (req) => {
+      await app.auth.requireUser(req);
+    };
+    const pluginRouter = new PluginRouter(app, authPreHandler);
+
+    const managerRef: { instance: PluginManager | null } = { instance: null };
+    const healthMonitor = new PluginHealthMonitor({
+      maxErrors: 5,
+      windowMs: 60_000,
+      onDisable: async (pluginId) => {
+        app.log.warn({ pluginId }, "auto-disabling plugin (excessive errors)");
+        await managerRef.instance?.disablePlugin(pluginId);
+        try {
+          await app.prisma.installedPlugin.update({
+            where: { id: pluginId },
+            data: {
+              enabled: false,
+              state: "error",
+              error: "Auto-disabled: too many errors",
+            },
+          });
+        } catch (err) {
+          app.log.error({ err, pluginId }, "failed to mark plugin disabled");
+        }
+      },
+    });
+
+    const storage = new PluginStorageService(app.prisma);
+    const registry = new PluginRegistryService({
+      warn: (msg) => app.log.warn(msg),
+    });
+
+    const fastifyLogger = {
+      info: (msg: string) => app.log.info(msg),
+      warn: (msg: string) => app.log.warn(msg),
+      error: (msg: string) => app.log.error(msg),
+    };
+
+    const apiFactory = new PluginApiFactory({
+      eventBus,
+      pluginRouter,
+      healthMonitor,
+      storage,
+      prisma: app.prisma,
+      notesDir,
+      notesOps,
+      loggerFactory: (tag: string) => ({
+        info: (msg: string) => app.log.info(`[${tag}] ${msg}`),
+        warn: (msg: string) => app.log.warn(`[${tag}] ${msg}`),
+        error: (msg: string) => app.log.error(`[${tag}] ${msg}`),
+      }),
+    });
+
+    const manager = new PluginManager({
+      pluginsDir,
+      eventBus,
+      pluginRouter,
+      healthMonitor,
+      apiFactory,
+      prisma: app.prisma,
+      logger: fastifyLogger,
+    });
+    managerRef.instance = manager;
+
+    const websocket = new PluginWebSocket(app);
+    manager.setPluginWebSocket(websocket);
+
+    // ── Decorate ───────────────────────────────────────────────────────
+    app.decorate("plugins", {
+      eventBus,
+      manager,
+      router: pluginRouter,
+      healthMonitor,
+      apiFactory,
+      registry,
+      storage,
+      websocket,
+    });
+
+    // ── Register HTTP routes ───────────────────────────────────────────
+    await app.register(
+      pluginsRoutes({ pluginManager: manager, registry, pluginsDir }),
+      { prefix: "/api/plugins" },
+    );
+
+    // ── Discover plugins on disk ───────────────────────────────────────
+    if (options.autoDiscover !== false) {
+      try {
+        await manager.discoverAndLoadPlugins();
+      } catch (err) {
+        app.log.error({ err }, "plugin discovery failed");
+      }
+    }
+
+    app.addHook("onClose", async () => {
+      websocket.close();
+    });
+  };
+
+/**
+ * Public module entrypoint. Wrapped with `fastify-plugin` so the
+ * `app.plugins` decorator escapes the encapsulation boundary and is
+ * visible to siblings + tests that call `app.plugins.manager` directly.
+ */
+export const pluginsModule = (options: PluginsModuleOptions = {}): FastifyPluginAsync =>
+  fp(pluginsModuleImpl(options), { name: "plugins-module" });
