@@ -24,6 +24,16 @@ export interface FileTreeNode {
   children?: FileTreeNode[];
 }
 
+/** Count file leaves under a folder (recursive). Used for the right-aligned
+ *  count chip on each folder row, matching prototype/app/sidebar.jsx. */
+function countLeaves(node: FileTreeNode): number {
+  if (node.type === "file") return 1;
+  if (!node.children) return 0;
+  let n = 0;
+  for (const child of node.children) n += countLeaves(child);
+  return n;
+}
+
 export interface SharedNote {
   id: string;
   ownerUserId: string;
@@ -330,42 +340,28 @@ export function FileTree({
                 />
               )}
               {node.type === "folder" ? (
-                <>
-                  <ChevronRight
-                    size={11}
-                    aria-hidden="true"
-                    className={cn(
-                      "flex-shrink-0 transition-transform duration-150",
-                      isExpanded && "rotate-90",
-                    )}
-                    style={{ color: "var(--fg-4)" }}
-                  />
-                  {isExpanded ? (
-                    <FolderOpen
-                      size={14}
-                      aria-hidden="true"
-                      className="flex-shrink-0"
-                      style={{ color: isActive ? "var(--accent)" : "var(--fg-3)" }}
-                    />
-                  ) : (
-                    <Folder
-                      size={14}
-                      aria-hidden="true"
-                      className="flex-shrink-0"
-                      style={{ color: isActive ? "var(--accent)" : "var(--fg-3)" }}
-                    />
-                  )}
-                </>
-              ) : (
-                <>
-                  <span style={{ width: 11, flexShrink: 0 }} />
-                  <FileText
-                    size={13}
+                isExpanded ? (
+                  <FolderOpen
+                    size={14}
                     aria-hidden="true"
                     className="flex-shrink-0"
-                    style={{ color: isActive ? "var(--accent)" : "var(--fg-3)" }}
+                    style={{ color: "var(--fg-3)" }}
                   />
-                </>
+                ) : (
+                  <Folder
+                    size={14}
+                    aria-hidden="true"
+                    className="flex-shrink-0"
+                    style={{ color: "var(--fg-3)" }}
+                  />
+                )
+              ) : (
+                <FileText
+                  size={13}
+                  aria-hidden="true"
+                  className="flex-shrink-0"
+                  style={{ color: isActive ? "var(--accent)" : "var(--fg-3)" }}
+                />
               )}
               {isRenaming ? (
                 <input
@@ -381,7 +377,31 @@ export function FileTree({
                   onClick={(e) => e.stopPropagation()}
                 />
               ) : (
-                <span className="flex-1 truncate">{displayName}</span>
+                <span
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    textAlign: "left",
+                  }}
+                >
+                  {displayName}
+                </span>
+              )}
+              {node.type === "folder" && node.children && (
+                <span
+                  className="mono"
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 11,
+                    color: "var(--fg-4)",
+                    flexShrink: 0,
+                  }}
+                >
+                  {countLeaves(node)}
+                </span>
               )}
               {node.type === "file" && !isRenaming && (
                 <button

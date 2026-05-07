@@ -1,7 +1,6 @@
-import { useCallback, useMemo, useState, ReactNode } from 'react';
-import { FileNode } from '../../lib/api';
-import { FileTree, FavoritesSection, Resizer } from '@azrtydxb/ui';
-import { TagPane } from '../Tags/TagPane';
+import { useCallback, useEffect, useMemo, useState, ReactNode } from 'react';
+import { api, FileNode, TagData } from '../../lib/api';
+import { FileTree, FavoritesSection } from '@azrtydxb/ui';
 import { useUIStore } from '../../stores/uiStore';
 import { Icons } from '../Icons';
 
@@ -240,15 +239,20 @@ export function Sidebar({
   version = DEFAULT_VERSION,
   beforeFooter,
 }: SidebarProps) {
-  const [tagPaneHeight, setTagPaneHeight] = useState(180);
   const [favOpen, setFavOpen] = useState(true);
   const [filesOpen, setFilesOpen] = useState(true);
   const [tagsOpen, setTagsOpen] = useState(true);
+  const [tags, setTags] = useState<TagData[]>([]);
 
   const noteCount = useMemo(() => countNotes(tree), [tree]);
 
-  const handleTagResize = useCallback((delta: number) => {
-    setTagPaneHeight(h => Math.max(60, Math.min(500, h - delta)));
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getTags()
+      .then((t) => { if (!cancelled) setTags(t); })
+      .catch(() => { if (!cancelled) setTags([]); });
+    return () => { cancelled = true; };
   }, []);
 
   const dispatchCreateRootFile = useCallback(() => {
@@ -431,17 +435,73 @@ export function Sidebar({
           </div>
         )}
 
-        <Resizer orientation="vertical" onResize={handleTagResize} />
-
-        {/* Tags */}
+        {/* Tags — chip cluster per prototype/app/sidebar.jsx Tags section */}
         <div style={{ padding: '0 4px' }}>
-          <SectionHeader open={tagsOpen} setOpen={setTagsOpen} label="Tags" />
+          <SectionHeader
+            open={tagsOpen}
+            setOpen={setTagsOpen}
+            label="Tags"
+            count={tags.length}
+          />
+          {tagsOpen && tags.length > 0 && (
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 4,
+                padding: '2px 6px 12px',
+              }}
+            >
+              {tags.map(({ tag, count }) => (
+                <button
+                  key={tag}
+                  className="mono"
+                  onClick={() => onSelect(`#${tag}`)}
+                  title={`#${tag} (${count})`}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    padding: '3px 7px 3px 6px',
+                    borderRadius: 4,
+                    background: 'var(--bg-2)',
+                    border: '1px solid var(--line)',
+                    color: 'var(--fg-1)',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 11.5,
+                    cursor: 'pointer',
+                    transition: 'border-color 120ms, color 120ms',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.borderColor = 'var(--accent)';
+                    e.currentTarget.style.color = 'var(--accent)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.borderColor = 'var(--line)';
+                    e.currentTarget.style.color = 'var(--fg-1)';
+                  }}
+                >
+                  <span style={{ color: 'var(--fg-3)' }}>#</span>
+                  {tag}
+                  <span style={{ color: 'var(--fg-4)', marginLeft: 2 }}>{count}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {tagsOpen && tags.length === 0 && (
+            <div
+              className="mono"
+              style={{
+                padding: '6px 10px 12px',
+                color: 'var(--fg-4)',
+                fontSize: 11.5,
+                fontStyle: 'italic',
+              }}
+            >
+              no tags yet
+            </div>
+          )}
         </div>
-        {tagsOpen && (
-          <div className="flex-shrink-0 overflow-hidden" style={{ height: `${tagPaneHeight}px` }}>
-            <TagPane onNoteSelect={onSelect} />
-          </div>
-        )}
       </div>
 
       {/* plugin slot — sits between sections and the agents footer */}
