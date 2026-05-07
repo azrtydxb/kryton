@@ -2012,13 +2012,13 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
-                            author: string;
-                            description: string;
-                            icon: string;
+                            author: unknown;
+                            description: unknown;
+                            icon: unknown;
                             id: string;
-                            minKrytonVersion: string;
+                            minKrytonVersion: unknown;
                             name: string;
-                            tags: string[];
+                            tags: unknown;
                             version: string;
                         }[];
                     };

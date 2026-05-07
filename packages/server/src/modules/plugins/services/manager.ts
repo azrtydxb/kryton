@@ -78,7 +78,10 @@ export class PluginManager {
           state,
           error,
           manifest: manifest as unknown as object,
-          enabled: state !== "error" && state !== "unloaded",
+          // Don't overwrite `enabled` here — that's the user's
+          // sticky choice. enable() / disable() set it explicitly.
+          // The previous behaviour reset it on every boot, so a
+          // disabled plugin would re-enable as soon as discovery ran.
         },
       });
     } catch (err) {
@@ -257,6 +260,13 @@ export class PluginManager {
       return; // Plugins directory does not exist
     }
 
+    // Read sticky enabled-state from the DB so plugins that the admin
+    // explicitly disabled stay disabled across restarts.
+    const installed = await this.deps.prisma.installedPlugin.findMany({
+      select: { id: true, enabled: true },
+    });
+    const enabledMap = new Map(installed.map((p) => [p.id, p.enabled]));
+
     const entries = await fs.readdir(this.deps.pluginsDir, { withFileTypes: true });
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
@@ -264,6 +274,11 @@ export class PluginManager {
       try {
         await fs.access(manifestPath);
       } catch {
+        continue;
+      }
+      // Skip plugins the admin disabled. They keep their on-disk
+      // installation but don't activate.
+      if (enabledMap.get(entry.name) === false) {
         continue;
       }
       try {

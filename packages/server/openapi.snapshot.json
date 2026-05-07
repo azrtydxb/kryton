@@ -3274,30 +3274,17 @@
                   "items": {
                     "additionalProperties": false,
                     "properties": {
-                      "author": {
-                        "type": "string"
-                      },
-                      "description": {
-                        "type": "string"
-                      },
-                      "icon": {
-                        "type": "string"
-                      },
+                      "author": {},
+                      "description": {},
+                      "icon": {},
                       "id": {
                         "type": "string"
                       },
-                      "minKrytonVersion": {
-                        "type": "string"
-                      },
+                      "minKrytonVersion": {},
                       "name": {
                         "type": "string"
                       },
-                      "tags": {
-                        "items": {
-                          "type": "string"
-                        },
-                        "type": "array"
-                      },
+                      "tags": {},
                       "version": {
                         "type": "string"
                       }
