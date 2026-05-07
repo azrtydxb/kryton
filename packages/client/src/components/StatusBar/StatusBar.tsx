@@ -20,8 +20,6 @@ interface StatusBarProps {
   encoding?: string;
 }
 
-const dotStyle: CSSProperties = { color: 'var(--fg-4)' };
-
 const railStyle: CSSProperties = {
   flex: 1,
   height: 28,
@@ -57,19 +55,14 @@ export function StatusBar({
       <span>
         <span style={{ color: 'var(--accent)' }}>{outgoingCount}</span> outgoing
       </span>
-      <span style={dotStyle}>·</span>
       <span>
         <span style={{ color: 'var(--accent-2)' }}>{backlinksCount}</span> backlinks
       </span>
-      <span style={dotStyle}>·</span>
       <span>{tagsCount} tags</span>
       <div style={{ flex: 1 }} />
       <span>{wordCount.toLocaleString()} words</span>
-      <span style={dotStyle}>·</span>
       <span>Ln {line}, Col {col}</span>
-      <span style={dotStyle}>·</span>
       <span>{encoding}</span>
-      <span style={dotStyle}>·</span>
       <span>Markdown</span>
     </div>
   );
