@@ -32,6 +32,9 @@ jobs:
       - name: Verify @azrtydxb/core generated files are up to date
         run: npm run verify-generated --workspace=packages/core
 
+      - name: Build shared packages (core, core-react, ui)
+        run: npm run build:core
+
       - name: TypeCheck
         run: npm run typecheck
 
