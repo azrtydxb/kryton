@@ -1,6 +1,5 @@
 import { FileNode } from '../../lib/api';
 import { Sidebar } from '../Sidebar/Sidebar';
-import { ResizeHandle } from './ResizeHandle';
 import { Icons } from '../Icons';
 
 interface SharedNote {
@@ -40,7 +39,7 @@ interface SidebarLayoutProps {
 export function SidebarLayout({
   sidebarOpen, setSidebarOpen,
   mobileMenuOpen, setMobileMenuOpen,
-  sidebarWidth, onSidebarResize,
+  sidebarWidth,
   tree, activeNotePath, starredPaths, sharedNotes,
   onSelect, onCreateNote, onDeleteNote, onRenameNote,
   onCreateFolder, onDeleteFolder, onRenameFolder,
@@ -123,8 +122,8 @@ export function SidebarLayout({
         </div>
       </aside>
 
-      {/* Sidebar resize handle */}
-      {sidebarOpen && <ResizeHandle direction="horizontal" onResize={onSidebarResize} />}
+      {/* Sidebar resize handle removed per design — sidebar uses a fixed
+         260px width and is toggled via the brand-row collapse button. */}
     </>
   );
 }
