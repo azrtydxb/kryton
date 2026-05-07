@@ -215,6 +215,7 @@ export function FileTree({
         : "";
       if (node.path === draggedParent) return;
       e.preventDefault();
+      e.stopPropagation();
       e.dataTransfer.dropEffect = "move";
       setDragOverPath(node.path);
     },
@@ -230,6 +231,7 @@ export function FileTree({
   const handleDrop = useCallback(
     async (e: React.DragEvent, targetNode: FileTreeNode) => {
       e.preventDefault();
+      e.stopPropagation();
       setDragOverPath(null);
       const sourcePath = e.dataTransfer.getData("text/plain") || draggedPath;
       if (!sourcePath || targetNode.type !== "folder") return;
@@ -255,6 +257,42 @@ export function FileTree({
         await onRenameNote(sourcePath, newPath);
       }
       setExpanded((prev) => new Set(prev).add(targetNode.path));
+    },
+    [draggedPath, draggedType, onRenameNote, onRenameFolder],
+  );
+
+  /** Drop on the tree's empty area → move source to the root. */
+  const handleRootDragOver = useCallback(
+    (e: React.DragEvent) => {
+      if (!draggedPath) return;
+      // Already at root → no-op (don't accept the drop)
+      if (!draggedPath.includes("/")) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      // Clear any folder hover highlight so the user sees we'll drop to root.
+      setDragOverPath(null);
+    },
+    [draggedPath],
+  );
+
+  const handleRootDrop = useCallback(
+    async (e: React.DragEvent) => {
+      e.preventDefault();
+      const sourcePath = e.dataTransfer.getData("text/plain") || draggedPath;
+      if (!sourcePath || !sourcePath.includes("/")) return;
+      const filename = sourcePath.split("/").pop()!;
+      if (draggedType === "folder") {
+        await onRenameFolder(sourcePath, filename);
+        setExpanded((prev) => {
+          const next = new Set(prev);
+          next.delete(sourcePath);
+          next.add(filename);
+          return next;
+        });
+      } else {
+        await onRenameNote(sourcePath, filename);
+      }
+      setDragOverPath(null);
     },
     [draggedPath, draggedType, onRenameNote, onRenameFolder],
   );
@@ -498,7 +536,11 @@ export function FileTree({
   return (
     <div className="h-full flex flex-col" onClick={() => setContextMenu(null)}>
       {/* File tree */}
-      <div className="flex-1 overflow-y-auto py-1">
+      <div
+        className="flex-1 overflow-y-auto py-1"
+        onDragOver={handleRootDragOver}
+        onDrop={handleRootDrop}
+      >
         {creating && creating.parentPath === "" && (
           <div className="flex items-center gap-1 px-2 py-1 mx-1" style={{ paddingLeft: "8px" }}>
             {creating.type === "file" ? (
