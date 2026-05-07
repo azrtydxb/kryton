@@ -136,10 +136,16 @@ export interface NoteVersionContent {
 const BASE = '/api';
 
 export async function request<T>(url: string, options?: RequestInit): Promise<T> {
+  // Only set Content-Type when we actually have a JSON body — Fastify
+  // rejects requests with content-type:application/json and an empty
+  // body (FST_ERR_CTP_EMPTY_JSON_BODY), which breaks bodyless POSTs
+  // such as /api/daily.
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
     ...(options?.headers as Record<string, string>),
   };
+  if (options?.body !== undefined && options?.body !== null && headers['Content-Type'] === undefined) {
+    headers['Content-Type'] = 'application/json';
+  }
   const res = await fetch(`${BASE}${url}`, {
     ...options,
     credentials: 'include',
