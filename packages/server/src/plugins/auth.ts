@@ -1,10 +1,8 @@
 import fp from "fastify-plugin";
 import type { FastifyRequest } from "fastify";
 import { fromNodeHeaders } from "better-auth/node";
-import { auth, type Auth } from "../auth.js";
+import { auth, type Auth } from "../modules/identity/auth-config.js";
 import { AuthError, ForbiddenError } from "../lib/errors.js";
-import { validateApiKey } from "../services/apiKeyService.js";
-import { validateToken as validateAgentToken } from "../services/agent.js";
 
 export interface AuthUser {
   id: string;
@@ -75,7 +73,7 @@ export const authPlugin = fp(async (app) => {
       // Personal Access Token (kryton_ prefix)
       if (authHeader?.startsWith("Bearer kryton_")) {
         const rawKey = authHeader.slice(7);
-        const keyData = await validateApiKey(rawKey);
+        const keyData = await app.identity.apiKey.validate(rawKey);
         if (!keyData) return null;
 
         const user = await prisma.user.findUnique({
@@ -97,7 +95,7 @@ export const authPlugin = fp(async (app) => {
       // Agent token
       if (authHeader?.startsWith("Bearer ")) {
         const rawToken = authHeader.slice(7);
-        const agentValidation = await validateAgentToken(rawToken);
+        const agentValidation = await app.agents.service.validateToken(rawToken);
         if (agentValidation) {
           const owner = await prisma.user.findUnique({
             where: { id: agentValidation.ownerUserId },
@@ -178,7 +176,7 @@ export const authPlugin = fp(async (app) => {
     },
 
     async authenticateWsToken(token) {
-      const agentValidation = await validateAgentToken(token);
+      const agentValidation = await app.agents.service.validateToken(token);
       if (agentValidation) {
         return { userId: agentValidation.ownerUserId, agentId: agentValidation.agentId };
       }

@@ -4,6 +4,8 @@ import type { HttpMethod, PluginRouteHandler } from "./types.js";
 interface RouteEntry {
   method: HttpMethod;
   path: string;
+  /** Updated on each re-registration so disable/enable swaps the live handler. */
+  handler: PluginRouteHandler;
 }
 
 /**
@@ -39,10 +41,21 @@ export class PluginRouter {
     routePath: string,
     handler: PluginRouteHandler,
   ): void {
-    // If we previously disabled this plugin, re-enable it on (re)registration.
+    // Re-enabling on (re)registration.
     this.disabledPlugins.delete(pluginId);
 
+    const entries = this.routes.get(pluginId) ?? [];
+    const existing = entries.find((e) => e.method === method && e.path === routePath);
+
+    if (existing) {
+      // Plugin was previously registered (and possibly disabled). Swap the
+      // live handler in-place — no new Fastify route, no duplicate-path crash.
+      existing.handler = handler;
+      return;
+    }
+
     const fullPath = this.joinPath(`/api/plugins/${pluginId}`, routePath);
+    const entry: RouteEntry = { method, path: routePath, handler };
 
     const preHandlers: preHandlerHookHandler[] = [];
     if (this.authPreHandler) preHandlers.push(this.authPreHandler);
@@ -52,19 +65,18 @@ export class PluginRouter {
       method: method.toUpperCase() as Uppercase<HttpMethod>,
       url: fullPath,
       preHandler: preHandlers,
-      handler: async (request, reply) => {
-        return handler(request, reply);
-      },
+      handler: async (request, reply) => entry.handler(request, reply),
     });
 
-    const entries = this.routes.get(pluginId) ?? [];
-    entries.push({ method, path: routePath });
+    entries.push(entry);
     this.routes.set(pluginId, entries);
   }
 
   removeAllForPlugin(pluginId: string): void {
+    // Mark plugin as disabled — preHandler short-circuits all of its routes
+    // with 404. Route entries are kept so a subsequent enable can swap
+    // handlers back in via `register()` without a duplicate-path crash.
     this.disabledPlugins.add(pluginId);
-    this.routes.delete(pluginId);
   }
 
   getRoutesForPlugin(pluginId: string): RouteEntry[] {

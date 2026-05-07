@@ -1,7 +1,24 @@
+import fp from "fastify-plugin";
 import type { FastifyPluginAsync } from "fastify";
 import { AgentService } from "./services/agent.service.js";
 import { agentsRoutes } from "./routes/agents.routes.js";
 import { mcpRoutes } from "./mcp/server.js";
+
+declare module "fastify" {
+  interface FastifyInstance {
+    agents: {
+      service: AgentService;
+    };
+  }
+}
+
+const agentsModuleImpl: FastifyPluginAsync = async (app) => {
+  const agentService = new AgentService(app);
+  app.decorate("agents", { service: agentService });
+
+  await app.register(agentsRoutes({ agentService }), { prefix: "/api/agents" });
+  await app.register(mcpRoutes, { prefix: "/api/mcp" });
+};
 
 /**
  * Agents module — agent CRUD, bearer token minting/revocation, and the MCP
@@ -10,10 +27,10 @@ import { mcpRoutes } from "./mcp/server.js";
  * Routes:
  *   - /api/agents/*   — session-authenticated agent management
  *   - /api/mcp        — Personal Access Token authenticated MCP transport
+ *
+ * Wrapped with `fastify-plugin` so `app.agents.service` is visible to
+ * siblings (notably `plugins/auth.ts` for agent-token validation).
  */
-export const agentsModule: FastifyPluginAsync = async (app) => {
-  const agentService = new AgentService(app);
-
-  await app.register(agentsRoutes({ agentService }), { prefix: "/api/agents" });
-  await app.register(mcpRoutes, { prefix: "/api/mcp" });
-};
+export const agentsModule: FastifyPluginAsync = fp(agentsModuleImpl, {
+  name: "agents-module",
+});

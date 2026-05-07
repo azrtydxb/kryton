@@ -1,12 +1,20 @@
+import path from "node:path";
+import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { betterAuth } from "better-auth";
 import { passkey } from "@better-auth/passkey";
 import { twoFactor } from "better-auth/plugins";
 import { prismaAdapter } from "better-auth/adapters/prisma";
-import { prisma } from "./prisma.js";
-import { createLogger } from "./lib/logger.js";
-import { GLOBAL_USER_ID } from "./lib/pathUtils.js";
-// Import env.ts to ensure dotenv loads before better-auth reads process.env
-import "./lib/env.js";
+import { PrismaClient } from "../../generated/prisma/client.js";
+import { createLogger } from "../../lib/logger.js";
+import { GLOBAL_USER_ID } from "../../lib/pathUtils.js";
+
+// Standalone Prisma client for Better Auth hooks. better-auth instantiates
+// at module load (before the Fastify app exists) and its hooks run during
+// user create/login, so we can't share `app.prisma` here. Same DB file.
+const dbPath = process.env.DATABASE_URL?.replace("file:", "") ||
+  path.resolve("data/kryton.db");
+const _adapter = new PrismaBetterSqlite3({ url: `file:${dbPath}` });
+const prisma = new PrismaClient({ adapter: _adapter });
 
 const log = createLogger("auth");
 
@@ -213,12 +221,12 @@ export const auth = betterAuth({
 
           // Provision user notes directory (delegated to notes module's service)
           const { provisionUserNotes } = await import(
-            "./modules/notes/services/user-notes-dir.service.js"
+            "../notes/services/user-notes-dir.service.js"
           );
           const NOTES_DIR = process.env.NOTES_DIR
             ? (await import("path")).resolve(process.env.NOTES_DIR)
             : (await import("path")).resolve(
-                (await import("path")).join(import.meta.dirname, "../../notes"),
+                (await import("path")).join(import.meta.dirname, "../../../../notes"),
               );
           await provisionUserNotes(NOTES_DIR, user.id);
         },

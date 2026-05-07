@@ -1,5 +1,6 @@
 import path from "node:path";
 import fs from "node:fs/promises";
+import fp from "fastify-plugin";
 import type { FastifyPluginAsync, preHandlerHookHandler } from "fastify";
 import { PluginEventBus } from "./services/event-bus.js";
 import { PluginHealthMonitor } from "./services/health-monitor.js";
@@ -74,7 +75,7 @@ const noopNotesOps: NotesOps = {
  * REST endpoints under `/api/plugins`, and a WebSocket channel at
  * `/ws/plugins` for lifecycle events.
  */
-export const pluginsModule = (options: PluginsModuleOptions = {}): FastifyPluginAsync =>
+const pluginsModuleImpl = (options: PluginsModuleOptions = {}): FastifyPluginAsync =>
   async (app) => {
     const pluginsDir =
       options.pluginsDir ?? path.resolve(process.cwd(), "plugins");
@@ -185,3 +186,11 @@ export const pluginsModule = (options: PluginsModuleOptions = {}): FastifyPlugin
       websocket.close();
     });
   };
+
+/**
+ * Public module entrypoint. Wrapped with `fastify-plugin` so the
+ * `app.plugins` decorator escapes the encapsulation boundary and is
+ * visible to siblings + tests that call `app.plugins.manager` directly.
+ */
+export const pluginsModule = (options: PluginsModuleOptions = {}): FastifyPluginAsync =>
+  fp(pluginsModuleImpl(options), { name: "plugins-module" });
