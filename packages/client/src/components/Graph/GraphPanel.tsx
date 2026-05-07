@@ -392,7 +392,9 @@ export function GraphPanel({
   const containerStyle: CSSProperties = {
     display: 'flex',
     flexDirection: 'column',
+    flex: 1,
     height: '100%',
+    width: fullscreen ? '100%' : undefined,
     background: 'var(--bg-1)',
     minWidth: 0,
     overflow: 'hidden',

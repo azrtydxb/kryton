@@ -329,7 +329,7 @@ function AppContent() {
           <AppStatusBar notePath={notes.activeNote?.path ?? null} />
         </main>
 
-        {!editing && (
+        {!editing && view === 'note' && (
           <>
             <RightPanel
               rightPanelWidth={rightPanelWidth}
