@@ -220,12 +220,15 @@ export function Preview({
 
   // Extract dataview blocks before passing content to the ui renderer.
   // NotePreviewReact doesn't know about dataview; we keep that client-specific.
+  // Default to empty string so a brief activeNote.content === undefined
+  // window (e.g. immediately after createNote returns its bare metadata)
+  // doesn't crash NotePreviewReact's matchAll() calls.
   const dataviewBlocks: { id: string; query: string }[] = [];
-  let processedContent = content;
+  let processedContent = content ?? '';
 
   const dataviewRegex = /```dataview\n([\s\S]*?)```/g;
   let dvMatch;
-  while ((dvMatch = dataviewRegex.exec(content)) !== null) {
+  while ((dvMatch = dataviewRegex.exec(processedContent)) !== null) {
     const id = `dataview-${dataviewBlocks.length}`;
     dataviewBlocks.push({ id, query: dvMatch[1].trim() });
     processedContent = processedContent.replace(

@@ -50,7 +50,13 @@ export function useNotes(userId?: string) {
   const createNote = useCallback(async (path: string, content = '') => {
     try {
       setError(null);
-      const note = await api.createNote(path, content || `# ${path.split('/').pop()?.replace('.md', '') || 'Untitled'}\n\n`);
+      const initialContent =
+        content || `# ${path.split('/').pop()?.replace('.md', '') || 'Untitled'}\n\n`;
+      // POST /api/notes returns { path, message } (no content) — fetch the
+      // full note so the editor opens with valid content. Without this the
+      // preview crashed on undefined content.matchAll().
+      const created = await api.createNote(path, initialContent);
+      const note = await api.getNote(created.path);
       await refreshTree();
       setActiveNote(note);
       return note;
