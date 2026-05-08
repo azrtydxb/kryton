@@ -52,40 +52,93 @@
   @apply btn text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 active:bg-red-100 dark:active:bg-red-900/30;
 }
 
-/* CodeMirror overrides for seamless look */
-.cm-editor {
-  height: 100% !important;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace !important;
-  font-size: 14px !important;
-}
-
-.cm-editor .cm-scroller {
-  padding: 16px 0 !important;
-}
-
-.cm-editor .cm-content {
-  padding: 0 20px !important;
-}
-
-.cm-editor .cm-gutters {
-  background: transparent !important;
-  border-right: 0 !important;
-  min-width: 40px;
-  color: var(--fg-4);
-  font-size: 10.5px;
+/* In-house editor (EditorView.web.tsx) — spans carry data-kind=… and one of
+   the .ed-* classes from KIND_CLASS in EditorView.web.tsx. The container
+   itself uses [data-editor-root]. Aligned to the design doc:
+     edit body  — monospace, 1.7 line-height, padding 24px 32px
+     wikilinks  — dashed underline in --link
+     inline code — mono 0.88em, --code-bg/--code-fg, 1px 6px, 4px radius
+     code block — mono, --bg-2, 12px padding, 6px radius
+     blockquote — 2px left border in --accent, italic --fg-2
+*/
+[data-editor-root] {
   font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.7;
+  padding: 24px 32px;
+  color: var(--fg-1);
+  background: var(--bg);
+  outline: none;
+  white-space: pre-wrap;
+  overflow-y: auto;
+  height: 100%;
+  caret-color: var(--accent);
+}
+[data-editor-root]:focus { outline: none; }
+[data-editor-root]::selection,
+[data-editor-root] *::selection { background: var(--selection); }
+
+/* Markdown decoration spans rendered inline (the Lezer-emitted ranges). The
+   tokens — including the `# ` mark for headings — stay visible in edit mode
+   so the user always sees raw markdown; we only restyle. */
+.ed-h1 { font-family: var(--font-display); font-size: 22px; font-weight: 600; letter-spacing: -0.4px; color: var(--fg); }
+.ed-h2 { font-family: var(--font-display); font-size: 18px; font-weight: 600; letter-spacing: -0.2px; color: var(--fg); }
+.ed-h3 { font-family: var(--font-display); font-size: 16px; font-weight: 600; color: var(--fg); }
+.ed-h4 { font-family: var(--font-display); font-size: 15px; font-weight: 600; color: var(--fg); }
+.ed-h5 { font-family: var(--font-display); font-size: 14px; font-weight: 600; color: var(--fg); }
+.ed-h6 { font-family: var(--font-display); font-size: 13px; font-weight: 600; color: var(--fg-2); }
+
+.ed-bold { font-weight: 700; color: var(--fg); }
+.ed-italic { font-style: italic; }
+.ed-strike { text-decoration: line-through; text-decoration-color: var(--fg-3); }
+
+.ed-code-inline {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  background: var(--code-bg);
+  color: var(--code-fg);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.ed-code-block {
+  display: inline;
+  font-family: var(--font-mono);
+  background: var(--bg-2);
+  color: var(--fg-1);
+  border-radius: 6px;
+  padding: 0 4px;
 }
 
-.cm-editor .cm-activeLineGutter,
-.cm-editor .cm-activeLine {
-  background-color: var(--accent-soft) !important;
+.ed-link {
+  color: var(--link);
+  text-decoration: underline;
+  text-decoration-style: dashed;
+  text-underline-offset: 3px;
+}
+.ed-wikilink {
+  color: var(--link);
+  text-decoration: underline;
+  text-decoration-style: dashed;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.ed-wikilink:hover { color: var(--accent); }
+
+.ed-tag { color: var(--accent-2); font-weight: 500; }
+
+.ed-blockquote {
+  display: inline;
+  border-left: 2px solid var(--accent);
+  padding-left: 10px;
+  margin-left: -12px;
+  font-style: italic;
+  color: var(--fg-2);
 }
 
-.cm-editor.cm-focused {
-  outline: none !important;
-}
-
-.cm-editor { background-color: var(--bg) !important; }
+.ed-li { color: var(--fg-1); }
+.ed-task-checked { color: var(--fg-3); text-decoration: line-through; }
+.ed-task-unchecked { color: var(--fg-1); }
+.ed-hr { color: var(--fg-4); }
 
 /* Markdown preview styling — token-driven. The .kryton-md wrapper in
    Preview.tsx provides additional scoped overrides per the design spec. */
@@ -223,33 +276,3 @@
 .embed-image { margin: 16px 0; border-radius: 6px; overflow: hidden; }
 .embed-image img { max-width: 100%; border-radius: 6px; box-shadow: var(--shadow-md); }
 
-/* Vim command bar */
-.cm-vim-panel {
-  background: var(--bg-1);
-  border-top: 1px solid var(--line);
-  color: var(--fg-1);
-  font-size: 12px;
-  font-family: var(--font-mono);
-  padding: 4px 8px;
-}
-.cm-vim-panel input {
-  background: transparent;
-  color: var(--fg-1);
-  outline: none;
-  font-family: var(--font-mono);
-  font-size: 12px;
-}
-
-/* Autocomplete dropdown */
-.cm-tooltip-autocomplete {
-  background: var(--bg-1) !important;
-  border: 1px solid var(--line-strong) !important;
-  border-radius: 8px !important;
-  box-shadow: var(--shadow-lg) !important;
-  overflow: hidden !important;
-}
-.cm-tooltip-autocomplete ul li { padding: 6px 12px !important; font-size: 13px !important; }
-.cm-tooltip-autocomplete ul li[aria-selected="true"] {
-  background: var(--accent-soft) !important;
-  color: var(--accent) !important;
-}
