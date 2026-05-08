@@ -1,11 +1,13 @@
 import { ComponentType } from "react";
-import { Extension } from "@codemirror/state";
+import type { EditorPlugin } from "@azrtydxb/ui";
+
+export type { EditorPlugin };
 
 // --- Editor Extension Types ---
 
 export interface EditorExtensionRegistration {
   pluginId: string;
-  extension: Extension;
+  extension: EditorPlugin;
 }
 
 // --- UI Slot Types ---
@@ -111,7 +113,7 @@ export interface ClientPluginAPI {
     }): void;
   };
   editor: {
-    registerExtension(extension: Extension): void;
+    registerExtension(extension: EditorPlugin): void;
   };
   markdown: {
     registerCodeFenceRenderer(
