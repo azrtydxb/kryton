@@ -149,34 +149,41 @@ export function EditorView({
     ...collectDecorations(plugins, stateRef.current),
   ];
   const runs = projectDom(stateRef.current.doc, decos);
+  const lineCount = stateRef.current.doc.split("\n").length;
 
   return (
-    <div
-      ref={rootRef}
-      className={className ?? "ed-root"}
-      contentEditable
-      suppressContentEditableWarning
-      spellCheck
-      onCompositionStart={onCompositionStart}
-      onCompositionEnd={onCompositionEnd}
-      onPaste={onPaste}
-      onKeyDown={onKeyDown}
-      onSelect={onSelect}
-      onClick={onClick}
-      data-editor-root=""
-    >
-      {runs.map((run, i) => (
-        <span
-          key={i}
-          data-from={run.from}
-          data-to={run.to}
-          data-kind={run.kind ?? undefined}
-          data-target={run.attrs?.target}
-          className={run.kind ? KIND_CLASS[run.kind] : undefined}
-        >
-          {run.text}
-        </span>
-      ))}
+    <div className={className ?? "ed-shell"} data-editor-shell="">
+      <div className="ed-gutter" aria-hidden="true">
+        {Array.from({ length: lineCount }, (_, i) => (
+          <span key={i} className="ed-ln">{i + 1}</span>
+        ))}
+      </div>
+      <div
+        ref={rootRef}
+        contentEditable
+        suppressContentEditableWarning
+        spellCheck
+        onCompositionStart={onCompositionStart}
+        onCompositionEnd={onCompositionEnd}
+        onPaste={onPaste}
+        onKeyDown={onKeyDown}
+        onSelect={onSelect}
+        onClick={onClick}
+        data-editor-root=""
+      >
+        {runs.map((run, i) => (
+          <span
+            key={i}
+            data-from={run.from}
+            data-to={run.to}
+            data-kind={run.kind ?? undefined}
+            data-target={run.attrs?.target}
+            className={run.kind ? KIND_CLASS[run.kind] : undefined}
+          >
+            {run.text}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

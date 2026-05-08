@@ -52,26 +52,40 @@
   @apply btn text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 active:bg-red-100 dark:active:bg-red-900/30;
 }
 
-/* In-house editor (EditorView.web.tsx) — spans carry data-kind=… and one of
-   the .ed-* classes from KIND_CLASS in EditorView.web.tsx. The container
-   itself uses [data-editor-root]. Aligned to the design doc:
-     edit body  — monospace, 1.7 line-height, padding 24px 32px
-     wikilinks  — dashed underline in --link
-     inline code — mono 0.88em, --code-bg/--code-fg, 1px 6px, 4px radius
-     code block — mono, --bg-2, 12px padding, 6px radius
-     blockquote — 2px left border in --accent, italic --fg-2
+/* In-house editor (EditorView.web.tsx) — outer .ed-shell is a 2-column grid
+   (52px gutter + content). The contenteditable surface is the right cell,
+   reachable via [data-editor-root]; spans inside carry data-kind and one of
+   the .ed-* classes from KIND_CLASS. Aligned to
+   design_handoff_kryton_redesign/prototype/app/editor.jsx (EditorBody):
+     mono 13.5px / 22px line-height, padding 20px 0 200px
+     gutter: mono 11.5px, --fg-4, right-aligned, paddingRight 14
 */
-[data-editor-root] {
-  font-family: var(--font-mono);
-  font-size: 14px;
-  line-height: 1.7;
-  padding: 24px 32px;
-  color: var(--fg-1);
+[data-editor-shell] {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  height: 100%;
+  overflow-y: auto;
   background: var(--bg);
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  line-height: 22px;
+}
+.ed-gutter {
+  text-align: right;
+  padding: 20px 14px 200px 0;
+  color: var(--fg-4);
+  font-size: 11.5px;
+  line-height: 22px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.ed-ln { display: block; }
+[data-editor-root] {
+  padding: 20px 28px 200px 0;
+  color: var(--fg-1);
   outline: none;
   white-space: pre-wrap;
-  overflow-y: auto;
-  height: 100%;
+  word-break: break-word;
   caret-color: var(--accent);
 }
 [data-editor-root]:focus { outline: none; }
@@ -88,21 +102,19 @@
 .ed-h5 { font-family: var(--font-display); font-size: 14px; font-weight: 600; color: var(--fg); }
 .ed-h6 { font-family: var(--font-display); font-size: 13px; font-weight: 600; color: var(--fg-2); }
 
-.ed-bold { font-weight: 700; color: var(--fg); }
-.ed-italic { font-style: italic; }
-.ed-strike { text-decoration: line-through; text-decoration-color: var(--fg-3); }
+/* Bold uses --accent-warn (amber) per editor.jsx MdInline so emphasis pops
+   inside the mono surface; the body --fg already gives normal text contrast. */
+.ed-bold { font-weight: 600; color: var(--accent-warn); }
+.ed-italic { font-style: italic; color: var(--fg-1); }
+.ed-strike { text-decoration: line-through; text-decoration-color: var(--fg-3); color: var(--fg-3); }
 
 .ed-code-inline {
-  font-family: var(--font-mono);
-  font-size: 0.88em;
   background: var(--code-bg);
   color: var(--code-fg);
-  padding: 1px 6px;
-  border-radius: 4px;
+  padding: 0 4px;
+  border-radius: 3px;
 }
 .ed-code-block {
-  display: inline;
-  font-family: var(--font-mono);
   background: var(--bg-2);
   color: var(--fg-1);
   border-radius: 6px;
