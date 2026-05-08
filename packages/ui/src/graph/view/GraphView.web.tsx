@@ -32,7 +32,7 @@ export function GraphView({
   const layoutRef = React.useRef<LayoutHandle | null>(null);
   const hitRef = React.useRef<HitTest | null>(null);
   const hoverRef = React.useRef<string | null>(null);
-  const dragRef = React.useRef<{ id: string } | null>(null);
+  const dragRef = React.useRef<{ id: string; startX: number; startY: number } | null>(null);
   const { viewport, bind, setViewport } = useViewport();
   const layoutMode: LayoutMode = mode === "full" ? "global" : "local";
 
@@ -52,6 +52,10 @@ export function GraphView({
       [...layoutRef.current.positions()],
       Math.sqrt(GRAPH_CONFIG.node.hitTestRadiusSq),
     );
+    return () => {
+      layoutRef.current?.dispose();
+      layoutRef.current = null;
+    };
   }, [graphData, layoutMode, activeNotePath]);
 
   // Recenter handle.
@@ -150,18 +154,22 @@ export function GraphView({
     const wy = (e.clientY - rect.top - viewport.y) / viewport.k;
     const id = hitRef.current?.test(wx, wy);
     if (id) {
-      dragRef.current = { id };
+      dragRef.current = { id, startX: e.clientX, startY: e.clientY };
       applyDragStart(layoutRef.current!, id, wx, wy);
     }
   };
   const onPointerUp = (e: React.PointerEvent) => {
     if (dragRef.current) {
-      // If the pointer didn't move much, treat as click.
+      const dx = e.clientX - dragRef.current.startX;
+      const dy = e.clientY - dragRef.current.startY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
       applyDragEnd(layoutRef.current!, dragRef.current.id);
-      const node = graphData?.nodes.find((n) => n.id === dragRef.current!.id);
-      if (node) onNoteSelect(node.path);
+      // Only treat as click if the pointer didn't move much.
+      if (dist <= 5) {
+        const node = graphData?.nodes.find((n) => n.id === dragRef.current!.id);
+        if (node) onNoteSelect(node.path);
+      }
       dragRef.current = null;
-      void e;
     }
   };
 

@@ -53,6 +53,10 @@ export function GraphView({
       [...layoutRef.current.positions()],
       Math.sqrt(GRAPH_CONFIG.node.hitTestRadiusSq),
     );
+    return () => {
+      layoutRef.current?.dispose();
+      layoutRef.current = null;
+    };
   }, [graphData, layoutMode, activeNotePath, size.w, size.h]);
 
   useFrameCallback(() => {
