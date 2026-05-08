@@ -100,13 +100,10 @@ export function useAppCallbacks(state: AppState) {
 
   const handleOutlineJump = useCallback((line: number) => {
     if (editing) {
-      const view = editorViewRef.current;
-      if (!view) return;
-      const doc = view.state.doc;
-      if (line < 1 || line > doc.lines) return;
-      const lineObj = doc.line(line);
-      view.dispatch({ selection: { anchor: lineObj.from }, scrollIntoView: true });
-      view.focus();
+      const handle = editorViewRef.current;
+      if (!handle) return;
+      handle.scrollToLine(line);
+      handle.focus();
     } else {
       const lines = (notes.activeNote?.content || '').split('\n');
       let inCodeBlock = false;
