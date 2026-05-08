@@ -3,13 +3,6 @@ import type { EditorPlugin } from "@azrtydxb/ui";
 
 export type { EditorPlugin };
 
-// --- Editor Extension Types ---
-
-export interface EditorExtensionRegistration {
-  pluginId: string;
-  extension: EditorPlugin;
-}
-
 // --- UI Slot Types ---
 
 export interface SidebarPanelRegistration {
@@ -111,9 +104,6 @@ export interface ClientPluginAPI {
       icon: string;
       onClick: (notePath: string) => void;
     }): void;
-  };
-  editor: {
-    registerExtension(extension: EditorPlugin): void;
   };
   markdown: {
     registerCodeFenceRenderer(

@@ -2,7 +2,6 @@
 import { parser as baseParser } from "@lezer/markdown";
 import type { MarkdownExtension } from "@lezer/markdown";
 import type { Tree } from "@lezer/common";
-import { TreeFragment } from "@lezer/common";
 
 /** Wikilink Lezer extension: recognises [[Title]] and [[Title|alias]]. */
 const wikilink: MarkdownExtension = {
@@ -46,9 +45,12 @@ export function createParser(): MarkdownParser {
     parse(text) {
       return md.parse(text);
     },
-    parseIncremental(text, previous) {
-      const fragments = TreeFragment.addTree(previous);
-      return md.parse(text, fragments);
+    parseIncremental(text, _previous) {
+      // Full reparse: TreeFragment.addTree without applyChanges produces
+      // stale decorations after edits. Markdown is small enough per note
+      // that full reparse is fine; can revisit with applyChanges if perf
+      // becomes a concern.
+      return md.parse(text);
     },
   };
 }

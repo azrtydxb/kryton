@@ -102,13 +102,6 @@ export interface CommandRegistration {
   execute: () => void;
 }
 
-export interface EditorExtensionRegistration {
-  pluginId: string;
-  // Extension type is from @codemirror/state but we avoid that hard dep here;
-  // cast at call site.
-  extension: unknown;
-}
-
 // ──────────────────────────────────────────────────────────────────────────────
 // Plugin API surface exposed to client plugins via activate(api)
 // ──────────────────────────────────────────────────────────────────────────────
@@ -147,9 +140,6 @@ export interface ClientPluginAPI {
       icon: string;
       onClick: (notePath: string) => void;
     }): void;
-  };
-  editor: {
-    registerExtension(extension: unknown): void;
   };
   markdown: {
     registerCodeFenceRenderer(
@@ -198,9 +188,6 @@ export interface ClientPluginModule {
 export interface KrytonPluginDeps {
   React: typeof import("react");
   ReactDOM: typeof import("react-dom");
-  // Editor deps present only when the editor is mounted
-  vim?: unknown;
-  getCM?: () => unknown;
 }
 
 declare global {

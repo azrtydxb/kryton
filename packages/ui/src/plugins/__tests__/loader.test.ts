@@ -30,7 +30,6 @@ function makeApi(): ClientPluginAPI {
       registerPage: vi.fn(),
       registerNoteAction: vi.fn(),
     },
-    editor: { registerExtension: vi.fn() },
     markdown: {
       registerCodeFenceRenderer: vi.fn(),
       registerPostProcessor: vi.fn(),

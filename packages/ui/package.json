@@ -39,27 +39,25 @@
   "peerDependencies": {
     "@azrtydxb/core": "4.4.0-pre.9",
     "@azrtydxb/core-react": "4.4.0-pre.9",
+    "@shopify/react-native-skia": ">=1.5.0",
     "react": ">=18",
     "react-dom": ">=18",
-    "yjs": "^13.6.0",
-    "@shopify/react-native-skia": ">=1.5.0",
     "react-native-gesture-handler": ">=2.18.0",
-    "react-native-reanimated": ">=3.15.0"
+    "react-native-reanimated": ">=3.15.0",
+    "yjs": "^13.6.0"
   },
   "peerDependenciesMeta": {
-    "@shopify/react-native-skia": { "optional": true },
-    "react-native-gesture-handler": { "optional": true },
-    "react-native-reanimated": { "optional": true }
+    "@shopify/react-native-skia": {
+      "optional": true
+    },
+    "react-native-gesture-handler": {
+      "optional": true
+    },
+    "react-native-reanimated": {
+      "optional": true
+    }
   },
   "dependencies": {
-    "@codemirror/autocomplete": "^6.18.0",
-    "@codemirror/commands": "^6.7.0",
-    "@codemirror/lang-markdown": "^6.3.0",
-    "@codemirror/language": "^6.10.0",
-    "@codemirror/search": "^6.5.0",
-    "@codemirror/state": "^6.5.0",
-    "@codemirror/theme-one-dark": "^6.1.2",
-    "@codemirror/view": "^6.35.0",
     "@lezer/common": "^1.5.2",
     "@lezer/highlight": "^1.2.3",
     "@lezer/markdown": "^1.6.3",

@@ -163,10 +163,6 @@ export class ClientPluginManager {
         registerNoteAction: (options) =>
           registry.registerNoteAction(pluginId, options),
       },
-      editor: {
-        registerExtension: (extension) =>
-          registry.registerEditorExtension(pluginId, extension),
-      },
       markdown: {
         registerCodeFenceRenderer: (language, component) =>
           registry.registerCodeFenceRenderer(pluginId, language, component),
