@@ -1,52 +1,182 @@
-import { useEffect, useRef, useState, type CSSProperties, type MutableRefObject } from 'react';
-import { NoteEditorReact, type EditorCursorState } from '@azrtydxb/ui';
-import type { EditorView } from '@codemirror/view';
-import type { Extension } from '@codemirror/state';
-import { FileNode } from '../../lib/api';
-import { collectNotePaths } from '../../lib/noteTreeUtils';
+import {
+  useRef,
+  useState,
+  useImperativeHandle,
+  forwardRef,
+  type CSSProperties,
+} from 'react';
+import { EditorView, type EditorPlugin, type EditorState } from '@azrtydxb/ui';
 import { Icons } from '../Icons';
 import { usePrefs, type EditorLayout } from '../../stores/prefsStore';
 
-export type { EditorCursorState };
+export interface EditorCursorState {
+  line: number;
+  col: number;
+  wordCount: number;
+}
+
+/** Imperative handle exposed by <Editor ref={...}> for toolbar / outline usage. */
+export interface EditorHandle {
+  /** Wrap the current selection (or the word "text") with `before` / `after`. */
+  wrapSelection(before: string, after: string): void;
+  /** Insert `prefix` at the start of the current line. */
+  insertAtLineStart(prefix: string): void;
+  /** Insert `text` at the current caret position. */
+  insertText(text: string): void;
+  /** Return the current document text. */
+  getDoc(): string;
+  /** Scroll to a 1-based line number (best effort, DOM-based). */
+  scrollToLine(line: number): void;
+  /** Focus the editor surface. */
+  focus(): void;
+}
 
 interface EditorProps {
+  /** Initial document text — treated as uncontrolled after mount.
+   *  To switch to a different note, remount via a `key` change at the parent. */
   content: string;
   onChange: (content: string) => void;
-  darkMode: boolean;
-  allNotes: FileNode[];
+  /** Passed for future wiki-link plugin wiring; currently unused. */
+  darkMode?: boolean;
   onCursorStateChange?: (state: EditorCursorState) => void;
-  viewRef?: MutableRefObject<EditorView | undefined>;
-  pluginExtensions?: Extension[];
+  plugins?: readonly EditorPlugin[];
+  onWikilinkClick?: (target: string) => void;
+  className?: string;
+}
+
+function countWords(text: string): number {
+  const trimmed = text.trim();
+  if (!trimmed) return 0;
+  return trimmed.split(/\s+/).length;
 }
 
 /**
- * Thin adapter over @azrtydxb/ui NoteEditorReact.
- * Converts client's `allNotes: FileNode[]` to flat `notePaths` for
- * the ui component's [[wiki-link]] autocomplete.
+ * Editor — wraps the new in-house EditorView.
+ *
+ * Exposes an imperative EditorHandle so toolbar and outline-jump can
+ * manipulate the document without a CM6 view ref.
+ *
+ * Note: this component is uncontrolled after mount. The parent is responsible
+ * for remounting (via a `key` prop) when switching to a different note.
+ *
+ * Toolbar mutations (bold, italic, etc.) are applied by updating `localDoc`
+ * state and incrementing `mountKey`, which remounts the EditorView with the
+ * new content. This is acceptable for infrequent toolbar commands.
  */
-export function Editor({
-  content,
-  onChange,
-  darkMode,
-  allNotes,
-  onCursorStateChange,
-  viewRef,
-  pluginExtensions,
-}: EditorProps) {
-  const notePaths = collectNotePaths(allNotes);
+export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
+  {
+    content,
+    onChange,
+    onCursorStateChange,
+    plugins = [],
+    onWikilinkClick,
+    className,
+  }: EditorProps,
+  ref,
+) {
+  // localDoc tracks the current doc for imperative mutations.
+  // Initialised once from `content`; updated by toolbar commands.
+  const [localDoc, setLocalDoc] = useState(content);
+  // Incrementing mountKey causes EditorView to remount with the new localDoc.
+  const [mountKey, setMountKey] = useState(0);
+  // selectionRef tracks the last known selection offsets.
+  const selectionRef = useRef<{ anchor: number; head: number }>({ anchor: 0, head: 0 });
+  const editorRootRef = useRef<HTMLDivElement>(null);
+
+  const handleChange = (state: EditorState) => {
+    selectionRef.current = state.selection;
+    const doc = state.doc;
+    // Keep localDoc in sync for imperative ops without triggering remount.
+    setLocalDoc(doc);
+    onChange(doc);
+
+    if (onCursorStateChange) {
+      const offset = state.selection.head;
+      const textBefore = doc.slice(0, offset);
+      const lines = textBefore.split('\n');
+      const line = lines.length;
+      const col = (lines[lines.length - 1]?.length ?? 0) + 1;
+      onCursorStateChange({ line, col, wordCount: countWords(doc) });
+    }
+  };
+
+  // Apply a toolbar mutation: update localDoc state and bump mountKey to
+  // remount EditorView with the new content.
+  const applyMutation = (nextDoc: string, newOffset: number) => {
+    setLocalDoc(nextDoc);
+    setMountKey((k) => k + 1);
+    selectionRef.current = { anchor: newOffset, head: newOffset };
+    onChange(nextDoc);
+  };
+
+  useImperativeHandle(ref, () => ({
+    wrapSelection(before: string, after: string) {
+      const { anchor, head } = selectionRef.current;
+      const from = Math.min(anchor, head);
+      const to = Math.max(anchor, head);
+      const selected = localDoc.slice(from, to);
+      const inner = selected || 'text';
+      const nextDoc = localDoc.slice(0, from) + before + inner + after + localDoc.slice(to);
+      applyMutation(nextDoc, from + before.length + inner.length + after.length);
+    },
+    insertAtLineStart(prefix: string) {
+      const { anchor } = selectionRef.current;
+      const lineStart = localDoc.lastIndexOf('\n', anchor - 1) + 1;
+      const nextDoc = localDoc.slice(0, lineStart) + prefix + localDoc.slice(lineStart);
+      applyMutation(nextDoc, anchor + prefix.length);
+    },
+    insertText(text: string) {
+      const { anchor } = selectionRef.current;
+      const from = Math.min(anchor, selectionRef.current.head);
+      const to = Math.max(anchor, selectionRef.current.head);
+      const nextDoc = localDoc.slice(0, from) + text + localDoc.slice(to);
+      applyMutation(nextDoc, from + text.length);
+    },
+    getDoc() {
+      return localDoc;
+    },
+    scrollToLine(line: number) {
+      const root = editorRootRef.current;
+      if (!root) return;
+      const lines = localDoc.split('\n');
+      if (line < 1 || line > lines.length) return;
+      // Compute the char offset of the target line.
+      let offset = 0;
+      for (let i = 0; i < line - 1; i++) {
+        offset += (lines[i]?.length ?? 0) + 1; // +1 for '\n'
+      }
+      // Find the span whose [data-from, data-to] straddles offset.
+      const spans = root.querySelectorAll<HTMLElement>('span[data-from]');
+      for (const span of spans) {
+        const from = parseInt(span.getAttribute('data-from') ?? '-1', 10);
+        const to = parseInt(span.getAttribute('data-to') ?? '-1', 10);
+        if (from <= offset && offset <= to) {
+          span.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          return;
+        }
+      }
+    },
+    focus() {
+      const root = editorRootRef.current;
+      if (!root) return;
+      const editable = root.querySelector<HTMLElement>('[contenteditable]');
+      editable?.focus();
+    },
+  }));
 
   return (
-    <NoteEditorReact
-      content={content}
-      onChange={onChange}
-      darkMode={darkMode}
-      notePaths={notePaths}
-      onCursorStateChange={onCursorStateChange}
-      viewRef={viewRef}
-      pluginExtensions={pluginExtensions}
-    />
+    <div ref={editorRootRef} className={className ?? 'h-full w-full'}>
+      <EditorView
+        key={mountKey}
+        initialDoc={localDoc}
+        plugins={plugins}
+        onChange={handleChange}
+        onWikilinkClick={onWikilinkClick}
+        className="h-full w-full"
+      />
+    </div>
   );
-}
+});
 
 /* -------------------------------------------------------------------------- */
 /*  Tab strip                                                                 */
@@ -65,25 +195,6 @@ interface EditorTabStripProps {
  * so we render a single tab. Designed to extend to multi-tab later.
  */
 export function EditorTabStrip({ activePath, activeTitle, dirty, onClose }: EditorTabStripProps) {
-  // Pulse window: while dirty=true the accent dot pulses; 1.5s after dirty
-  // flips to false the pulse fades out.
-  const [showPulse, setShowPulse] = useState<boolean>(!!dirty);
-  const fadeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (dirty) {
-      if (fadeTimer.current) clearTimeout(fadeTimer.current);
-      setShowPulse(true);
-    } else if (showPulse) {
-      if (fadeTimer.current) clearTimeout(fadeTimer.current);
-      fadeTimer.current = setTimeout(() => setShowPulse(false), 1500);
-    }
-    return () => {
-      if (fadeTimer.current) clearTimeout(fadeTimer.current);
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dirty]);
-
   const [hover, setHover] = useState(false);
 
   return (
@@ -128,15 +239,14 @@ export function EditorTabStrip({ activePath, activeTitle, dirty, onClose }: Edit
             return basename.endsWith('.md') ? basename : `${activeTitle}.md`;
           })()}
         </span>
-        {showPulse && (
+        {dirty && (
           <span
-            className={dirty ? 'dot pulse' : 'dot'}
+            className="dot pulse"
             style={{
               width: 6,
               height: 6,
               boxShadow: 'none',
-              opacity: dirty ? 1 : 0.4,
-              transition: 'opacity 600ms ease',
+              opacity: 1,
             }}
             aria-hidden
           />
