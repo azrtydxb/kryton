@@ -1,3 +1,5 @@
+> **STATUS — SUPERSEDED 2026-05-08.** Replaced by [`2026-05-08-editor-cross-platform.md`](../specs/2026-05-08-editor-cross-platform.md) and the editor sub-plans (state-core, yjs-binding, web-view, native-ios-view, native-android-view, plugin-migration). The WebView bundle approach is no longer pursued; mobile uses a native UITextView/EditText editor. **Do not implement this plan.**
+
 # WebView CodeMirror+Yjs Bundle — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: `superpowers:subagent-driven-development`. Steps use checkbox (`- [ ]`).
