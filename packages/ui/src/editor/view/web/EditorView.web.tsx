@@ -37,6 +37,11 @@ const KIND_CLASS: Record<string, string> = {
   blockquote: "ed-blockquote", "list-item": "ed-li",
   "task-checked": "ed-task-checked", "task-unchecked": "ed-task-unchecked",
   "horizontal-rule": "ed-hr",
+  "mark-header": "ed-mark-header",
+  "mark-list": "ed-mark-list",
+  "mark-quote": "ed-mark-quote",
+  "mark-link": "ed-mark-link",
+  "mark-link-url": "ed-mark-link-url",
 };
 
 export function EditorView({

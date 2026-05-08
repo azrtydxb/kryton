@@ -21,6 +21,22 @@ const KIND_BY_NODE: Record<string, DecorationKind> = {
   HorizontalRule: "horizontal-rule",
 };
 
+// Lezer mark nodes: structural delimiters that should get a distinct
+// colour while leaving the construct's content alone. Per the prototype
+// (editor.jsx MdLine) the heading `#`, list `-`, and quote `>` are
+// highlighted as separate spans. Emphasis (`**`) and inline-code
+// backticks are intentionally NOT split out — those tokens render with
+// the same colour as the bold / italic / code content so the whole
+// marker-plus-text reads as one unit. WikiLinkMark also stays inside the
+// surrounding wikilink span for the same reason.
+const MARK_BY_NODE: Record<string, DecorationKind> = {
+  HeaderMark: "mark-header",
+  ListMark: "mark-list",
+  QuoteMark: "mark-quote",
+  LinkMark: "mark-link",
+  URL: "mark-link-url",
+};
+
 export function emitDecorations(text: string, tree: Tree): DecorationSpec[] {
   const out: DecorationSpec[] = [];
   tree.iterate({
@@ -28,6 +44,11 @@ export function emitDecorations(text: string, tree: Tree): DecorationSpec[] {
       const kind = KIND_BY_NODE[node.name];
       if (kind) {
         out.push({ from: node.from, to: node.to, kind });
+        return;
+      }
+      const mark = MARK_BY_NODE[node.name];
+      if (mark) {
+        out.push({ from: node.from, to: node.to, kind: mark });
         return;
       }
       if (node.name === "WikiLink") {

@@ -14,7 +14,13 @@ export type DecorationKind =
   | "heading-1" | "heading-2" | "heading-3" | "heading-4" | "heading-5" | "heading-6"
   | "bold" | "italic" | "strikethrough" | "code-inline" | "code-block"
   | "link" | "wikilink" | "tag" | "blockquote" | "list-item" | "task-checked" | "task-unchecked"
-  | "horizontal-rule";
+  | "horizontal-rule"
+  // Mark-level decorations: the syntax tokens that delimit a construct (the
+  // `#` of a heading, the `-` of a list, etc.). Emitted as separate spans
+  // with their own colour so raw markdown reads as a syntax-highlighted
+  // surface in edit mode.
+  | "mark-header" | "mark-list" | "mark-quote"
+  | "mark-link" | "mark-link-url";
 
 export interface DecorationSpec {
   from: Offset;

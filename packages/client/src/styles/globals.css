@@ -152,6 +152,22 @@
 .ed-task-unchecked { color: var(--fg-1); }
 .ed-hr { color: var(--fg-4); }
 
+/* Syntax marks per editor.jsx MdLine: heading `#`s in cyan, list bullet
+   in violet, quote `>` dimmed, emphasis/code/link marks de-emphasised so
+   the content reads first; the URL inside an inline link gets the link
+   colour. The deeper-wins logic in projectDom guarantees these win over
+   their enclosing decoration on the mark range. */
+.ed-mark-header { color: var(--accent-2); font-weight: 600; }
+.ed-mark-list { color: var(--accent); }
+.ed-mark-quote { color: var(--fg-3); }
+.ed-mark-link { color: var(--fg-4); }
+.ed-mark-link-url {
+  color: var(--link);
+  text-decoration: underline;
+  text-decoration-style: dashed;
+  text-underline-offset: 3px;
+}
+
 /* Markdown preview styling — token-driven. The .kryton-md wrapper in
    Preview.tsx provides additional scoped overrides per the design spec. */
 .markdown-preview {
