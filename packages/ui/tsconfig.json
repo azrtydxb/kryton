@@ -9,5 +9,9 @@
     "allowSyntheticDefaultImports": true
   },
   "include": ["src/**/*"],
-  "exclude": ["src/editor/codemirror-bundle/**/*"]
+  "exclude": [
+    "src/editor/codemirror-bundle/**/*",
+    "src/**/*.native.ts",
+    "src/**/*.native.tsx"
+  ]
 }
