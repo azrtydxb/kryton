@@ -1,4 +1,3 @@
-export * from "./types";
-export * from "./graphConfig";
-export * from "./useD3Graph";
-export * from "./GraphView";
+export { GraphView } from "./view/GraphView";
+export type { GraphViewProps } from "./view/GraphView";
+export type { GraphData, GraphNode, GraphEdge, HoveredNodeInfo } from "./types";
