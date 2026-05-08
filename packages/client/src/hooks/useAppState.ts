@@ -1,7 +1,7 @@
 import { useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { EditorView } from '@codemirror/view';
 import { useShallow } from 'zustand/react/shallow';
+import type { EditorHandle } from '../components/Editor/Editor';
 import { useTheme } from './useTheme';
 import { useNotes } from './useNotes';
 import { useAuth } from './useAuth';
@@ -90,8 +90,8 @@ export function useAppState(pluginManager?: import('../plugins/PluginManager').C
 
   const isActiveNoteStarred = notes.activeNote ? starredPaths.has(notes.activeNote.path) : false;
 
-  // Refs (unchanged)
-  const editorViewRef = useRef<EditorView>(undefined);
+  // Refs
+  const editorViewRef = useRef<EditorHandle | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(undefined);
   const previewRef = useRef<HTMLDivElement>(null);
 

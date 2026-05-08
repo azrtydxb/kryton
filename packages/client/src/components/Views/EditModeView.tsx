@@ -1,9 +1,7 @@
-import { MutableRefObject, ComponentType, useState, useEffect, useRef } from 'react';
-import { Extension } from '@codemirror/state';
-import { EditorView } from '@codemirror/view';
+import { ComponentType, useRef, useState, useEffect } from 'react';
 import { useDebouncedCallback } from 'use-debounce';
 import { FileNode } from '../../lib/api';
-import { Editor, EditorCursorState, EditorTabStrip, ModePills } from '../Editor/Editor';
+import { Editor, type EditorCursorState, type EditorHandle, EditorTabStrip, ModePills } from '../Editor/Editor';
 import { EditorToolbar } from '../Editor/EditorToolbar';
 import { Preview } from '../Preview/Preview';
 // OutgoingLinksPanel intentionally removed to match design handoff: the
@@ -21,9 +19,9 @@ interface EditModeViewProps {
   isStarred: boolean;
   resolvedTheme: string;
   allNotes: FileNode[];
-  editorViewRef: MutableRefObject<EditorView | undefined>;
-  previewRef: MutableRefObject<HTMLDivElement | null>;
-  pluginExtensions?: Extension[];
+  previewRef: React.MutableRefObject<HTMLDivElement | null>;
+  /** Ref exposed to parent for outline jump and other imperative needs. */
+  editorRef?: React.MutableRefObject<EditorHandle | null>;
   getCodeFenceRenderer?: (language: string) => { component: ComponentType<{ content: string; notePath: string }> } | undefined;
   /** retained for parent API compatibility; auto-save handles persistence. */
   onSave?: () => void;
@@ -43,7 +41,7 @@ interface EditModeViewProps {
 export function EditModeView({
   activeNote, editContent, originalContent,
   isStarred, resolvedTheme, allNotes,
-  editorViewRef, previewRef, pluginExtensions,
+  editorRef: externalEditorRef, previewRef,
   getCodeFenceRenderer,
   onAutoSave, onCancel, onToggleStar, onPdfExport,
   onContentChange, onCursorStateChange,
@@ -53,6 +51,10 @@ export function EditModeView({
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('unchanged');
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const layout = usePrefs((s) => s.layout);
+
+  // Internal editor ref; also forwarded to parent via externalEditorRef.
+  const localEditorRef = useRef<EditorHandle | null>(null);
+  const editorRef = externalEditorRef ?? localEditorRef;
 
   const debouncedAutoSave = useDebouncedCallback(async () => {
     setSaveStatus('saving');
@@ -104,6 +106,11 @@ export function EditModeView({
       default: return { text: '', color: 'var(--fg-3)' };
     }
   })();
+
+  // Suppress unused variable warnings; resolvedTheme and allNotes are used
+  // for future theming and wiki-link plugin wiring.
+  void resolvedTheme;
+  void allNotes;
 
   const headerBtn = (props: { onClick: () => void; title: string; children: React.ReactNode; active?: boolean }) => (
     <button
@@ -173,7 +180,7 @@ export function EditModeView({
       </div>
 
       {/* Toolbar (formatting) */}
-      {showEditor && <EditorToolbar viewRef={editorViewRef} />}
+      {showEditor && <EditorToolbar editorRef={editorRef} />}
 
       {/* Body */}
       <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
@@ -184,13 +191,10 @@ export function EditModeView({
           }}>
             <div style={{ flex: 1, overflow: 'hidden' }}>
               <Editor
+                ref={editorRef}
                 content={editContent ?? activeNote.content}
                 onChange={onContentChange}
-                darkMode={resolvedTheme === 'dark'}
-                allNotes={allNotes}
                 onCursorStateChange={onCursorStateChange}
-                viewRef={editorViewRef}
-                pluginExtensions={pluginExtensions}
               />
             </div>
           </div>

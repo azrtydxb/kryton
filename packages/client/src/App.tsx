@@ -1,6 +1,5 @@
 import { useMemo, useEffect, useCallback } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { Extension } from '@codemirror/state';
 import { AuthProvider } from './hooks/useAuth';
 import { PluginSlotRegistry, PluginProvider, usePluginSlots } from '@azrtydxb/ui';
 import { ClientPluginManager } from './plugins/PluginManager';
@@ -142,7 +141,7 @@ function AppContent() {
     starredPaths,
     sharedNotes,
     isActiveNoteStarred,
-    editorViewRef, searchInputRef, previewRef,
+    searchInputRef, previewRef,
   } = state;
 
   const setShowAdmin = useUIStore((s) => s.setShowAdmin);
@@ -194,7 +193,7 @@ function AppContent() {
 
   useKeyboardShortcuts(shortcutActions);
 
-  const { editorExtensions, getCodeFenceRenderer } = usePluginSlots();
+  const { getCodeFenceRenderer } = usePluginSlots();
 
   const onShareActiveNote = useCallback(() => {
     if (notes.activeNote) handleShare(notes.activeNote.path, false);
@@ -290,9 +289,7 @@ function AppContent() {
                   isStarred={isActiveNoteStarred}
                   resolvedTheme={themeCtx.resolvedTheme}
                   allNotes={notes.tree}
-                  editorViewRef={editorViewRef}
                   previewRef={previewRef}
-                  pluginExtensions={editorExtensions as Extension[]}
                   getCodeFenceRenderer={getCodeFenceRenderer}
                   onSave={saveEdit}
                   onAutoSave={saveEditInPlace}
