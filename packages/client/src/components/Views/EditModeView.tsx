@@ -191,6 +191,7 @@ export function EditModeView({
           }}>
             <div style={{ flex: 1, overflow: 'hidden' }}>
               <Editor
+                key={activeNote.path}
                 ref={editorRef}
                 content={editContent ?? activeNote.content}
                 onChange={onContentChange}

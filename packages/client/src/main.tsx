@@ -9,7 +9,6 @@ import { applyPrefs, usePrefs } from './stores/prefsStore';
 applyPrefs(usePrefs.getState());
 
 // Expose dependencies for runtime-loaded plugins.
-// NOTE: vim/getCM removed — vim mode is not supported in the in-house editor (v1 gap).
 (window as unknown as Record<string, unknown>).__krytonPluginDeps = { React };
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

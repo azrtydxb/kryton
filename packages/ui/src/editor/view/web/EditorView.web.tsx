@@ -66,13 +66,23 @@ export function EditorView({
     selectionToDomRange(root, stateRef.current.selection);
   });
 
-  const onBeforeInput = (e: React.FormEvent<HTMLDivElement>) => {
-    if (composingRef.current) return; // let IME run
-    e.preventDefault();
-    const interpreted = interpretBeforeInput(e.nativeEvent as InputEvent, stateRef.current.selection);
-    if (!interpreted) return;
-    dispatch(interpreted);
-  };
+  // React's synthetic `onBeforeInput` is mapped to the legacy `textInput` event,
+  // not the modern `beforeinput`. Bind a native listener so we can preventDefault
+  // on the real event and translate it into a Transaction.
+  React.useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const handler = (e: Event) => {
+      const ev = e as InputEvent;
+      if (composingRef.current) return; // let IME run
+      const interpreted = interpretBeforeInput(ev, stateRef.current.selection);
+      if (!interpreted) return;
+      ev.preventDefault();
+      dispatch(interpreted);
+    };
+    root.addEventListener("beforeinput", handler);
+    return () => root.removeEventListener("beforeinput", handler);
+  }, [dispatch]);
 
   const onCompositionStart = () => { composingRef.current = true; };
   const onCompositionEnd = (e: React.CompositionEvent) => {
@@ -147,7 +157,6 @@ export function EditorView({
       contentEditable
       suppressContentEditableWarning
       spellCheck
-      onBeforeInput={onBeforeInput}
       onCompositionStart={onCompositionStart}
       onCompositionEnd={onCompositionEnd}
       onPaste={onPaste}

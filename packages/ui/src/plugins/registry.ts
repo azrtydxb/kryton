@@ -8,7 +8,6 @@ import type {
   NoteActionRegistration,
   CodeFenceRendererRegistration,
   CommandRegistration,
-  EditorExtensionRegistration,
 } from "./types";
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -27,7 +26,6 @@ export class PluginSlotRegistry {
   private codeFenceRenderers = new Map<string, CodeFenceRendererRegistration>();
   private postProcessors: Array<{ pluginId: string; fn: (html: string) => string }> = [];
   private commands: CommandRegistration[] = [];
-  private editorExtensions: EditorExtensionRegistration[] = [];
   private listeners = new Set<() => void>();
 
   private notify(): void {
@@ -169,17 +167,6 @@ export class PluginSlotRegistry {
     return [...this.commands];
   }
 
-  // Editor Extensions
-
-  registerEditorExtension(pluginId: string, extension: unknown): void {
-    this.editorExtensions.push({ pluginId, extension });
-    this.notify();
-  }
-
-  getEditorExtensions(): unknown[] {
-    return this.editorExtensions.map((r) => r.extension);
-  }
-
   // Cleanup
 
   removeAllForPlugin(pluginId: string): void {
@@ -191,7 +178,6 @@ export class PluginSlotRegistry {
     this.noteActions = this.noteActions.filter((r) => r.pluginId !== pluginId);
     this.postProcessors = this.postProcessors.filter((r) => r.pluginId !== pluginId);
     this.commands = this.commands.filter((r) => r.pluginId !== pluginId);
-    this.editorExtensions = this.editorExtensions.filter((r) => r.pluginId !== pluginId);
     for (const [lang, reg] of this.codeFenceRenderers) {
       if (reg.pluginId === pluginId) this.codeFenceRenderers.delete(lang);
     }

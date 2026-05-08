@@ -23,19 +23,15 @@ import type { ActivePluginInfo, ClientPluginAPI, ClientPluginModule } from "./ty
 //  - activePlugins: list from the server (/plugins/active endpoint). The host
 //    app is responsible for fetching this and passing it in. PluginRoot is
 //    pure – it does not fetch.
-//  - getEditorInstance: optional accessor for the CodeMirror instance; forwarded
-//    onto window.__krytonPluginDeps.getCM for editor plugins.
 // ──────────────────────────────────────────────────────────────────────────────
 
 export interface PluginRootProps {
   /** Active plugins fetched from /plugins/active. */
   activePlugins: ActivePluginInfo[];
-  /** Optional accessor for the CodeMirror editor instance (editor window only). */
-  getEditorInstance?: () => unknown;
   children: ReactNode;
 }
 
-export function PluginRoot({ activePlugins, getEditorInstance, children }: PluginRootProps) {
+export function PluginRoot({ activePlugins, children }: PluginRootProps) {
   // Stable registry instance — created once for this PluginRoot mount.
   const registry = useMemo(() => new PluginSlotRegistry(), []);
 
@@ -48,10 +44,9 @@ export function PluginRoot({ activePlugins, getEditorInstance, children }: Plugi
     window.__krytonPluginDeps = {
       React,
       ReactDOM,
-      getCM: getEditorInstance,
     };
     // Nothing to clean up — deps remain available for the lifetime of the app.
-  }, [getEditorInstance]);
+  }, []);
 
   // ── 2. Load / unload plugins when activePlugins list changes ───────────────
 
@@ -159,10 +154,6 @@ function buildClientApi(
         registry.registerPage(pluginId, component, options),
       registerNoteAction: (options) =>
         registry.registerNoteAction(pluginId, options),
-    },
-    editor: {
-      registerExtension: (extension) =>
-        registry.registerEditorExtension(pluginId, extension),
     },
     markdown: {
       registerCodeFenceRenderer: (language, component) =>
