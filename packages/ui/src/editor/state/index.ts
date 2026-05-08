@@ -20,3 +20,8 @@ export {
   toggleBold, toggleItalic, toggleStrikethrough, toggleInlineCode,
   insertWikilink, insertHeading,
 } from "./commands";
+
+export type { YjsBinding } from "./yjsBinding";
+export { createYjsBinding } from "./yjsBinding";
+export type { CursorAwareness, RemoteCursor } from "./awareness";
+export { createCursorAwareness } from "./awareness";
