@@ -62,6 +62,7 @@ export interface Scene {
   /** Optional design-token overrides resolved from CSS variables at draw time. */
   tokens?: {
     bg2: string;
+    fg1: string;
     fg3: string;
     fg4: string;
     accent: string;

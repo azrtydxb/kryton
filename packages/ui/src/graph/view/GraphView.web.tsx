@@ -273,6 +273,7 @@ function resolveTokens(canvas: HTMLCanvasElement): Scene["tokens"] | undefined {
   if (!bg2) return undefined;
   return {
     bg2,
+    fg1: get("--fg-1"),
     fg3: get("--fg-3"),
     fg4: get("--fg-4"),
     accent: get("--accent"),

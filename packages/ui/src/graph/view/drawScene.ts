@@ -6,6 +6,12 @@ export function drawScene(painter: Painter, scene: Scene, width: number, height:
   // Build the palette from design tokens when available so the canvas tracks
   // the live theme; fall back to the static GRAPH_CONFIG palette on platforms
   // that can't resolve CSS vars (e.g. native Skia).
+  // Palette resolution mirrors prototype/app/graph.jsx exactly:
+  //   edge default: --fg-4, active/hover: --accent
+  //   node fill default: --bg-2, active: --accent
+  //   node stroke default: --fg-3, active/hover: --accent
+  //   halo: solid --accent at opacity 0.18, no stroke
+  //   label default: --fg-1, active: --accent
   const palette: Palette = scene.tokens
     ? {
       link: scene.tokens.fg4,
@@ -16,13 +22,16 @@ export function drawScene(painter: Painter, scene: Scene, width: number, height:
       strokeActive: scene.tokens.accent,
       strokeShared: scene.tokens.accent2,
       strokeHovered: scene.tokens.accent,
-      label: scene.tokens.fg3,
+      label: scene.tokens.fg1,
+      labelActive: scene.tokens.accent,
       star: GRAPH_CONFIG.colors[scene.theme].star,
       starStroke: GRAPH_CONFIG.colors[scene.theme].starStroke,
       strokeDefault: scene.tokens.fg3,
-      activeHalo: scene.tokens.accentSoft,
+      // Bible uses solid accent at 0.18 opacity — pass full-alpha accent
+      // through and let drawCircle apply alpha 0.18 itself.
+      activeHalo: scene.tokens.accent,
     }
-    : { ...GRAPH_CONFIG.colors[scene.theme], strokeDefault: GRAPH_CONFIG.colors[scene.theme].label, activeHalo: GRAPH_CONFIG.colors[scene.theme].nodeActive };
+    : { ...GRAPH_CONFIG.colors[scene.theme], strokeDefault: GRAPH_CONFIG.colors[scene.theme].label, activeHalo: GRAPH_CONFIG.colors[scene.theme].nodeActive, labelActive: GRAPH_CONFIG.colors[scene.theme].nodeActive };
 
   painter.beginFrame(width, height);
   painter.save();
@@ -47,6 +56,7 @@ interface Palette {
   strokeShared: string;
   strokeHovered: string;
   label: string;
+  labelActive: string;
   star: string;
   starStroke: string;
   strokeDefault: string;
@@ -106,14 +116,19 @@ function drawNode(p: Painter, n: SceneNode, palette: Palette, mode: Scene["mode"
     p.drawCircle(n.position.x, n.position.y, r, baseStyle);
   }
 
+  // Per prototype/app/graph.jsx EditorMeta line ~99-106: labels render at
+  //   y + n.r + 14
+  //   fontSize = fullscreen ? 13 : 11
+  //   fill = active ? --accent : --fg-1
   if ((n.isActive || n.isHovered || showAllLabels) && !ghosted) {
+    const fontSize = showAllLabels ? 13 : 11;
     p.drawText(
       n.position.x,
-      n.position.y + r + GRAPH_CONFIG.node.labelOffset + GRAPH_CONFIG.font.defaultSize,
+      n.position.y + r + 14,
       truncate(n.node.title),
-      n.isActive ? GRAPH_CONFIG.font.activeSize : GRAPH_CONFIG.font.defaultSize,
+      fontSize,
       GRAPH_CONFIG.font.family,
-      palette.label,
+      n.isActive ? palette.labelActive : palette.label,
       "center",
     );
   }
