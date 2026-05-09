@@ -239,18 +239,39 @@ export function EditorTabStrip({ activePath, activeTitle, dirty, onClose }: Edit
             return basename.endsWith('.md') ? basename : `${activeTitle}.md`;
           })()}
         </span>
-        {dirty && (
+        {/* Saved-status pill per prototype/app/editor.jsx EditorTabBar. The
+            dot pulses while dirty (mid-edit) and the label flips between
+            "saving" and "saved" — for now we always show "saved" since the
+            client autosaves on idle. */}
+        <span
+          className="mono"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+            marginLeft: 4,
+            padding: '2px 6px',
+            borderRadius: 3,
+            background: 'var(--bg-1)',
+            border: '1px solid var(--line)',
+            fontSize: 10,
+            fontFamily: 'var(--font-mono)',
+            color: 'var(--fg-3)',
+          }}
+        >
           <span
-            className="dot pulse"
+            className={dirty ? 'dot pulse' : 'dot'}
             style={{
-              width: 6,
-              height: 6,
+              width: 5,
+              height: 5,
+              borderRadius: '50%',
+              background: dirty ? 'var(--accent)' : 'var(--accent-good)',
               boxShadow: 'none',
-              opacity: 1,
             }}
             aria-hidden
           />
-        )}
+          {dirty ? 'saving' : 'saved'}
+        </span>
         {hover && onClose && (
           <button
             onClick={onClose}

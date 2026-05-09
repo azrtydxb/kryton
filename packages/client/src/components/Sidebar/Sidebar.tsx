@@ -361,6 +361,7 @@ export function Sidebar({
         <NavRow
           icon={<Icons.Hash size={14} />}
           label="Tags"
+          hint={tags.length || undefined}
           active={view === 'tags'}
           onClick={handleTagsClick}
         />

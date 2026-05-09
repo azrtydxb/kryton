@@ -10,7 +10,7 @@ import { Icons } from '../Icons';
 import { usePrefs, type EditorLayout } from '../../stores/prefsStore';
 
 interface PreviewModeViewProps {
-  activeNote: { path: string; title: string; content: string };
+  activeNote: { path: string; title: string; content: string; modifiedAt?: string };
   isStarred: boolean;
   allNotes: FileNode[];
   previewRef: MutableRefObject<HTMLDivElement | null>;
@@ -340,6 +340,7 @@ export function PreviewModeView({
             allNotes={allNotes}
             onCreateNote={onCreateNote}
             notePath={activeNote.path}
+            modifiedAt={activeNote.modifiedAt}
             onNoteSelect={onNoteSelect}
             getCodeFenceRenderer={getCodeFenceRenderer}
           />
