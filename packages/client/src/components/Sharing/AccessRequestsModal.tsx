@@ -93,11 +93,19 @@ export function AccessRequestsModal({ onClose }: AccessRequestsModalProps) {
     >
       <div
         ref={dialogRef}
-        className="bg-white dark:bg-surface-900 rounded-xl shadow-2xl border dark:border-surface-700 w-full max-w-md mx-4 overflow-hidden"
+        className="w-full max-w-md mx-4 overflow-hidden"
+        style={{ background: 'var(--bg-1)', borderRadius: 12, boxShadow: 'var(--shadow-lg)', border: '1px solid var(--line)' }}
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b dark:border-surface-700">
+        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--line)' }}>
           <h2 className="text-sm font-semibold">Access Requests</h2>
-          <button type="button" onClick={onClose} className="btn-ghost p-1" aria-label="Close">
+          <button
+            type="button"
+            onClick={onClose}
+            style={{ padding: 4, borderRadius: 4, color: 'var(--fg-3)', background: 'transparent' }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+            aria-label="Close"
+          >
             <X size={16} />
           </button>
         </div>

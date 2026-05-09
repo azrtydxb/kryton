@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { Fingerprint, Plus, Trash2, X } from 'lucide-react';
 import { authClient } from '../../lib/auth-client';
@@ -14,6 +14,27 @@ interface PasskeyManagerProps {
   open: boolean;
   onClose: () => void;
 }
+
+const rowStyle: CSSProperties = {
+  background: 'var(--bg-2)',
+  borderColor: 'var(--line)',
+  color: 'var(--fg)',
+};
+
+const inputStyle: CSSProperties = {
+  background: 'var(--bg-2)',
+  borderColor: 'var(--line)',
+  color: 'var(--fg)',
+};
+
+const primaryBtnStyle: CSSProperties = {
+  background: 'var(--accent)',
+  color: 'var(--accent-fg)',
+};
+
+const ghostBtnStyle: CSSProperties = {
+  color: 'var(--fg-3)',
+};
 
 export function PasskeyManagerContent() {
   const [passkeys, setPasskeys] = useState<PasskeyData[]>([]);
@@ -87,7 +108,7 @@ export function PasskeyManagerContent() {
 
   return (
     <>
-      <p className="text-xs text-gray-400 mb-4">
+      <p className="text-xs mb-4" style={{ color: 'var(--fg-3)' }}>
         Passkeys let you sign in with your fingerprint, face, or device PIN instead of a password.
       </p>
 
@@ -101,20 +122,21 @@ export function PasskeyManagerContent() {
       {/* Passkey list */}
       <div className="space-y-2 mb-4 max-h-60 overflow-y-auto">
         {loading ? (
-          <div className="text-center py-6 text-gray-500 text-sm">Loading passkeys...</div>
+          <div className="text-center py-6 text-sm" style={{ color: 'var(--fg-3)' }}>Loading passkeys...</div>
         ) : passkeys.length === 0 ? (
-          <div className="text-center py-6 text-gray-500 text-sm">No passkeys registered yet.</div>
+          <div className="text-center py-6 text-sm" style={{ color: 'var(--fg-3)' }}>No passkeys registered yet.</div>
         ) : (
           passkeys.map(pk => (
             <div
               key={pk.id}
-              className="flex items-center justify-between rounded-lg bg-surface-800 border border-gray-700/50 px-3 py-2"
+              className="flex items-center justify-between rounded-lg border px-3 py-2"
+              style={rowStyle}
             >
               <div className="min-w-0 flex-1">
-                <div className="text-sm text-gray-200 truncate">
+                <div className="text-sm truncate" style={{ color: 'var(--fg)' }}>
                   {pk.name || 'Unnamed passkey'}
                 </div>
-                <div className="text-xs text-gray-500">
+                <div className="text-xs" style={{ color: 'var(--fg-3)' }}>
                   Added {new Date(pk.createdAt).toLocaleDateString()}
                 </div>
               </div>
@@ -129,7 +151,8 @@ export function PasskeyManagerContent() {
                   </button>
                   <button
                     onClick={() => setConfirmDeleteId(null)}
-                    className="text-xs text-gray-400 hover:text-gray-200 px-2 py-1"
+                    className="text-xs px-2 py-1"
+                    style={ghostBtnStyle}
                   >
                     Cancel
                   </button>
@@ -137,7 +160,8 @@ export function PasskeyManagerContent() {
               ) : (
                 <button
                   onClick={() => setConfirmDeleteId(pk.id)}
-                  className="ml-2 p-1.5 text-gray-500 hover:text-red-400 transition-colors"
+                  className="ml-2 p-1.5 hover:text-red-400 transition-colors"
+                  style={{ color: 'var(--fg-3)' }}
                   aria-label="Delete passkey"
                 >
                   <Trash2 size={14} />
@@ -157,20 +181,23 @@ export function PasskeyManagerContent() {
             onChange={e => setNewPasskeyName(e.target.value)}
             placeholder="Passkey name (optional)"
             autoFocus
-            className="w-full bg-surface-800 border border-gray-700/50 rounded-lg px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none"
+            style={inputStyle}
             onKeyDown={e => { if (e.key === 'Enter') handleAddPasskey(); }}
           />
           <div className="flex gap-2">
             <button
               onClick={handleAddPasskey}
               disabled={adding}
-              className="flex-1 bg-violet-500 text-white rounded-lg py-2 text-sm font-medium hover:bg-violet-600 transition-colors disabled:opacity-50"
+              className="flex-1 rounded-lg py-2 text-sm font-medium transition-colors disabled:opacity-50"
+              style={primaryBtnStyle}
             >
               {adding ? 'Registering...' : 'Register Passkey'}
             </button>
             <button
               onClick={() => { setShowNamePrompt(false); setNewPasskeyName(''); }}
-              className="px-3 py-2 text-sm text-gray-400 hover:text-gray-200 transition-colors"
+              className="px-3 py-2 text-sm transition-colors"
+              style={ghostBtnStyle}
             >
               Cancel
             </button>
@@ -179,7 +206,8 @@ export function PasskeyManagerContent() {
       ) : (
         <button
           onClick={() => setShowNamePrompt(true)}
-          className="w-full flex items-center justify-center gap-2 rounded-lg border border-dashed border-gray-600 px-4 py-2.5 text-sm font-medium text-gray-300 hover:border-violet-500 hover:text-violet-400 transition-colors"
+          className="w-full flex items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-2.5 text-sm font-medium transition-colors"
+          style={{ borderColor: 'var(--line)', color: 'var(--fg)' }}
         >
           <Plus size={16} />
           Add Passkey
@@ -194,15 +222,16 @@ export function PasskeyManager({ open, onClose }: PasskeyManagerProps) {
   return createPortal(
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center" onClick={onClose}>
       <div
-        className="bg-surface-900 rounded-xl shadow-2xl w-full max-w-md p-6 border border-gray-700/50"
+        className="rounded-xl shadow-2xl w-full max-w-md p-6 border"
+        style={{ background: 'var(--bg-1)', borderColor: 'var(--line)' }}
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Fingerprint size={20} className="text-violet-400" />
-            <h3 className="text-lg font-semibold text-gray-100">Passkeys</h3>
+            <Fingerprint size={20} style={{ color: 'var(--accent)' }} />
+            <h3 className="text-lg font-semibold" style={{ color: 'var(--fg)' }}>Passkeys</h3>
           </div>
-          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-200 transition-colors" aria-label="Close">
+          <button onClick={onClose} className="p-1 transition-colors" style={ghostBtnStyle} aria-label="Close">
             <X size={18} />
           </button>
         </div>

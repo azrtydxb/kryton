@@ -1,5 +1,21 @@
-import { useState, useCallback, FormEvent } from 'react';
+import { useState, useCallback, FormEvent, CSSProperties } from 'react';
 import { Settings, User, Fingerprint, Key, Shield, X, Palette } from 'lucide-react';
+
+const inputStyle: CSSProperties = {
+  background: 'var(--bg-2)',
+  borderColor: 'var(--line)',
+  color: 'var(--fg)',
+};
+const dialogStyle: CSSProperties = { background: 'var(--bg-1)' };
+const borderLine: CSSProperties = { borderColor: 'var(--line)' };
+const labelStyle: CSSProperties = { color: 'var(--fg-3)' };
+const headingStyle: CSSProperties = { color: 'var(--fg)' };
+const mutedStyle: CSSProperties = { color: 'var(--fg-3)' };
+const submitStyle: CSSProperties = {
+  background: 'var(--accent)',
+  color: 'var(--accent-fg)',
+};
+const ghostHoverBase: CSSProperties = { color: 'var(--fg-3)' };
 import { authApi } from '../lib/api';
 import { PasskeyManagerContent } from '../components/Security/PasskeyManager';
 import { ApiKeyManager } from '../components/ApiKeys/ApiKeyManager';
@@ -48,23 +64,26 @@ function ProfileSection() {
   return (
     <div className="max-w-sm space-y-4">
       <div>
-        <h3 className="text-sm font-medium text-gray-200 mb-1">Change Password</h3>
-        <p className="text-xs text-gray-500">Update your account password.</p>
+        <h3 className="text-sm font-medium mb-1" style={headingStyle}>Change Password</h3>
+        <p className="text-xs" style={mutedStyle}>Update your account password.</p>
       </div>
       <form onSubmit={handlePasswordChange} className="space-y-3">
         <div>
-          <label htmlFor="current-password" className="block text-xs text-gray-400 mb-1">Current Password</label>
+          <label htmlFor="current-password" className="block text-xs mb-1" style={labelStyle}>Current Password</label>
           <input
             id="current-password"
             type="password"
             value={currentPw}
             onChange={e => setCurrentPw(e.target.value)}
             required
-            className="w-full bg-surface-800 border border-gray-700/50 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none"
+            style={inputStyle}
+            onFocus={e => { e.currentTarget.style.boxShadow = '0 0 0 2px var(--accent-soft)'; }}
+            onBlur={e => { e.currentTarget.style.boxShadow = 'none'; }}
           />
         </div>
         <div>
-          <label htmlFor="new-password" className="block text-xs text-gray-400 mb-1">New Password</label>
+          <label htmlFor="new-password" className="block text-xs mb-1" style={labelStyle}>New Password</label>
           <input
             id="new-password"
             type="password"
@@ -72,18 +91,24 @@ function ProfileSection() {
             onChange={e => setNewPw(e.target.value)}
             required
             minLength={8}
-            className="w-full bg-surface-800 border border-gray-700/50 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none"
+            style={inputStyle}
+            onFocus={e => { e.currentTarget.style.boxShadow = '0 0 0 2px var(--accent-soft)'; }}
+            onBlur={e => { e.currentTarget.style.boxShadow = 'none'; }}
           />
         </div>
         <div>
-          <label htmlFor="confirm-password" className="block text-xs text-gray-400 mb-1">Confirm New Password</label>
+          <label htmlFor="confirm-password" className="block text-xs mb-1" style={labelStyle}>Confirm New Password</label>
           <input
             id="confirm-password"
             type="password"
             value={confirmPw}
             onChange={e => setConfirmPw(e.target.value)}
             required
-            className="w-full bg-surface-800 border border-gray-700/50 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none"
+            style={inputStyle}
+            onFocus={e => { e.currentTarget.style.boxShadow = '0 0 0 2px var(--accent-soft)'; }}
+            onBlur={e => { e.currentTarget.style.boxShadow = 'none'; }}
           />
         </div>
         {pwError && <div className="text-red-400 text-xs">{pwError}</div>}
@@ -92,7 +117,8 @@ function ProfileSection() {
           <button
             type="submit"
             disabled={pwLoading}
-            className="flex-1 bg-violet-500 text-white rounded-lg py-2 text-sm font-medium hover:bg-violet-600 transition-colors disabled:opacity-50"
+            className="flex-1 rounded-lg py-2 text-sm font-medium transition-colors disabled:opacity-50"
+            style={submitStyle}
           >
             {pwLoading ? 'Changing...' : 'Change Password'}
           </button>
@@ -114,34 +140,37 @@ export default function AccountSettingsPage({ onClose }: { onClose: () => void }
         role="dialog"
         aria-modal="true"
         aria-labelledby="account-settings-title"
-        className="bg-surface-900 rounded-xl shadow-2xl w-[90vw] max-w-2xl max-h-[85vh] overflow-hidden flex flex-col"
+        className="rounded-xl shadow-2xl w-[90vw] max-w-2xl max-h-[85vh] overflow-hidden flex flex-col"
+        style={dialogStyle}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700/50">
+        <div className="flex items-center justify-between px-6 py-4 border-b" style={borderLine}>
           <div className="flex items-center gap-2">
-            <Settings size={18} className="text-violet-400" />
+            <Settings size={18} style={{ color: 'var(--accent)' }} />
             <h2 id="account-settings-title" className="text-lg font-semibold text-white">Account Settings</h2>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700/50 transition-colors"
+            className="p-1.5 rounded-lg transition-colors"
+            style={ghostHoverBase}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--fg)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-3)'; }}
           >
             <X size={18} />
           </button>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-gray-700/50 px-6">
+        <div className="flex border-b px-6" style={borderLine}>
           {TABS.map(t => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                tab === t.key
-                  ? 'border-violet-500 text-violet-400'
-                  : 'border-transparent text-gray-400 hover:text-gray-200'
-              }`}
+              className="flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors"
+              style={tab === t.key
+                ? { borderColor: 'var(--accent)', color: 'var(--accent)' }
+                : { borderColor: 'transparent', color: 'var(--fg-3)' }}
             >
               <t.icon size={16} />
               {t.label}
