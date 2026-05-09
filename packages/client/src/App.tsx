@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useCallback } from 'react';
+import { useMemo, useEffect, useCallback, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './hooks/useAuth';
 import { PluginSlotRegistry, PluginProvider, usePluginSlots } from '@azrtydxb/ui';
@@ -150,6 +150,14 @@ function AppContent() {
   const setEditContent = useUIStore((s) => s.setEditContent);
   const view = useUIStore((s) => s.view);
   const setView = useUIStore((s) => s.setView);
+  // Tag selected via the sidebar chip click — passed into <TagsView> as
+  // initialTag so the view opens already filtered. Subsequent clicks
+  // inside the TagsView manage selection internally.
+  const [pendingTag, setPendingTag] = useState<string | null>(null);
+  const handleSidebarTagSelect = useCallback((tag: string) => {
+    setPendingTag(tag);
+    setView('tags');
+  }, [setView]);
 
   const {
     toggleStar,
@@ -252,6 +260,7 @@ function AppContent() {
           onCreateFromTemplate={handleCreateFromTemplate}
           onToggleStar={toggleStar}
           onShare={handleShare}
+          onTagSelect={handleSidebarTagSelect}
         >
           <PluginSlot slot="sidebar" />
         </SidebarLayout>
@@ -279,7 +288,14 @@ function AppContent() {
                 mode="global"
               />
             ) : view === 'tags' ? (
-              <TagsView onNoteSelect={(p) => { handleNoteSelect(p); setView('note'); }} />
+              <TagsView
+                // key remounts the view when the user picks a different tag
+                // from the sidebar, so initialTag seeds fresh state without
+                // requiring a sync-in-effect inside TagsView.
+                key={pendingTag ?? '__none__'}
+                initialTag={pendingTag}
+                onNoteSelect={(p) => { handleNoteSelect(p); setView('note'); setPendingTag(null); }}
+              />
             ) : notes.activeNote ? (
               editing ? (
                 <EditModeView

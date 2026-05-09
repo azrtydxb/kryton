@@ -341,15 +341,23 @@ export function FileTree({
         const isDragOver = node.type === "folder" && node.path === dragOverPath;
         const displayName = node.type === "file" ? node.name.replace(/\.md$/, "") : node.name;
 
+        const onRowActivate = () => {
+          if (node.type === "folder") toggleExpand(node.path);
+          else onSelect(node.path);
+        };
         return (
           <div>
-            <button
+            {/* Tree row uses a <div role="treeitem"> rather than a <button>
+                because it wraps the Star + More-options buttons, and HTML
+                doesn't allow interactive content inside a <button>. We add
+                tabIndex + keyboard activation to keep it focusable. */}
+            <div
               draggable
               role="treeitem"
               aria-expanded={node.type === "folder" ? isExpanded : undefined}
               tabIndex={0}
               className={cn(
-                "group w-full flex items-center gap-2 py-1 text-sm rounded-md mx-1 transition-colors duration-100 kryton-tree-row relative",
+                "group w-full flex items-center gap-2 py-1 text-sm rounded-md mx-1 transition-colors duration-100 kryton-tree-row relative cursor-pointer",
                 isDragging && "opacity-50",
                 isDragOver && "kryton-tree-row--dragover",
                 isActive && "kryton-tree-row--active",
@@ -360,9 +368,12 @@ export function FileTree({
                 color: isActive ? "var(--fg)" : "var(--fg-1)",
                 background: isActive ? "var(--accent-soft)" : "transparent",
               }}
-              onClick={() => {
-                if (node.type === "folder") toggleExpand(node.path);
-                else onSelect(node.path);
+              onClick={onRowActivate}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onRowActivate();
+                }
               }}
               onContextMenu={(e) => handleContextMenu(e, node)}
               onDragStart={(e) => handleDragStart(e, node)}
@@ -489,7 +500,7 @@ export function FileTree({
               >
                 <MoreHorizontal size={14} aria-hidden="true" />
               </button>
-            </button>
+            </div>
             {node.type === "folder" && isExpanded && node.children && (
               <div>
                 {creating && creating.parentPath === node.path && (

@@ -5,12 +5,19 @@
  * tag chip grid, and a side detail showing the notes for the selected
  * tag. Replaces the editor pane (sidebar + graph rail stay mounted).
  */
-import { useEffect, useState, useCallback, type CSSProperties } from 'react';
+import { useState, useCallback, type CSSProperties } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { api, type TagData, type TagNoteData } from '../../lib/api';
 import { Icons } from '../Icons';
 
 interface TagsViewProps {
   onNoteSelect: (path: string) => void;
+  /**
+   * Tag to pre-select when the view mounts. Used when the user navigates
+   * here by clicking a tag chip in the sidebar. Subsequent clicks inside
+   * the view manage selection internally.
+   */
+  initialTag?: string | null;
 }
 
 const headerStyle: CSSProperties = {
@@ -39,33 +46,30 @@ const tagChip = (active: boolean): CSSProperties => ({
   transition: 'background 120ms, border-color 120ms, color 120ms',
 });
 
-export function TagsView({ onNoteSelect }: TagsViewProps) {
-  const [tags, setTags] = useState<TagData[]>([]);
-  const [selectedTag, setSelectedTag] = useState<string | null>(null);
-  const [tagNotes, setTagNotes] = useState<TagNoteData[]>([]);
-  const [loadingNotes, setLoadingNotes] = useState(false);
+export function TagsView({ onNoteSelect, initialTag }: TagsViewProps) {
+  // initialTag seeds the first render. The parent passes `key={initialTag}`
+  // so picking a different tag from the sidebar remounts the view and
+  // re-seeds state without any sync-in-effect dance.
+  const [selectedTag, setSelectedTag] = useState<string | null>(initialTag ?? null);
 
-  useEffect(() => {
-    api.getTags().then(setTags).catch(() => setTags([]));
+  // The tags index and the per-tag note list both come from the network —
+  // delegated to react-query so loading/data state lives outside React's
+  // effect machinery (no sync setState in effects).
+  const { data: tags = [] } = useQuery<TagData[]>({
+    queryKey: ['tags'],
+    queryFn: () => api.getTags(),
+    staleTime: 30_000,
+  });
+  const { data: tagNotes = [], isLoading: loadingNotes } = useQuery<TagNoteData[]>({
+    queryKey: ['tag-notes', selectedTag],
+    queryFn: () => api.getNotesByTag(selectedTag as string),
+    enabled: !!selectedTag,
+    staleTime: 30_000,
+  });
+
+  const handleTagSelect = useCallback((tag: string) => {
+    setSelectedTag((prev) => (prev === tag ? null : tag));
   }, []);
-
-  const handleTagSelect = useCallback(async (tag: string) => {
-    if (selectedTag === tag) {
-      setSelectedTag(null);
-      setTagNotes([]);
-      return;
-    }
-    setSelectedTag(tag);
-    setLoadingNotes(true);
-    try {
-      const notes = await api.getNotesByTag(tag);
-      setTagNotes(notes);
-    } catch {
-      setTagNotes([]);
-    } finally {
-      setLoadingNotes(false);
-    }
-  }, [selectedTag]);
 
   return (
     <div
@@ -101,7 +105,7 @@ export function TagsView({ onNoteSelect }: TagsViewProps) {
         <div style={{ flex: 1 }} />
         {selectedTag && (
           <button
-            onClick={() => { setSelectedTag(null); setTagNotes([]); }}
+            onClick={() => setSelectedTag(null)}
             className="mono"
             style={{
               fontSize: 11,
