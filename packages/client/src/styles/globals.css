@@ -8,11 +8,11 @@
 @source "../../../ui/src";
 @source "../../../ui/dist";
 
-@custom-variant dark (&:where(.dark, .dark *));
+@custom-variant dark ([data-theme="dark"] &);
 
 @theme {
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
   --color-surface-50: #fafafa;
   --color-surface-100: #f5f5f5;
@@ -28,10 +28,6 @@
 @layer base {
   :root {
     --sidebar-width: 260px;
-  }
-  /* Default border tracks the design-system line token. */
-  * {
-    border-color: var(--line);
   }
 }
 
@@ -95,12 +91,12 @@
 /* Markdown decoration spans rendered inline (the Lezer-emitted ranges). The
    tokens — including the `# ` mark for headings — stay visible in edit mode
    so the user always sees raw markdown; we only restyle. */
-.ed-h1 { font-family: var(--font-display); font-size: 22px; font-weight: 600; letter-spacing: -0.4px; color: var(--fg); }
-.ed-h2 { font-family: var(--font-display); font-size: 18px; font-weight: 600; letter-spacing: -0.2px; color: var(--fg); }
-.ed-h3 { font-family: var(--font-display); font-size: 16px; font-weight: 600; color: var(--fg); }
-.ed-h4 { font-family: var(--font-display); font-size: 15px; font-weight: 600; color: var(--fg); }
-.ed-h5 { font-family: var(--font-display); font-size: 14px; font-weight: 600; color: var(--fg); }
-.ed-h6 { font-family: var(--font-display); font-size: 13px; font-weight: 600; color: var(--fg-2); }
+.ed-h1 { color: var(--fg); font-weight: 600; }
+.ed-h2 { color: var(--fg); font-weight: 600; }
+.ed-h3 { color: var(--fg); font-weight: 600; }
+.ed-h4 { color: var(--fg); font-weight: 600; }
+.ed-h5 { color: var(--fg); font-weight: 600; }
+.ed-h6 { color: var(--fg); font-weight: 600; }
 
 /* Bold uses --accent-warn (amber) per editor.jsx MdInline so emphasis pops
    inside the mono surface; the body --fg already gives normal text contrast. */

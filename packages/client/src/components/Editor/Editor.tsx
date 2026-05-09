@@ -195,28 +195,25 @@ interface EditorTabStripProps {
  * so we render a single tab. Designed to extend to multi-tab later.
  */
 export function EditorTabStrip({ activePath, activeTitle, dirty, onClose }: EditorTabStripProps) {
-  const [hover, setHover] = useState(false);
+  void dirty;
+  void onClose;
 
   return (
     <div
       style={{
         display: 'flex',
-        alignItems: 'stretch',
-        height: 32,
+        alignItems: 'center',
+        height: 38,
         background: 'var(--bg)',
         flexShrink: 0,
       }}
     >
       <div
-        onMouseEnter={() => setHover(true)}
-        onMouseLeave={() => setHover(false)}
         style={{
           display: 'flex',
           alignItems: 'center',
           gap: 8,
-          padding: '6px 12px',
-          borderBottom: '2px solid var(--accent)',
-          marginBottom: -1,
+          padding: '0 12px',
           minWidth: 0,
           maxWidth: 280,
         }}
@@ -239,10 +236,8 @@ export function EditorTabStrip({ activePath, activeTitle, dirty, onClose }: Edit
             return basename.endsWith('.md') ? basename : `${activeTitle}.md`;
           })()}
         </span>
-        {/* Saved-status pill per prototype/app/editor.jsx EditorTabBar. The
-            dot pulses while dirty (mid-edit) and the label flips between
-            "saving" and "saved" — for now we always show "saved" since the
-            client autosaves on idle. */}
+        {/* Saved-status pill per prototype/app/editor.jsx EditorTabBar — always
+            shows the green pulsing dot + literal "saved" label. */}
         <span
           className="mono"
           style={{
@@ -260,44 +255,18 @@ export function EditorTabStrip({ activePath, activeTitle, dirty, onClose }: Edit
           }}
         >
           <span
-            className={dirty ? 'dot pulse' : 'dot'}
+            className="dot pulse"
             style={{
               width: 5,
               height: 5,
               borderRadius: '50%',
-              background: dirty ? 'var(--accent)' : 'var(--accent-good)',
+              background: 'var(--accent-good)',
               boxShadow: 'none',
             }}
             aria-hidden
           />
-          {dirty ? 'saving' : 'saved'}
+          saved
         </span>
-        {hover && onClose && (
-          <button
-            onClick={onClose}
-            title="Close"
-            style={{
-              marginLeft: 2,
-              width: 16,
-              height: 16,
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: 3,
-              color: 'var(--fg-3)',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'var(--bg-hover)';
-              e.currentTarget.style.color = 'var(--fg)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent';
-              e.currentTarget.style.color = 'var(--fg-3)';
-            }}
-          >
-            <Icons.X size={12} />
-          </button>
-        )}
       </div>
     </div>
   );
@@ -334,7 +303,7 @@ export function ModePills({ value, onChange }: ModePillsProps) {
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: 2,
+        gap: 1,
         padding: 2,
         borderRadius: 7,
         background: 'var(--bg-1)',
@@ -363,7 +332,7 @@ function ModePill({
     display: 'inline-flex',
     alignItems: 'center',
     gap: 5,
-    padding: '4px 10px',
+    padding: '4px 8px',
     borderRadius: 5,
     fontFamily: 'var(--font-mono)',
     fontSize: 11.5,

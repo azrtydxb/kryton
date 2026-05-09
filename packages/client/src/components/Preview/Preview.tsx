@@ -62,13 +62,6 @@ const MD_CSS = `
   border: 0;
   padding: 0;
 }
-.kryton-md .markdown-preview h3 {
-  font-family: var(--font-display);
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--fg);
-  margin: 22px 0 8px;
-}
 .kryton-md .markdown-preview h4,
 .kryton-md .markdown-preview h5,
 .kryton-md .markdown-preview h6 {
@@ -125,19 +118,6 @@ const MD_CSS = `
   border-radius: 0;
   font-size: 12.5px;
 }
-.kryton-md .markdown-preview pre[data-language]::before {
-  content: attr(data-language);
-  position: absolute;
-  top: 6px;
-  right: 10px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--fg-4);
-  pointer-events: none;
-}
-
 .kryton-md .markdown-preview blockquote {
   border-left: 2px solid var(--accent);
   padding: 0 0 0 14px;
@@ -149,7 +129,7 @@ const MD_CSS = `
 .kryton-md .markdown-preview ul,
 .kryton-md .markdown-preview ol {
   padding-left: 22px;
-  margin: 8px 0 14px;
+  margin: 8px 0;
 }
 .kryton-md .markdown-preview li { margin-bottom: 4px; }
 
@@ -267,7 +247,7 @@ export function Preview({
           }}
         >
           <Icons.FileText size={11} aria-hidden />
-          <span>/{notePath}</span>
+          <span>{notePath}</span>
           {(() => {
             const words = (content.replace(/`{1,3}.*?`{1,3}/gs, '').match(/\S+/g) || []).length;
             return (
@@ -279,13 +259,12 @@ export function Preview({
           })()}
           {modifiedAt && (
             <>
-              <span style={{ flex: 1 }} aria-hidden />
+              <span aria-hidden>·</span>
               <span>
                 updated{' '}
-                {new Date(modifiedAt).toLocaleDateString(undefined, {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
+                {new Date(modifiedAt).toLocaleString(undefined, {
+                  dateStyle: 'medium',
+                  timeStyle: 'short',
                 })}
               </span>
             </>
@@ -310,8 +289,8 @@ export function Preview({
           style={{
             maxWidth: 760,
             margin: '0 auto',
-            padding: '0 36px 80px',
-            marginTop: 28,
+            padding: '0 48px 80px',
+            marginTop: 36,
           }}
         >
           <div

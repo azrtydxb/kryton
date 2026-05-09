@@ -1,6 +1,5 @@
 import { FileNode } from '../../lib/api';
 import { Sidebar } from '../Sidebar/Sidebar';
-import { Icons } from '../Icons';
 
 interface SharedNote {
   id: string;
@@ -41,7 +40,6 @@ interface SidebarLayoutProps {
 export function SidebarLayout({
   sidebarOpen, setSidebarOpen,
   mobileMenuOpen, setMobileMenuOpen,
-  sidebarWidth,
   tree, activeNotePath, starredPaths, sharedNotes,
   onSelect, onCreateNote, onDeleteNote, onRenameNote,
   onCreateFolder, onDeleteFolder, onRenameFolder,
@@ -49,6 +47,12 @@ export function SidebarLayout({
   onTagSelect,
   children,
 }: SidebarLayoutProps) {
+  // When the sidebar is closed on desktop, the column is not rendered at all
+  // (matching the prototype). The mobile drawer still uses the open flag.
+  if (!sidebarOpen && !mobileMenuOpen) {
+    return null;
+  }
+
   return (
     <>
       {/* Mobile overlay */}
@@ -60,43 +64,16 @@ export function SidebarLayout({
         />
       )}
 
-      {/* Collapsed bar (desktop only) — shown when the full sidebar is closed */}
-      <div
-        className={`hidden ${sidebarOpen ? 'md:hidden' : 'md:flex'} flex-col items-center flex-shrink-0`}
-        style={{
-          width: 36,
-          background: 'var(--bg-1)',
-          borderRight: '1px solid var(--line)',
-          padding: '6px 0',
-        }}
-      >
-        <button
-          onClick={() => setSidebarOpen(true)}
-          aria-label="Open sidebar"
-          title="Open sidebar (Ctrl+B)"
-          style={{
-            width: 28, height: 28, borderRadius: 5,
-            color: 'var(--fg-3)',
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--fg)'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-3)'; }}
-        >
-          <Icons.PanelLeft size={14} />
-        </button>
-      </div>
-
-      {/* Full sidebar */}
+      {/* Full sidebar — fixed 260px width per design */}
       <aside
         className={`
           ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
           md:translate-x-0
-          ${sidebarOpen ? '' : 'md:!w-0 md:overflow-hidden md:border-r-0'}
           fixed md:relative inset-y-0 left-0 z-40 md:z-0
           flex-shrink-0
         `}
         style={{
-          width: sidebarOpen ? `${sidebarWidth}px` : undefined,
+          width: '260px',
           background: 'var(--bg-1)',
           borderRight: '1px solid var(--line)',
           display: 'flex', flexDirection: 'column',

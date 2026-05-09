@@ -6,6 +6,11 @@ interface QuickSwitcherProps {
   notes: FileNode[];
   onSelect: (path: string) => void;
   onClose: () => void;
+  onNewNote?: () => void;
+  onNewFolder?: () => void;
+  onDailyNote?: () => void;
+  onGraphView?: () => void;
+  onSettings?: () => void;
 }
 
 interface NoteEntry {
@@ -29,6 +34,7 @@ interface Section {
 }
 
 const monoFamily = 'var(--font-mono)';
+const sansFamily = 'var(--font-sans)';
 
 function collectFiles(nodes: FileNode[]): NoteEntry[] {
   const files: NoteEntry[] = [];
@@ -43,7 +49,16 @@ function collectFiles(nodes: FileNode[]): NoteEntry[] {
   return files;
 }
 
-export function QuickSwitcher({ notes, onSelect, onClose }: QuickSwitcherProps) {
+export function QuickSwitcher({
+  notes,
+  onSelect,
+  onClose,
+  onNewNote,
+  onNewFolder,
+  onDailyNote,
+  onGraphView,
+  onSettings,
+}: QuickSwitcherProps) {
   const allFiles = useMemo(() => collectFiles(notes), [notes]);
   const [q, setQ] = useState('');
   const [idx, setIdx] = useState(0);
@@ -61,23 +76,68 @@ export function QuickSwitcher({ notes, onSelect, onClose }: QuickSwitcherProps) 
   const sections = useMemo<Section[]>(() => {
     const ql = q.trim().toLowerCase();
 
+    const commands: ResultItem[] = [
+      {
+        kind: 'command',
+        icon: <Icons.Plus size={13} />,
+        label: 'New note',
+        hint: `${mod}N`,
+        onActivate: onNewNote,
+      },
+      {
+        kind: 'command',
+        icon: <Icons.FolderPlus size={13} />,
+        label: 'New folder',
+        hint: `${mod}⇧N`,
+        onActivate: onNewFolder,
+      },
+      {
+        kind: 'command',
+        icon: <Icons.Calendar size={13} />,
+        label: 'Daily note',
+        hint: `${mod}D`,
+        onActivate: onDailyNote,
+      },
+      {
+        kind: 'command',
+        icon: <Icons.Network size={13} />,
+        label: 'Graph view',
+        hint: `${mod}G`,
+        onActivate: onGraphView,
+      },
+      {
+        kind: 'command',
+        icon: <Icons.Settings size={13} />,
+        label: 'Settings',
+        hint: `${mod},`,
+        onActivate: onSettings,
+      },
+    ];
+
     const noteHits = allFiles
       .filter((n) => !ql || n.name.toLowerCase().includes(ql) || n.path.toLowerCase().includes(ql))
       .slice(0, 20)
       .map<ResultItem>((n) => ({
         kind: 'note',
-        icon: <Icons.FileText size={14} />,
+        icon: <Icons.FileText size={13} />,
         label: n.name,
         hint: n.path,
         value: n.path,
       }));
 
     if (ql) {
-      return [{ title: `Notes (${noteHits.length})`, items: noteHits }];
+      const cmdHits = commands.filter((c) => c.label.toLowerCase().includes(ql));
+      const out: Section[] = [];
+      if (cmdHits.length) out.push({ title: 'Commands', items: cmdHits });
+      if (noteHits.length) out.push({ title: `Notes (${noteHits.length})`, items: noteHits });
+      return out;
     }
 
-    return [{ title: 'Notes', items: noteHits.slice(0, 8) }];
-  }, [q, allFiles]);
+    return [
+      { title: 'Commands', items: commands },
+      { title: 'Notes', items: noteHits.slice(0, 8) },
+    ];
+  }, [q, allFiles, mod, onNewNote, onNewFolder, onDailyNote, onGraphView, onSettings]);
 
   const flat = useMemo(() => sections.flatMap((s) => s.items), [sections]);
 
@@ -95,7 +155,9 @@ export function QuickSwitcher({ notes, onSelect, onClose }: QuickSwitcherProps) 
     if (item.kind === 'note' && item.value) {
       onSelect(item.value);
       onClose();
+      return;
     }
+    onClose();
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -116,7 +178,7 @@ export function QuickSwitcher({ notes, onSelect, onClose }: QuickSwitcherProps) 
   };
 
   const sectionHeader: CSSProperties = {
-    padding: '10px 12px 6px',
+    padding: '8px 10px 4px',
     fontSize: 10.5,
     fontFamily: monoFamily,
     letterSpacing: '0.08em',
@@ -132,7 +194,7 @@ export function QuickSwitcher({ notes, onSelect, onClose }: QuickSwitcherProps) 
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'oklch(0 0 0 / 0.5)',
+        background: 'oklch(0 0 0 / 0.45)',
         zIndex: 100,
         backdropFilter: 'blur(4px)',
         display: 'flex',
@@ -144,11 +206,11 @@ export function QuickSwitcher({ notes, onSelect, onClose }: QuickSwitcherProps) 
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: 560,
+          width: 580,
           maxWidth: '90vw',
           background: 'var(--bg-1)',
           border: '1px solid var(--line-strong)',
-          borderRadius: 12,
+          borderRadius: 10,
           boxShadow: 'var(--shadow-lg)',
           overflow: 'hidden',
           display: 'flex',
@@ -165,17 +227,7 @@ export function QuickSwitcher({ notes, onSelect, onClose }: QuickSwitcherProps) 
             borderBottom: '1px solid var(--line)',
           }}
         >
-          <span
-            className="mono"
-            style={{
-              color: 'var(--accent)',
-              fontSize: 16,
-              fontWeight: 600,
-              userSelect: 'none',
-            }}
-          >
-            &gt;
-          </span>
+          <Icons.Search size={16} style={{ color: 'var(--accent)' }} />
           <input
             ref={inputRef}
             value={q}
@@ -184,39 +236,18 @@ export function QuickSwitcher({ notes, onSelect, onClose }: QuickSwitcherProps) 
               setIdx(0);
             }}
             onKeyDown={onKeyDown}
-            placeholder="search or type a command…"
+            placeholder="Search notes, run a command…"
             style={{
               flex: 1,
               background: 'transparent',
               border: 'none',
               outline: 'none',
               color: 'var(--fg)',
-              fontSize: 16,
-              fontFamily: monoFamily,
+              fontSize: 15,
+              fontFamily: sansFamily,
             }}
           />
           <span className="kbd">esc</span>
-        </div>
-
-        {/* AI hint */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '8px 16px',
-            borderBottom: '1px solid var(--line)',
-            fontFamily: monoFamily,
-            fontSize: 11.5,
-            color: 'var(--fg-3)',
-            background: 'var(--bg-1)',
-          }}
-        >
-          <Icons.Sparkle size={12} style={{ color: 'var(--accent)' }} />
-          <span>
-            <span style={{ color: 'var(--accent)' }}>✦</span>{' '}
-            AI search ready · press <span className="kbd">↵</span> to ask Claude
-          </span>
         </div>
 
         {/* Results */}
@@ -224,14 +255,14 @@ export function QuickSwitcher({ notes, onSelect, onClose }: QuickSwitcherProps) 
           {flat.length === 0 && (
             <div
               style={{
-                padding: 28,
+                padding: 30,
                 textAlign: 'center',
                 color: 'var(--fg-3)',
-                fontFamily: monoFamily,
-                fontSize: 12,
+                fontFamily: sansFamily,
+                fontSize: 13,
               }}
             >
-              no matches.
+              No matches.
             </div>
           )}
 
@@ -258,7 +289,7 @@ export function QuickSwitcher({ notes, onSelect, onClose }: QuickSwitcherProps) 
                         borderRadius: 6,
                         border: 'none',
                         background: sel ? 'var(--accent-soft)' : 'transparent',
-                        color: sel ? 'var(--accent)' : 'var(--fg-1)',
+                        color: sel ? 'var(--fg)' : 'var(--fg-1)',
                         fontSize: 13,
                         textAlign: 'left',
                         cursor: 'pointer',
@@ -282,7 +313,7 @@ export function QuickSwitcher({ notes, onSelect, onClose }: QuickSwitcherProps) 
                         <span
                           className="mono"
                           style={{
-                            color: sel ? 'var(--accent)' : 'var(--fg-4)',
+                            color: 'var(--fg-4)',
                             fontSize: 11,
                             opacity: 0.85,
                             maxWidth: 220,
@@ -308,8 +339,7 @@ export function QuickSwitcher({ notes, onSelect, onClose }: QuickSwitcherProps) 
             display: 'flex',
             gap: 14,
             alignItems: 'center',
-            padding: '0 14px',
-            height: 28,
+            padding: '8px 14px',
             background: 'var(--bg-1)',
             borderTop: '1px solid var(--line)',
             fontSize: 11,
@@ -331,7 +361,7 @@ export function QuickSwitcher({ notes, onSelect, onClose }: QuickSwitcherProps) 
           <div style={{ flex: 1 }} />
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--accent)' }}>
             <span className="dot pulse" style={{ background: 'var(--accent)' }} />
-            AI ready
+            AI search ready
           </span>
         </div>
       </div>

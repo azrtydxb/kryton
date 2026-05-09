@@ -116,10 +116,16 @@ function AppModals({
   noteTree,
   onTemplateSelected,
   onNoteSelect,
+  onNewNote,
+  onDailyNote,
+  onGraphView,
 }: {
   noteTree: FileNode[];
   onTemplateSelected: (content: string) => void;
   onNoteSelect: (path: string) => void;
+  onNewNote?: () => void;
+  onDailyNote?: () => void;
+  onGraphView?: () => void;
 }) {
   const showTemplatePicker = useUIStore((s) => s.showTemplatePicker);
   const setShowTemplatePicker = useUIStore((s) => s.setShowTemplatePicker);
@@ -153,6 +159,10 @@ function AppModals({
       onCloseShareDialog={() => setShowShareDialog(false)}
       onCloseAccessRequests={() => setShowAccessRequests(false)}
       onCloseAccountSettings={() => setShowAccountSettings(false)}
+      onNewNote={onNewNote}
+      onDailyNote={onDailyNote}
+      onGraphView={onGraphView}
+      onSettings={() => setShowAccountSettings(true)}
     />
   );
 }
@@ -417,6 +427,9 @@ function AppContent() {
         noteTree={notes.tree}
         onTemplateSelected={handleTemplateSelected}
         onNoteSelect={handleNoteSelect}
+        onNewNote={callbacks.handleNewNote}
+        onDailyNote={callbacks.handleDailyNote}
+        onGraphView={() => setView('graph')}
       />
     </div>
   );

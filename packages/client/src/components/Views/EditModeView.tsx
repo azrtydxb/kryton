@@ -96,16 +96,6 @@ export function EditModeView({
   const showPreview = layout === 'preview' || layout === 'split';
   const dirty = hasChanges || saveStatus === 'saving' || saveStatus === 'unsaved';
 
-  const saveStatusLabel = (() => {
-    switch (saveStatus) {
-      case 'saving': return { text: 'saving…', color: 'var(--fg-3)' };
-      case 'saved':  return { text: 'saved',   color: 'var(--accent-good)' };
-      case 'error':  return { text: 'save failed', color: 'var(--accent-danger)' };
-      case 'unsaved': return { text: 'unsaved', color: 'var(--accent-warn)' };
-      default: return { text: '', color: 'var(--fg-3)' };
-    }
-  })();
-
   // Suppress unused variable warnings; resolvedTheme and allNotes are used
   // for future theming and wiki-link plugin wiring.
   void resolvedTheme;
@@ -116,7 +106,7 @@ export function EditModeView({
       onClick={props.onClick}
       title={props.title}
       style={{
-        width: 28, height: 28, borderRadius: 5,
+        width: 30, height: 30, borderRadius: 6,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         color: props.active ? 'var(--accent-warn)' : 'var(--fg-3)',
         background: 'transparent',
@@ -137,7 +127,7 @@ export function EditModeView({
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, background: 'var(--bg)' }}>
-      {/* Tab strip + actions row (single 32px row, shared bottom border) */}
+      {/* Tab strip + actions row (single 38px row, shared bottom border) */}
       <div style={{ display: 'flex', alignItems: 'stretch', background: 'var(--bg)', borderBottom: '1px solid var(--line)' }}>
         <div style={{ flex: 1, minWidth: 0, display: 'flex' }}>
           <EditorTabStrip
@@ -148,16 +138,10 @@ export function EditModeView({
           />
         </div>
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          padding: '0 8px 0 4px', height: 32,
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '0 12px 0 4px', height: 38,
         }}>
           <ModePills />
-          {/* tiny inline saved/saving indicator (mono, accent-good when 'saved') */}
-          {(saveStatus === 'saving' || saveStatus === 'saved' || saveStatus === 'error' || saveStatus === 'unsaved') && (
-            <span className="mono" style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: saveStatusLabel.color, minWidth: 56, textAlign: 'right' }}>
-              {saveStatusLabel.text}
-            </span>
-          )}
           {/* Star / Share / More — per prototype/app/editor.jsx EditorTabBar */}
           {headerBtn({
             onClick: onToggleStar,
