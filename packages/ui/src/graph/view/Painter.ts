@@ -57,4 +57,15 @@ export interface Scene {
   theme: "light" | "dark";
   /** Mode-aware: local mode ghosts non-set elements. */
   mode: "global" | "local";
+  /** When true, draw every node's label. Otherwise labels render on hover/active only. */
+  showAllLabels?: boolean;
+  /** Optional design-token overrides resolved from CSS variables at draw time. */
+  tokens?: {
+    bg2: string;
+    fg3: string;
+    fg4: string;
+    accent: string;
+    accent2: string;
+    accentSoft: string;
+  };
 }

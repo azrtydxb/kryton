@@ -418,6 +418,7 @@ export function GraphPanel({
               onNodeHover={handleHover}
               recenterRef={recenterRef}
               starredPaths={starredPaths}
+              showAllLabels={fullscreen}
             />
             {renderCornerControls(fullscreen ? null : () => setExpanded(true))}
             {tooltip && renderHoverCard(tooltip)}
@@ -527,6 +528,7 @@ export function GraphPanel({
                   onNodeHover={handleHover}
                   recenterRef={expandedRecenterRef}
                   starredPaths={starredPaths}
+                  showAllLabels
                 />
                 {renderCornerControls(null)}
                 {tooltip && renderHoverCard(tooltip)}

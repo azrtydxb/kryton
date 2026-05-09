@@ -22,11 +22,14 @@ export interface GraphViewProps {
   recenterRef?: React.MutableRefObject<(() => void) | null>;
   starredPaths?: Set<string>;
   className?: string;
+  /** When true, render every node's label (fullscreen graph view). Defaults to false (rail mode shows labels only on active/hover). */
+  showAllLabels?: boolean;
 }
 
 export function GraphView({
   graphData, loading = false, activeNotePath = null, mode = "full",
   onNoteSelect, onNodeHover, recenterRef, starredPaths, className,
+  showAllLabels = false,
 }: GraphViewProps) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const layoutRef = React.useRef<LayoutHandle | null>(null);
@@ -135,6 +138,8 @@ export function GraphView({
             transform: viewport,
             theme: detectTheme(),
             mode: layoutMode,
+            showAllLabels,
+            tokens: resolveTokens(canvas),
             nodes: graphData.nodes.map((n) => {
               const pos = layout.getPosition(n.id);
               return {
@@ -250,6 +255,30 @@ export function GraphView({
 function detectTheme(): "light" | "dark" {
   if (typeof document === "undefined") return "dark";
   return document.documentElement.classList.contains("dark") ? "dark" : "light";
+}
+
+/**
+ * Resolve the graph palette from live CSS variables on the canvas's nearest
+ * styled ancestor. Canvas itself doesn't inherit custom-property reads
+ * reliably across all browsers, so we read from documentElement which always
+ * carries the global token sheet. Fallback `undefined` lets drawScene fall
+ * back to the static GRAPH_CONFIG palette when tokens are missing (tests,
+ * SSR, native).
+ */
+function resolveTokens(canvas: HTMLCanvasElement): Scene["tokens"] | undefined {
+  if (typeof document === "undefined" || !canvas) return undefined;
+  const cs = getComputedStyle(document.documentElement);
+  const get = (name: string) => cs.getPropertyValue(name).trim();
+  const bg2 = get("--bg-2");
+  if (!bg2) return undefined;
+  return {
+    bg2,
+    fg3: get("--fg-3"),
+    fg4: get("--fg-4"),
+    accent: get("--accent"),
+    accent2: get("--accent-2"),
+    accentSoft: get("--accent-soft"),
+  };
 }
 
 function computeLocalSet(

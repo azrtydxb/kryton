@@ -12,10 +12,14 @@ export function createForceLayout(input: LayoutInput): LayoutHandle {
   for (const n of input.nodes) graph.addNode(n.id, { ...n });
   for (const e of input.edges) graph.addLink(e.fromNoteId, e.toNoteId);
 
+  // ngraph convention: gravity NEGATIVE = repulsion, POSITIVE = attraction.
+  // Our config uses d3-style chargeStrength (-400 = strong repulsion); divide
+  // it down to ngraph's scale (~-12 default) and keep the sign so nodes
+  // actually push apart instead of collapsing onto the centroid.
   const layout = createLayout(graph, {
     springLength: cfg.linkDistance,
     springCoefficient: 0.0008,
-    gravity: cfg.chargeStrength * -1, // ngraph: positive gravity = repulsion
+    gravity: cfg.chargeStrength / 30,
     theta: 0.8,
     dragCoefficient: 0.02,
     timeStep: 20,
