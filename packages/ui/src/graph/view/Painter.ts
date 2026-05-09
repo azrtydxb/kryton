@@ -65,6 +65,7 @@ export interface Scene {
     fg1: string;
     fg3: string;
     fg4: string;
+    line: string;
     accent: string;
     accent2: string;
     accentSoft: string;

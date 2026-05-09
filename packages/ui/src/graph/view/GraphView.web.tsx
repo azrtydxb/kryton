@@ -276,26 +276,28 @@ function resolveTokens(canvas: HTMLCanvasElement): Scene["tokens"] | undefined {
     fg1: get("--fg-1"),
     fg3: get("--fg-3"),
     fg4: get("--fg-4"),
+    line: get("--line"),
     accent: get("--accent"),
     accent2: get("--accent-2"),
     accentSoft: get("--accent-soft"),
   };
 }
 
+// Per prototype/app/graph.jsx ~line 14-16:
+//   const visibleNodes = mode === 'local' && activeId
+//     ? nodes.filter(n => n.id === activeId
+//         || edges.some(([a,b]) => (a === activeId && b === n.id) || (b === activeId && a === n.id)))
+//     : nodes;
+// Local mode shows ONLY the active note + direct (1-hop) neighbours. Local
+// without an active note matches global. Global always shows everything.
 function computeLocalSet(
   data: GraphData, activeId: string | null, mode: LayoutMode,
 ): Set<string> | null {
   if (mode !== "local" || !activeId) return null;
   const set = new Set<string>([activeId]);
-  const adj = new Map<string, Set<string>>();
-  for (const n of data.nodes) adj.set(n.id, new Set());
   for (const e of data.edges) {
-    adj.get(e.fromNoteId)?.add(e.toNoteId);
-    adj.get(e.toNoteId)?.add(e.fromNoteId);
-  }
-  for (const id of adj.get(activeId) ?? []) {
-    set.add(id);
-    for (const id2 of adj.get(id) ?? []) set.add(id2);
+    if (e.fromNoteId === activeId) set.add(e.toNoteId);
+    else if (e.toNoteId === activeId) set.add(e.fromNoteId);
   }
   return set;
 }
