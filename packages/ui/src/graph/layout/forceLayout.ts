@@ -52,8 +52,24 @@ export function createForceLayout(input: LayoutInput): LayoutHandle {
     });
   }
 
+  // Soft anchor: nudge every node toward the origin proportional to its
+  // distance. With pure repulsion, isolated/unconnected nodes drift outward
+  // forever; this gives them a weak return spring so the cluster stays
+  // compact without overpowering the link-driven layout.
+  const ANCHOR_STRENGTH = 0.005;
+  function applyAnchor() {
+    graph.forEachNode((node) => {
+      const id = node.id as string;
+      const body = layout.getBody(id);
+      if (!body || body.isPinned) return;
+      body.velocity.x -= body.pos.x * ANCHOR_STRENGTH;
+      body.velocity.y -= body.pos.y * ANCHOR_STRENGTH;
+    });
+  }
+
   const handle: LayoutHandle = {
     step() {
+      applyAnchor();
       layout.step();
       recentre();
       for (const id of pinned) {
