@@ -54,10 +54,12 @@ export function GraphView({
     const bboxW = Math.max(1, maxX - minX);
     const bboxH = Math.max(1, maxY - minY);
     const margin = 60;
-    // Allow zooming in past 1× when the cluster is small — the bbox can be
-    // tiny for sparse graphs, and we want nodes to be visible, not pinheads.
+    // Auto-fit caps zoom-in at 1.5× so a sparse cluster doesn't blow up
+    // node radii to the size of the rail. User can still pinch / wheel up
+    // to scaleMax manually.
+    const AUTO_FIT_MAX_K = 1.5;
     const k = Math.min(
-      GRAPH_CONFIG.zoom.scaleMax,
+      AUTO_FIT_MAX_K,
       Math.max(
         GRAPH_CONFIG.zoom.scaleMin,
         Math.min((w - margin) / bboxW, (h - margin) / bboxH),

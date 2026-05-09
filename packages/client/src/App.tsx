@@ -59,8 +59,31 @@ export default function App() {
   );
 }
 
-function AppStatusBar({ notePath }: { notePath: string | null }) {
+function AppStatusBar({
+  notePath,
+  noteContent,
+}: {
+  notePath: string | null;
+  noteContent: string | null;
+}) {
   const cursorState = useUIStore((s) => s.cursorState);
+
+  // Derive outgoing-link and tag counts from the active note's content so the
+  // status bar tracks the live document, not just file metadata. Strip
+  // fenced code blocks first so wikilinks/hashtags inside snippets don't
+  // inflate the counts.
+  const { outgoing, tags, words } = useMemo(() => {
+    if (!noteContent) return { outgoing: 0, tags: 0, words: 0 };
+    const stripped = noteContent.replace(/```[\s\S]*?```/g, '').replace(/`[^`]*`/g, '');
+    const outgoingMatches = stripped.match(/\[\[[^\]]+\]\]/g) || [];
+    const tagMatches = stripped.match(/(^|\s)#[A-Za-z][\w-]*/g) || [];
+    const wordMatches = stripped.match(/\S+/g) || [];
+    return {
+      outgoing: outgoingMatches.length,
+      tags: tagMatches.length,
+      words: wordMatches.length,
+    };
+  }, [noteContent]);
 
   return (
     <div className="flex items-center">
@@ -69,7 +92,9 @@ function AppStatusBar({ notePath }: { notePath: string | null }) {
         notePath={notePath}
         line={cursorState.line}
         col={cursorState.col}
-        wordCount={cursorState.wordCount}
+        wordCount={cursorState.wordCount || words}
+        outgoingCount={outgoing}
+        tagsCount={tags}
       />
       <PluginSlot slot="statusbar-right" />
     </div>
@@ -342,10 +367,16 @@ function AppContent() {
           {/* EditorMeta — per prototype, the editor pane's own bottom rail
              (28px, bg-1) so it shares the baseline with the sidebar
              AgentsFooter and the graph legend. */}
-          <AppStatusBar notePath={notes.activeNote?.path ?? null} />
+          <AppStatusBar
+            notePath={notes.activeNote?.path ?? null}
+            noteContent={notes.activeNote?.content ?? null}
+          />
         </main>
 
-        {!editing && view === 'note' && (
+        {/* Graph rail is shown in every view except the fullscreen graph view
+            (matches prototype/app/main.jsx: graphPosition='right' && view!=='graph').
+            Previously hidden during edit mode — that broke the 3-pane layout. */}
+        {view !== 'graph' && view !== 'all' && view !== 'tags' && (
           <>
             <RightPanel
               rightPanelWidth={rightPanelWidth}

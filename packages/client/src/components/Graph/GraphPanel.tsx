@@ -101,7 +101,10 @@ export function GraphPanel({
   onModeChange,
   fullscreen = false,
 }: GraphPanelProps) {
-  const [internalMode, setInternalMode] = useState<'local' | 'global'>('local');
+  // Default to global so the rail always shows the whole graph at a glance.
+  // Local is the focus mode the user opts into to see "what's connected to
+  // this note"; global is the right idle state.
+  const [internalMode, setInternalMode] = useState<'local' | 'global'>('global');
   const mode = controlledMode ?? internalMode;
   const setMode = useCallback(
     (m: 'local' | 'global') => {

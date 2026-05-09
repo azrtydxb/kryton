@@ -11,6 +11,8 @@ interface PreviewProps {
   allNotes?: FileNode[];
   onCreateNote?: (name: string) => void;
   notePath?: string;
+  /** ISO timestamp of the note's last modification — surfaced in the meta header. */
+  modifiedAt?: string;
   /** Open a backlink note. When provided, the inline backlinks tail is clickable. */
   onNoteSelect?: (path: string) => void;
   getCodeFenceRenderer?: (language: string) => { component: React.ComponentType<{ content: string; notePath: string }> } | undefined;
@@ -29,16 +31,20 @@ interface PreviewProps {
 const MD_CSS = `
 .kryton-md .markdown-preview {
   font-family: var(--font-sans);
-  font-size: 14.5px;
+  /* prototype/app/editor.jsx PreviewBody: fontSize 15, lineHeight 1.7 */
+  font-size: 15px;
   line-height: 1.7;
   color: var(--fg-1);
-  padding: 28px 36px 80px;
+  /* Top padding handled by the meta-header row above; bottom keeps the
+     "scroll past content" feel from the prototype. */
+  padding: 8px 48px 80px;
   max-width: 760px;
   margin: 0 auto;
 }
 .kryton-md .markdown-preview h1 {
   font-family: var(--font-display);
-  font-size: 28px;
+  /* prototype: fontSize 32, letterSpacing -0.4 */
+  font-size: 32px;
   font-weight: 600;
   letter-spacing: -0.4px;
   color: var(--fg);
@@ -190,6 +196,7 @@ export function Preview({
   allNotes,
   onCreateNote,
   notePath = '',
+  modifiedAt,
   onNoteSelect,
   getCodeFenceRenderer,
 }: PreviewProps) {
@@ -240,6 +247,51 @@ export function Preview({
   return (
     <div className="kryton-md">
       <style>{MD_CSS}</style>
+      {/* Meta header per prototype/app/editor.jsx PreviewBody:
+          file-icon · path · words · updated <date>. Sits above the h1 in
+          mono 11.5px / --fg-3, matching the design tokens. */}
+      {notePath && (
+        <div
+          className="mono"
+          style={{
+            maxWidth: 760,
+            margin: '0 auto',
+            padding: '28px 48px 0',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            marginBottom: 0,
+            fontFamily: 'var(--font-mono)',
+            fontSize: 11.5,
+            color: 'var(--fg-3)',
+          }}
+        >
+          <Icons.FileText size={11} aria-hidden />
+          <span>/{notePath}</span>
+          {(() => {
+            const words = (content.replace(/`{1,3}.*?`{1,3}/gs, '').match(/\S+/g) || []).length;
+            return (
+              <>
+                <span aria-hidden>·</span>
+                <span>{words} words</span>
+              </>
+            );
+          })()}
+          {modifiedAt && (
+            <>
+              <span style={{ flex: 1 }} aria-hidden />
+              <span>
+                updated{' '}
+                {new Date(modifiedAt).toLocaleDateString(undefined, {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                })}
+              </span>
+            </>
+          )}
+        </div>
+      )}
       <NotePreviewReact
         content={processedContent}
         onLinkClick={onLinkClick}
