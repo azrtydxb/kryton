@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useCallback, useState } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { AuthProvider } from './hooks/useAuth';
 import { PluginSlotRegistry, PluginProvider, usePluginSlots } from '@azrtydxb/ui';
 import { ClientPluginManager } from './plugins/PluginManager';
@@ -42,7 +42,7 @@ import { ModalsContainer } from './components/Modals/ModalsContainer';
 import { ErrorToast } from './components/Toast/ErrorToast';
 import { ToastContainer } from './components/Toast/ToastContainer';
 import { StatusBar } from './components/StatusBar/StatusBar';
-import { FileNode } from './lib/api';
+import { api, FileNode } from './lib/api';
 import LoginPage from './pages/LoginPage';
 
 export default function App() {
@@ -67,6 +67,16 @@ function AppStatusBar({
   noteContent: string | null;
 }) {
   const cursorState = useUIStore((s) => s.cursorState);
+
+  // Backlinks count is server-derived (live indexer); cached so the bar
+  // reflects current cross-references without forcing extra fetches.
+  const backlinksQuery = useQuery({
+    queryKey: ['backlinks-count', notePath],
+    queryFn: () => (notePath ? api.getBacklinks(notePath) : Promise.resolve([])),
+    enabled: !!notePath,
+    staleTime: 5_000,
+  });
+  const backlinksCount = backlinksQuery.data?.length ?? 0;
 
   // Derive outgoing-link and tag counts from the active note's content so the
   // status bar tracks the live document, not just file metadata. Strip
@@ -94,6 +104,7 @@ function AppStatusBar({
         col={cursorState.col}
         wordCount={cursorState.wordCount || words}
         outgoingCount={outgoing}
+        backlinksCount={backlinksCount}
         tagsCount={tags}
       />
       <PluginSlot slot="statusbar-right" />
