@@ -33,6 +33,8 @@ interface SidebarLayoutProps {
   onCreateFromTemplate: () => void;
   onToggleStar: (path: string) => void;
   onShare: (path: string, isFolder: boolean) => void;
+  /** Sidebar tag-chip click — routes to the tags view filtered by `tag`. */
+  onTagSelect?: (tag: string) => void;
   children?: React.ReactNode;
 }
 
@@ -44,6 +46,7 @@ export function SidebarLayout({
   onSelect, onCreateNote, onDeleteNote, onRenameNote,
   onCreateFolder, onDeleteFolder, onRenameFolder,
   onDailyNote, onCreateFromTemplate, onToggleStar, onShare,
+  onTagSelect,
   children,
 }: SidebarLayoutProps) {
   return (
@@ -104,6 +107,7 @@ export function SidebarLayout({
             tree={tree}
             activeNotePath={activeNotePath}
             onSelect={onSelect}
+            onTagSelect={onTagSelect}
             onCreateNote={onCreateNote}
             onDeleteNote={onDeleteNote}
             onRenameNote={onRenameNote}

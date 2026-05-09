@@ -35,6 +35,11 @@ interface SidebarProps {
   version?: string;
   /** optional content rendered between the section list and the agents footer (e.g. plugin slot) */
   beforeFooter?: ReactNode;
+  /**
+   * Called when the user clicks a tag chip in the sidebar — should route
+   * to the tags-filtered view (not load `#tag` as a note path, which 500s).
+   */
+  onTagSelect?: (tag: string) => void;
 }
 
 const DEFAULT_VERSION = 'v4.3.2';
@@ -238,6 +243,7 @@ export function Sidebar({
   onCollapse,
   version = DEFAULT_VERSION,
   beforeFooter,
+  onTagSelect,
 }: SidebarProps) {
   const [favOpen, setFavOpen] = useState(true);
   const [filesOpen, setFilesOpen] = useState(true);
@@ -457,7 +463,7 @@ export function Sidebar({
                 <button
                   key={tag}
                   className="mono"
-                  onClick={() => onSelect(`#${tag}`)}
+                  onClick={() => onTagSelect?.(tag)}
                   title={`#${tag} (${count})`}
                   style={{
                     display: 'inline-flex',

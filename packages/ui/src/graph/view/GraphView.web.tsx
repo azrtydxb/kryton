@@ -33,10 +33,43 @@ export function GraphView({
   const hitRef = React.useRef<HitTest | null>(null);
   const hoverRef = React.useRef<string | null>(null);
   const dragRef = React.useRef<{ id: string; startX: number; startY: number } | null>(null);
+  // Once the layout has been pre-settled we stop stepping the simulation —
+  // continuing would let positions drift past the initial fit. Drag bumps
+  // this back to false so the simulation runs while the user is dragging.
+  const frozenRef = React.useRef(false);
   const { viewport, bind, setViewport } = useViewport();
   const layoutMode: LayoutMode = mode === "full" ? "global" : "local";
 
+  /** Compute a viewport that frames the current layout positions inside (w, h). */
+  const fitToCanvas = React.useCallback((w: number, h: number) => {
+    const layout = layoutRef.current;
+    if (!layout) return { x: w / 2, y: h / 2, k: 1 };
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity, count = 0;
+    for (const p of layout.positions()) {
+      if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+      count++;
+    }
+    if (count === 0 || !Number.isFinite(minX)) return { x: w / 2, y: h / 2, k: 1 };
+    const bboxW = Math.max(1, maxX - minX);
+    const bboxH = Math.max(1, maxY - minY);
+    const margin = 60;
+    // Allow zooming in past 1× when the cluster is small — the bbox can be
+    // tiny for sparse graphs, and we want nodes to be visible, not pinheads.
+    const k = Math.min(
+      GRAPH_CONFIG.zoom.scaleMax,
+      Math.max(
+        GRAPH_CONFIG.zoom.scaleMin,
+        Math.min((w - margin) / bboxW, (h - margin) / bboxH),
+      ),
+    );
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    return { x: w / 2 - cx * k, y: h / 2 - cy * k, k };
+  }, []);
+
   // Build / rebuild layout when graphData, mode, or activeNotePath changes.
+  // Settle for a few hundred ticks before fitting so the bbox is meaningful.
   React.useEffect(() => {
     if (!graphData) return;
     layoutRef.current?.dispose();
@@ -48,21 +81,30 @@ export function GraphView({
       nodes: graphData.nodes, edges: graphData.edges, mode: layoutMode,
       activeId, width: w, height: h,
     });
+    // Pre-settle so positions stabilise before the first paint, then freeze.
+    frozenRef.current = false;
+    for (let i = 0; i < 500; i++) layoutRef.current.step();
+    frozenRef.current = true;
     hitRef.current = createHitTest(
       [...layoutRef.current.positions()],
       Math.sqrt(GRAPH_CONFIG.node.hitTestRadiusSq),
     );
+    setViewport(fitToCanvas(w, h));
     return () => {
       layoutRef.current?.dispose();
       layoutRef.current = null;
     };
-  }, [graphData, layoutMode, activeNotePath]);
+  }, [graphData, layoutMode, activeNotePath, setViewport, fitToCanvas]);
 
-  // Recenter handle.
+  // Recenter handle — fits the bounding box of current positions to the canvas.
   React.useEffect(() => {
     if (!recenterRef) return;
-    recenterRef.current = () => setViewport({ x: 0, y: 0, k: 1 });
-  }, [recenterRef, setViewport]);
+    recenterRef.current = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      setViewport(fitToCanvas(canvas.clientWidth, canvas.clientHeight));
+    };
+  }, [recenterRef, setViewport, fitToCanvas]);
 
   // Render loop.
   React.useEffect(() => {
@@ -80,8 +122,10 @@ export function GraphView({
             canvas.width = w * dpr; canvas.height = h * dpr;
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
           }
-          layout.step();
-          hit?.rebuild([...layout.positions()]);
+          if (!frozenRef.current || dragRef.current) {
+            layout.step();
+            hit?.rebuild([...layout.positions()]);
+          }
 
           const activeId = graphData.nodes.find((n) => n.path === activeNotePath)?.id ?? null;
           const localSet = computeLocalSet(graphData, activeId, layoutMode);
@@ -155,6 +199,8 @@ export function GraphView({
     const id = hitRef.current?.test(wx, wy);
     if (id) {
       dragRef.current = { id, startX: e.clientX, startY: e.clientY };
+      // Unfreeze so the dragged node can move and the rest react.
+      frozenRef.current = false;
       applyDragStart(layoutRef.current!, id, wx, wy);
     }
   };
@@ -170,6 +216,8 @@ export function GraphView({
         if (node) onNoteSelect(node.path);
       }
       dragRef.current = null;
+      // Re-freeze after the user lets go so the simulation stops.
+      frozenRef.current = true;
     }
   };
 

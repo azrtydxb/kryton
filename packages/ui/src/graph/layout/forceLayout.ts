@@ -23,9 +23,35 @@ export function createForceLayout(input: LayoutInput): LayoutHandle {
 
   const pinned = new Set<string>();
 
+  // ngraph's gravity is pure repulsion; with no edges or sparse graphs the
+  // cluster's centre of mass drifts and falls off-screen. After every step,
+  // shift all unpinned positions so the centroid stays at (0, 0). This is
+  // gentle (relative offsets between nodes are preserved) and gives consumers
+  // a stable bbox to fit the camera against.
+  function recentre() {
+    let sx = 0, sy = 0, count = 0;
+    graph.forEachNode((node) => {
+      const id = node.id as string;
+      const body = layout.getBody(id);
+      if (!body) return;
+      sx += body.pos.x; sy += body.pos.y; count++;
+    });
+    if (count === 0) return;
+    const dx = sx / count, dy = sy / count;
+    if (dx === 0 && dy === 0) return;
+    graph.forEachNode((node) => {
+      const id = node.id as string;
+      const body = layout.getBody(id);
+      if (!body || body.isPinned) return;
+      body.pos.x -= dx;
+      body.pos.y -= dy;
+    });
+  }
+
   const handle: LayoutHandle = {
     step() {
       layout.step();
+      recentre();
       for (const id of pinned) {
         const body = layout.getBody(id);
         if (!body) continue;
