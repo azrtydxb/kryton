@@ -27,26 +27,47 @@ export function createForceLayout(input: LayoutInput): LayoutHandle {
 
   const pinned = new Set<string>();
 
+  // Pin the active note at the origin so every layout pass orbits around it.
+  // The active node never moves; everything else relaxes around it under
+  // spring + repulsion + the soft anchor below. Selecting a different note
+  // disposes the layout (in GraphView.web.tsx) and we get a fresh handle.
+  if (input.activeId) {
+    const body = layout.getBody(input.activeId);
+    if (body) {
+      body.pos.x = 0;
+      body.pos.y = 0;
+      body.isPinned = true;
+      pinned.add(input.activeId);
+    }
+  }
+
   // ngraph's gravity is pure repulsion; with no edges or sparse graphs the
-  // cluster's centre of mass drifts and falls off-screen. After every step,
-  // shift all unpinned positions so the centroid stays at (0, 0). This is
-  // gentle (relative offsets between nodes are preserved) and gives consumers
-  // a stable bbox to fit the camera against.
+  // cluster's centre of mass drifts. After every step we shift positions so
+  // the *anchor* stays at (0, 0) — that's the active note when one is
+  // selected (so the active stays dead-centre), or the centroid otherwise.
   function recentre() {
-    let sx = 0, sy = 0, count = 0;
-    graph.forEachNode((node) => {
-      const id = node.id as string;
-      const body = layout.getBody(id);
-      if (!body) return;
-      sx += body.pos.x; sy += body.pos.y; count++;
-    });
-    if (count === 0) return;
-    const dx = sx / count, dy = sy / count;
+    let dx = 0, dy = 0;
+    if (input.activeId) {
+      const anchorBody = layout.getBody(input.activeId);
+      if (!anchorBody) return;
+      dx = anchorBody.pos.x;
+      dy = anchorBody.pos.y;
+    } else {
+      let sx = 0, sy = 0, count = 0;
+      graph.forEachNode((node) => {
+        const body = layout.getBody(node.id as string);
+        if (!body) return;
+        sx += body.pos.x; sy += body.pos.y; count++;
+      });
+      if (count === 0) return;
+      dx = sx / count;
+      dy = sy / count;
+    }
     if (dx === 0 && dy === 0) return;
     graph.forEachNode((node) => {
       const id = node.id as string;
       const body = layout.getBody(id);
-      if (!body || body.isPinned) return;
+      if (!body) return;
       body.pos.x -= dx;
       body.pos.y -= dy;
     });

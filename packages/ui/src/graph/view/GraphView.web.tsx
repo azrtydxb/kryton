@@ -43,7 +43,14 @@ export function GraphView({
   const { viewport, bind, setViewport } = useViewport();
   const layoutMode: LayoutMode = mode === "full" ? "global" : "local";
 
-  /** Compute a viewport that frames the current layout positions inside (w, h). */
+  /**
+   * Compute a viewport that frames the current layout inside (w, h).
+   *
+   * When a note is active the layout pins it at world (0, 0) — we centre
+   * the canvas on that origin so the active node always sits dead-centre
+   * regardless of how the cluster shifts during settle. Without an active
+   * note we fall back to centring on the bbox.
+   */
   const fitToCanvas = React.useCallback((w: number, h: number) => {
     const layout = layoutRef.current;
     if (!layout) return { x: w / 2, y: h / 2, k: 1 };
@@ -68,10 +75,15 @@ export function GraphView({
         Math.min((w - margin) / bboxW, (h - margin) / bboxH),
       ),
     );
+    // Active node is pinned at world (0,0) by the layout, so centring the
+    // canvas on world-origin places the active node at the canvas centre.
+    if (activeNotePath) {
+      return { x: w / 2, y: h / 2, k };
+    }
     const cx = (minX + maxX) / 2;
     const cy = (minY + maxY) / 2;
     return { x: w / 2 - cx * k, y: h / 2 - cy * k, k };
-  }, []);
+  }, [activeNotePath]);
 
   // Build / rebuild layout when graphData, mode, or activeNotePath changes.
   // Settle for a few hundred ticks before fitting so the bbox is meaningful.
