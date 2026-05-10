@@ -36,6 +36,11 @@ export function GraphView({
   const hitRef = React.useRef<HitTest | null>(null);
   const hoverRef = React.useRef<string | null>(null);
   const dragRef = React.useRef<{ id: string; startX: number; startY: number } | null>(null);
+  // Tracks which active note we last centred the camera on. The render-loop
+  // camera-follow only fires when this drifts behind activeNotePath — so a
+  // selection re-centres once, but subsequent user pan/wheel isn't fought
+  // by the follower every frame.
+  const centredOnRef = React.useRef<string | null>(null);
   const { viewport, bind, setViewport } = useViewport();
   // viewportRef mirrors the React state; the render loop and camera-follow
   // read/write through the ref so the effect doesn't need `viewport` in its
@@ -155,22 +160,22 @@ export function GraphView({
 
           const activeId = graphData.nodes.find((n) => n.path === activeNotePath)?.id ?? null;
 
-          // Camera follow: snap to the active note's screen position. A lerp
-          // looks like spider-web sway because every label translates in
-          // sync each frame; an instant snap on selection (and held still
-          // afterwards) reads as a clean focus change.
-          const v = viewportRef.current;
-          if (activeId) {
+          // Camera focus: snap to the active note ONCE per selection, not
+          // every frame. Continuous follow would fight user pan/wheel — they
+          // could never drag the viewport because the next frame would snap
+          // it back. centredOnRef remembers which active we last centred on;
+          // we only re-centre when it changes.
+          if (activeId && centredOnRef.current !== activeId) {
             const pos = layout.getPosition(activeId);
             if (pos) {
-              const targetX = w / 2 - pos.x * v.k;
-              const targetY = h / 2 - pos.y * v.k;
-              if (Math.abs(targetX - v.x) > 0.5 || Math.abs(targetY - v.y) > 0.5) {
-                const next = { x: targetX, y: targetY, k: v.k };
-                viewportRef.current = next;
-                setViewport(next);
-              }
+              const v = viewportRef.current;
+              const next = { x: w / 2 - pos.x * v.k, y: h / 2 - pos.y * v.k, k: v.k };
+              viewportRef.current = next;
+              setViewport(next);
+              centredOnRef.current = activeId;
             }
+          } else if (!activeId) {
+            centredOnRef.current = null;
           }
           const tiers = computeLocalTiers(graphData, activeId, layoutMode);
           const tierFor = (id: string): "primary" | "secondary" | "hidden" => {
