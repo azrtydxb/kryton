@@ -45,6 +45,13 @@ export function GraphView({
   const ALPHA_MIN = 0.005;
   const ALPHA_DECAY = 0.018;
   const { viewport, bind, setViewport } = useViewport();
+  // viewportRef mirrors the React state; the render loop and camera-follow
+  // read/write through the ref so the effect doesn't need `viewport` in its
+  // deps. Without this, every camera-lerp tick triggered a setViewport
+  // → state change → effect re-run → rAF cancel + restart, which is the
+  // "spider web vibration" the user reported.
+  const viewportRef = React.useRef(viewport);
+  React.useEffect(() => { viewportRef.current = viewport; }, [viewport]);
   const layoutMode: LayoutMode = mode === "full" ? "global" : "local";
 
   /**
@@ -111,32 +118,10 @@ export function GraphView({
     };
   }, [graphData, layoutMode, setViewport, fitToCanvas]);
 
-  // Selection in global mode: do nothing to the layout. The render loop
-  // pans the camera to follow the active note's current position — the
-  // cluster stays exactly where it sits, no spring tug-of-war.
-  // Selection in local mode: the layout structure (concentric rings) is
-  // keyed on the active id, so it does need a rebuild.
-  React.useEffect(() => {
-    if (layoutMode !== "local") return;
-    if (!graphData) return;
-    const layout = layoutRef.current;
-    if (!layout) return;
-    const activeId = graphData.nodes.find((n) => n.path === activeNotePath)?.id ?? null;
-    layout.dispose();
-    const canvas = canvasRef.current!;
-    const w = canvas.clientWidth, h = canvas.clientHeight;
-    layoutRef.current = createLayout({
-      nodes: graphData.nodes, edges: graphData.edges, mode: layoutMode,
-      activeId, width: w, height: h,
-    });
-    for (let i = 0; i < 200; i++) layoutRef.current.step();
-    hitRef.current = createHitTest(
-      [...layoutRef.current.positions()],
-      Math.sqrt(GRAPH_CONFIG.node.hitTestRadiusSq),
-    );
-    setViewport(fitToCanvas(w, h));
-    alphaRef.current = 1;
-  }, [activeNotePath, graphData, layoutMode, setViewport, fitToCanvas]);
+  // Selection never touches the layout. Both modes use the same force
+  // layout; local just ghosts the non-active set in the renderer (see
+  // drawScene + computeLocalSet). The render-loop's camera-follow pans
+  // the viewport to the new active.
 
   // Recenter handle — fits the bounding box of current positions to the canvas.
   React.useEffect(() => {
@@ -180,26 +165,33 @@ export function GraphView({
           // Camera follow: when an active note exists, glide the viewport so
           // the active node sits at the canvas centre. We lerp toward the
           // target each frame (8% per frame ≈ ~480ms half-life) for a calm
-          // glide that doesn't feel like a snap.
+          // glide that doesn't feel like a snap. Mutates the ref directly
+          // so the next frame sees the updated viewport without waiting on
+          // React state — and only calls setViewport when the camera has
+          // actually moved by a pixel, which keeps re-renders rare instead
+          // of one-per-frame.
+          const v = viewportRef.current;
           if (activeId) {
             const pos = layout.getPosition(activeId);
             if (pos) {
-              const targetX = w / 2 - pos.x * viewport.k;
-              const targetY = h / 2 - pos.y * viewport.k;
-              const dx = targetX - viewport.x;
-              const dy = targetY - viewport.y;
+              const targetX = w / 2 - pos.x * v.k;
+              const targetY = h / 2 - pos.y * v.k;
+              const dx = targetX - v.x;
+              const dy = targetY - v.y;
               if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
-                setViewport({
-                  x: viewport.x + dx * 0.08,
-                  y: viewport.y + dy * 0.08,
-                  k: viewport.k,
-                });
+                const next = {
+                  x: v.x + dx * 0.08,
+                  y: v.y + dy * 0.08,
+                  k: v.k,
+                };
+                viewportRef.current = next;
+                setViewport(next);
               }
             }
           }
           const localSet = computeLocalSet(graphData, activeId, layoutMode);
           const scene: Scene = {
-            transform: viewport,
+            transform: viewportRef.current,
             theme: detectTheme(),
             mode: layoutMode,
             showAllLabels,
@@ -242,7 +234,10 @@ export function GraphView({
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [graphData, viewport, activeNotePath, layoutMode, starredPaths]);
+    // viewport intentionally NOT in deps — read via viewportRef so the rAF
+    // loop stays alive across camera-follow updates instead of being
+    // cancelled and restarted every frame.
+  }, [graphData, layoutMode, activeNotePath, starredPaths, setViewport, showAllLabels]);
 
   // Hover + click + drag from pointer events on the wrapper.
   const onPointerMove = (e: React.PointerEvent) => {
