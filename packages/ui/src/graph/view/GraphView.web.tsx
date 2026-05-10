@@ -36,6 +36,14 @@ export function GraphView({
   const hitRef = React.useRef<HitTest | null>(null);
   const hoverRef = React.useRef<string | null>(null);
   const dragRef = React.useRef<{ id: string; startX: number; startY: number } | null>(null);
+  // d3-force style alpha decay: simulation runs while alpha > alphaMin, then
+  // stops. Selecting a note or dragging reheats it back to 1. Without this
+  // the cluster vibrates indefinitely — repulsion never wins enough to be
+  // counted "still" and the spring keeps wobbling. With decay the graph
+  // settles to a quiet equilibrium, then perturbs and re-settles on input.
+  const alphaRef = React.useRef(1);
+  const ALPHA_MIN = 0.005;
+  const ALPHA_DECAY = 0.018;
   const { viewport, bind, setViewport } = useViewport();
   const layoutMode: LayoutMode = mode === "full" ? "global" : "local";
 
@@ -94,13 +102,10 @@ export function GraphView({
       nodes: graphData.nodes, edges: graphData.edges, mode: layoutMode,
       activeId, width: w, height: h,
     });
-    // Pre-settle so the first paint isn't a chaotic explosion. We deliberately
-    // do NOT freeze afterwards — the render loop keeps stepping every frame so
-    // the graph behaves like a real-time particle simulation (Obsidian-style):
-    // nodes repel, links spring, the active node stays pinned at origin, and
-    // damping (ngraph's dragCoefficient) lets the cluster settle into an
-    // organic equilibrium that perturbs and re-settles on every interaction.
+    // Pre-settle so the first paint isn't a chaotic explosion, then let the
+    // render loop continue stepping with alpha decay until equilibrium.
     for (let i = 0; i < 200; i++) layoutRef.current.step();
+    alphaRef.current = 1;
     hitRef.current = createHitTest(
       [...layoutRef.current.positions()],
       Math.sqrt(GRAPH_CONFIG.node.hitTestRadiusSq),
@@ -138,10 +143,16 @@ export function GraphView({
             canvas.width = w * dpr; canvas.height = h * dpr;
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
           }
-          // Continuous physics — every frame, every time. Repulsion + springs
-          // + soft anchor + active-pin do the rest.
-          layout.step();
-          hit?.rebuild([...layout.positions()]);
+          // Step only while the simulation has energy. Drag forces a step
+          // regardless so the dragged node tracks the pointer instantly.
+          if (alphaRef.current > ALPHA_MIN || dragRef.current) {
+            layout.step();
+            hit?.rebuild([...layout.positions()]);
+            alphaRef.current = Math.max(
+              ALPHA_MIN,
+              alphaRef.current * (1 - ALPHA_DECAY),
+            );
+          }
 
           const activeId = graphData.nodes.find((n) => n.path === activeNotePath)?.id ?? null;
           const localSet = computeLocalSet(graphData, activeId, layoutMode);
@@ -217,6 +228,9 @@ export function GraphView({
     const id = hitRef.current?.test(wx, wy);
     if (id) {
       dragRef.current = { id, startX: e.clientX, startY: e.clientY };
+      // Reheat so the rest of the cluster reacts to the drag instead of
+      // the dragged node moving through frozen positions.
+      alphaRef.current = 1;
       applyDragStart(layoutRef.current!, id, wx, wy);
     }
   };
