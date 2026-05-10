@@ -36,14 +36,6 @@ export function GraphView({
   const hitRef = React.useRef<HitTest | null>(null);
   const hoverRef = React.useRef<string | null>(null);
   const dragRef = React.useRef<{ id: string; startX: number; startY: number } | null>(null);
-  // d3-force style alpha decay: simulation runs while alpha > alphaMin, then
-  // stops. Selecting a note or dragging reheats it back to 1. Without this
-  // the cluster vibrates indefinitely — repulsion never wins enough to be
-  // counted "still" and the spring keeps wobbling. With decay the graph
-  // settles to a quiet equilibrium, then perturbs and re-settles on input.
-  const alphaRef = React.useRef(1);
-  const ALPHA_MIN = 0.005;
-  const ALPHA_DECAY = 0.018;
   const { viewport, bind, setViewport } = useViewport();
   // viewportRef mirrors the React state; the render loop and camera-follow
   // read/write through the ref so the effect doesn't need `viewport` in its
@@ -105,8 +97,12 @@ export function GraphView({
       nodes: graphData.nodes, edges: graphData.edges, mode: layoutMode,
       activeId, width: w, height: h,
     });
-    for (let i = 0; i < 200; i++) layoutRef.current.step();
-    alphaRef.current = 1;
+    // Pre-settle thoroughly so the graph is in equilibrium before first
+    // paint. We then *stop stepping* in the render loop — running the
+    // simulation continuously made the cluster look like a spider web in
+    // the wind because every spring kept nudging neighbours by sub-pixel
+    // amounts each frame. Dragging temporarily resumes stepping.
+    for (let i = 0; i < 800; i++) layoutRef.current.step();
     hitRef.current = createHitTest(
       [...layoutRef.current.positions()],
       Math.sqrt(GRAPH_CONFIG.node.hitTestRadiusSq),
@@ -149,41 +145,28 @@ export function GraphView({
             canvas.width = w * dpr; canvas.height = h * dpr;
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
           }
-          // Step only while the simulation has energy. Drag forces a step
-          // regardless so the dragged node tracks the pointer instantly.
-          if (alphaRef.current > ALPHA_MIN || dragRef.current) {
+          // Only step while the user is dragging — the layout was already
+          // pre-settled at mount and stays frozen otherwise, so the graph
+          // doesn't wobble between renders.
+          if (dragRef.current) {
             layout.step();
             hit?.rebuild([...layout.positions()]);
-            alphaRef.current = Math.max(
-              ALPHA_MIN,
-              alphaRef.current * (1 - ALPHA_DECAY),
-            );
           }
 
           const activeId = graphData.nodes.find((n) => n.path === activeNotePath)?.id ?? null;
 
-          // Camera follow: when an active note exists, glide the viewport so
-          // the active node sits at the canvas centre. We lerp toward the
-          // target each frame (8% per frame ≈ ~480ms half-life) for a calm
-          // glide that doesn't feel like a snap. Mutates the ref directly
-          // so the next frame sees the updated viewport without waiting on
-          // React state — and only calls setViewport when the camera has
-          // actually moved by a pixel, which keeps re-renders rare instead
-          // of one-per-frame.
+          // Camera follow: snap to the active note's screen position. A lerp
+          // looks like spider-web sway because every label translates in
+          // sync each frame; an instant snap on selection (and held still
+          // afterwards) reads as a clean focus change.
           const v = viewportRef.current;
           if (activeId) {
             const pos = layout.getPosition(activeId);
             if (pos) {
               const targetX = w / 2 - pos.x * v.k;
               const targetY = h / 2 - pos.y * v.k;
-              const dx = targetX - v.x;
-              const dy = targetY - v.y;
-              if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
-                const next = {
-                  x: v.x + dx * 0.08,
-                  y: v.y + dy * 0.08,
-                  k: v.k,
-                };
+              if (Math.abs(targetX - v.x) > 0.5 || Math.abs(targetY - v.y) > 0.5) {
+                const next = { x: targetX, y: targetY, k: v.k };
                 viewportRef.current = next;
                 setViewport(next);
               }
@@ -265,9 +248,6 @@ export function GraphView({
     const id = hitRef.current?.test(wx, wy);
     if (id) {
       dragRef.current = { id, startX: e.clientX, startY: e.clientY };
-      // Reheat so the rest of the cluster reacts to the drag instead of
-      // the dragged node moving through frozen positions.
-      alphaRef.current = 1;
       applyDragStart(layoutRef.current!, id, wx, wy);
     }
   };
