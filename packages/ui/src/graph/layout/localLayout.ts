@@ -140,6 +140,13 @@ export function createLocalLayout(input: LayoutInput): LayoutHandle {
         n.angle += (Math.random() - 0.5) * 0.2;
       }
     },
+    setActive() {
+      // Local layout is structurally rebuilt from the active id at create
+      // time (concentric rings around the active). Switching the active
+      // requires a full rebuild — the GraphView layout effect handles that
+      // by disposing and recreating when graphData/mode change. We expose
+      // a no-op here so the LayoutHandle interface stays uniform.
+    },
     setBounds(w, h) {
       cx = w / 2;
       cy = h / 2;

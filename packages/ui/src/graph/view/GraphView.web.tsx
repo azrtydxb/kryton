@@ -48,12 +48,11 @@ export function GraphView({
   const layoutMode: LayoutMode = mode === "full" ? "global" : "local";
 
   /**
-   * Compute a viewport that frames the current layout inside (w, h).
-   *
-   * When a note is active the layout pins it at world (0, 0) — we centre
-   * the canvas on that origin so the active node always sits dead-centre
-   * regardless of how the cluster shifts during settle. Without an active
-   * note we fall back to centring on the bbox.
+   * Compute a viewport that frames the current layout's bounding box inside
+   * (w, h). Used at mount and when the user hits the recenter button. With
+   * an active note the render loop continuously pans the camera to follow
+   * the active's world position, so initial fit just sets the zoom — the
+   * follow logic handles centring afterwards.
    */
   const fitToCanvas = React.useCallback((w: number, h: number) => {
     const layout = layoutRef.current;
@@ -68,9 +67,6 @@ export function GraphView({
     const bboxW = Math.max(1, maxX - minX);
     const bboxH = Math.max(1, maxY - minY);
     const margin = 60;
-    // Auto-fit caps zoom-in at 1.5× so a sparse cluster doesn't blow up
-    // node radii to the size of the rail. User can still pinch / wheel up
-    // to scaleMax manually.
     const AUTO_FIT_MAX_K = 1.5;
     const k = Math.min(
       AUTO_FIT_MAX_K,
@@ -79,31 +75,29 @@ export function GraphView({
         Math.min((w - margin) / bboxW, (h - margin) / bboxH),
       ),
     );
-    // Active node is pinned at world (0,0) by the layout, so centring the
-    // canvas on world-origin places the active node at the canvas centre.
-    if (activeNotePath) {
-      return { x: w / 2, y: h / 2, k };
-    }
     const cx = (minX + maxX) / 2;
     const cy = (minY + maxY) / 2;
     return { x: w / 2 - cx * k, y: h / 2 - cy * k, k };
-  }, [activeNotePath]);
+  }, []);
 
-  // Build / rebuild layout when graphData, mode, or activeNotePath changes.
-  // Settle for a few hundred ticks before fitting so the bbox is meaningful.
+  // Latest activeNotePath, read by long-lived effects that only want to
+  // react to graphData / mode changes (not selection). Selection is handled
+  // by a separate effect that calls layout.setActive.
+  const activePathRef = React.useRef(activeNotePath);
+  activePathRef.current = activeNotePath;
+
+  // Build the layout once per graphData / mode. Selection is handled below.
   React.useEffect(() => {
     if (!graphData) return;
     layoutRef.current?.dispose();
     const canvas = canvasRef.current!;
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
-    const activeId = graphData.nodes.find((n) => n.path === activeNotePath)?.id ?? null;
+    const activeId = graphData.nodes.find((n) => n.path === activePathRef.current)?.id ?? null;
     layoutRef.current = createLayout({
       nodes: graphData.nodes, edges: graphData.edges, mode: layoutMode,
       activeId, width: w, height: h,
     });
-    // Pre-settle so the first paint isn't a chaotic explosion, then let the
-    // render loop continue stepping with alpha decay until equilibrium.
     for (let i = 0; i < 200; i++) layoutRef.current.step();
     alphaRef.current = 1;
     hitRef.current = createHitTest(
@@ -115,7 +109,35 @@ export function GraphView({
       layoutRef.current?.dispose();
       layoutRef.current = null;
     };
-  }, [graphData, layoutMode, activeNotePath, setViewport, fitToCanvas]);
+  }, [graphData, layoutMode, setViewport, fitToCanvas]);
+
+  // Selection: morph in global mode (swap the pin, preserve positions),
+  // rebuild in local mode (concentric rings are keyed on active id).
+  React.useEffect(() => {
+    if (!graphData) return;
+    const layout = layoutRef.current;
+    if (!layout) return;
+    const activeId = graphData.nodes.find((n) => n.path === activeNotePath)?.id ?? null;
+    if (layoutMode === "local") {
+      // Full rebuild — the layout structure depends on the active id.
+      layout.dispose();
+      const canvas = canvasRef.current!;
+      const w = canvas.clientWidth, h = canvas.clientHeight;
+      layoutRef.current = createLayout({
+        nodes: graphData.nodes, edges: graphData.edges, mode: layoutMode,
+        activeId, width: w, height: h,
+      });
+      for (let i = 0; i < 200; i++) layoutRef.current.step();
+      hitRef.current = createHitTest(
+        [...layoutRef.current.positions()],
+        Math.sqrt(GRAPH_CONFIG.node.hitTestRadiusSq),
+      );
+      setViewport(fitToCanvas(w, h));
+    } else {
+      layout.setActive(activeId);
+    }
+    alphaRef.current = 1;
+  }, [activeNotePath, graphData, layoutMode, setViewport, fitToCanvas]);
 
   // Recenter handle — fits the bounding box of current positions to the canvas.
   React.useEffect(() => {
@@ -155,6 +177,27 @@ export function GraphView({
           }
 
           const activeId = graphData.nodes.find((n) => n.path === activeNotePath)?.id ?? null;
+
+          // Camera follow: when an active note exists, glide the viewport so
+          // the active node sits at the canvas centre. We lerp toward the
+          // target each frame (15% per frame ≈ ~250ms half-life) so selecting
+          // a different note pans smoothly instead of snapping.
+          if (activeId) {
+            const pos = layout.getPosition(activeId);
+            if (pos) {
+              const targetX = w / 2 - pos.x * viewport.k;
+              const targetY = h / 2 - pos.y * viewport.k;
+              const dx = targetX - viewport.x;
+              const dy = targetY - viewport.y;
+              if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
+                setViewport({
+                  x: viewport.x + dx * 0.15,
+                  y: viewport.y + dy * 0.15,
+                  k: viewport.k,
+                });
+              }
+            }
+          }
           const localSet = computeLocalSet(graphData, activeId, layoutMode);
           const scene: Scene = {
             transform: viewport,

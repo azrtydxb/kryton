@@ -27,17 +27,21 @@ export function createForceLayout(input: LayoutInput): LayoutHandle {
 
   const pinned = new Set<string>();
 
+  // Mutable active id — `setActive(...)` updates this without recreating the
+  // layout, so existing positions survive the swap and the cluster morphs
+  // smoothly around the new pin.
+  let activeId: string | null = input.activeId ?? null;
+
   // Pin the active note at the origin so every layout pass orbits around it.
-  // The active node never moves; everything else relaxes around it under
-  // spring + repulsion + the soft anchor below. Selecting a different note
-  // disposes the layout (in GraphView.web.tsx) and we get a fresh handle.
-  if (input.activeId) {
-    const body = layout.getBody(input.activeId);
+  // The pinned node never moves; everything else relaxes around it under
+  // spring + repulsion + the soft anchor below.
+  if (activeId) {
+    const body = layout.getBody(activeId);
     if (body) {
       body.pos.x = 0;
       body.pos.y = 0;
       body.isPinned = true;
-      pinned.add(input.activeId);
+      pinned.add(activeId);
     }
   }
 
@@ -45,29 +49,25 @@ export function createForceLayout(input: LayoutInput): LayoutHandle {
   // cluster's centre of mass drifts. After every step we shift positions so
   // the *anchor* stays at (0, 0) — that's the active note when one is
   // selected (so the active stays dead-centre), or the centroid otherwise.
+  // Recentre keeps the cluster centred on world (0, 0) when there's NO active
+  // note. With an active note the camera (in GraphView) tracks the active's
+  // world position instead — shifting positions here would teleport every
+  // body each frame, defeating the morph.
   function recentre() {
-    let dx = 0, dy = 0;
-    if (input.activeId) {
-      const anchorBody = layout.getBody(input.activeId);
-      if (!anchorBody) return;
-      dx = anchorBody.pos.x;
-      dy = anchorBody.pos.y;
-    } else {
-      let sx = 0, sy = 0, count = 0;
-      graph.forEachNode((node) => {
-        const body = layout.getBody(node.id as string);
-        if (!body) return;
-        sx += body.pos.x; sy += body.pos.y; count++;
-      });
-      if (count === 0) return;
-      dx = sx / count;
-      dy = sy / count;
-    }
+    if (activeId) return;
+    let sx = 0, sy = 0, count = 0;
+    graph.forEachNode((node) => {
+      const body = layout.getBody(node.id as string);
+      if (!body) return;
+      sx += body.pos.x; sy += body.pos.y; count++;
+    });
+    if (count === 0) return;
+    const dx = sx / count, dy = sy / count;
     if (dx === 0 && dy === 0) return;
     graph.forEachNode((node) => {
       const id = node.id as string;
       const body = layout.getBody(id);
-      if (!body) return;
+      if (!body || body.isPinned) return;
       body.pos.x -= dx;
       body.pos.y -= dy;
     });
@@ -135,6 +135,30 @@ export function createForceLayout(input: LayoutInput): LayoutHandle {
         body.velocity.x += (Math.random() - 0.5) * alpha * 50;
         body.velocity.y += (Math.random() - 0.5) * alpha * 50;
       });
+    },
+    setActive(id) {
+      // Release the previous pin (if any) so its body becomes a free
+      // particle again — spring + repulsion will push it away from the
+      // new focus naturally as the cluster reorganises.
+      if (activeId) {
+        const prev = layout.getBody(activeId);
+        if (prev) prev.isPinned = false;
+        pinned.delete(activeId);
+      }
+      activeId = id;
+      if (!id) return;
+      // Pin the new active *where it currently sits* — no teleport. The
+      // camera (in GraphView) follows the active's world position each
+      // frame, so as connected nodes pull closer (springs) and unrelated
+      // ones drift away (repulsion), the user sees the existing graph
+      // morph and the camera glide to the new focus, instead of a fresh
+      // layout snap.
+      const body = layout.getBody(id);
+      if (!body) return;
+      body.isPinned = true;
+      body.velocity.x = 0;
+      body.velocity.y = 0;
+      pinned.add(id);
     },
     setBounds() {
       // Force-directed global mode is bounds-agnostic; the camera handles
