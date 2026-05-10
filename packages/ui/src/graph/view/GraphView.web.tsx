@@ -111,31 +111,30 @@ export function GraphView({
     };
   }, [graphData, layoutMode, setViewport, fitToCanvas]);
 
-  // Selection: morph in global mode (swap the pin, preserve positions),
-  // rebuild in local mode (concentric rings are keyed on active id).
+  // Selection in global mode: do nothing to the layout. The render loop
+  // pans the camera to follow the active note's current position — the
+  // cluster stays exactly where it sits, no spring tug-of-war.
+  // Selection in local mode: the layout structure (concentric rings) is
+  // keyed on the active id, so it does need a rebuild.
   React.useEffect(() => {
+    if (layoutMode !== "local") return;
     if (!graphData) return;
     const layout = layoutRef.current;
     if (!layout) return;
     const activeId = graphData.nodes.find((n) => n.path === activeNotePath)?.id ?? null;
-    if (layoutMode === "local") {
-      // Full rebuild — the layout structure depends on the active id.
-      layout.dispose();
-      const canvas = canvasRef.current!;
-      const w = canvas.clientWidth, h = canvas.clientHeight;
-      layoutRef.current = createLayout({
-        nodes: graphData.nodes, edges: graphData.edges, mode: layoutMode,
-        activeId, width: w, height: h,
-      });
-      for (let i = 0; i < 200; i++) layoutRef.current.step();
-      hitRef.current = createHitTest(
-        [...layoutRef.current.positions()],
-        Math.sqrt(GRAPH_CONFIG.node.hitTestRadiusSq),
-      );
-      setViewport(fitToCanvas(w, h));
-    } else {
-      layout.setActive(activeId);
-    }
+    layout.dispose();
+    const canvas = canvasRef.current!;
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    layoutRef.current = createLayout({
+      nodes: graphData.nodes, edges: graphData.edges, mode: layoutMode,
+      activeId, width: w, height: h,
+    });
+    for (let i = 0; i < 200; i++) layoutRef.current.step();
+    hitRef.current = createHitTest(
+      [...layoutRef.current.positions()],
+      Math.sqrt(GRAPH_CONFIG.node.hitTestRadiusSq),
+    );
+    setViewport(fitToCanvas(w, h));
     alphaRef.current = 1;
   }, [activeNotePath, graphData, layoutMode, setViewport, fitToCanvas]);
 
@@ -180,8 +179,8 @@ export function GraphView({
 
           // Camera follow: when an active note exists, glide the viewport so
           // the active node sits at the canvas centre. We lerp toward the
-          // target each frame (15% per frame ≈ ~250ms half-life) so selecting
-          // a different note pans smoothly instead of snapping.
+          // target each frame (8% per frame ≈ ~480ms half-life) for a calm
+          // glide that doesn't feel like a snap.
           if (activeId) {
             const pos = layout.getPosition(activeId);
             if (pos) {
@@ -189,10 +188,10 @@ export function GraphView({
               const targetY = h / 2 - pos.y * viewport.k;
               const dx = targetX - viewport.x;
               const dy = targetY - viewport.y;
-              if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
+              if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
                 setViewport({
-                  x: viewport.x + dx * 0.15,
-                  y: viewport.y + dy * 0.15,
+                  x: viewport.x + dx * 0.08,
+                  y: viewport.y + dy * 0.08,
                   k: viewport.k,
                 });
               }

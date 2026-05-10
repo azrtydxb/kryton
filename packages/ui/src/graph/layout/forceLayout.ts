@@ -27,34 +27,20 @@ export function createForceLayout(input: LayoutInput): LayoutHandle {
 
   const pinned = new Set<string>();
 
-  // Mutable active id — `setActive(...)` updates this without recreating the
-  // layout, so existing positions survive the swap and the cluster morphs
-  // smoothly around the new pin.
-  let activeId: string | null = input.activeId ?? null;
-
-  // Pin the active note at the origin so every layout pass orbits around it.
-  // The pinned node never moves; everything else relaxes around it under
-  // spring + repulsion + the soft anchor below.
-  if (activeId) {
-    const body = layout.getBody(activeId);
-    if (body) {
-      body.pos.x = 0;
-      body.pos.y = 0;
-      body.isPinned = true;
-      pinned.add(activeId);
-    }
-  }
+  // No active-pin: the simulation runs with every node free. The active
+  // note is purely a *camera* concept — the GraphView render loop pans
+  // the viewport to keep it on screen. Pinning the active produced
+  // spider-web tugging when selection swapped the pin, because every
+  // connected spring suddenly had a new fixed endpoint to react to.
+  void input.activeId;
 
   // ngraph's gravity is pure repulsion; with no edges or sparse graphs the
   // cluster's centre of mass drifts. After every step we shift positions so
   // the *anchor* stays at (0, 0) — that's the active note when one is
   // selected (so the active stays dead-centre), or the centroid otherwise.
-  // Recentre keeps the cluster centred on world (0, 0) when there's NO active
-  // note. With an active note the camera (in GraphView) tracks the active's
-  // world position instead — shifting positions here would teleport every
-  // body each frame, defeating the morph.
+  // Keep the cluster centred on world (0, 0) so the camera has a stable
+  // anchor regardless of which node is "active" (active is camera-only now).
   function recentre() {
-    if (activeId) return;
     let sx = 0, sy = 0, count = 0;
     graph.forEachNode((node) => {
       const body = layout.getBody(node.id as string);
@@ -136,29 +122,10 @@ export function createForceLayout(input: LayoutInput): LayoutHandle {
         body.velocity.y += (Math.random() - 0.5) * alpha * 50;
       });
     },
-    setActive(id) {
-      // Release the previous pin (if any) so its body becomes a free
-      // particle again — spring + repulsion will push it away from the
-      // new focus naturally as the cluster reorganises.
-      if (activeId) {
-        const prev = layout.getBody(activeId);
-        if (prev) prev.isPinned = false;
-        pinned.delete(activeId);
-      }
-      activeId = id;
-      if (!id) return;
-      // Pin the new active *where it currently sits* — no teleport. The
-      // camera (in GraphView) follows the active's world position each
-      // frame, so as connected nodes pull closer (springs) and unrelated
-      // ones drift away (repulsion), the user sees the existing graph
-      // morph and the camera glide to the new focus, instead of a fresh
-      // layout snap.
-      const body = layout.getBody(id);
-      if (!body) return;
-      body.isPinned = true;
-      body.velocity.x = 0;
-      body.velocity.y = 0;
-      pinned.add(id);
+    setActive() {
+      // No-op for the force layout — active is purely a camera concept.
+      // The render loop pans the viewport to follow the active note's
+      // current position; the layout itself doesn't restructure.
     },
     setBounds() {
       // Force-directed global mode is bounds-agnostic; the camera handles
