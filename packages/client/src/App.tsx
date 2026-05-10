@@ -331,7 +331,6 @@ function AppContent() {
                 starredPaths={starredPaths}
                 onNoteSelect={(p) => { handleNoteSelect(p); setView('note'); }}
                 fullscreen
-                mode="global"
               />
             ) : view === 'tags' ? (
               <TagsView

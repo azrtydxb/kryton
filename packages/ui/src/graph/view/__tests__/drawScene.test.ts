@@ -9,20 +9,20 @@ const baseScene = (): Scene => ({
       node: { id: "a", title: "A", path: "a.md" },
       position: { id: "a", x: 100, y: 100 },
       isActive: true, isHovered: false, isStarred: false, isShared: false,
-      isVisible: true, isInLocalSet: true,
+      isVisible: true, tier: "primary",
     },
     {
       node: { id: "b", title: "B", path: "b.md" },
       position: { id: "b", x: 200, y: 200 },
       isActive: false, isHovered: false, isStarred: true, isShared: false,
-      isVisible: true, isInLocalSet: true,
+      isVisible: true, tier: "primary",
     },
   ],
   edges: [
     {
       fromPosition: { id: "a", x: 100, y: 100 },
       toPosition: { id: "b", x: 200, y: 200 },
-      isActive: false, isHovered: false, isInLocalSet: true,
+      isActive: false, isHovered: false, tier: "primary",
     },
   ],
   transform: { x: 0, y: 0, k: 1 },
@@ -65,7 +65,7 @@ describe("drawScene", () => {
     const scene = baseScene();
     scene.mode = "local";
     const node1 = scene.nodes[1];
-    if (node1) node1.isInLocalSet = false;
+    if (node1) node1.tier = "secondary";
     drawScene(painter, scene, 400, 400);
     const ghostedCircle = calls.find(
       (c) => c.kind === "circle" && (c.style.alpha ?? 1) < 0.5,

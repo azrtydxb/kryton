@@ -72,14 +72,14 @@ interface Palette {
 }
 
 // Per prototype/app/graph.jsx ~line 53-75:
-//   ghost edge (local mode, one end outside set):
+//   ghost edge (local-mode secondary tier):
 //     stroke=var(--line) strokeWidth=1 opacity=0.3
-//   visible edge:
+//   visible edge (primary tier):
 //     stroke= active/hover ? var(--accent) : var(--fg-4)
 //     strokeWidth= active/hover ? 1.5 : 1
 //     opacity= active/hover ? 0.9 : 0.5
 function drawEdge(p: Painter, e: SceneEdge, palette: Palette, mode: Scene["mode"]) {
-  const ghosted = mode === "local" && !e.isInLocalSet;
+  const ghosted = mode === "local" && e.tier === "secondary";
   if (ghosted) {
     p.drawLine(e.fromPosition.x, e.fromPosition.y, e.toPosition.x, e.toPosition.y, {
       stroke: palette.ghostLine, strokeWidth: 1, alpha: 0.3,
@@ -95,7 +95,7 @@ function drawEdge(p: Painter, e: SceneEdge, palette: Palette, mode: Scene["mode"
 }
 
 function drawNode(p: Painter, n: SceneNode, palette: Palette, mode: Scene["mode"], showAllLabels: boolean) {
-  const ghosted = mode === "local" && !n.isInLocalSet;
+  const ghosted = mode === "local" && n.tier === "secondary";
   const r = n.isActive
     ? GRAPH_CONFIG.node.activeRadius
     : n.isHovered

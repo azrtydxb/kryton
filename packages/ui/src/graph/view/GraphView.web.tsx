@@ -172,39 +172,56 @@ export function GraphView({
               }
             }
           }
-          const localSet = computeLocalSet(graphData, activeId, layoutMode);
+          const tiers = computeLocalTiers(graphData, activeId, layoutMode);
+          const tierFor = (id: string): "primary" | "secondary" | "hidden" => {
+            if (!tiers) return "primary"; // global mode: everything is primary
+            if (tiers.primary.has(id)) return "primary";
+            if (tiers.secondary.has(id)) return "secondary";
+            return "hidden";
+          };
           const scene: Scene = {
             transform: viewportRef.current,
             theme: detectTheme(),
             mode: layoutMode,
             showAllLabels,
             tokens: resolveTokens(canvas),
-            nodes: graphData.nodes.map((n) => {
-              const pos = layout.getPosition(n.id);
-              return {
-                node: n,
-                position: pos ?? { id: n.id, x: 0, y: 0 },
-                isActive: n.id === activeId,
-                isHovered: n.id === hoverRef.current,
-                isStarred: !!(starredPaths && starredPaths.has(n.path)),
-                isShared: !!n.shared,
-                isVisible: !!pos,
-                isInLocalSet: localSet ? localSet.has(n.id) : true,
-              };
-            }),
+            // Skip hidden nodes entirely (3rd-tier+ in local mode).
+            nodes: graphData.nodes
+              .map((n) => ({ n, tier: tierFor(n.id) }))
+              .filter((x) => x.tier !== "hidden")
+              .map(({ n, tier }) => {
+                const pos = layout.getPosition(n.id);
+                return {
+                  node: n,
+                  position: pos ?? { id: n.id, x: 0, y: 0 },
+                  isActive: n.id === activeId,
+                  isHovered: n.id === hoverRef.current,
+                  isStarred: !!(starredPaths && starredPaths.has(n.path)),
+                  isShared: !!n.shared,
+                  isVisible: !!pos,
+                  tier,
+                };
+              }),
+            // An edge is drawn if both endpoints are visible. Its tier is
+            // the higher (more ghosted) of the two endpoints' tiers.
             edges: graphData.edges
               .map((e) => {
+                const fromTier = tierFor(e.fromNoteId);
+                const toTier = tierFor(e.toNoteId);
+                if (fromTier === "hidden" || toTier === "hidden") return null;
                 const fp = layout.getPosition(e.fromNoteId);
                 const tp = layout.getPosition(e.toNoteId);
                 if (!fp || !tp) return null;
+                const tier: "primary" | "secondary" =
+                  fromTier === "primary" && toTier === "primary"
+                    ? "primary"
+                    : "secondary";
                 return {
                   fromPosition: fp,
                   toPosition: tp,
                   isActive: e.fromNoteId === activeId || e.toNoteId === activeId,
                   isHovered: e.fromNoteId === hoverRef.current || e.toNoteId === hoverRef.current,
-                  isInLocalSet: localSet
-                    ? localSet.has(e.fromNoteId) && localSet.has(e.toNoteId)
-                    : true,
+                  tier,
                 };
               })
               .filter((e): e is NonNullable<typeof e> => e !== null),
@@ -321,21 +338,32 @@ function resolveTokens(canvas: HTMLCanvasElement): Scene["tokens"] | undefined {
   };
 }
 
-// Per prototype/app/graph.jsx ~line 14-16:
-//   const visibleNodes = mode === 'local' && activeId
-//     ? nodes.filter(n => n.id === activeId
-//         || edges.some(([a,b]) => (a === activeId && b === n.id) || (b === activeId && a === n.id)))
-//     : nodes;
-// Local mode shows ONLY the active note + direct (1-hop) neighbours. Local
-// without an active note matches global. Global always shows everything.
-function computeLocalSet(
+/**
+ * Compute the two visibility tiers for local mode:
+ *   primary  = active + 1-hop  (drawn full colour)
+ *   secondary = 2-hop neighbours (drawn as gray ghost dots)
+ * Anything farther is hidden entirely.
+ *
+ * Returns null in global mode (every node is primary; no ghosting/hiding).
+ */
+function computeLocalTiers(
   data: GraphData, activeId: string | null, mode: LayoutMode,
-): Set<string> | null {
+): { primary: Set<string>; secondary: Set<string> } | null {
   if (mode !== "local" || !activeId) return null;
-  const set = new Set<string>([activeId]);
+  const adj = new Map<string, Set<string>>();
+  for (const n of data.nodes) adj.set(n.id, new Set());
   for (const e of data.edges) {
-    if (e.fromNoteId === activeId) set.add(e.toNoteId);
-    else if (e.toNoteId === activeId) set.add(e.fromNoteId);
+    adj.get(e.fromNoteId)?.add(e.toNoteId);
+    adj.get(e.toNoteId)?.add(e.fromNoteId);
   }
-  return set;
+  const primary = new Set<string>([activeId]);
+  for (const id of adj.get(activeId) ?? []) primary.add(id);
+  const secondary = new Set<string>();
+  for (const id of primary) {
+    if (id === activeId) continue;
+    for (const id2 of adj.get(id) ?? []) {
+      if (!primary.has(id2)) secondary.add(id2);
+    }
+  }
+  return { primary, secondary };
 }
