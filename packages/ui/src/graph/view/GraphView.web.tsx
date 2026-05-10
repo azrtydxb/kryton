@@ -36,10 +36,6 @@ export function GraphView({
   const hitRef = React.useRef<HitTest | null>(null);
   const hoverRef = React.useRef<string | null>(null);
   const dragRef = React.useRef<{ id: string; startX: number; startY: number } | null>(null);
-  // Once the layout has been pre-settled we stop stepping the simulation —
-  // continuing would let positions drift past the initial fit. Drag bumps
-  // this back to false so the simulation runs while the user is dragging.
-  const frozenRef = React.useRef(false);
   const { viewport, bind, setViewport } = useViewport();
   const layoutMode: LayoutMode = mode === "full" ? "global" : "local";
 
@@ -98,10 +94,13 @@ export function GraphView({
       nodes: graphData.nodes, edges: graphData.edges, mode: layoutMode,
       activeId, width: w, height: h,
     });
-    // Pre-settle so positions stabilise before the first paint, then freeze.
-    frozenRef.current = false;
-    for (let i = 0; i < 500; i++) layoutRef.current.step();
-    frozenRef.current = true;
+    // Pre-settle so the first paint isn't a chaotic explosion. We deliberately
+    // do NOT freeze afterwards — the render loop keeps stepping every frame so
+    // the graph behaves like a real-time particle simulation (Obsidian-style):
+    // nodes repel, links spring, the active node stays pinned at origin, and
+    // damping (ngraph's dragCoefficient) lets the cluster settle into an
+    // organic equilibrium that perturbs and re-settles on every interaction.
+    for (let i = 0; i < 200; i++) layoutRef.current.step();
     hitRef.current = createHitTest(
       [...layoutRef.current.positions()],
       Math.sqrt(GRAPH_CONFIG.node.hitTestRadiusSq),
@@ -139,10 +138,10 @@ export function GraphView({
             canvas.width = w * dpr; canvas.height = h * dpr;
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
           }
-          if (!frozenRef.current || dragRef.current) {
-            layout.step();
-            hit?.rebuild([...layout.positions()]);
-          }
+          // Continuous physics — every frame, every time. Repulsion + springs
+          // + soft anchor + active-pin do the rest.
+          layout.step();
+          hit?.rebuild([...layout.positions()]);
 
           const activeId = graphData.nodes.find((n) => n.path === activeNotePath)?.id ?? null;
           const localSet = computeLocalSet(graphData, activeId, layoutMode);
@@ -218,8 +217,6 @@ export function GraphView({
     const id = hitRef.current?.test(wx, wy);
     if (id) {
       dragRef.current = { id, startX: e.clientX, startY: e.clientY };
-      // Unfreeze so the dragged node can move and the rest react.
-      frozenRef.current = false;
       applyDragStart(layoutRef.current!, id, wx, wy);
     }
   };
@@ -235,8 +232,6 @@ export function GraphView({
         if (node) onNoteSelect(node.path);
       }
       dragRef.current = null;
-      // Re-freeze after the user lets go so the simulation stops.
-      frozenRef.current = true;
     }
   };
 
