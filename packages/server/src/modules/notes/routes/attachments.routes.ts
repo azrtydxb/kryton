@@ -4,7 +4,9 @@ import { z } from "zod";
 import * as crypto from "crypto";
 import * as fs from "fs/promises";
 import * as path from "path";
+import { eq } from "drizzle-orm";
 import { NotFoundError, ValidationError } from "../../../lib/errors.js";
+import { attachment } from "../../../db/schema/notes.js";
 
 const attachmentResponseSchema = z.object({
   id: z.string(),
@@ -59,8 +61,9 @@ export const attachmentsRoutes: FastifyPluginAsync = async (app) => {
       await fs.mkdir(path.dirname(targetPath), { recursive: true });
       await fs.writeFile(targetPath, buffer);
 
-      const att = await app.prisma.attachment.create({
-        data: {
+      const [att] = await app.db
+        .insert(attachment)
+        .values({
           userId: user.id,
           notePath,
           filename: data.filename,
@@ -68,8 +71,8 @@ export const attachmentsRoutes: FastifyPluginAsync = async (app) => {
           sizeBytes: buffer.length,
           mimeType: data.mimetype,
           storagePath: targetPath,
-        },
-      });
+        })
+        .returning();
       return att;
     },
   );
@@ -89,7 +92,9 @@ export const attachmentsRoutes: FastifyPluginAsync = async (app) => {
       const user = await app.auth.requireUser(req);
       const { id } = req.params as { id: string };
 
-      const att = await app.prisma.attachment.findUnique({ where: { id } });
+      const att = await app.db.query.attachment.findFirst({
+        where: eq(attachment.id, id),
+      });
       if (!att || att.userId !== user.id) {
         throw new NotFoundError("Attachment not found");
       }

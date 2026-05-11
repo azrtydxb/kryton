@@ -1,7 +1,10 @@
 import path from "node:path";
 import fs from "node:fs";
+import { and, eq, or, like } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { GLOBAL_USER_ID, validatePathWithinBase, ensureExtension } from "../../../lib/pathUtils.js";
+import { settings } from "../../../db/schema/settings.js";
+import { searchIndex } from "../../../db/schema/notes.js";
 import type {
   IndexFields,
   NoteEntry,
@@ -17,7 +20,7 @@ import type { PluginRouter } from "./plugin-router.js";
 import type { PluginHealthMonitor } from "./health-monitor.js";
 import type { PluginStorageService } from "./storage.service.js";
 
-type Prisma = FastifyInstance["prisma"];
+type Db = FastifyInstance["db"];
 
 interface SimpleLogger {
   info: (msg: string, ...args: unknown[]) => void;
@@ -30,7 +33,7 @@ export interface PluginApiFactoryDeps {
   pluginRouter: PluginRouter;
   healthMonitor: PluginHealthMonitor;
   storage: PluginStorageService;
-  prisma: Prisma;
+  db: Db;
   notesDir: string;
   notesOps: NotesOps;
   /** Factory that returns a logger scoped by tag. */
@@ -190,20 +193,23 @@ export class PluginApiFactory {
   }
 
   private createSettingsApi(pluginId: string): PluginAPI["settings"] {
-    const prisma = this.deps.prisma;
+    const db = this.deps.db;
     return {
       async get(key: string, userId?: string) {
         const settingsKey = `plugin:${pluginId}:${key}`;
 
         if (userId) {
-          const userSetting = await prisma.settings.findUnique({
-            where: { key_userId: { key: settingsKey, userId } },
+          const userSetting = await db.query.settings.findFirst({
+            where: and(eq(settings.key, settingsKey), eq(settings.userId, userId)),
           });
           if (userSetting) return JSON.parse(userSetting.value);
         }
 
-        const adminSetting = await prisma.settings.findUnique({
-          where: { key_userId: { key: settingsKey, userId: GLOBAL_USER_ID } },
+        const adminSetting = await db.query.settings.findFirst({
+          where: and(
+            eq(settings.key, settingsKey),
+            eq(settings.userId, GLOBAL_USER_ID),
+          ),
         });
         if (adminSetting) return JSON.parse(adminSetting.value);
 
@@ -213,37 +219,44 @@ export class PluginApiFactory {
   }
 
   private createSearchApi(): PluginAPI["search"] {
-    const prisma = this.deps.prisma;
+    const db = this.deps.db;
     return {
       async index(userId: string, notePath: string, fields: IndexFields) {
-        await prisma.searchIndex.upsert({
-          where: { notePath_userId: { notePath, userId } },
-          create: {
+        const now = new Date();
+        await db
+          .insert(searchIndex)
+          .values({
             notePath,
             userId,
             title: fields.title,
             content: fields.content,
             tags: JSON.stringify(fields.tags || []),
-            modifiedAt: new Date(),
-          },
-          update: {
-            title: fields.title,
-            content: fields.content,
-            tags: JSON.stringify(fields.tags || []),
-            modifiedAt: new Date(),
-          },
-        });
+            modifiedAt: now,
+          })
+          .onConflictDoUpdate({
+            target: [searchIndex.notePath, searchIndex.userId],
+            set: {
+              title: fields.title,
+              content: fields.content,
+              tags: JSON.stringify(fields.tags || []),
+              modifiedAt: now,
+            },
+          });
       },
       async query(userId: string, queryStr: string) {
-        const results = await prisma.searchIndex.findMany({
-          where: {
-            userId,
-            OR: [
-              { title: { contains: queryStr } },
-              { content: { contains: queryStr } },
-            ],
-          },
-        });
+        const pattern = `%${queryStr}%`;
+        const results = await db
+          .select()
+          .from(searchIndex)
+          .where(
+            and(
+              eq(searchIndex.userId, userId),
+              or(
+                like(searchIndex.title, pattern),
+                like(searchIndex.content, pattern),
+              ),
+            ),
+          );
         return results.map((r) => ({
           path: r.notePath,
           title: r.title,

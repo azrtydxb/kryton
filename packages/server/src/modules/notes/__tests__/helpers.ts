@@ -1,17 +1,51 @@
 import os from "node:os";
 import path from "node:path";
 import fs from "node:fs/promises";
+import { sql } from "drizzle-orm";
 import Fastify, { type FastifyInstance } from "fastify";
 import { zodPlugin } from "../../../plugins/zod.js";
 import { errorsPlugin } from "../../../plugins/errors.js";
 import { notesModule } from "../index.js";
 import type { AuthApi, AuthContext, AuthUser } from "../../../plugins/auth.js";
+import { createTestDb, type TestDbHandle } from "../../../test/db-fixture.js";
+import { user as userTable } from "../../../db/schema/auth.js";
+
+/**
+ * Shared Drizzle handle for notes tests. Lazily created on first call and
+ * reused across the file. The notes test suite touches: SearchIndex, Folder,
+ * Tag, NoteTag, TrashItem, SyncDeletion, SyncCursor, Settings, NoteShare,
+ * Attachment, GraphEdge, NoteVersion, NoteRevision — all truncated below.
+ */
+let sharedHandle: TestDbHandle | null = null;
+function getHandle(): TestDbHandle {
+  if (!sharedHandle) sharedHandle = createTestDb();
+  return sharedHandle;
+}
+
+async function resetNotesTestDb(handle: TestDbHandle): Promise<void> {
+  await handle.db.execute(sql`
+    TRUNCATE TABLE
+      "Attachment",
+      "NoteRevision",
+      "NoteVersion",
+      "NoteTag",
+      "Tag",
+      "Folder",
+      "TrashItem",
+      "SyncDeletion",
+      "SyncCursor",
+      "Settings",
+      "NoteShare",
+      "GraphEdge",
+      "SearchIndex",
+      "User"
+    RESTART IDENTITY CASCADE
+  `);
+}
 
 export interface NotesTestAppOptions {
   user?: AuthUser | null;
   apiKey?: { id: string; scope: string } | null;
-  /** Inline prisma stub — provide just the methods used by routes under test. */
-  prisma?: unknown;
   /** Optional NOTES_DIR override; default = a fresh tmp dir. */
   notesDir?: string;
 }
@@ -22,13 +56,34 @@ export interface NotesTestApp {
   cleanup: () => Promise<void>;
 }
 
-/** Build a Fastify app with the notes module wired up against stubs. */
+/** Build a Fastify app with the notes module wired up against the
+ * testcontainers Postgres. */
 export async function buildNotesTestApp(
   opts: NotesTestAppOptions = {},
 ): Promise<NotesTestApp> {
   const notesDir =
     opts.notesDir ??
     (await fs.mkdtemp(path.join(os.tmpdir(), "kryton-notes-test-")));
+
+  const handle = getHandle();
+  await resetNotesTestDb(handle);
+
+  const user = opts.user ?? null;
+  // Seed the User row when an authenticated user is configured — every
+  // table that references User via FK (Folder, Tag, NoteTag, SyncCursor,
+  // NoteShare, …) is cascade-deleted via the truncate above, so we must
+  // re-insert the user row for each test that needs one.
+  if (user) {
+    await handle.db.insert(userTable).values({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      emailVerified: false,
+      role: user.role,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }
 
   const app = Fastify({ logger: false });
 
@@ -37,28 +92,9 @@ export async function buildNotesTestApp(
 
   await app.register(zodPlugin);
 
-  // Stub prisma — default to a no-op stub good enough for unauth tests.
-  const prismaStub = opts.prisma ?? {
-    folder: { findUnique: async () => null, findMany: async () => [], create: async () => ({}) },
-    tag: { upsert: async () => ({ id: "t-1" }) },
-    noteTag: { findUnique: async () => null, create: async () => ({}), findMany: async () => [] },
-    searchIndex: { findMany: async () => [] },
-    syncCursor: { upsert: async () => ({ cursor: 1n }) },
-    settings: { findUnique: async () => null },
-    trashItem: {
-      findFirst: async () => null,
-      findMany: async () => [],
-      create: async () => ({}),
-      delete: async () => ({}),
-      deleteMany: async () => ({}),
-    },
-    syncDeletion: { create: async () => ({}), createMany: async () => ({}) },
-    noteShare: { deleteMany: async () => ({}), updateMany: async () => ({}) },
-  };
-  app.decorate("prisma", prismaStub as never);
+  app.decorate("db", handle.db);
 
   // Stub auth — same shape as identity helpers.
-  const user = opts.user ?? null;
   const apiKey = opts.apiKey ?? null;
   const ctx: AuthContext | null = user ? { user, apiKey, agentId: null } : null;
 

@@ -194,8 +194,8 @@ Plugin APIs are automatically exposed as MCP tools — install a plugin and your
 | Component | Technology |
 |-----------|------------|
 | Frontend | React 19, Vite 8, TypeScript 5.9, Tailwind CSS 4 |
-| Backend | Express 5, Prisma 7, TypeScript 5.9 |
-| Database | SQLite (via better-sqlite3) |
+| Backend | Fastify 5, Drizzle ORM, TypeScript 5.9 |
+| Database | Postgres 16 with `pgvector` and `tsvector` |
 | Mobile | Expo SDK 55, React Native, expo-sqlite |
 | Editor | CodeMirror 6 with Vim mode |
 | Graph | D3.js force-directed |
@@ -209,37 +209,27 @@ Plugin APIs are automatically exposed as MCP tools — install a plugin and your
 
 ### Docker (recommended)
 
-```yaml
-# docker-compose.yml
-services:
-  kryton:
-    image: ghcr.io/azrtydxb/kryton/kryton:latest
-    ports:
-      - "3100:3000"
-    volumes:
-      - ./notes:/notes
-      - kryton-data:/data
-    environment:
-      - DATABASE_URL=file:/data/kryton.db
-      - BETTER_AUTH_SECRET=change-me-use-openssl-rand-hex-32
-      - APP_URL=http://localhost:3100
-
-volumes:
-  kryton-data:
-```
-
-```bash
-docker compose up -d
-```
-
-Open http://localhost:3100 — the first user to register becomes admin.
-
-### From Source
+The simplest path. The repo ships a `docker-compose.yml` that brings up a `pgvector/pgvector:pg16` Postgres alongside the Kryton server — no separate database install needed.
 
 ```bash
 git clone https://github.com/azrtydxb/kryton.git
 cd kryton
+docker compose up --build -d
+```
+
+Open http://localhost:3000 — the first user to register becomes admin.
+
+### From Source
+
+Requires Postgres 16+ with the `pgvector` extension. The fastest way is to run just the Postgres service from the bundled compose file and run the app on the host:
+
+```bash
+git clone https://github.com/azrtydxb/kryton.git
+cd kryton
+docker compose up -d postgres        # Postgres 16 + pgvector on :5432
 npm install
+export POSTGRES_URL=postgres://kryton:kryton@localhost:5432/kryton
+export BETTER_AUTH_SECRET=$(openssl rand -hex 32)
 npm run dev
 ```
 
@@ -247,13 +237,15 @@ npm run dev
 - Backend: http://localhost:3001
 - API Docs: http://localhost:5173/api/docs
 
+If you'd rather use a Postgres you already have, make sure it's 16+ and run `CREATE EXTENSION IF NOT EXISTS vector;` once against the target database, then point `POSTGRES_URL` at it.
+
 ---
 
 ## Environment Variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `DATABASE_URL` | Yes | SQLite path: `file:/data/kryton.db` |
+| `POSTGRES_URL` | Yes | Postgres connection string, e.g. `postgres://kryton:kryton@localhost:5432/kryton`. Target DB must have the `pgvector` extension installed. |
 | `BETTER_AUTH_SECRET` | Yes | Auth secret (min 32 chars). Generate: `openssl rand -hex 32` |
 | `APP_URL` | No | Public URL (default: `http://localhost:5173`) |
 | `PORT` | No | Server port (default: `3001`) |
@@ -365,7 +357,7 @@ A GitHub Personal Access Token with `read:packages` scope is required. See `docs
 └──────────────────────┬───────────────────────────────────────┘
                        │ REST API + Sync API
 ┌──────────────────────┴───────────────────────────────────────┐
-│  Express 5 Server                                             │
+│  Fastify 5 Server                                             │
 │  ├── Auth (better-auth + OAuth + passkeys + 2FA)              │
 │  ├── Notes, Search, Graph, Tags, Trash, History               │
 │  ├── Sharing & Access Requests                                │
@@ -374,12 +366,13 @@ A GitHub Personal Access Token with `read:packages` scope is required. See `docs
 │  ├── Plugin system (server + client)                          │
 │  └── Swagger API Docs                                         │
 ├─────────────────┬────────────────────────────────────────────┤
-│  SQLite         │  File System                                │
-│  (search index, │  notes/{userId}/                            │
-│   graph edges,  │  ├── Welcome.md                             │
-│   settings,     │  ├── .trash/                                │
-│   users, shares,│  ├── .history/                              │
-│   sync tracking)│  └── attachments/                           │
+│  Postgres 16    │  File System                                │
+│  + pgvector     │  notes/{userId}/                            │
+│  + tsvector     │  ├── Welcome.md                             │
+│  (drizzle-orm — │  ├── .trash/                                │
+│   search index, │  ├── .history/                              │
+│   graph edges,  │  └── attachments/                           │
+│   sync, Yjs)    │                                             │
 └─────────────────┴────────────────────────────────────────────┘
          ▲                           ▲
          │ Sync v2 API + WS/Yjs      │ MCP Protocol (streamable HTTP)
@@ -397,15 +390,16 @@ A GitHub Personal Access Token with `read:packages` scope is required. See `docs
 
 ## Database Migrations
 
-Kryton uses Prisma Migrate for safe schema updates. Migrations run automatically on container startup with automatic backup.
+Kryton uses [Drizzle Kit](https://orm.drizzle.team/kit-docs/overview) against Postgres. Migrations live under `packages/server/src/db/migrations/` and run automatically at server startup.
 
-For developers:
+For developers, after editing any file under `packages/server/src/db/schema/`:
+
 ```bash
-# After changing prisma/schema.prisma:
-DATABASE_URL="file:./data/kryton.db" npx prisma migrate dev --name describe_change
+cd packages/server
+POSTGRES_URL=postgres://kryton:kryton@localhost:5432/kryton npm run db:generate
 ```
 
-See [MIGRATIONS.md](packages/server/MIGRATIONS.md) for details.
+Inspect and commit the generated `.sql` file alongside the schema change. See [MIGRATIONS.md](packages/server/MIGRATIONS.md) for details.
 
 ---
 

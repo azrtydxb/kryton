@@ -1,6 +1,8 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { FastifyInstance } from "fastify";
+import { and, eq } from "drizzle-orm";
+import { folder } from "../../../../db/schema/notes.js";
 import { FolderService } from "../folder.service.js";
 
 export async function backfillFolders(
@@ -26,8 +28,8 @@ export async function backfillFolders(
   for (const rel of dirs) {
     const parts = rel.split("/");
     const parentPath = parts.length > 1 ? parts.slice(0, -1).join("/") : undefined;
-    const existing = await app.prisma.folder.findUnique({
-      where: { userId_path: { userId, path: rel } },
+    const existing = await app.db.query.folder.findFirst({
+      where: and(eq(folder.userId, userId), eq(folder.path, rel)),
     });
     if (!existing) {
       await folderService.create(userId, { path: rel, parentPath });

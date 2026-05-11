@@ -1,22 +1,31 @@
 import type { FastifyInstance } from "fastify";
+import { and, eq } from "drizzle-orm";
 import { incrementCursor } from "./folder.service.js";
+import { noteTag, tag } from "../../../db/schema/notes.js";
 
 export class TagService {
   constructor(private readonly app: FastifyInstance) {}
 
   async upsert(userId: string, name: string) {
     const cursor = await incrementCursor(this.app, userId);
-    return this.app.prisma.tag.upsert({
-      where: { userId_name: { userId, name } },
-      update: {},
-      create: { userId, name, version: 1, cursor },
-    });
+    // Drizzle has no Postgres-compatible "upsert + return existing without
+    // updating" — emulate with INSERT ... ON CONFLICT DO UPDATE on a column
+    // (set userId to itself to make it a no-op-write that still RETURNING-s).
+    const [row] = await this.app.db
+      .insert(tag)
+      .values({ userId, name, version: 1, cursor })
+      .onConflictDoUpdate({
+        target: [tag.userId, tag.name],
+        set: { userId: tag.userId },
+      })
+      .returning();
+    return row;
   }
 
   async listNoteTags(userId: string, notePath: string): Promise<string[]> {
-    const rows = await this.app.prisma.noteTag.findMany({
-      where: { userId, notePath },
-      include: { tag: true },
+    const rows = await this.app.db.query.noteTag.findMany({
+      where: and(eq(noteTag.userId, userId), eq(noteTag.notePath, notePath)),
+      with: { tag: true },
     });
     return rows.map((r) => r.tag.name);
   }
@@ -29,13 +38,12 @@ export class TagService {
     const existing = await this.listNoteTags(userId, notePath);
     const union = Array.from(new Set([...existing, ...addTags]));
     for (const name of addTags) {
-      const tag = await this.upsert(userId, name);
+      const tagRow = await this.upsert(userId, name);
       const cursor = await incrementCursor(this.app, userId);
-      await this.app.prisma.noteTag.upsert({
-        where: { userId_notePath_tagId: { userId, notePath, tagId: tag.id } },
-        update: {},
-        create: { userId, notePath, tagId: tag.id, version: 1, cursor },
-      });
+      await this.app.db
+        .insert(noteTag)
+        .values({ userId, notePath, tagId: tagRow.id, version: 1, cursor })
+        .onConflictDoNothing({ target: [noteTag.userId, noteTag.notePath, noteTag.tagId] });
     }
     return union;
   }

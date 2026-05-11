@@ -1,7 +1,9 @@
 import path from "node:path";
 import fs from "node:fs/promises";
 import fp from "fastify-plugin";
+import { eq } from "drizzle-orm";
 import type { FastifyPluginAsync, preHandlerHookHandler } from "fastify";
+import { installedPlugin } from "../../db/schema/settings.js";
 import { PluginEventBus } from "./services/event-bus.js";
 import { PluginHealthMonitor } from "./services/health-monitor.js";
 import { PluginRouter } from "./services/plugin-router.js";
@@ -104,21 +106,22 @@ const pluginsModuleImpl = (options: PluginsModuleOptions = {}): FastifyPluginAsy
         app.log.warn({ pluginId }, "auto-disabling plugin (excessive errors)");
         await managerRef.instance?.disablePlugin(pluginId);
         try {
-          await app.prisma.installedPlugin.update({
-            where: { id: pluginId },
-            data: {
+          await app.db
+            .update(installedPlugin)
+            .set({
               enabled: false,
               state: "error",
               error: "Auto-disabled: too many errors",
-            },
-          });
+              updatedAt: new Date(),
+            })
+            .where(eq(installedPlugin.id, pluginId));
         } catch (err) {
           app.log.error({ err, pluginId }, "failed to mark plugin disabled");
         }
       },
     });
 
-    const storage = new PluginStorageService(app.prisma);
+    const storage = new PluginStorageService(app.db);
     const registry = new PluginRegistryService({
       warn: (msg) => app.log.warn(msg),
     });
@@ -134,7 +137,7 @@ const pluginsModuleImpl = (options: PluginsModuleOptions = {}): FastifyPluginAsy
       pluginRouter,
       healthMonitor,
       storage,
-      prisma: app.prisma,
+      db: app.db,
       notesDir,
       notesOps,
       loggerFactory: (tag: string) => ({
@@ -150,7 +153,7 @@ const pluginsModuleImpl = (options: PluginsModuleOptions = {}): FastifyPluginAsy
       pluginRouter,
       healthMonitor,
       apiFactory,
-      prisma: app.prisma,
+      db: app.db,
       logger: fastifyLogger,
     });
     managerRef.instance = manager;

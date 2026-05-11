@@ -7,7 +7,7 @@ import { zodPlugin } from "./plugins/zod.js";
 import { telemetryPlugin } from "./plugins/telemetry.js";
 import { securityPlugin } from "./plugins/security.js";
 import { rateLimitPlugin } from "./plugins/rate-limit.js";
-import { prismaPlugin } from "./plugins/prisma.js";
+import { dbPlugin } from "./plugins/db.js";
 import { cedarPlugin } from "./plugins/cedar.js";
 import { authPlugin } from "./plugins/auth.js";
 import { errorsPlugin } from "./plugins/errors.js";
@@ -57,7 +57,8 @@ export async function buildApp({
   await app.register(telemetryPlugin);
   await app.register(securityPlugin, { config });
   await app.register(rateLimitPlugin, { config });
-  await app.register(prismaPlugin);
+  // Drizzle is the sole data layer (Postgres + Drizzle migration complete).
+  await app.register(dbPlugin);
   await app.register(cedarPlugin);
   await app.register(authPlugin);
   await app.register(errorsPlugin);

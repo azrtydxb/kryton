@@ -10,7 +10,13 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3001),
   HOST: z.string().default("0.0.0.0"),
 
-  DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
+  /**
+   * Postgres connection string for the Drizzle data layer. Drizzle is the
+   * sole data layer after Phase 8 of the Postgres migration (Prisma fully
+   * removed). Still optional at schema level — `dbPlugin` validates presence
+   * at registration time so test harnesses can short-circuit without it.
+   */
+  POSTGRES_URL: z.string().optional(),
 
   BETTER_AUTH_SECRET: z.string().min(32, "BETTER_AUTH_SECRET must be at least 32 characters"),
   BETTER_AUTH_URL: z.string().default("http://localhost:3001"),

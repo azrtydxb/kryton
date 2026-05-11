@@ -1,5 +1,8 @@
 import * as crypto from "node:crypto";
+import { and, eq, gt, isNull } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
+
+import { agent, agentToken } from "../../../db/schema/agents.js";
 
 export interface CreateAgentInput {
   name: string;
@@ -26,29 +29,37 @@ export interface ValidatedToken {
 
 /**
  * Agent service. Receives the Fastify instance via constructor and uses
- * `app.prisma` for all DB access — no module-level Prisma singleton.
+ * `app.db` (Drizzle) for all DB access — no module-level Drizzle singleton.
  */
 export class AgentService {
   constructor(private readonly app: FastifyInstance) {}
 
+  private get db() {
+    return this.app.db;
+  }
+
   /** Create a new agent owned by the given user. */
   async create(ownerUserId: string, input: CreateAgentInput) {
-    return this.app.prisma.agent.create({
-      data: {
+    const [row] = await this.db
+      .insert(agent)
+      .values({
         ownerUserId,
         name: input.name,
         label: input.label,
         policyText: input.policyText ?? null,
-      },
-    });
+      })
+      .returning();
+    return row;
   }
 
   /** Replace the Cedar policy text for an agent. */
   async setPolicy(agentId: string, policyText: string) {
-    return this.app.prisma.agent.update({
-      where: { id: agentId },
-      data: { policyText },
-    });
+    const [row] = await this.db
+      .update(agent)
+      .set({ policyText })
+      .where(eq(agent.id, agentId))
+      .returning();
+    return row;
   }
 
   /** Mint a new bearer token for the agent. Returns the raw token (shown once). */
@@ -57,14 +68,15 @@ export class AgentService {
     const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
     const expiresAt = new Date(Date.now() + opts.expiresInSeconds * 1000);
 
-    const row = await this.app.prisma.agentToken.create({
-      data: {
+    const [row] = await this.db
+      .insert(agentToken)
+      .values({
         agentId,
         tokenHash,
         scope: opts.scope ?? null,
         expiresAt,
-      },
-    });
+      })
+      .returning();
 
     return { token, tokenId: row.id, expiresAt };
   }
@@ -76,13 +88,13 @@ export class AgentService {
   async validateToken(token: string): Promise<ValidatedToken | null> {
     const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
 
-    const t = await this.app.prisma.agentToken.findFirst({
-      where: {
-        tokenHash,
-        revokedAt: null,
-        expiresAt: { gt: new Date() },
-      },
-      include: { agent: true },
+    const t = await this.db.query.agentToken.findFirst({
+      where: and(
+        eq(agentToken.tokenHash, tokenHash),
+        isNull(agentToken.revokedAt),
+        gt(agentToken.expiresAt, new Date()),
+      ),
+      with: { agent: true },
     });
 
     if (!t) return null;
@@ -96,29 +108,37 @@ export class AgentService {
 
   /** Soft-revoke a token by setting revokedAt. */
   async revokeToken(tokenId: string): Promise<void> {
-    await this.app.prisma.agentToken.update({
-      where: { id: tokenId },
-      data: { revokedAt: new Date() },
-    });
+    await this.db
+      .update(agentToken)
+      .set({ revokedAt: new Date() })
+      .where(eq(agentToken.id, tokenId));
   }
 
   /** List all agents owned by a user. */
   async list(ownerUserId: string) {
-    return this.app.prisma.agent.findMany({ where: { ownerUserId } });
+    return this.db.query.agent.findMany({
+      where: eq(agent.ownerUserId, ownerUserId),
+    });
   }
 
   /** Permanently delete an agent and cascade its tokens. */
   async delete(agentId: string): Promise<void> {
-    await this.app.prisma.agent.delete({ where: { id: agentId } });
+    await this.db.delete(agent).where(eq(agent.id, agentId));
   }
 
   /** Find an agent by id, returning null if missing. */
   async findById(agentId: string) {
-    return this.app.prisma.agent.findUnique({ where: { id: agentId } });
+    const row = await this.db.query.agent.findFirst({
+      where: eq(agent.id, agentId),
+    });
+    return row ?? null;
   }
 
   /** Find a token row by id, returning null if missing. */
   async findTokenById(tokenId: string) {
-    return this.app.prisma.agentToken.findUnique({ where: { id: tokenId } });
+    const row = await this.db.query.agentToken.findFirst({
+      where: eq(agentToken.id, tokenId),
+    });
+    return row ?? null;
   }
 }

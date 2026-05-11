@@ -16,6 +16,3 @@ pgdata/
 
 # Installed plugins (downloaded from registry at runtime)
 packages/server/plugins/
-packages/server/data
-packages/server/data/
-*.db

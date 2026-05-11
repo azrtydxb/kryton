@@ -1,6 +1,8 @@
 import type { FastifyPluginAsync } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
+import { eq } from "drizzle-orm";
 import { NotFoundError } from "../../../lib/errors.js";
+import { user } from "../../../db/schema/auth.js";
 import {
   userSearchQuerySchema,
   userPublicProfileSchema,
@@ -29,12 +31,14 @@ export const usersRoutes: FastifyPluginAsync = async (app) => {
     async (req) => {
       const { email } = req.query;
 
-      const user = await app.prisma.user.findUnique({ where: { email } });
-      if (!user) {
+      const found = await app.db.query.user.findFirst({
+        where: eq(user.email, email),
+      });
+      if (!found) {
         throw new NotFoundError("User not found");
       }
 
-      return { id: user.id, name: user.name, email: user.email };
+      return { id: found.id, name: found.name, email: found.email };
     },
   );
 };

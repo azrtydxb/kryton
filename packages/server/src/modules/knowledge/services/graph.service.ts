@@ -1,5 +1,8 @@
 import type { FastifyInstance } from "fastify";
+import { and, eq, inArray, like, or } from "drizzle-orm";
 import { getAccessibleSharedPaths } from "./share-paths.js";
+import { graphEdge, searchIndex } from "../../../db/schema/notes.js";
+import { noteShare } from "../../../db/schema/sharing.js";
 
 const WIKI_LINK_REGEX = /\[\[([^\]]+)\]\]/g;
 
@@ -47,7 +50,7 @@ export interface GraphData {
 /**
  * Knowledge graph service — wiki-link extraction, edge cache management,
  * backlinks, and full-graph traversal. Receives the Fastify instance via
- * constructor and uses `app.prisma`.
+ * constructor and uses `app.db` (Drizzle).
  */
 export class GraphService {
   constructor(private readonly app: FastifyInstance) {}
@@ -61,8 +64,10 @@ export class GraphService {
     content: string,
     userId: string,
   ): Promise<void> {
-    const prisma = this.app.prisma;
-    await prisma.graphEdge.deleteMany({ where: { fromPath: notePath, userId } });
+    const db = this.app.db;
+    await db
+      .delete(graphEdge)
+      .where(and(eq(graphEdge.fromPath, notePath), eq(graphEdge.userId, userId)));
 
     const links = parseLinks(content);
     if (links.length === 0) return;
@@ -74,15 +79,17 @@ export class GraphService {
 
     const resolvedRows =
       shortFilenames.length > 0
-        ? await prisma.searchIndex.findMany({
-            where: {
-              userId,
-              OR: shortFilenames.flatMap((filename) => [
-                { notePath: filename },
-                { notePath: { endsWith: `/${filename}` } },
-              ]),
-            },
-            select: { notePath: true },
+        ? await db.query.searchIndex.findMany({
+            where: and(
+              eq(searchIndex.userId, userId),
+              or(
+                ...shortFilenames.flatMap((filename) => [
+                  eq(searchIndex.notePath, filename),
+                  like(searchIndex.notePath, `%/${filename}`),
+                ]),
+              ),
+            ),
+            columns: { notePath: true },
           })
         : [];
 
@@ -116,13 +123,18 @@ export class GraphService {
       };
     });
 
-    await prisma.graphEdge.createMany({ data: edges });
+    await db.insert(graphEdge).values(edges);
   }
 
   async removeFromGraph(notePath: string, userId: string): Promise<void> {
-    await this.app.prisma.graphEdge.deleteMany({
-      where: { userId, OR: [{ fromPath: notePath }, { toPath: notePath }] },
-    });
+    await this.app.db
+      .delete(graphEdge)
+      .where(
+        and(
+          eq(graphEdge.userId, userId),
+          or(eq(graphEdge.fromPath, notePath), eq(graphEdge.toPath, notePath)),
+        ),
+      );
   }
 
   async renameInGraph(
@@ -130,24 +142,26 @@ export class GraphService {
     newPath: string,
     userId: string,
   ): Promise<void> {
-    const prisma = this.app.prisma;
+    const db = this.app.db;
     const newNoteId = noteIdFromPath(newPath);
     const oldNoteId = noteIdFromPath(oldPath);
 
-    await prisma.graphEdge.updateMany({
-      where: { fromPath: oldPath, userId },
-      data: { fromPath: newPath, fromNoteId: newNoteId },
-    });
+    await db
+      .update(graphEdge)
+      .set({ fromPath: newPath, fromNoteId: newNoteId })
+      .where(and(eq(graphEdge.fromPath, oldPath), eq(graphEdge.userId, userId)));
 
-    await prisma.graphEdge.updateMany({
-      where: { toPath: oldPath, userId },
-      data: { toPath: newPath, toNoteId: newNoteId },
-    });
+    await db
+      .update(graphEdge)
+      .set({ toPath: newPath, toNoteId: newNoteId })
+      .where(and(eq(graphEdge.toPath, oldPath), eq(graphEdge.userId, userId)));
 
-    await prisma.graphEdge.updateMany({
-      where: { toNoteId: oldNoteId, userId },
-      data: { toNoteId: newNoteId },
-    });
+    await db
+      .update(graphEdge)
+      .set({ toNoteId: newNoteId })
+      .where(
+        and(eq(graphEdge.toNoteId, oldNoteId), eq(graphEdge.userId, userId)),
+      );
   }
 
   /**
@@ -157,14 +171,16 @@ export class GraphService {
     notePath: string,
     userId: string,
   ): Promise<{ path: string; title: string }[]> {
-    const prisma = this.app.prisma;
+    const db = this.app.db;
     const noteId = noteIdFromPath(notePath);
 
-    const edges = await prisma.graphEdge.findMany({ where: { toNoteId: noteId } });
+    const edges = await db.query.graphEdge.findMany({
+      where: eq(graphEdge.toNoteId, noteId),
+    });
     if (edges.length === 0) return [];
 
-    const sharesWithMe = await prisma.noteShare.findMany({
-      where: { sharedWithUserId: userId },
+    const sharesWithMe = await db.query.noteShare.findMany({
+      where: eq(noteShare.sharedWithUserId, userId),
     });
 
     const fileShareSet = new Set<string>();
@@ -193,14 +209,13 @@ export class GraphService {
 
     if (accessibleEdges.length === 0) return [];
 
-    const lookupKeys = accessibleEdges.map((e) => ({
-      notePath: e.fromPath,
-      userId: e.userId,
-    }));
+    const lookupConditions = accessibleEdges.map((e) =>
+      and(eq(searchIndex.notePath, e.fromPath), eq(searchIndex.userId, e.userId)),
+    );
 
-    const notes = await prisma.searchIndex.findMany({
-      where: { OR: lookupKeys },
-      select: { notePath: true, title: true },
+    const notes = await db.query.searchIndex.findMany({
+      where: or(...lookupConditions),
+      columns: { notePath: true, title: true },
     });
 
     const seen = new Set<string>();
@@ -214,10 +229,10 @@ export class GraphService {
   }
 
   async getFullGraph(userId: string): Promise<GraphData> {
-    const prisma = this.app.prisma;
+    const db = this.app.db;
     const [allNotes, allEdges, sharedPaths] = await Promise.all([
-      prisma.searchIndex.findMany({ where: { userId } }),
-      prisma.graphEdge.findMany({ where: { userId } }),
+      db.query.searchIndex.findMany({ where: eq(searchIndex.userId, userId) }),
+      db.query.graphEdge.findMany({ where: eq(graphEdge.userId, userId) }),
       getAccessibleSharedPaths(this.app, userId),
     ]);
 
@@ -229,16 +244,18 @@ export class GraphService {
 
     const ownNodeIds = new Set(nodes.map((n) => n.id));
 
-    const sharedNoteLookups = sharedPaths.map((sp) => ({
-      notePath: sp.notePath,
-      userId: sp.ownerUserId,
-    }));
-
     const sharedNoteRows =
-      sharedNoteLookups.length > 0
-        ? await prisma.searchIndex.findMany({
-            where: { OR: sharedNoteLookups },
-            select: { notePath: true, title: true, userId: true },
+      sharedPaths.length > 0
+        ? await db.query.searchIndex.findMany({
+            where: or(
+              ...sharedPaths.map((sp) =>
+                and(
+                  eq(searchIndex.notePath, sp.notePath),
+                  eq(searchIndex.userId, sp.ownerUserId),
+                ),
+              ),
+            ),
+            columns: { notePath: true, title: true, userId: true },
           })
         : [];
 
@@ -276,7 +293,9 @@ export class GraphService {
     const ownerIds = [...new Set(sharedPaths.map((sp) => sp.ownerUserId))];
     const sharedEdges =
       ownerIds.length > 0
-        ? await prisma.graphEdge.findMany({ where: { userId: { in: ownerIds } } })
+        ? await db.query.graphEdge.findMany({
+            where: inArray(graphEdge.userId, ownerIds),
+          })
         : [];
 
     const resolveId = (rawNoteId: string, ownerId: string): string | null => {

@@ -1,22 +1,57 @@
 import Fastify, { type FastifyInstance } from "fastify";
+import { sql } from "drizzle-orm";
 import { zodPlugin } from "../../../plugins/zod.js";
 import { errorsPlugin } from "../../../plugins/errors.js";
 import { AuthError, ForbiddenError } from "../../../lib/errors.js";
 import { identityModule } from "../index.js";
 import type { AuthApi, AuthContext, AuthUser } from "../../../plugins/auth.js";
+import { createTestDb, type TestDbHandle } from "../../../test/db-fixture.js";
 
 export interface IdentityTestAppOptions {
   /** The user returned by auth helpers. Set to null to simulate anonymous. */
   user?: AuthUser | null;
   /** Whether the simulated session is API-key based. */
   apiKey?: { id: string; scope: string } | null;
-  /** Inline prisma stub. Provide just the methods used by the routes under test. */
-  prisma: unknown;
+  /** Handle returned by `createIdentityTestDb()` (shared across the test file). */
+  dbHandle: TestDbHandle;
 }
 
 /**
- * Build a Fastify app for identity tests. Stubs out `app.prisma` and `app.auth`
- * so we don't need a real DB or Better Auth session.
+ * Shared Drizzle test DB handle. Identity tests share a single connection to
+ * the testcontainers Postgres started by the vitest global setup; rows are
+ * cleared between tests via `resetIdentityTestDb()` instead of opening a
+ * new pool per app.
+ */
+export function createIdentityTestDb(): TestDbHandle {
+  return createTestDb();
+}
+
+/**
+ * Truncate all tables touched by the identity tests. Call from `beforeEach`
+ * (or `afterEach`) to keep tests isolated.
+ */
+export async function resetIdentityTestDb(handle: TestDbHandle): Promise<void> {
+  // RESTART IDENTITY + CASCADE so dependent FKs (Session, ApiKey, ...) clear
+  // in one shot. Only the tables identity routes/services touch are listed,
+  // but CASCADE handles any rows in unrelated tables that reference them.
+  await handle.db.execute(sql`
+    TRUNCATE TABLE
+      "ApiKey",
+      "Session",
+      "Account",
+      "Passkey",
+      "TwoFactor",
+      "InviteCode",
+      "Settings",
+      "User"
+    RESTART IDENTITY CASCADE
+  `);
+}
+
+/**
+ * Build a Fastify app for identity tests. Decorates `app.db` with the shared
+ * Drizzle testcontainers handle and stubs out `app.auth` so we don't need
+ * real Better Auth sessions.
  */
 export async function buildIdentityTestApp(
   opts: IdentityTestAppOptions,
@@ -25,7 +60,7 @@ export async function buildIdentityTestApp(
 
   await app.register(zodPlugin);
 
-  app.decorate("prisma", opts.prisma as never);
+  app.decorate("db", opts.dbHandle.db);
 
   const user = opts.user ?? null;
   const apiKey = opts.apiKey ?? null;

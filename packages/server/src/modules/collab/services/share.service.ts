@@ -1,7 +1,11 @@
-import type { PrismaClient } from "../../../generated/prisma/client.js";
+import { and, eq, like } from "drizzle-orm";
+import type { Db } from "../../../db/client.js";
+import { noteShare } from "../../../db/schema/sharing.js";
+import { searchIndex } from "../../../db/schema/notes.js";
+import { user } from "../../../db/schema/auth.js";
 
 export class ShareService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly db: Db) {}
 
   /**
    * Check whether `requestingUserId` has read/write access to a specific
@@ -12,21 +16,21 @@ export class ShareService {
     path: string,
     requestingUserId: string,
   ): Promise<{ canRead: boolean; canWrite: boolean }> {
-    const directShare = await this.prisma.noteShare.findFirst({
-      where: {
-        ownerUserId,
-        sharedWithUserId: requestingUserId,
-        path,
-        isFolder: false,
-      },
+    const directShare = await this.db.query.noteShare.findFirst({
+      where: and(
+        eq(noteShare.ownerUserId, ownerUserId),
+        eq(noteShare.sharedWithUserId, requestingUserId),
+        eq(noteShare.path, path),
+        eq(noteShare.isFolder, false),
+      ),
     });
 
-    const folderShares = await this.prisma.noteShare.findMany({
-      where: {
-        ownerUserId,
-        sharedWithUserId: requestingUserId,
-        isFolder: true,
-      },
+    const folderShares = await this.db.query.noteShare.findMany({
+      where: and(
+        eq(noteShare.ownerUserId, ownerUserId),
+        eq(noteShare.sharedWithUserId, requestingUserId),
+        eq(noteShare.isFolder, true),
+      ),
     });
     const matchingFolderShares = folderShares.filter(
       (s) => path === s.path || path.startsWith(s.path + "/"),
@@ -60,18 +64,26 @@ export class ShareService {
       permission: string;
     }>
   > {
-    const shares = await this.prisma.noteShare.findMany({
-      where: { sharedWithUserId: userId },
-      include: { owner: { select: { name: true } } },
-    });
+    const rows = await this.db
+      .select({
+        id: noteShare.id,
+        ownerUserId: noteShare.ownerUserId,
+        path: noteShare.path,
+        isFolder: noteShare.isFolder,
+        permission: noteShare.permission,
+        ownerName: user.name,
+      })
+      .from(noteShare)
+      .leftJoin(user, eq(user.id, noteShare.ownerUserId))
+      .where(eq(noteShare.sharedWithUserId, userId));
 
-    return shares.map((share) => ({
-      id: share.id,
-      ownerUserId: share.ownerUserId,
-      ownerName: share.owner?.name ?? "",
-      path: share.path,
-      isFolder: share.isFolder,
-      permission: share.permission,
+    return rows.map((r) => ({
+      id: r.id,
+      ownerUserId: r.ownerUserId,
+      ownerName: r.ownerName ?? "",
+      path: r.path,
+      isFolder: r.isFolder,
+      permission: r.permission,
     }));
   }
 
@@ -82,8 +94,8 @@ export class ShareService {
   async getAccessibleSharedPaths(
     userId: string,
   ): Promise<Array<{ ownerUserId: string; notePath: string; permission: string }>> {
-    const shares = await this.prisma.noteShare.findMany({
-      where: { sharedWithUserId: userId },
+    const shares = await this.db.query.noteShare.findMany({
+      where: eq(noteShare.sharedWithUserId, userId),
     });
 
     const paths: Array<{ ownerUserId: string; notePath: string; permission: string }> = [];
@@ -96,11 +108,11 @@ export class ShareService {
           permission: share.permission,
         });
       } else {
-        const notesInFolder = await this.prisma.searchIndex.findMany({
-          where: {
-            userId: share.ownerUserId,
-            notePath: { startsWith: share.path + "/" },
-          },
+        const notesInFolder = await this.db.query.searchIndex.findMany({
+          where: and(
+            eq(searchIndex.userId, share.ownerUserId),
+            like(searchIndex.notePath, `${share.path}/%`),
+          ),
         });
         for (const note of notesInFolder) {
           paths.push({

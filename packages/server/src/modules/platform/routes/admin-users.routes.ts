@@ -1,7 +1,12 @@
 import type { FastifyPluginAsync } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
+import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { ValidationError, NotFoundError } from "../../../lib/errors.js";
+import { account, session, user } from "../../../db/schema/auth.js";
+import { graphEdge, searchIndex } from "../../../db/schema/notes.js";
+import { settings } from "../../../db/schema/settings.js";
+import { accessRequest, noteShare } from "../../../db/schema/sharing.js";
 
 const userResponseSchema = z.object({
   id: z.string(),
@@ -44,9 +49,9 @@ export const adminUsersRoutes: FastifyPluginAsync = async (app) => {
       },
     },
     async () => {
-      const users = await app.prisma.user.findMany({
-        orderBy: { createdAt: "desc" },
-        select: {
+      const users = await app.db.query.user.findMany({
+        orderBy: desc(user.createdAt),
+        columns: {
           id: true,
           email: true,
           name: true,
@@ -81,8 +86,10 @@ export const adminUsersRoutes: FastifyPluginAsync = async (app) => {
         throw new ValidationError("Cannot modify yourself");
       }
 
-      const user = await app.prisma.user.findUnique({ where: { id: userId } });
-      if (!user) {
+      const existing = await app.db.query.user.findFirst({
+        where: eq(user.id, userId),
+      });
+      if (!existing) {
         throw new NotFoundError("User not found");
       }
 
@@ -91,23 +98,24 @@ export const adminUsersRoutes: FastifyPluginAsync = async (app) => {
       const updateData: Record<string, unknown> = {};
 
       if (typeof disabled === "boolean") {
-        if (disabled && !user.disabled) shouldInvalidateTokens = true;
+        if (disabled && !existing.disabled) shouldInvalidateTokens = true;
         updateData.disabled = disabled;
       }
 
       if (typeof role === "string") {
-        if (role !== user.role) shouldInvalidateTokens = true;
+        if (role !== existing.role) shouldInvalidateTokens = true;
         updateData.role = role;
       }
 
       if (shouldInvalidateTokens) {
-        await app.prisma.session.deleteMany({ where: { userId } });
+        await app.db.delete(session).where(eq(session.userId, userId));
       }
 
-      const saved = await app.prisma.user.update({
-        where: { id: userId },
-        data: updateData,
-      });
+      const [saved] = await app.db
+        .update(user)
+        .set(updateData)
+        .where(eq(user.id, userId))
+        .returning();
 
       return {
         id: saved.id,
@@ -141,20 +149,22 @@ export const adminUsersRoutes: FastifyPluginAsync = async (app) => {
         throw new ValidationError("Cannot delete yourself");
       }
 
-      const user = await app.prisma.user.findUnique({ where: { id: userId } });
-      if (!user) {
+      const existing = await app.db.query.user.findFirst({
+        where: eq(user.id, userId),
+      });
+      if (!existing) {
         throw new NotFoundError("User not found");
       }
 
-      await app.prisma.searchIndex.deleteMany({ where: { userId } });
-      await app.prisma.graphEdge.deleteMany({ where: { userId } });
-      await app.prisma.settings.deleteMany({ where: { userId } });
-      await app.prisma.noteShare.deleteMany({ where: { ownerUserId: userId } });
-      await app.prisma.noteShare.deleteMany({ where: { sharedWithUserId: userId } });
-      await app.prisma.accessRequest.deleteMany({ where: { requesterUserId: userId } });
-      await app.prisma.accessRequest.deleteMany({ where: { ownerUserId: userId } });
+      await app.db.delete(searchIndex).where(eq(searchIndex.userId, userId));
+      await app.db.delete(graphEdge).where(eq(graphEdge.userId, userId));
+      await app.db.delete(settings).where(eq(settings.userId, userId));
+      await app.db.delete(noteShare).where(eq(noteShare.ownerUserId, userId));
+      await app.db.delete(noteShare).where(eq(noteShare.sharedWithUserId, userId));
+      await app.db.delete(accessRequest).where(eq(accessRequest.requesterUserId, userId));
+      await app.db.delete(accessRequest).where(eq(accessRequest.ownerUserId, userId));
 
-      await app.prisma.user.delete({ where: { id: userId } });
+      await app.db.delete(user).where(eq(user.id, userId));
 
       return { ok: true };
     },
@@ -178,20 +188,22 @@ export const adminUsersRoutes: FastifyPluginAsync = async (app) => {
       const userId = req.params.id;
       const { newPassword } = req.body;
 
-      const user = await app.prisma.user.findUnique({ where: { id: userId } });
-      if (!user) {
+      const existing = await app.db.query.user.findFirst({
+        where: eq(user.id, userId),
+      });
+      if (!existing) {
         throw new NotFoundError("User not found");
       }
 
       const { hashPassword } = await import("better-auth/crypto");
       const hashedPassword = await hashPassword(newPassword);
 
-      await app.prisma.account.updateMany({
-        where: { userId, providerId: "credential" },
-        data: { password: hashedPassword },
-      });
+      await app.db
+        .update(account)
+        .set({ password: hashedPassword })
+        .where(and(eq(account.userId, userId), eq(account.providerId, "credential")));
 
-      await app.prisma.session.deleteMany({ where: { userId } });
+      await app.db.delete(session).where(eq(session.userId, userId));
 
       return { ok: true };
     },

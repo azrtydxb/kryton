@@ -1,71 +1,44 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { buildIdentityTestApp } from "./helpers.js";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
+import { apiKey, user } from "../../../db/schema/auth.js";
+import type { TestDbHandle } from "../../../test/db-fixture.js";
+import {
+  buildIdentityTestApp,
+  createIdentityTestDb,
+  resetIdentityTestDb,
+} from "./helpers.js";
 
 const TEST_USER = { id: "u-1", email: "alice@example.com", name: "Alice", role: "user" };
 
-interface ApiKeyRow {
-  id: string;
-  userId: string;
-  name: string;
-  keyHash: string;
-  keyPrefix: string;
-  scope: string;
-  expiresAt: Date | null;
-  lastUsedAt: Date | null;
-  createdAt: Date;
-}
-
-function makePrisma(initial: ApiKeyRow[] = []) {
-  const rows: ApiKeyRow[] = [...initial];
-  let seq = 0;
-  return {
-    apiKey: {
-      async count({ where }: { where: { userId: string } }) {
-        return rows.filter((r) => r.userId === where.userId).length;
-      },
-      async create({ data }: { data: Omit<ApiKeyRow, "id" | "lastUsedAt" | "createdAt"> }) {
-        const row: ApiKeyRow = {
-          id: `k-${++seq}`,
-          lastUsedAt: null,
-          createdAt: new Date(),
-          ...data,
-          expiresAt: data.expiresAt ?? null,
-        };
-        rows.push(row);
-        return row;
-      },
-      async findMany({ where }: { where: { userId: string } }) {
-        return rows
-          .filter((r) => r.userId === where.userId)
-          .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-      },
-      async findUnique({ where }: { where: { id?: string; keyHash?: string } }) {
-        return (
-          rows.find((r) => (where.id && r.id === where.id) || (where.keyHash && r.keyHash === where.keyHash)) ??
-          null
-        );
-      },
-      async delete({ where }: { where: { id: string } }) {
-        const idx = rows.findIndex((r) => r.id === where.id);
-        if (idx === -1) throw new Error("not found");
-        const [removed] = rows.splice(idx, 1);
-        return removed;
-      },
-    },
-    _rows: rows,
-  };
+async function seedUser(dbHandle: TestDbHandle): Promise<void> {
+  await dbHandle.db.insert(user).values({
+    id: TEST_USER.id,
+    name: TEST_USER.name,
+    email: TEST_USER.email,
+  });
 }
 
 describe("identity / api-keys routes", () => {
+  let dbHandle: TestDbHandle;
   let close: (() => Promise<void>) | null = null;
+
+  beforeAll(() => {
+    dbHandle = createIdentityTestDb();
+  });
+  afterAll(async () => {
+    await dbHandle.close();
+  });
+  beforeEach(async () => {
+    await resetIdentityTestDb(dbHandle);
+  });
   afterEach(async () => {
     if (close) await close();
     close = null;
   });
 
   it("POST /api/api-keys creates a key and returns the raw value once", async () => {
-    const prisma = makePrisma();
-    const app = await buildIdentityTestApp({ user: TEST_USER, prisma });
+    await seedUser(dbHandle);
+    const app = await buildIdentityTestApp({ user: TEST_USER, dbHandle });
     close = () => app.close();
 
     const res = await app.inject({
@@ -84,8 +57,8 @@ describe("identity / api-keys routes", () => {
   // BLOCKED: see users.routes.test.ts — validation-failure path crashes
   // inside fastify-type-provider-zod 4.0.2 against Zod 4.
   it.skip("POST /api/api-keys validates body", async () => {
-    const prisma = makePrisma();
-    const app = await buildIdentityTestApp({ user: TEST_USER, prisma });
+    await seedUser(dbHandle);
+    const app = await buildIdentityTestApp({ user: TEST_USER, dbHandle });
     close = () => app.close();
 
     const res = await app.inject({
@@ -97,11 +70,11 @@ describe("identity / api-keys routes", () => {
   });
 
   it("POST /api/api-keys rejects API-key-based callers (session-only)", async () => {
-    const prisma = makePrisma();
+    await seedUser(dbHandle);
     const app = await buildIdentityTestApp({
       user: TEST_USER,
       apiKey: { id: "k-existing", scope: "read-write" },
-      prisma,
+      dbHandle,
     });
     close = () => app.close();
 
@@ -114,20 +87,19 @@ describe("identity / api-keys routes", () => {
   });
 
   it("GET /api/api-keys lists user's keys", async () => {
-    const prisma = makePrisma([
-      {
-        id: "k-1",
-        userId: TEST_USER.id,
-        name: "key-a",
-        keyHash: "hash-a",
-        keyPrefix: "kryton_aaaaaaaa",
-        scope: "read-only",
-        expiresAt: null,
-        lastUsedAt: null,
-        createdAt: new Date("2024-01-01T00:00:00Z"),
-      },
-    ]);
-    const app = await buildIdentityTestApp({ user: TEST_USER, prisma });
+    await seedUser(dbHandle);
+    await dbHandle.db.insert(apiKey).values({
+      id: "k-1",
+      userId: TEST_USER.id,
+      name: "key-a",
+      keyHash: "hash-a",
+      keyPrefix: "kryton_aaaaaaaa",
+      scope: "read-only",
+      expiresAt: null,
+      lastUsedAt: null,
+      createdAt: new Date("2024-01-01T00:00:00Z"),
+    });
+    const app = await buildIdentityTestApp({ user: TEST_USER, dbHandle });
     close = () => app.close();
 
     const res = await app.inject({ method: "GET", url: "/api/api-keys" });
@@ -139,30 +111,30 @@ describe("identity / api-keys routes", () => {
   });
 
   it("DELETE /api/api-keys/:id revokes the key", async () => {
-    const prisma = makePrisma([
-      {
-        id: "k-1",
-        userId: TEST_USER.id,
-        name: "key-a",
-        keyHash: "hash-a",
-        keyPrefix: "kryton_aaaaaaaa",
-        scope: "read-only",
-        expiresAt: null,
-        lastUsedAt: null,
-        createdAt: new Date(),
-      },
-    ]);
-    const app = await buildIdentityTestApp({ user: TEST_USER, prisma });
+    await seedUser(dbHandle);
+    await dbHandle.db.insert(apiKey).values({
+      id: "k-1",
+      userId: TEST_USER.id,
+      name: "key-a",
+      keyHash: "hash-a",
+      keyPrefix: "kryton_aaaaaaaa",
+      scope: "read-only",
+    });
+    const app = await buildIdentityTestApp({ user: TEST_USER, dbHandle });
     close = () => app.close();
 
     const res = await app.inject({ method: "DELETE", url: "/api/api-keys/k-1" });
     expect(res.statusCode).toBe(204);
-    expect(prisma._rows).toHaveLength(0);
+    const remaining = await dbHandle.db
+      .select()
+      .from(apiKey)
+      .where(eq(apiKey.id, "k-1"));
+    expect(remaining).toHaveLength(0);
   });
 
   it("DELETE /api/api-keys/:id returns 404 for unknown key", async () => {
-    const prisma = makePrisma();
-    const app = await buildIdentityTestApp({ user: TEST_USER, prisma });
+    await seedUser(dbHandle);
+    const app = await buildIdentityTestApp({ user: TEST_USER, dbHandle });
     close = () => app.close();
 
     const res = await app.inject({ method: "DELETE", url: "/api/api-keys/missing" });

@@ -1,45 +1,40 @@
 # Database Migrations
 
-Kryton uses [Prisma Migrate](https://www.prisma.io/docs/concepts/components/prisma-migrate) for database schema versioning.
+Kryton uses [Drizzle Kit](https://orm.drizzle.team/kit-docs/overview) for Postgres schema versioning. Migrations live in `packages/server/src/db/migrations/` as plain `.sql` files alongside a `meta/` journal maintained by drizzle-kit.
+
+## Requirements
+
+- Postgres 16+
+- The `pgvector` extension installed in the target database. The docker-compose stack uses `pgvector/pgvector:pg16` and runs `docker/postgres-init/01-extensions.sql` automatically on first boot.
+- `POSTGRES_URL` set to a libpq-style connection string, e.g. `postgres://kryton:kryton@localhost:5432/kryton`.
 
 ## For developers
 
-When you change `prisma/schema.prisma`, create a new migration:
+After editing any file under `packages/server/src/db/schema/`, generate a new migration:
 
 ```bash
-DATABASE_URL="file:./data/kryton.db" npx prisma migrate dev --name describe_your_change
+cd packages/server
+POSTGRES_URL=postgres://kryton:kryton@localhost:5432/kryton npm run db:generate
 ```
 
-This generates a new migration file in `prisma/migrations/`. Commit it alongside your schema change.
+Drizzle Kit diffs the schema against the recorded snapshot and emits a new `NNNN_<name>.sql` file. Inspect it, rename if needed, and commit it alongside the schema change.
+
+Apply pending migrations against a running Postgres:
+
+```bash
+POSTGRES_URL=postgres://kryton:kryton@localhost:5432/kryton npm run db:migrate
+```
+
+Open Drizzle Studio (local schema/data browser):
+
+```bash
+POSTGRES_URL=... npm run db:studio
+```
 
 ## For production
 
-Migrations run automatically on container startup via `scripts/migrate.mjs`. The script:
+Run `npm run db:migrate` against the target `POSTGRES_URL` before starting the server. The container entrypoint does this automatically on boot. The `pgvector` extension must already be installed in the target database — the dev compose stack does this automatically; bring-your-own-Postgres deployments must `CREATE EXTENSION IF NOT EXISTS vector;` once before the first migration.
 
-1. Backs up the database (keeps the 5 most recent backups)
-2. Detects legacy databases and baselines them
-3. Runs `prisma migrate deploy` to apply any pending migrations
+## History
 
-## Upgrading from pre-v3.3.0 (db push era)
-
-Databases created before v3.3.0 used `prisma db push` and have no migration history. The migration script detects this automatically (no `_prisma_migrations` table present) and baselines the `init` migration before applying any subsequent ones. No manual action is required.
-
-## Renaming `mnemo.db` → `kryton.db` (local dev only)
-
-If you have a local development database file at `packages/server/data/mnemo.db` from before the Mnemo→Kryton rename, rename it once:
-
-```bash
-cd packages/server/data
-mv mnemo.db kryton.db
-mv mnemo.db-journal kryton.db-journal 2>/dev/null
-mv mnemo.db-wal kryton.db-wal 2>/dev/null
-mv mnemo.db-shm kryton.db-shm 2>/dev/null
-```
-
-Then update your local `.env` so `DATABASE_URL="file:./data/kryton.db"`. Production deployments are unaffected — the production Prisma config and Docker entrypoint already reference the new filename.
-
-## Upgrading to v4.4 sync v2
-
-The `20260430153558_sync_v2` migration adds 11 new models (Folder, Tag, NoteTag, NoteRevision, Attachment, Agent, AgentToken, YjsDocument, YjsUpdate, SyncCursor, NoteVersion) and `version` + `cursor` columns on existing tier 1 models. Apply via `npx prisma migrate deploy`. The migration script handles this automatically on container startup.
-
-After v4.4 deployment, on first user login the server lazily backfills `Folder` rows from the user's notes directory and `Tag`+`NoteTag` rows from `SearchIndex.tags`. No manual backfill is required.
+This repository previously used Prisma + SQLite. The 2026-05-11 Postgres + Drizzle migration replaced that stack wholesale — there is no SQLite codepath, no backup-and-migrate shell script, and no Prisma migration history to carry forward. See `docs/superpowers/specs/2026-05-11-postgres-drizzle-migration-design.md` for the design rationale.

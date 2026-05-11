@@ -1,22 +1,50 @@
 import Fastify, { type FastifyInstance } from "fastify";
+import { sql } from "drizzle-orm";
 import { zodPlugin } from "../../../plugins/zod.js";
 import { errorsPlugin } from "../../../plugins/errors.js";
 import { AuthError, ForbiddenError } from "../../../lib/errors.js";
 import { agentsRoutes } from "../routes/agents.routes.js";
 import { AgentService } from "../services/agent.service.js";
 import type { AuthApi, AuthContext, AuthUser } from "../../../plugins/auth.js";
+import { createTestDb, type TestDbHandle } from "../../../test/db-fixture.js";
 
 export interface AgentsTestAppOptions {
   /** The user returned by auth helpers. Set to null to simulate anonymous. */
   user?: AuthUser | null;
-  /** Inline prisma stub. Provide just the methods used by the routes under test. */
-  prisma: unknown;
+  /** Handle returned by `createAgentsTestDb()` (shared across the test file). */
+  dbHandle: TestDbHandle;
 }
 
 /**
- * Build a Fastify app with the agents routes wired in, but with `app.prisma`
- * and `app.auth` stubbed. This avoids the need for a real DB or Better Auth
- * session in unit tests.
+ * Shared Drizzle test DB handle. Agents tests share a single connection to
+ * the testcontainers Postgres started by the vitest global setup; rows are
+ * cleared between tests via `resetAgentsTestDb()` instead of opening a new
+ * pool per app.
+ */
+export function createAgentsTestDb(): TestDbHandle {
+  return createTestDb();
+}
+
+/**
+ * Truncate all tables touched by the agents tests. Call from `beforeEach`
+ * (or `afterEach`) to keep tests isolated.
+ */
+export async function resetAgentsTestDb(handle: TestDbHandle): Promise<void> {
+  // RESTART IDENTITY + CASCADE so dependent FKs (AgentToken -> Agent -> User)
+  // clear in one shot.
+  await handle.db.execute(sql`
+    TRUNCATE TABLE
+      "AgentToken",
+      "Agent",
+      "User"
+    RESTART IDENTITY CASCADE
+  `);
+}
+
+/**
+ * Build a Fastify app for agents tests. Decorates `app.db` with the shared
+ * Drizzle testcontainers handle and stubs out `app.auth` so we don't need
+ * real Better Auth sessions.
  */
 export async function buildAgentsTestApp(
   opts: AgentsTestAppOptions,
@@ -25,7 +53,7 @@ export async function buildAgentsTestApp(
 
   await app.register(zodPlugin);
 
-  app.decorate("prisma", opts.prisma as never);
+  app.decorate("db", opts.dbHandle.db);
 
   const user = opts.user ?? null;
   const ctx: AuthContext | null = user

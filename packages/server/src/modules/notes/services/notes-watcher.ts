@@ -3,8 +3,7 @@
  *
  * Keeps the SearchIndex and GraphEdge tables in sync with the filesystem
  * regardless of how files were added or removed (UI, MCP, git, manual rm,
- * Finder, etc.). The startup reconcile (`reconcileSearchIndex`) handles the
- * cold-start case; this watcher handles everything that happens *while* the
+ * Finder, etc.). This watcher handles everything that happens *while* the
  * server is running.
  *
  * One chokidar watcher per user-dir, started lazily on first request to that

@@ -1,7 +1,9 @@
 import type { FastifyPluginAsync } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { ValidationError, ForbiddenError } from "../../../lib/errors.js";
+import { settings } from "../../../db/schema/settings.js";
 
 const updateSettingSchema = z.object({
   value: z.string(),
@@ -39,8 +41,8 @@ export const settingsRoutes: FastifyPluginAsync = async (app) => {
     },
     async (req) => {
       const user = await app.auth.requireUser(req);
-      const userSettings = await app.prisma.settings.findMany({
-        where: { userId: user.id },
+      const userSettings = await app.db.query.settings.findMany({
+        where: eq(settings.userId, user.id),
       });
 
       const result: Record<string, string> = {};
@@ -79,11 +81,13 @@ export const settingsRoutes: FastifyPluginAsync = async (app) => {
 
       const { value } = req.body;
 
-      await app.prisma.settings.upsert({
-        where: { key_userId: { key, userId: user.id } },
-        create: { key, userId: user.id, value },
-        update: { value },
-      });
+      await app.db
+        .insert(settings)
+        .values({ key, userId: user.id, value })
+        .onConflictDoUpdate({
+          target: [settings.key, settings.userId],
+          set: { value, updatedAt: new Date() },
+        });
 
       return { key, value, message: "Setting updated" };
     },

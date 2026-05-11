@@ -2,9 +2,11 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { FastifyPluginAsync } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
+import { and, eq } from "drizzle-orm";
 import { dailyNoteResponseSchema } from "../schemas/daily.schemas.js";
 import type { NoteService } from "../services/note.service.js";
 import { getUserNotesDir } from "../services/user-notes-dir.service.js";
+import { settings } from "../../../db/schema/settings.js";
 
 const DEFAULT_TEMPLATE = `# Daily Note — {{date}}\n\n## Tasks\n- [ ] \n\n## Notes\n\n\n#daily\n`;
 
@@ -43,8 +45,8 @@ export function dailyRoutes(deps: DailyRoutesDeps): FastifyPluginAsync {
 
     async function getDailyTemplate(userId: string): Promise<string> {
       try {
-        const userSetting = await app.prisma.settings.findUnique({
-          where: { key_userId: { key: "dailyNoteTemplate", userId } },
+        const userSetting = await app.db.query.settings.findFirst({
+          where: and(eq(settings.key, "dailyNoteTemplate"), eq(settings.userId, userId)),
         });
         if (userSetting?.value) return userSetting.value;
       } catch {

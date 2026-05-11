@@ -4,7 +4,10 @@
  * Used by every MCP transport (Streamable HTTP, SSE, future stdio-via-
  * remote). Resolves to the owning user; rejects disabled accounts.
  */
+import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+
+import { user as userTable } from "../../../db/schema/auth.js";
 
 export interface McpAuthContext {
   userId: string;
@@ -33,9 +36,9 @@ export async function authenticateMcpRequest(
     void reply.status(401).send({ error: "Invalid or expired API key" });
     return null;
   }
-  const user = await app.prisma.user.findUnique({
-    where: { id: keyData.userId },
-    select: { id: true, role: true, disabled: true },
+  const user = await app.db.query.user.findFirst({
+    where: eq(userTable.id, keyData.userId),
+    columns: { id: true, role: true, disabled: true },
   });
   if (!user) {
     void reply.status(401).send({ error: "User not found" });

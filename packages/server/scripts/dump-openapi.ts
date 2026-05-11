@@ -36,7 +36,8 @@ async function main(): Promise<void> {
   // Override env: don't try to read .env or fail on missing secrets at dump time.
   process.env.NODE_ENV ??= "test";
   process.env.LOG_LEVEL ??= "silent";
-  process.env.DATABASE_URL ??= "file:./data/openapi-dump.db";
+  process.env.POSTGRES_URL ??=
+    "postgresql://kryton:kryton@localhost:5432/kryton_test";
   process.env.BETTER_AUTH_SECRET ??=
     "openapi-dump-secret-must-be-at-least-32-characters";
   process.env.OPENAPI_ENABLED = "true";

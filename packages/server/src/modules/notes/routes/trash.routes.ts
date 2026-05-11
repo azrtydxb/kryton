@@ -2,7 +2,10 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { FastifyPluginAsync } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
+import { and, eq } from "drizzle-orm";
 import { NotFoundError, ValidationError } from "../../../lib/errors.js";
+import { trashItem } from "../../../db/schema/notes.js";
+import { syncDeletion } from "../../../db/schema/sync.js";
 import {
   trashDeleteResponseSchema,
   trashEmptyResponseSchema,
@@ -112,14 +115,19 @@ export function trashRoutes(deps: TrashRoutesDeps): FastifyPluginAsync {
         await fs.rename(trashFilePath, restorePath);
         await removeEmptyDirs(path.dirname(trashFilePath), trashDir);
 
-        const trashRecord = await app.prisma.trashItem.findFirst({
-          where: { originalPath: fullNotePath, userId: ctx.user.id },
+        const trashRecord = await app.db.query.trashItem.findFirst({
+          where: and(
+            eq(trashItem.originalPath, fullNotePath),
+            eq(trashItem.userId, ctx.user.id),
+          ),
         });
         if (trashRecord) {
-          await app.prisma.syncDeletion.create({
-            data: { tableName: "trash_items", recordId: trashRecord.id, userId: ctx.user.id },
+          await app.db.insert(syncDeletion).values({
+            tableName: "trash_items",
+            recordId: trashRecord.id,
+            userId: ctx.user.id,
           });
-          await app.prisma.trashItem.delete({ where: { id: trashRecord.id } });
+          await app.db.delete(trashItem).where(eq(trashItem.id, trashRecord.id));
         }
 
         return { message: "Note restored", path: fullNotePath };
@@ -165,17 +173,24 @@ export function trashRoutes(deps: TrashRoutesDeps): FastifyPluginAsync {
         }
         await removeEmptyDirs(path.dirname(trashFilePath), trashDir);
 
-        const trashRecord = await app.prisma.trashItem.findFirst({
-          where: { originalPath: fullNotePath, userId: ctx.user.id },
+        const trashRecord = await app.db.query.trashItem.findFirst({
+          where: and(
+            eq(trashItem.originalPath, fullNotePath),
+            eq(trashItem.userId, ctx.user.id),
+          ),
         });
         if (trashRecord) {
-          await app.prisma.syncDeletion.create({
-            data: { tableName: "trash_items", recordId: trashRecord.id, userId: ctx.user.id },
+          await app.db.insert(syncDeletion).values({
+            tableName: "trash_items",
+            recordId: trashRecord.id,
+            userId: ctx.user.id,
           });
-          await app.prisma.trashItem.delete({ where: { id: trashRecord.id } });
+          await app.db.delete(trashItem).where(eq(trashItem.id, trashRecord.id));
         }
-        await app.prisma.syncDeletion.create({
-          data: { tableName: "notes", recordId: fullNotePath, userId: ctx.user.id },
+        await app.db.insert(syncDeletion).values({
+          tableName: "notes",
+          recordId: fullNotePath,
+          userId: ctx.user.id,
         });
 
         return { message: "Note permanently deleted" };
@@ -216,8 +231,8 @@ export function trashEmptyRoutes(deps: TrashRoutesDeps): FastifyPluginAsync {
         const userDir = await getUserNotesDir(notesDir, ctx.user.id);
         const trashDir = getTrashDir(userDir);
 
-        const trashItemRecords = await app.prisma.trashItem.findMany({
-          where: { userId: ctx.user.id },
+        const trashItemRecords = await app.db.query.trashItem.findMany({
+          where: eq(trashItem.userId, ctx.user.id),
         });
 
         try {
@@ -227,21 +242,19 @@ export function trashEmptyRoutes(deps: TrashRoutesDeps): FastifyPluginAsync {
         }
 
         if (trashItemRecords.length > 0) {
-          await app.prisma.syncDeletion.createMany({
-            data: [
-              ...trashItemRecords.map((item) => ({
-                tableName: "trash_items",
-                recordId: item.id,
-                userId: ctx.user.id,
-              })),
-              ...trashItemRecords.map((item) => ({
-                tableName: "notes",
-                recordId: item.originalPath,
-                userId: ctx.user.id,
-              })),
-            ],
-          });
-          await app.prisma.trashItem.deleteMany({ where: { userId: ctx.user.id } });
+          await app.db.insert(syncDeletion).values([
+            ...trashItemRecords.map((item) => ({
+              tableName: "trash_items",
+              recordId: item.id,
+              userId: ctx.user.id,
+            })),
+            ...trashItemRecords.map((item) => ({
+              tableName: "notes",
+              recordId: item.originalPath,
+              userId: ctx.user.id,
+            })),
+          ]);
+          await app.db.delete(trashItem).where(eq(trashItem.userId, ctx.user.id));
         }
 
         return { message: "Trash emptied" };

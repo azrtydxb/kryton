@@ -652,6 +652,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/agents/mcp-health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** MCP transport reachability probe */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /** @enum {string} */
+                            status: "ok";
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/agents/online": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List MCP sessions currently connected for the calling user */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            clients: {
+                                lastActivity: number;
+                                name: string | null;
+                                sessionId: string;
+                                startedAt: number;
+                                /** @enum {string} */
+                                transport: "sse" | "streamable";
+                                version: string | null;
+                            }[];
+                            count: number;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/agents/tokens/{tokenId}/revoke": {
         parameters: {
             query?: never;
@@ -1373,7 +1459,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Delete an empty folder */
+        /** Delete a folder (recursively trashes any notes inside) */
         delete: {
             parameters: {
                 query?: never;

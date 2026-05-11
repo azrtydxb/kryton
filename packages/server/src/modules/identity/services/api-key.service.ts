@@ -1,6 +1,8 @@
 import crypto from "node:crypto";
 import type { FastifyInstance } from "fastify";
+import { count, desc, eq } from "drizzle-orm";
 import { AppError, NotFoundError } from "../../../lib/errors.js";
+import { apiKey } from "../../../db/schema/auth.js";
 
 const KEY_PREFIX = "kryton_";
 const KEY_BYTES = 32; // 256 bits of entropy
@@ -37,7 +39,7 @@ export function buildKeyPrefix(key: string): string {
 
 /**
  * API key service. Receives the Fastify instance via constructor and uses
- * `app.prisma` for all DB access — no module-level Prisma singleton.
+ * `app.db` (Drizzle) for all DB access — no module-level singleton.
  */
 export class ApiKeyService {
   constructor(private readonly app: FastifyInstance) {}
@@ -48,8 +50,12 @@ export class ApiKeyService {
     scope: string,
     expiresAt: Date | null,
   ): Promise<CreatedApiKey> {
-    const count = await this.app.prisma.apiKey.count({ where: { userId } });
-    if (count >= MAX_KEYS_PER_USER) {
+    const countRow = await this.app.db
+      .select({ c: count() })
+      .from(apiKey)
+      .where(eq(apiKey.userId, userId));
+    const existing = Number(countRow[0]?.c ?? 0);
+    if (existing >= MAX_KEYS_PER_USER) {
       throw new AppError(
         "Maximum of 10 API keys per user reached",
         400,
@@ -61,9 +67,10 @@ export class ApiKeyService {
     const keyHash = hashApiKey(rawKey);
     const keyPrefix = buildKeyPrefix(rawKey);
 
-    const record = await this.app.prisma.apiKey.create({
-      data: { userId, name, keyHash, keyPrefix, scope, expiresAt },
-    });
+    const [record] = await this.app.db
+      .insert(apiKey)
+      .values({ userId, name, keyHash, keyPrefix, scope, expiresAt })
+      .returning();
 
     return {
       id: record.id,
@@ -77,9 +84,9 @@ export class ApiKeyService {
   }
 
   async list(userId: string) {
-    return this.app.prisma.apiKey.findMany({
-      where: { userId },
-      select: {
+    return this.app.db.query.apiKey.findMany({
+      where: eq(apiKey.userId, userId),
+      columns: {
         id: true,
         name: true,
         keyPrefix: true,
@@ -88,32 +95,38 @@ export class ApiKeyService {
         lastUsedAt: true,
         createdAt: true,
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: [desc(apiKey.createdAt)],
     });
   }
 
   async revoke(userId: string, keyId: string): Promise<void> {
-    const key = await this.app.prisma.apiKey.findUnique({ where: { id: keyId } });
+    const key = await this.app.db.query.apiKey.findFirst({
+      where: eq(apiKey.id, keyId),
+    });
     if (!key || key.userId !== userId) {
       throw new NotFoundError("API key not found");
     }
-    await this.app.prisma.apiKey.delete({ where: { id: keyId } });
+    await this.app.db.delete(apiKey).where(eq(apiKey.id, keyId));
   }
 
   async validate(rawKey: string): Promise<ValidatedApiKey | null> {
     const keyHash = hashApiKey(rawKey);
-    const record = await this.app.prisma.apiKey.findUnique({ where: { keyHash } });
+    const record = await this.app.db.query.apiKey.findFirst({
+      where: eq(apiKey.keyHash, keyHash),
+    });
 
     if (!record) return null;
     if (record.expiresAt && record.expiresAt < new Date()) return null;
 
     // Update lastUsedAt (fire-and-forget)
-    this.app.prisma.apiKey
-      .update({
-        where: { id: record.id },
-        data: { lastUsedAt: new Date() },
-      })
-      .catch(() => {});
+    void this.app.db
+      .update(apiKey)
+      .set({ lastUsedAt: new Date() })
+      .where(eq(apiKey.id, record.id))
+      .then(
+        () => undefined,
+        () => undefined,
+      );
 
     return {
       keyId: record.id,
