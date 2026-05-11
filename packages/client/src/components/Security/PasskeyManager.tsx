@@ -73,7 +73,9 @@ export function PasskeyManagerContent() {
   }, []);
 
   useEffect(() => {
-    fetchPasskeys();
+    void (async () => {
+      await fetchPasskeys();
+    })();
   }, [fetchPasskeys]);
 
   const handleAddPasskey = async () => {

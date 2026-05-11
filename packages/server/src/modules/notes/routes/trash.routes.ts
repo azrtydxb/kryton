@@ -5,7 +5,6 @@ import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { and, eq } from "drizzle-orm";
 import { NotFoundError, ValidationError } from "../../../lib/errors.js";
 import { trashItem } from "../../../db/schema/notes.js";
-import { syncDeletion } from "../../../db/schema/sync.js";
 import {
   trashDeleteResponseSchema,
   trashEmptyResponseSchema,
@@ -122,11 +121,6 @@ export function trashRoutes(deps: TrashRoutesDeps): FastifyPluginAsync {
           ),
         });
         if (trashRecord) {
-          await app.db.insert(syncDeletion).values({
-            tableName: "trash_items",
-            recordId: trashRecord.id,
-            userId: ctx.user.id,
-          });
           await app.db.delete(trashItem).where(eq(trashItem.id, trashRecord.id));
         }
 
@@ -180,18 +174,8 @@ export function trashRoutes(deps: TrashRoutesDeps): FastifyPluginAsync {
           ),
         });
         if (trashRecord) {
-          await app.db.insert(syncDeletion).values({
-            tableName: "trash_items",
-            recordId: trashRecord.id,
-            userId: ctx.user.id,
-          });
           await app.db.delete(trashItem).where(eq(trashItem.id, trashRecord.id));
         }
-        await app.db.insert(syncDeletion).values({
-          tableName: "notes",
-          recordId: fullNotePath,
-          userId: ctx.user.id,
-        });
 
         return { message: "Note permanently deleted" };
       },
@@ -242,18 +226,6 @@ export function trashEmptyRoutes(deps: TrashRoutesDeps): FastifyPluginAsync {
         }
 
         if (trashItemRecords.length > 0) {
-          await app.db.insert(syncDeletion).values([
-            ...trashItemRecords.map((item) => ({
-              tableName: "trash_items",
-              recordId: item.id,
-              userId: ctx.user.id,
-            })),
-            ...trashItemRecords.map((item) => ({
-              tableName: "notes",
-              recordId: item.originalPath,
-              userId: ctx.user.id,
-            })),
-          ]);
           await app.db.delete(trashItem).where(eq(trashItem.userId, ctx.user.id));
         }
 

@@ -1,6 +1,5 @@
 import { relations, sql } from "drizzle-orm";
 import {
-  bigint,
   boolean,
   index,
   integer,
@@ -38,7 +37,6 @@ export const noteShare = pgTable(
       .notNull()
       .defaultNow(),
     version: integer("version").notNull().default(0),
-    cursor: bigint("cursor", { mode: "bigint" }).notNull().default(sql`0`),
   },
   (t) => [
     uniqueIndex("NoteShare_ownerUserId_path_sharedWithUserId_key").on(

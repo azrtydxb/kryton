@@ -25,7 +25,6 @@ export async function resetKnowledgeTestDb(handle: TestDbHandle): Promise<void> 
       "GraphEdge",
       "SearchIndex",
       "NoteShare",
-      "SyncCursor",
       "User"
     RESTART IDENTITY CASCADE
   `);

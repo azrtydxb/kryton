@@ -34,7 +34,9 @@ export function ShareDialog({ notePath, isFolder, onClose }: ShareDialogProps) {
   }, [notePath]);
 
   useEffect(() => {
-    fetchShares();
+    void (async () => {
+      await fetchShares();
+    })();
   }, [fetchShares]);
 
   const handleSearchUser = useCallback(async (email: string) => {

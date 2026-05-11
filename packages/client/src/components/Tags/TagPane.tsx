@@ -26,7 +26,9 @@ export function TagPane({ onNoteSelect }: TagPaneProps) {
   }, []);
 
   useEffect(() => {
-    fetchTags();
+    void (async () => {
+      await fetchTags();
+    })();
   }, [fetchTags]);
 
   const handleTagSelect = useCallback(async (tag: string | null) => {

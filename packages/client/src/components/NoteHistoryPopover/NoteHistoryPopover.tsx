@@ -50,8 +50,8 @@ export function NoteHistoryPopover({ activePath, onRestored }: NoteHistoryPopove
   // Compute anchor position on open + on viewport resize while open.
   useEffect(() => {
     if (!open) return;
-    setAnchor(readAnchor());
     const onResize = (): void => setAnchor(readAnchor());
+    onResize();
     window.addEventListener('resize', onResize);
     window.addEventListener('scroll', onResize, true);
     return () => {
@@ -63,11 +63,21 @@ export function NoteHistoryPopover({ activePath, onRestored }: NoteHistoryPopove
   // Load versions when the panel opens.
   useEffect(() => {
     if (!open || !activePath) return;
-    setLoading(true);
-    api.listVersions(activePath)
-      .then((data) => setVersions(data.versions))
-      .catch(() => setVersions([]))
-      .finally(() => setLoading(false));
+    let cancelled = false;
+    void (async () => {
+      setLoading(true);
+      try {
+        const data = await api.listVersions(activePath);
+        if (!cancelled) setVersions(data.versions);
+      } catch {
+        if (!cancelled) setVersions([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [open, activePath]);
 
   // Outside-click + Esc close. Allow clicks on the header toggle through so

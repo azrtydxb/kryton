@@ -40,11 +40,7 @@ const serializeShare = (s: {
   createdAt: Date;
   updatedAt: Date;
   version: number;
-  cursor: bigint;
-}) => ({
-  ...s,
-  cursor: s.cursor.toString(),
-});
+}) => ({ ...s });
 
 // Postgres unique_violation
 const isUniqueViolation = (err: unknown): boolean =>

@@ -1,6 +1,5 @@
-import { relations, sql } from "drizzle-orm";
+import { relations } from "drizzle-orm";
 import {
-  bigint,
   boolean,
   integer,
   jsonb,
@@ -26,7 +25,6 @@ export const settings = pgTable(
       .notNull()
       .defaultNow(),
     version: integer("version").notNull().default(0),
-    cursor: bigint("cursor", { mode: "bigint" }).notNull().default(sql`0`),
   },
   (t) => [primaryKey({ columns: [t.key, t.userId] })],
 );
@@ -52,7 +50,6 @@ export const installedPlugin = pgTable("InstalledPlugin", {
     .notNull()
     .defaultNow(),
   schemaVersion: integer("schemaVersion").notNull().default(0),
-  cursor: bigint("cursor", { mode: "bigint" }).notNull().default(sql`0`),
 });
 
 // ---------------------------------------------------------------------------

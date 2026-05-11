@@ -32,7 +32,9 @@ export function BacklinksPanel({ notePath, onNoteSelect, rail = false }: Backlin
   }, [notePath]);
 
   useEffect(() => {
-    fetchBacklinks();
+    void (async () => {
+      await fetchBacklinks();
+    })();
   }, [fetchBacklinks]);
 
   const heading = (

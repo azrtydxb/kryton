@@ -121,12 +121,22 @@ export function useNotes(userId?: string) {
   }, [refreshTree]);
 
   useEffect(() => {
-    // Only fetch when authenticated
-    if (!userId) {
-      setLoading(false);
-      return;
-    }
-    refreshTree().finally(() => setLoading(false));
+    let cancelled = false;
+    void (async () => {
+      // Only fetch when authenticated
+      if (!userId) {
+        setLoading(false);
+        return;
+      }
+      try {
+        await refreshTree();
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [refreshTree, userId]);
 
   // Set content without auto-saving (for cancel/revert)

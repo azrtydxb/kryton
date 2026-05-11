@@ -1,8 +1,48 @@
 # Performance Baselines — Kryton Server
 
+> **HISTORICAL — superseded.** Numbers below were captured against the
+> SQLite + sync v2 stack that was removed in May 2026 (see
+> `docs/superpowers/specs/2026-05-11-postgres-drizzle-migration-design.md`
+> and `2026-05-11-remove-sqlite-and-offline-sync-design.md`). The server
+> now runs on Postgres with online-only clients; the `/api/sync/v2/*`
+> endpoints and the SQLite-backed bench scripts referenced here no
+> longer exist. A fresh baseline against Postgres is pending. Kept for
+> historical reference only.
+>
 > Generated: 2026-04-30 on MacBook Air M2 (Darwin 25.3.0, arm64).
 > All numbers are real measurements on local dev hardware with SQLite.
-> These are baselines for regression detection — not aspirational targets.
+> These were baselines for regression detection — not aspirational targets.
+
+---
+
+## Next Steps for a Fresh Postgres Baseline
+
+The historical sync-v2 + SQLite benchmarks (`bench:pull`, `bench:push`,
+`bench:tier2`) and their result files were deleted in the SQLite removal
+PR. To establish a new baseline for the current architecture, the
+following bench scripts need to be written and run against
+`pgvector/pgvector:pg16`:
+
+1. **REST CRUD throughput** — replace the pull/push/tier2 benches with a
+   bench that exercises the actual hot paths: `POST /api/notes`,
+   `GET /api/notes/:path`, `POST /api/notes/:path/save`,
+   `GET /api/knowledge/search` (lexical via tsvector),
+   `GET /api/knowledge/graph`. p50/p95/p99 per endpoint.
+2. **Yjs collab throughput** — the existing `stress:yjs:converge`,
+   `stress:yjs:reconnect`, `stress:yjs:rate` scripts are still valid
+   conceptually but should be re-run against the Postgres-backed
+   `YjsPersistence` to capture the new flush-latency numbers.
+3. **Attachment throughput** — `bench:attachments` was retained and
+   should still run. Re-run it against Postgres to capture the new
+   number.
+4. **Search throughput** — new bench for the Postgres `tsvector` lexical
+   search path that replaced MiniSearch.
+
+The hardware capture pattern, p50/p95 measurement methodology, and
+result-file conventions from the historical baseline are still good
+practice. Whoever runs the new baseline should produce one
+`<bench-name>-results.json` per script and link them from this README
+the same way the historical ones do.
 
 ## Hardware
 

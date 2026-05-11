@@ -3,7 +3,7 @@ import { sql, eq } from "drizzle-orm";
 import * as Y from "yjs";
 import { createTestDb, type TestDbHandle } from "../../../test/db-fixture.js";
 import { user as userTable } from "../../../db/schema/auth.js";
-import { yjsDocument, yjsUpdate } from "../../../db/schema/sync.js";
+import { yjsDocument, yjsUpdate } from "../../../db/schema/collab.js";
 import { YjsPersistence } from "../ws/persistence.js";
 
 /**

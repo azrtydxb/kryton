@@ -3905,9 +3905,6 @@
                         "format": "date-time",
                         "type": "string"
                       },
-                      "cursor": {
-                        "type": "string"
-                      },
                       "id": {
                         "type": "string"
                       },
@@ -3945,8 +3942,7 @@
                       "permission",
                       "createdAt",
                       "updatedAt",
-                      "version",
-                      "cursor"
+                      "version"
                     ],
                     "type": "object"
                   },
@@ -4011,9 +4007,6 @@
                       "format": "date-time",
                       "type": "string"
                     },
-                    "cursor": {
-                      "type": "string"
-                    },
                     "id": {
                       "type": "string"
                     },
@@ -4051,8 +4044,7 @@
                     "permission",
                     "createdAt",
                     "updatedAt",
-                    "version",
-                    "cursor"
+                    "version"
                   ],
                   "type": "object"
                 }
@@ -4203,9 +4195,6 @@
                       "format": "date-time",
                       "type": "string"
                     },
-                    "cursor": {
-                      "type": "string"
-                    },
                     "id": {
                       "type": "string"
                     },
@@ -4243,8 +4232,7 @@
                     "permission",
                     "createdAt",
                     "updatedAt",
-                    "version",
-                    "cursor"
+                    "version"
                   ],
                   "type": "object"
                 }
@@ -4254,335 +4242,6 @@
           }
         },
         "summary": "Update share permission",
-        "tags": [
-          "collab"
-        ]
-      }
-    },
-    "/api/sync/v2/pull": {
-      "post": {
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "cursor": {
-                    "default": "0",
-                    "type": "string"
-                  }
-                },
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": false,
-                  "properties": {
-                    "changes": {
-                      "additionalProperties": {
-                        "additionalProperties": false,
-                        "properties": {
-                          "created": {
-                            "items": {},
-                            "type": "array"
-                          },
-                          "deleted": {
-                            "items": {
-                              "type": "string"
-                            },
-                            "type": "array"
-                          },
-                          "updated": {
-                            "items": {},
-                            "type": "array"
-                          }
-                        },
-                        "required": [
-                          "created",
-                          "updated",
-                          "deleted"
-                        ],
-                        "type": "object"
-                      },
-                      "propertyNames": {
-                        "type": "string"
-                      },
-                      "type": "object"
-                    },
-                    "cursor": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "cursor",
-                    "changes"
-                  ],
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Default Response"
-          }
-        },
-        "summary": "Pull changes since cursor",
-        "tags": [
-          "collab"
-        ]
-      }
-    },
-    "/api/sync/v2/push": {
-      "post": {
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "properties": {
-                  "changes": {
-                    "additionalProperties": {
-                      "items": {
-                        "oneOf": [
-                          {
-                            "properties": {
-                              "fields": {
-                                "additionalProperties": {},
-                                "propertyNames": {
-                                  "type": "string"
-                                },
-                                "type": "object"
-                              },
-                              "id": {
-                                "type": "string"
-                              },
-                              "op": {
-                                "enum": [
-                                  "create"
-                                ],
-                                "type": "string"
-                              }
-                            },
-                            "required": [
-                              "op",
-                              "id",
-                              "fields"
-                            ],
-                            "type": "object"
-                          },
-                          {
-                            "properties": {
-                              "base_version": {
-                                "maximum": 9007199254740991,
-                                "minimum": -9007199254740991,
-                                "type": "integer"
-                              },
-                              "fields": {
-                                "additionalProperties": {},
-                                "propertyNames": {
-                                  "type": "string"
-                                },
-                                "type": "object"
-                              },
-                              "id": {
-                                "type": "string"
-                              },
-                              "op": {
-                                "enum": [
-                                  "update"
-                                ],
-                                "type": "string"
-                              }
-                            },
-                            "required": [
-                              "op",
-                              "id",
-                              "base_version",
-                              "fields"
-                            ],
-                            "type": "object"
-                          },
-                          {
-                            "properties": {
-                              "id": {
-                                "type": "string"
-                              },
-                              "op": {
-                                "enum": [
-                                  "delete"
-                                ],
-                                "type": "string"
-                              }
-                            },
-                            "required": [
-                              "op",
-                              "id"
-                            ],
-                            "type": "object"
-                          }
-                        ]
-                      },
-                      "type": "array"
-                    },
-                    "propertyNames": {
-                      "type": "string"
-                    },
-                    "type": "object"
-                  }
-                },
-                "required": [
-                  "changes"
-                ],
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": false,
-                  "properties": {
-                    "accepted": {
-                      "additionalProperties": {
-                        "items": {
-                          "additionalProperties": false,
-                          "properties": {
-                            "id": {
-                              "type": "string"
-                            },
-                            "merged_value": {
-                              "additionalProperties": {},
-                              "propertyNames": {
-                                "type": "string"
-                              },
-                              "type": "object"
-                            },
-                            "version": {
-                              "maximum": 9007199254740991,
-                              "minimum": -9007199254740991,
-                              "type": "integer"
-                            }
-                          },
-                          "required": [
-                            "id",
-                            "version"
-                          ],
-                          "type": "object"
-                        },
-                        "type": "array"
-                      },
-                      "propertyNames": {
-                        "type": "string"
-                      },
-                      "type": "object"
-                    },
-                    "conflicts": {
-                      "items": {
-                        "additionalProperties": false,
-                        "properties": {
-                          "current_state": {},
-                          "current_version": {
-                            "maximum": 9007199254740991,
-                            "minimum": -9007199254740991,
-                            "type": "integer"
-                          },
-                          "id": {
-                            "type": "string"
-                          },
-                          "table": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "table",
-                          "id",
-                          "current_version",
-                          "current_state"
-                        ],
-                        "type": "object"
-                      },
-                      "type": "array"
-                    }
-                  },
-                  "required": [
-                    "accepted",
-                    "conflicts"
-                  ],
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Default Response"
-          }
-        },
-        "summary": "Push changes",
-        "tags": [
-          "collab"
-        ]
-      }
-    },
-    "/api/sync/v2/tier2/{entityType}/{parentId}": {
-      "get": {
-        "parameters": [
-          {
-            "in": "query",
-            "name": "limit",
-            "required": false,
-            "schema": {
-              "maximum": 200,
-              "minimum": 1,
-              "type": "integer"
-            }
-          },
-          {
-            "in": "path",
-            "name": "entityType",
-            "required": true,
-            "schema": {
-              "minLength": 1,
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "parentId",
-            "required": true,
-            "schema": {
-              "minLength": 1,
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": false,
-                  "properties": {
-                    "entities": {
-                      "items": {},
-                      "type": "array"
-                    }
-                  },
-                  "required": [
-                    "entities"
-                  ],
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Default Response"
-          }
-        },
-        "summary": "Tier 2 entity fetch",
         "tags": [
           "collab"
         ]

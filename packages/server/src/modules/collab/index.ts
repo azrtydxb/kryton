@@ -1,10 +1,8 @@
 import type { FastifyPluginAsync } from "fastify";
 import * as Y from "yjs";
 import { ShareService } from "./services/share.service.js";
-import { SyncService } from "./services/sync.service.js";
 import { YjsPersistence } from "./ws/persistence.js";
 import { sharesRoutes, accessRequestsRoutes } from "./routes/shares.routes.js";
-import { syncRoutes } from "./routes/sync.routes.js";
 import { registerYjsRoutes, type YjsRegistry } from "./ws/yjs.handler.js";
 
 export interface CollabApi {
@@ -24,22 +22,20 @@ declare module "fastify" {
 }
 
 /**
- * Collab module — note shares, access requests, sync v2, and Yjs WebSocket.
+ * Collab module — note shares, access requests, and Yjs WebSocket.
  *
  * Mounts:
- *   - HTTP: /api/shares/*, /api/access-requests/*, /api/sync/v2/*
+ *   - HTTP: /api/shares/*, /api/access-requests/*
  *   - WS:   /ws/yjs/:docId
  *
  * Exposes:
  *   - app.collab.getDoc(docId)
  *   - app.collab.broadcast(docId, msg)
  *
- * Graceful shutdown: an `onClose` hook flushes all dirty Y.Docs to SQLite.
+ * Graceful shutdown: an `onClose` hook flushes all dirty Y.Docs to Postgres.
  */
 export const collabModule: FastifyPluginAsync = async (app) => {
   const shareService = new ShareService(app.db);
-  const notesRoot = process.env.NOTES_DIR ?? "/var/kryton/notes";
-  const syncService = new SyncService(app.db, notesRoot);
   const persistence = new YjsPersistence(app.db);
 
   let registry: YjsRegistry | null = null;
@@ -47,7 +43,6 @@ export const collabModule: FastifyPluginAsync = async (app) => {
   // Register HTTP routes
   await app.register(sharesRoutes({ shareService }), { prefix: "/api/shares" });
   await app.register(accessRequestsRoutes, { prefix: "/api/access-requests" });
-  await app.register(syncRoutes({ syncService }), { prefix: "/api/sync/v2" });
 
   // Register WS route in an encapsulated child plugin so the websocket
   // route handler can be attached.

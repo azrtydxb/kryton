@@ -51,7 +51,9 @@ export function ApiKeyManager() {
   }, []);
 
   useEffect(() => {
-    fetchKeys();
+    void (async () => {
+      await fetchKeys();
+    })();
   }, [fetchKeys]);
 
   const handleMint = useCallback(async () => {

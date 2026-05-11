@@ -27,7 +27,6 @@ export const shareSchema = z.object({
   createdAt: z.date(),
   updatedAt: z.date(),
   version: z.number().int(),
-  cursor: z.string(), // bigint serialized
 });
 
 export const shareListSchema = z.array(shareSchema);

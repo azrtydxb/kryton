@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <strong>A shared brain for people and AI. Self-hosted knowledge base with built-in MCP server, wiki-linking, graph visualization, and mobile sync.</strong>
+  <strong>A shared brain for people and AI. Self-hosted knowledge base with built-in MCP server, wiki-linking, graph visualization, and real-time collaborative editing.</strong>
 </p>
 
 <p align="center">
@@ -145,11 +145,11 @@ See [API Keys & MCP docs](docs/API-ACCESS.md) for the full reference.
 </p>
 
 ### Mobile App (React Native)
-- **Offline-first** — expo-sqlite local database with bidirectional sync
+- **Online-only client** — talks to the Kryton server over REST + WebSocket; no local database
 - **Full feature parity** — notes, search, graph, tags, settings, daily notes, templates, trash, history, sharing, admin
 - **WebView editor** — same CodeMirror experience on mobile
+- **Real-time collaboration** — Yjs over WebSocket for live multi-device editing
 - **Android APK** available via EAS Build
-- **Auto-sync** on foreground, pull-to-refresh, manual sync button
 - **Version compatibility** — enforces major-version match with server
 
 ### Multi-User & Security
@@ -163,8 +163,8 @@ See [API Keys & MCP docs](docs/API-ACCESS.md) for the full reference.
 
 ### REST API
 - **Swagger/OpenAPI docs** at `/api/docs` — interactive API explorer
-- **30+ REST endpoints** — notes, search, graph, settings, sharing, auth, admin, sync
-- **Sync v2 API** — `/api/sync/v2/pull` and `/api/sync/v2/push` (primary); legacy `/api/sync` deprecated
+- **30+ REST endpoints** — notes, search, graph, settings, sharing, auth, admin
+- **Yjs WebSocket** — `/ws/yjs/:docId` for real-time collaborative editing of note content
 - **Version endpoint** — `GET /api/version` for compatibility checks
 
 ### UI & Layout
@@ -196,7 +196,7 @@ Plugin APIs are automatically exposed as MCP tools — install a plugin and your
 | Frontend | React 19, Vite 8, TypeScript 5.9, Tailwind CSS 4 |
 | Backend | Fastify 5, Drizzle ORM, TypeScript 5.9 |
 | Database | Postgres 16 with `pgvector` and `tsvector` |
-| Mobile | Expo SDK 55, React Native, expo-sqlite |
+| Mobile | Expo SDK 55, React Native (online-only against the server API) |
 | Editor | CodeMirror 6 with Vim mode |
 | Graph | D3.js force-directed |
 | Auth | better-auth (sessions, OAuth, passkeys, 2FA) |
@@ -265,7 +265,7 @@ If you'd rather use a Postgres you already have, make sure it's 16+ and run `CRE
 
 ## Mobile App
 
-The React Native mobile app lives in its own repository: **[azrtydxb/kryton-mobile](https://github.com/azrtydxb/kryton-mobile)**. It consumes `@azrtydxb/core` and `@azrtydxb/core-react` (see [Consumer Libraries](#consumer-libraries) below) and syncs with the server via the Sync v2 API.
+The React Native mobile app lives in its own repository: **[azrtydxb/kryton-mobile](https://github.com/azrtydxb/kryton-mobile)**. It is an online-only client that talks to the Kryton server over REST and uses the Yjs WebSocket endpoint for real-time collaborative editing of note bodies.
 
 ### Install on Android
 
@@ -273,58 +273,15 @@ Download the latest APK from [EAS Build](https://expo.dev/accounts/piwi3910/proj
 
 ---
 
-## Sync v2 Architecture
+## Collaboration & Note Content (Yjs)
 
-Kryton v4.4 ships a redesigned synchronisation layer that supports offline-first clients (mobile, and future desktop) with reliable conflict detection.
+Note bodies are stored and edited as [Yjs](https://yjs.dev) CRDT documents. All clients (web, mobile, and future desktop) connect to the server's WebSocket endpoint at `/ws/yjs/:docId` for live, conflict-free collaborative editing — concurrent edits from multiple devices or users merge automatically with no data loss.
 
-### Cursor-based delta sync
-
-Every tier 1 entity (folders, tags, notes, settings, graph edges, shares, trash items, installed plugins) carries two extra columns: a `version` integer and an `updatedCursor` bigint. The server maintains a single monotonically-increasing global cursor. On every write, the cursor is incremented and stamped onto each modified row in the same transaction.
-
-Clients store the last-seen cursor value. A `POST /api/sync/v2/pull` request returns only rows with `updatedCursor > clientCursor` — a deterministic, clock-skew-immune delta. Push requests include the client's `base_version` per row; if the server's version for that row is higher, a conflict response is returned instead of a silent overwrite.
-
-### Yjs for note content
-
-Note bodies are stored and synced as [Yjs](https://yjs.dev) CRDT documents rather than plain text columns. Concurrent edits from multiple devices or collaborators merge automatically with no data loss. The server exposes a WebSocket endpoint (`/ws/yjs/:docId`) for live collaboration; offline clients queue pending Yjs updates locally and flush them on reconnect. Everything that is not note body content (relational metadata) continues to use LWW delta sync.
+Everything else (folders, tags, shares, settings, graph edges, trash items, installed plugins) is plain relational data served by ordinary REST endpoints; clients fetch on demand and do not maintain a local mirror.
 
 ### Cedar for agent identity
 
 AI agents are first-class database entities with short-lived tokens and optional [Cedar](https://www.cedarpolicy.com) policy documents. The server evaluates the Cedar policy on every agent request — `(principal, action, resource)` — before executing the handler. Agents default to deny-all; permissions are granted explicitly per note, folder, or tag. Agent actions are attributed to `Agent::<id>` in audit logs, distinct from the owning user's actions.
-
-### Endpoint summary
-
-| Method | Path | Status |
-|--------|------|--------|
-| `POST` | `/api/sync/v2/pull` | **Primary** |
-| `POST` | `/api/sync/v2/push` | **Primary** |
-| `GET` | `/api/sync/v2/tier2/:entityType/:parentId` | **Primary** |
-| `WS` | `/ws/yjs/:docId` | **Primary** |
-| `POST` | `/api/sync/pull` | Deprecated — kept for legacy clients |
-| `POST` | `/api/sync/push` | Deprecated — kept for legacy clients |
-
-See `docs/superpowers/specs/2026-04-30-server-sync-v2-design.md` for the full endpoint reference and wire format.
-
----
-
-## Consumer Libraries
-
-Two npm packages are published from this monorepo to [GitHub Packages](https://github.com/features/packages) under the `@azrtydxb` scope:
-
-| Package | Description |
-|---------|-------------|
-| `@azrtydxb/core` | Platform-agnostic offline-first data layer. Local SQLite + Sync v2 + Yjs. Adapters for `expo-sqlite` and `better-sqlite3`. |
-| `@azrtydxb/core-react` | React hooks wrapping `@azrtydxb/core`. Typed hooks per entity type: `useNotes`, `useFolders`, `useTags`, `useNoteShares`, etc. |
-
-These packages are consumed by `kryton-mobile` today and by a future desktop sub-project. The Kryton web client (`packages/client`) does not consume them — it stays online-only against the server's REST API.
-
-To install in a consumer project, add to `.npmrc`:
-
-```
-@azrtydxb:registry=https://npm.pkg.github.com
-//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
-```
-
-A GitHub Personal Access Token with `read:packages` scope is required. See `docs/superpowers/specs/2026-04-30-core-publishing-design.md` and [ADR-006](docs/superpowers/adrs/ADR-006-pat-publish-token.md) for details.
 
 ---
 
@@ -355,13 +312,13 @@ A GitHub Personal Access Token with `read:packages` scope is required. See `docs
 │  │  favs)  │              │            │                     │
 │  └─────────┴──────────────┴────────────┘                     │
 └──────────────────────┬───────────────────────────────────────┘
-                       │ REST API + Sync API
+                       │ REST API + Yjs WebSocket
 ┌──────────────────────┴───────────────────────────────────────┐
 │  Fastify 5 Server                                             │
 │  ├── Auth (better-auth + OAuth + passkeys + 2FA)              │
 │  ├── Notes, Search, Graph, Tags, Trash, History               │
 │  ├── Sharing & Access Requests                                │
-│  ├── Sync v2 (cursor + Yjs for mobile/desktop)                │
+│  ├── Yjs WebSocket (/ws/yjs/:docId) for live collab           │
 │  ├── MCP Server (AI agent access — 14 tools + plugin tools)   │
 │  ├── Plugin system (server + client)                          │
 │  └── Swagger API Docs                                         │
@@ -372,18 +329,16 @@ A GitHub Personal Access Token with `read:packages` scope is required. See `docs
 │  (drizzle-orm — │  ├── .trash/                                │
 │   search index, │  ├── .history/                              │
 │   graph edges,  │  └── attachments/                           │
-│   sync, Yjs)    │                                             │
+│   Yjs updates)  │                                             │
 └─────────────────┴────────────────────────────────────────────┘
          ▲                           ▲
-         │ Sync v2 API + WS/Yjs      │ MCP Protocol (streamable HTTP)
+         │ REST + WS/Yjs             │ MCP Protocol (streamable HTTP)
 ┌────────┴────────────────┐  ┌───────┴──────────────────────────┐
 │  React Native Mobile    │  │  AI Agents                        │
 │  azrtydxb/kryton-mobile │  │  ├── Claude Code / Claude Desktop │
-│  ├── @azrtydxb/core     │  │  ├── Cursor / Windsurf            │
-│  ├── @azrtydxb/core-    │  │  ├── Custom MCP clients           │
-│  │   react hooks        │  │  └── Any MCP-compatible tool      │
-│  └── Expo SDK 55        │  └──────────────────────────────────┘
-└─────────────────────────┘
+│  (online-only client)   │  │  ├── Cursor / Windsurf            │
+│  └── Expo SDK 55        │  │  └── Any MCP-compatible tool      │
+└─────────────────────────┘  └──────────────────────────────────┘
 ```
 
 ---
