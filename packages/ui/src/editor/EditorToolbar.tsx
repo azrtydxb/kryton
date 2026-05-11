@@ -55,6 +55,10 @@ export interface EditorToolbarProps {
   className?: string;
 }
 
+/** Delay before the custom tooltip appears, in ms. Native `title` defaults
+ *  to ~1.5s which is too slow for a dense icon row. */
+const TOOLTIP_DELAY_MS = 250;
+
 function ToolbarButton({
   icon: Icon,
   title,
@@ -67,36 +71,79 @@ function ToolbarButton({
   active?: boolean;
 }) {
   const [hover, setHover] = React.useState(false);
+  const [showTip, setShowTip] = React.useState(false);
+  const tipTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const tinted = active || hover;
+
+  const beginTipTimer = (): void => {
+    if (tipTimerRef.current) clearTimeout(tipTimerRef.current);
+    tipTimerRef.current = setTimeout(() => setShowTip(true), TOOLTIP_DELAY_MS);
+  };
+  const cancelTip = (): void => {
+    if (tipTimerRef.current) {
+      clearTimeout(tipTimerRef.current);
+      tipTimerRef.current = null;
+    }
+    setShowTip(false);
+  };
+  React.useEffect(() => () => cancelTip(), []);
+
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      aria-label={title}
-      aria-pressed={active}
-      title={title}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        width: 28,
-        height: 28,
-        borderRadius: 6,
-        background: active
-          ? "var(--accent-soft)"
-          : hover
-            ? "var(--bg-hover)"
-            : "transparent",
-        color: tinted ? "var(--accent)" : "var(--fg-3)",
-        border: "none",
-        cursor: "pointer",
-        transition: "background 120ms, color 120ms",
-      }}
-    >
-      <Icon size={15} aria-hidden="true" />
-    </button>
+    <span style={{ position: "relative", display: "inline-flex" }}>
+      <button
+        type="button"
+        onClick={() => { cancelTip(); onClick(); }}
+        onMouseEnter={() => { setHover(true); beginTipTimer(); }}
+        onMouseLeave={() => { setHover(false); cancelTip(); }}
+        onFocus={beginTipTimer}
+        onBlur={cancelTip}
+        aria-label={title}
+        aria-pressed={active}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 28,
+          height: 28,
+          borderRadius: 6,
+          background: active
+            ? "var(--accent-soft)"
+            : hover
+              ? "var(--bg-hover)"
+              : "transparent",
+          color: tinted ? "var(--accent)" : "var(--fg-3)",
+          border: "none",
+          cursor: "pointer",
+          transition: "background 120ms, color 120ms",
+        }}
+      >
+        <Icon size={15} aria-hidden="true" />
+      </button>
+      {showTip && (
+        <span
+          role="tooltip"
+          style={{
+            position: "absolute",
+            top: "calc(100% + 6px)",
+            left: "50%",
+            transform: "translateX(-50%)",
+            padding: "4px 8px",
+            borderRadius: 4,
+            background: "var(--bg-2)",
+            border: "1px solid var(--line)",
+            color: "var(--fg)",
+            fontFamily: "var(--font-mono)",
+            fontSize: 11,
+            whiteSpace: "nowrap",
+            pointerEvents: "none",
+            zIndex: 50,
+            boxShadow: "var(--shadow-md)",
+          }}
+        >
+          {title}
+        </span>
+      )}
+    </span>
   );
 }
 
