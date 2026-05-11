@@ -263,31 +263,22 @@ A new route `POST /api/knowledge/hybrid-search` orchestrates the three calls in 
 
 When the NovaMem provider is active in Phase B, the hybrid call short-circuits — NovaMem already does all three fusions natively, so we just proxy `memory_search` and skip Kryton's local fusion math.
 
-### Multi-platform: server-only embedding, vectors as sync v2 payload (Q5)
+### Multi-platform: server-only, online-only
 
-**Hard rule across all platforms and phases:** clients (web, mobile, desktop) never run an embedder. Only the server embeds notes, only the server embeds queries.
+**Hard rule across all platforms:** clients (web, mobile, desktop) never run an embedder, never store vectors locally. Only the server embeds notes, only the server embeds queries, only the server stores vectors. All clients are online-only consumers of the semantic-search API — consistent with the post-sync-removal architecture (see `2026-05-11-remove-sqlite-and-offline-sync-design.md`).
 
-This produces three concrete behaviors:
+| Scenario       | Lexical search          | Semantic search                                                 |
+|----------------|-------------------------|-----------------------------------------------------------------|
+| **Online**     | Server API call         | API call to `/api/knowledge/semantic-search` (server embeds query + runs KNN) |
+| **Offline**    | Returns connection error | Returns connection error                                       |
 
-| Scenario       | Lexical search                  | Semantic search                                                 |
-|----------------|---------------------------------|-----------------------------------------------------------------|
-| **Online**     | Local MiniSearch on the client  | API call to `/api/knowledge/semantic-search` (server embeds query + runs KNN) |
-| **Offline**    | Local MiniSearch on the client  | Returns "semantic search needs connection" — falls back to lexical |
-| **Reconnect**  | (no change)                     | Resumes immediately; nothing to re-sync from the user's side    |
-
-**Vector-table sync** rides on Sync v2 (`docs/superpowers/specs/2026-04-30-server-sync-v2-design.md`). When a client comes online it receives the user's `NoteEmbeddingChunk` rows and the matching rows from `note_embeddings_vec` (vector blobs) as part of the normal sync delta. The client persists them in its local SQLite + sqlite-vec extension.
-
-In Phase A these synced vectors are **storage redundancy** — they're there for sync robustness and offline cache, not for client-side search (which is impossible without a client embedder).
-
-Forward path: if offline-first semantic search ever becomes a hard requirement, the spec for that day adds **only a query-only client embedder** (≤6 MB quantized MiniLM is feasible; or platform-native fallbacks like `NaturalLanguage`). Existing vectors don't need to change because the document-side embedder stays server-only.
-
-This also sidesteps the cross-platform vector-incompatibility issue entirely: there's only one embedder on the planet for any given Kryton deployment — the server's.
+There is no offline mode for either search type — the entire app requires a connection (online-only architecture).
 
 #### Per-platform notes
 
-- **Web client (current):** consumes the API directly. Does not need sqlite-vec.
-- **Mobile (`kryton-mobile` React Native):** consumes the API directly. Sync v2 brings vectors down for storage; in Phase A they're inert.
-- **Desktop (Tauri, planned):** bundles the server in the same binary. The server-bundled-with-client model means desktop gets local embedding "for free" without violating the rule — the embedder still runs in the server process, just one that happens to be hosted inside the desktop app.
+- **Web client:** consumes the API directly.
+- **Mobile (React Native, planned):** consumes the API directly.
+- **Desktop (Tauri, planned):** bundles the server in the same binary. The embedder runs in the server process inside the desktop app — clients still don't embed.
 
 ## Schema Changes Summary
 
@@ -332,7 +323,7 @@ Provider is set **at install/deployment time only** — there is no runtime UI f
 | Q2 | First-run model load                       | **B — pre-warm in background.** Server boots immediately; semantic routes return 503 + readiness payload until ready; UI polls `/semantic-ready`. |
 | Q3 | Multi-tenant scan cost                     | **Resolved natively by pgvector.** HNSW with `WHERE user_id = $1` filtering happens inside the index scan — no candidate over-fetching. The Phase A switch from sqlite-vec to pgvector (now that the Postgres migration ships first) closes this for free. |
 | Q4 | Chunk-vs-note dedup                        | **A — dedup by notePath.** Top-N results show one row per note (highest-scoring chunk).           |
-| Q5 | Multi-platform embedding                   | **Server-only, hard rule across all phases.** Clients never embed (neither documents nor queries). Vectors sync to clients as storage payload only. Offline = lexical search only; semantic search returns "needs connection" until reconnect. |
+| Q5 | Multi-platform embedding                   | **Server-only, hard rule.** Clients never embed and never store vectors. Online-only architecture (sync v2 + offline support removed; see `2026-05-11-remove-sqlite-and-offline-sync-design.md`). |
 | Q6 | NovaMem coupling                           | **Install-time choice only.** `sqlite-vec-local` is the default; `novamem` is opt-in via `SEMANTIC_PROVIDER=novamem` at deployment. Never auto-detected, never the default, no runtime UI switch. |
 
 ## Deferred — separate design docs
