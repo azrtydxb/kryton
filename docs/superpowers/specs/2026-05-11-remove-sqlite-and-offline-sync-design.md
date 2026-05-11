@@ -1,7 +1,7 @@
 # Remove SQLite + Offline Sync (keep collab) Design
 
 **Date**: 2026-05-11
-**Status**: Draft
+**Status**: Implemented (2026-05-11)
 **Prerequisite**: [Postgres + Drizzle Migration](2026-05-11-postgres-drizzle-migration-design.md) merged to master first.
 
 ## Problem
@@ -250,3 +250,18 @@ After all three phases land:
 - `docker compose up` brings up a working stack (sign up → log in → create note → edit collaboratively → search → graph)
 - The PR-#109 acceptance criteria (no Prisma, no MiniSearch) still hold
 - Docs / specs reflect the online-only architecture
+
+---
+
+## Implementation Notes
+
+Landed in three commits on `worktree-feat-remove-sqlite-and-sync`:
+
+- **Phase 1 — `1e7160a`**: `refactor(server): remove sync v2 + drop sync tables + cursor columns`. Stripped the entire `/api/sync/v2/*` surface from the server, dropped the `SyncCursor` / `SyncDeletion` tables and the `version` / `updatedCursor` columns from every tier-1 entity, and removed the cursor-increment infrastructure. Scope ended up larger than this design originally anticipated because the cursor columns leaked into nearly every write path; cleaning them out was a single coherent change rather than the staged removal the spec sketched.
+- **Phase 2 — `f384bbd`**: `refactor: delete @azrtydxb/core + @azrtydxb/core-react (phase 2/3)`. Deleted both packages, removed them from the workspace, and cleaned out remaining references in `packages/ui/`.
+- **Phase 3 (this commit set)**: Stale SQLite-era bench scripts deleted (`bench/tier2-history.ts`, `bench/pull-throughput.ts`, `bench/push-throughput.ts`, plus the dead sync-v2 seed helpers in `bench-utils.ts`); offline-first specs and plans moved to `docs/superpowers/{specs,plans}/archived/` (keeping the Yjs binding and graph cross-platform renderer specs in place); root `README.md` rewritten for the online-only architecture; `docs/perf/README.md` marked historical (its numbers reflect the deleted SQLite + sync v2 stack — a fresh Postgres baseline is a follow-up); spec marked Implemented.
+
+### Follow-ups
+
+- **`set-state-in-effect` lint errors (13 across 11 files).** Surfaced when the workspace's `eslint-plugin-react-hooks` was upgraded during this work; they were pre-existing in master once the plugin became strict enough to flag them. To keep this PR scoped to the SQLite + sync removal, the plugin is pinned to `7.0.1` (matching master) via `ed0f398`. Bumping the plugin and fixing the 13 occurrences should be a separate PR.
+- **Fresh Postgres perf baseline** to replace the archived SQLite numbers in `docs/perf/README.md`.

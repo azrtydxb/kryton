@@ -1,8 +1,17 @@
 # Performance Baselines — Kryton Server
 
+> **HISTORICAL — superseded.** Numbers below were captured against the
+> SQLite + sync v2 stack that was removed in May 2026 (see
+> `docs/superpowers/specs/2026-05-11-postgres-drizzle-migration-design.md`
+> and `2026-05-11-remove-sqlite-and-offline-sync-design.md`). The server
+> now runs on Postgres with online-only clients; the `/api/sync/v2/*`
+> endpoints and the SQLite-backed bench scripts referenced here no
+> longer exist. A fresh baseline against Postgres is pending. Kept for
+> historical reference only.
+>
 > Generated: 2026-04-30 on MacBook Air M2 (Darwin 25.3.0, arm64).
 > All numbers are real measurements on local dev hardware with SQLite.
-> These are baselines for regression detection — not aspirational targets.
+> These were baselines for regression detection — not aspirational targets.
 
 ## Hardware
 
