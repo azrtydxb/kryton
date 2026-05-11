@@ -249,7 +249,10 @@ function Tab({ path, label, active, dirty, onSelect, onClose }: TabProps) {
       >
         {label}
       </span>
-      {active && (
+      {active && dirty && (
+        // Only surface a status indicator while a save is in flight — when
+        // everything is persisted, the tab stays clean. Removes the "always
+        // green saved pill" the user found redundant.
         <span
           className="mono"
           style={{
@@ -266,17 +269,17 @@ function Tab({ path, label, active, dirty, onSelect, onClose }: TabProps) {
           }}
         >
           <span
-            className={dirty ? 'dot pulse' : 'dot pulse'}
+            className="dot pulse"
             style={{
               width: 5,
               height: 5,
               borderRadius: '50%',
-              background: dirty ? 'var(--accent-warn)' : 'var(--accent-good)',
+              background: 'var(--accent-warn)',
               boxShadow: 'none',
             }}
             aria-hidden
           />
-          {dirty ? 'saving' : 'saved'}
+          saving
         </span>
       )}
       <button
