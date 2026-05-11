@@ -6,6 +6,14 @@ import {
   ToggleLeft, ToggleRight, Tag, X, Save, RotateCcw,
 } from 'lucide-react';
 import { api, RegistryPlugin, PluginUpdate } from '../lib/api';
+import { Section, Field } from '../components/Settings/settings-kit';
+import {
+  helpText,
+  inputStyle as kitInputStyle,
+  primaryBtn,
+  ghostBtn,
+  dangerBtn,
+} from '../components/Settings/settings-kit-styles';
 
 /* ─────────────────────────── types ─────────────────────────── */
 
@@ -45,27 +53,38 @@ function semverGt(a: string, b: string): boolean {
 
 /* ─────────────────────────── shared styles ─────────────────────────── */
 
-const surfaceBox: CSSProperties = {
-  background: 'var(--bg-2)',
-  borderColor: 'var(--line)',
+const cardStyle: CSSProperties = {
+  background: 'var(--bg-1)',
+  border: '1px solid var(--line)',
+  borderRadius: 6,
+  padding: '12px 14px',
+  marginBottom: 8,
 };
 
-const inputStyle: CSSProperties = {
-  background: 'var(--bg-2)',
-  borderColor: 'var(--line)',
-  color: 'var(--fg)',
+const errorBoxStyle: CSSProperties = {
+  ...helpText,
+  marginBottom: 12,
+  padding: '8px 10px',
+  borderRadius: 5,
+  background: 'color-mix(in oklch, var(--accent-danger) 10%, transparent)',
+  border: '1px solid color-mix(in oklch, var(--accent-danger) 30%, transparent)',
+  color: 'var(--accent-danger)',
+  fontFamily: 'var(--font-mono)',
 };
 
-const tabActiveStyle: CSSProperties = {
-  background: 'var(--accent)',
-  color: '#fff',
-};
-
-const tabInactiveStyle: CSSProperties = {
-  background: 'var(--bg-2)',
-  color: 'var(--fg-3)',
-  borderColor: 'var(--line)',
-};
+const subTabStyle = (active: boolean): CSSProperties => ({
+  padding: '6px 10px',
+  borderRadius: 6,
+  background: active ? 'var(--accent-soft)' : 'transparent',
+  color: active ? 'var(--accent)' : 'var(--fg-3)',
+  border: 'none',
+  cursor: 'pointer',
+  fontFamily: 'var(--font-mono)',
+  fontSize: 12,
+  textTransform: 'uppercase',
+  letterSpacing: '0.04em',
+  transition: 'background 120ms, color 120ms',
+});
 
 /* ═══════════════════════════════════════════════════════════════
    Main PluginsTab — sub-view switcher
@@ -86,26 +105,15 @@ export function PluginsTab() {
   useEffect(() => { refreshInstalledIds(); }, [refreshInstalledIds]);
 
   return (
-    <div>
-      {/* Sub-view toggle */}
-      <div className="flex gap-2 mb-6">
-        <TabButton
-          active={subView === 'installed'}
-          onClick={() => setSubView('installed')}
-          label="Installed"
-        />
-        <TabButton
-          active={subView === 'browse'}
-          onClick={() => setSubView('browse')}
-          label="Browse Registry"
-        />
+    <div style={{ color: 'var(--fg-1)' }}>
+      {/* Sub-view toggle — same mode-pill pattern as the outer tabs */}
+      <div style={{ display: 'flex', gap: 2, marginBottom: 14 }}>
+        <SubTabBtn active={subView === 'installed'} onClick={() => setSubView('installed')} label="Installed" />
+        <SubTabBtn active={subView === 'browse'} onClick={() => setSubView('browse')} label="Browse Registry" />
       </div>
 
       {subView === 'browse' && (
-        <RegistryBrowse
-          installedIds={installedIds}
-          onInstalled={refreshInstalledIds}
-        />
+        <RegistryBrowse installedIds={installedIds} onInstalled={refreshInstalledIds} />
       )}
       {subView === 'installed' && (
         <InstalledPlugins onUninstalled={refreshInstalledIds} />
@@ -114,26 +122,23 @@ export function PluginsTab() {
   );
 }
 
-function TabButton({
-  active,
-  onClick,
-  label,
-}: {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-}) {
-  const [hovered, setHovered] = useState(false);
-  const style: CSSProperties = active
-    ? tabActiveStyle
-    : { ...tabInactiveStyle, color: hovered ? 'var(--fg)' : 'var(--fg-3)' };
+function SubTabBtn({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
   return (
     <button
       onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${active ? '' : 'border'}`}
-      style={style}
+      style={subTabStyle(active)}
+      onMouseEnter={e => {
+        if (!active) {
+          e.currentTarget.style.background = 'var(--bg-hover)';
+          e.currentTarget.style.color = 'var(--fg)';
+        }
+      }}
+      onMouseLeave={e => {
+        if (!active) {
+          e.currentTarget.style.background = 'transparent';
+          e.currentTarget.style.color = 'var(--fg-3)';
+        }
+      }}
     >
       {label}
     </button>
@@ -158,8 +163,6 @@ function RegistryBrowse({
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [installing, setInstalling] = useState<Set<string>>(new Set());
   const [installError, setInstallError] = useState<Record<string, string>>({});
-  const [searchFocused, setSearchFocused] = useState(false);
-  const [clearHovered, setClearHovered] = useState(false);
 
   const fetchRegistry = useCallback(async () => {
     try {
@@ -174,7 +177,11 @@ function RegistryBrowse({
     }
   }, []);
 
-  useEffect(() => { fetchRegistry(); }, [fetchRegistry]);
+  useEffect(() => {
+    void (async () => {
+      await fetchRegistry();
+    })();
+  }, [fetchRegistry]);
 
   const allTags = useMemo(() => {
     const set = new Set<string>();
@@ -195,7 +202,7 @@ function RegistryBrowse({
     });
   }, [registry, query, activeTag]);
 
-  const install = async (id: string) => {
+  const install = useCallback(async (id: string) => {
     setInstalling(prev => new Set(prev).add(id));
     setInstallError(prev => { const n = { ...prev }; delete n[id]; return n; });
     try {
@@ -209,98 +216,74 @@ function RegistryBrowse({
     } finally {
       setInstalling(prev => { const n = new Set(prev); n.delete(id); return n; });
     }
-  };
-
-  if (loading) {
-    return (
-      <div className="space-y-3">
-        {[1, 2, 3].map(i => (
-          <div
-            key={i}
-            className="h-24 rounded-lg animate-pulse border"
-            style={surfaceBox}
-          />
-        ))}
-      </div>
-    );
-  }
+  }, [onInstalled]);
 
   if (error) {
     return (
-      <div
-        className="px-4 py-3 border rounded-lg text-sm flex items-center justify-between"
-        style={{ background: 'color-mix(in oklch, var(--accent-danger) 10%, transparent)', borderColor: 'color-mix(in oklch, var(--accent-danger) 30%, transparent)', color: 'var(--accent-danger)' }}
-      >
+      <div style={{ ...errorBoxStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span>{error}</span>
-        <button onClick={fetchRegistry} className="ml-3 underline text-xs" style={{ color: 'var(--accent-danger)' }}>
-          Retry
-        </button>
+        <button onClick={fetchRegistry} style={{ ...ghostBtn, padding: '4px 8px' }}>Retry</button>
       </div>
     );
   }
 
   return (
-    <div>
-      {/* Search + tag filters */}
-      <div className="mb-4 flex flex-col gap-3">
-        <div className="relative">
-          <Search
-            size={15}
-            className="absolute left-3 top-1/2 -translate-y-1/2"
-            style={{ color: 'var(--fg-3)' }}
-          />
+    <Section title="browse registry">
+      <div style={helpText}>Search and install plugins from the public registry.</div>
+
+      <Field label="search">
+        <div style={{ position: 'relative' }}>
+          <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--fg-3)' }} />
           <input
             type="text"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            onFocus={() => setSearchFocused(true)}
-            onBlur={() => setSearchFocused(false)}
             placeholder="Search plugins..."
-            className="w-full pl-9 pr-4 py-2 border rounded-lg text-sm focus:outline-none transition-colors"
-            style={{
-              ...inputStyle,
-              borderColor: searchFocused ? 'var(--accent)' : 'var(--line)',
-            }}
+            style={{ ...kitInputStyle, paddingLeft: 30, paddingRight: query ? 30 : 10 }}
           />
           {query && (
             <button
               onClick={() => setQuery('')}
-              onMouseEnter={() => setClearHovered(true)}
-              onMouseLeave={() => setClearHovered(false)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
-              style={{ color: clearHovered ? 'var(--fg)' : 'var(--fg-3)' }}
+              aria-label="Clear search"
+              style={{
+                position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                background: 'transparent', border: 'none', color: 'var(--fg-3)', cursor: 'pointer', padding: 2,
+              }}
             >
-              <X size={13} />
+              <X size={12} />
             </button>
           )}
         </div>
-        {allTags.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {allTags.map(tag => (
-              <TagChip
-                key={tag}
-                tag={tag}
-                active={activeTag === tag}
-                onClick={() => setActiveTag(activeTag === tag ? null : tag)}
-              />
-            ))}
-          </div>
-        )}
-      </div>
+      </Field>
 
-      {/* Plugin cards */}
-      {filtered.length === 0 ? (
-        <div className="text-center py-12 text-sm" style={{ color: 'var(--fg-4)' }}>
-          No plugins match your search.
+      {allTags.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+          {allTags.map(tag => (
+            <TagChip
+              key={tag}
+              tag={tag}
+              active={activeTag === tag}
+              onClick={() => setActiveTag(activeTag === tag ? null : tag)}
+            />
+          ))}
         </div>
+      )}
+
+      {loading ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {[1, 2, 3].map(i => (
+            <div key={i} style={{ ...cardStyle, height: 72, opacity: 0.5 }} />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div style={helpText}>No plugins match your search.</div>
       ) : (
-        <div className="space-y-3">
+        <div>
           {filtered.map(plugin => {
             const isInstalled = installedIds.has(plugin.id);
             const isInstalling = installing.has(plugin.id);
             const err = installError[plugin.id];
             const incompatible = semverGt(plugin.minKrytonVersion, KRYTON_VERSION);
-
             return (
               <PluginCard
                 key={plugin.id}
@@ -315,39 +298,18 @@ function RegistryBrowse({
           })}
         </div>
       )}
-    </div>
+    </Section>
   );
 }
 
-function TagChip({
-  tag,
-  active,
-  onClick,
-}: {
-  tag: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  const [hovered, setHovered] = useState(false);
-  const baseClass = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors border';
-  const style: CSSProperties = active
-    ? {
-      background: 'var(--accent-soft)',
-      color: 'var(--accent)',
-      borderColor: 'var(--accent)',
-    }
-    : {
-      background: 'var(--bg-2)',
-      color: hovered ? 'var(--fg)' : 'var(--fg-3)',
-      borderColor: hovered ? 'var(--line-strong)' : 'var(--line)',
-    };
+function TagChip({ tag, active, onClick }: { tag: string; active: boolean; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      className={baseClass}
-      style={style}
+      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors border"
+      style={active
+        ? { background: 'var(--accent-soft)', color: 'var(--accent)', borderColor: 'var(--accent)' }
+        : { background: 'var(--bg-2)', color: 'var(--fg-3)', borderColor: 'var(--line)' }}
     >
       <Tag size={10} />
       {tag}
@@ -356,12 +318,7 @@ function TagChip({
 }
 
 function PluginCard({
-  plugin,
-  isInstalled,
-  isInstalling,
-  err,
-  incompatible,
-  onInstall,
+  plugin, isInstalled, isInstalling, err, incompatible, onInstall,
 }: {
   plugin: RegistryPlugin;
   isInstalled: boolean;
@@ -370,99 +327,78 @@ function PluginCard({
   incompatible: boolean;
   onInstall: () => void;
 }) {
-  const [hovered, setHovered] = useState(false);
   return (
-    <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      className="flex items-start justify-between px-4 py-4 rounded-lg border transition-colors"
-      style={{
-        background: 'var(--bg-2)',
-        borderColor: hovered ? 'var(--line-strong)' : 'var(--line)',
-      }}
-    >
-      <div className="flex items-start gap-3 flex-1 min-w-0">
-        <div
-          className="mt-0.5 p-2 rounded-lg shrink-0"
-          style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
-        >
-          <Package size={16} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-medium" style={{ color: 'var(--fg)' }}>{plugin.name}</span>
-            <span className="text-xs" style={{ color: 'var(--fg-4)' }}>v{plugin.version}</span>
-            <span className="text-xs" style={{ color: 'var(--fg-4)' }}>by {plugin.author}</span>
-            {isInstalled && (
-              <span
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-                style={{ background: 'color-mix(in oklch, var(--accent-good) 20%, transparent)', color: 'var(--accent-good)' }}
-              >
-                <CheckCircle size={10} />
-                Installed
-              </span>
-            )}
-            {incompatible && (
-              <span
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-                style={{ background: 'color-mix(in oklch, var(--accent-warn) 20%, transparent)', color: 'var(--accent-warn)' }}
-              >
-                <AlertCircle size={10} />
-                Requires v{plugin.minKrytonVersion}
-              </span>
-            )}
-          </div>
-          <p className="text-xs mt-1 leading-relaxed" style={{ color: 'var(--fg-3)' }}>{plugin.description}</p>
-          {plugin.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-2">
-              {plugin.tags.map(tag => (
-                <span
-                  key={tag}
-                  className="px-1.5 py-0.5 rounded text-xs"
-                  style={{ background: 'var(--bg-2)', color: 'var(--fg-3)' }}
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-          )}
-          {err && (
-            <p className="text-xs mt-1" style={{ color: 'var(--accent-danger)' }}>{err}</p>
-          )}
-        </div>
+    <div style={{ ...cardStyle, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+      <div
+        style={{
+          padding: 8, borderRadius: 6, background: 'var(--accent-soft)',
+          color: 'var(--accent)', flexShrink: 0,
+        }}
+      >
+        <Package size={16} />
       </div>
-      <div className="ml-4 shrink-0">
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--fg)', fontWeight: 500 }}>
+            {plugin.name}
+          </span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--fg-4)' }}>v{plugin.version}</span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--fg-4)' }}>by {plugin.author}</span>
+          {isInstalled && (
+            <span
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+              style={{ background: 'color-mix(in oklch, var(--accent-good) 20%, transparent)', color: 'var(--accent-good)' }}
+            >
+              <CheckCircle size={10} /> Installed
+            </span>
+          )}
+          {incompatible && (
+            <span
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+              style={{ background: 'color-mix(in oklch, var(--accent-warn) 20%, transparent)', color: 'var(--accent-warn)' }}
+            >
+              <AlertCircle size={10} /> Requires v{plugin.minKrytonVersion}
+            </span>
+          )}
+        </div>
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--fg-3)', marginTop: 4, lineHeight: 1.5 }}>
+          {plugin.description}
+        </p>
+        {plugin.tags.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+            {plugin.tags.map(tag => (
+              <span
+                key={tag}
+                style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 10, padding: '2px 6px',
+                  borderRadius: 4, background: 'var(--bg-2)', color: 'var(--fg-3)',
+                }}
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
+        {err && <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--accent-danger)', marginTop: 6 }}>{err}</p>}
+      </div>
+      <div style={{ flexShrink: 0 }}>
         {!isInstalled && (
-          <InstallButton
+          <button
             onClick={onInstall}
             disabled={isInstalling || incompatible}
-            label={isInstalling ? 'Installing...' : 'Install'}
-          />
+            style={{
+              ...primaryBtn,
+              opacity: isInstalling || incompatible ? 0.5 : 1,
+              cursor: isInstalling || incompatible ? 'not-allowed' : 'pointer',
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+            }}
+          >
+            <Download size={12} />
+            {isInstalling ? 'Installing…' : 'Install'}
+          </button>
         )}
       </div>
     </div>
-  );
-}
-
-function InstallButton({
-  onClick,
-  disabled,
-  label,
-}: {
-  onClick: () => void;
-  disabled: boolean;
-  label: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-      style={{ background: 'var(--accent)', color: '#fff' }}
-    >
-      <Download size={13} />
-      {label}
-    </button>
   );
 }
 
@@ -497,12 +433,14 @@ function InstalledPlugins({ onUninstalled }: { onUninstalled: () => void }) {
     }
   }, []);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => {
+    void (async () => {
+      await fetchAll();
+    })();
+  }, [fetchAll]);
 
-  const doAction = async (
-    id: string,
-    label: string,
-    fn: () => Promise<unknown>,
+  const doAction = useCallback(async (
+    id: string, label: string, fn: () => Promise<unknown>,
   ) => {
     setActionLoading(prev => ({ ...prev, [id]: label }));
     setActionError(prev => { const n = { ...prev }; delete n[id]; return n; });
@@ -517,288 +455,181 @@ function InstalledPlugins({ onUninstalled }: { onUninstalled: () => void }) {
     } finally {
       setActionLoading(prev => { const n = { ...prev }; delete n[id]; return n; });
     }
-  };
+  }, [fetchAll]);
 
-  const uninstall = async (id: string) => {
+  const uninstall = useCallback(async (id: string) => {
     setConfirmUninstall(null);
     await doAction(id, 'Uninstalling', () => api.uninstallPlugin(id));
     onUninstalled();
-  };
-
-  if (loading) {
-    return (
-      <div className="space-y-3">
-        {[1, 2].map(i => (
-          <div
-            key={i}
-            className="h-20 rounded-lg animate-pulse border"
-            style={surfaceBox}
-          />
-        ))}
-      </div>
-    );
-  }
+  }, [doAction, onUninstalled]);
 
   if (error) {
     return (
-      <div
-        className="px-4 py-3 border rounded-lg text-sm flex items-center justify-between"
-        style={{ background: 'color-mix(in oklch, var(--accent-danger) 10%, transparent)', borderColor: 'color-mix(in oklch, var(--accent-danger) 30%, transparent)', color: 'var(--accent-danger)' }}
-      >
+      <div style={{ ...errorBoxStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span>{error}</span>
-        <button onClick={fetchAll} className="ml-3 underline text-xs" style={{ color: 'var(--accent-danger)' }}>
-          Retry
-        </button>
-      </div>
-    );
-  }
-
-  if (plugins.length === 0) {
-    return (
-      <div className="text-center py-12 text-sm" style={{ color: 'var(--fg-4)' }}>
-        No plugins installed yet. Browse the registry to find plugins.
+        <button onClick={fetchAll} style={{ ...ghostBtn, padding: '4px 8px' }}>Retry</button>
       </div>
     );
   }
 
   return (
-    <div>
+    <Section title="installed plugins">
+      <div style={helpText}>Manage plugins installed on this server — enable, disable, configure, or update them.</div>
+
       {settingsPlugin && (
-        <PluginSettingsPanel
-          plugin={settingsPlugin}
-          onClose={() => setSettingsPlugin(null)}
-        />
+        <PluginSettingsPanel plugin={settingsPlugin} onClose={() => setSettingsPlugin(null)} />
       )}
 
-      <div className="space-y-3">
-        {plugins.map(plugin => {
-          const update = updates.find(u => u.id === plugin.id);
-          const busy = actionLoading[plugin.id];
-          const err = actionError[plugin.id];
-          const isActive = plugin.state === 'active';
-          const isDisabled = plugin.state === 'disabled' || plugin.state === 'unloaded';
-          const isError = plugin.state === 'error';
+      {loading ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {[1, 2].map(i => (
+            <div key={i} style={{ ...cardStyle, height: 60, opacity: 0.5 }} />
+          ))}
+        </div>
+      ) : plugins.length === 0 ? (
+        <div style={helpText}>No plugins installed yet. Browse the registry to find plugins.</div>
+      ) : (
+        <div>
+          {plugins.map(plugin => {
+            const update = updates.find(u => u.id === plugin.id);
+            const busy = actionLoading[plugin.id];
+            const err = actionError[plugin.id];
+            const isActive = plugin.state === 'active';
+            const isDisabled = plugin.state === 'disabled' || plugin.state === 'unloaded';
+            const isError = plugin.state === 'error';
 
-          return (
-            <div
-              key={plugin.id}
-              className="px-4 py-4 rounded-lg border"
-              style={surfaceBox}
-            >
-              <div className="flex items-start justify-between gap-3">
-                {/* Left: status dot + info */}
-                <div className="flex items-start gap-3 flex-1 min-w-0">
-                  <div className="mt-1 shrink-0">
-                    <StatusDot state={plugin.state} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-medium" style={{ color: 'var(--fg)' }}>{plugin.name}</span>
-                      <span className="text-xs" style={{ color: 'var(--fg-4)' }}>v{plugin.version}</span>
-                      <span className="text-xs" style={{ color: 'var(--fg-4)' }}>by {plugin.author}</span>
-                      <StateLabel state={plugin.state} />
-                      {update && (
-                        <span
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-                          style={{ background: 'color-mix(in oklch, var(--accent-warn) 20%, transparent)', color: 'var(--accent-warn)' }}
-                        >
-                          <AlertCircle size={10} />
-                          v{update.latestVersion} available
+            return (
+              <div key={plugin.id} style={cardStyle}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flex: 1, minWidth: 0 }}>
+                    <div style={{ marginTop: 4, flexShrink: 0 }}>
+                      <StatusDot state={plugin.state} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--fg)', fontWeight: 500 }}>
+                          {plugin.name}
                         </span>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--fg-4)' }}>v{plugin.version}</span>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--fg-4)' }}>by {plugin.author}</span>
+                        <StateLabel state={plugin.state} />
+                        {update && (
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                            style={{ background: 'color-mix(in oklch, var(--accent-warn) 20%, transparent)', color: 'var(--accent-warn)' }}
+                          >
+                            <AlertCircle size={10} /> v{update.latestVersion} available
+                          </span>
+                        )}
+                      </div>
+                      <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--fg-3)', marginTop: 2, lineHeight: 1.5 }}>
+                        {plugin.description}
+                      </p>
+                      {isError && plugin.error && (
+                        <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--accent-danger)', marginTop: 4 }}>{plugin.error}</p>
+                      )}
+                      {err && (
+                        <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--accent-danger)', marginTop: 4 }}>{err}</p>
+                      )}
+                      {busy && (
+                        <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--fg-4)', marginTop: 4 }}>{busy}…</p>
                       )}
                     </div>
-                    <p className="text-xs mt-0.5 leading-relaxed" style={{ color: 'var(--fg-3)' }}>{plugin.description}</p>
-                    {isError && plugin.error && (
-                      <p className="text-xs mt-1 font-mono" style={{ color: 'var(--accent-danger)' }}>{plugin.error}</p>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                    {plugin.settings && plugin.settings.length > 0 && (
+                      <PluginIconBtn
+                        onClick={() => setSettingsPlugin(plugin)}
+                        title="Plugin settings"
+                        color="var(--fg-3)"
+                        icon={<Settings size={14} />}
+                      />
                     )}
-                    {err && (
-                      <p className="text-xs mt-1" style={{ color: 'var(--accent-danger)' }}>{err}</p>
+                    {isDisabled ? (
+                      <PluginIconBtn
+                        onClick={() => doAction(plugin.id, 'Enabling', () => api.enablePlugin(plugin.id))}
+                        title="Enable plugin"
+                        color="var(--accent-good)"
+                        disabled={!!busy}
+                        icon={<ToggleLeft size={14} />}
+                      />
+                    ) : (
+                      <PluginIconBtn
+                        onClick={() => doAction(plugin.id, 'Disabling', () => api.disablePlugin(plugin.id))}
+                        title="Disable plugin"
+                        color="var(--accent-warn)"
+                        disabled={!!busy}
+                        icon={<ToggleRight size={14} />}
+                      />
                     )}
-                    {busy && (
-                      <p className="text-xs mt-1" style={{ color: 'var(--fg-4)' }}>{busy}...</p>
+                    {isActive && (
+                      <PluginIconBtn
+                        onClick={() => doAction(plugin.id, 'Reloading', () => api.reloadPlugin(plugin.id))}
+                        title="Reload plugin"
+                        color="var(--accent)"
+                        disabled={!!busy}
+                        icon={<RotateCcw size={14} />}
+                      />
+                    )}
+                    {update && (
+                      <PluginIconBtn
+                        onClick={() => doAction(plugin.id, 'Updating', () => api.updatePlugin(plugin.id))}
+                        title={`Update to v${update.latestVersion}`}
+                        color="var(--accent-warn)"
+                        disabled={!!busy}
+                        icon={<RefreshCw size={14} />}
+                      />
+                    )}
+                    {confirmUninstall === plugin.id ? (
+                      <>
+                        <button onClick={() => uninstall(plugin.id)} style={dangerBtn}>Confirm</button>
+                        <button onClick={() => setConfirmUninstall(null)} style={ghostBtn}>Cancel</button>
+                      </>
+                    ) : (
+                      <PluginIconBtn
+                        onClick={() => setConfirmUninstall(plugin.id)}
+                        title="Uninstall plugin"
+                        color="var(--accent-danger)"
+                        disabled={!!busy}
+                        icon={<Trash2 size={14} />}
+                      />
                     )}
                   </div>
                 </div>
-
-                {/* Right: action buttons */}
-                <div className="flex items-center gap-1 shrink-0">
-                  {/* Settings (only if plugin has settings) */}
-                  {plugin.settings && plugin.settings.length > 0 && (
-                    <IconActionButton
-                      onClick={() => setSettingsPlugin(plugin)}
-                      title="Plugin settings"
-                      icon={<Settings size={15} />}
-                    />
-                  )}
-
-                  {/* Enable / Disable toggle */}
-                  {isDisabled ? (
-                    <button
-                      onClick={() => doAction(plugin.id, 'Enabling', () => api.enablePlugin(plugin.id))}
-                      disabled={!!busy}
-                      className="p-1.5 rounded-lg transition-colors disabled:opacity-50"
-                      style={{ color: 'var(--accent-good)' }}
-                      onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in oklch, var(--accent-good) 10%, transparent)'; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-                      title="Enable plugin"
-                    >
-                      <ToggleLeft size={15} />
-                    </button>
-                  ) : (
-                    <DisableButton
-                      onClick={() => doAction(plugin.id, 'Disabling', () => api.disablePlugin(plugin.id))}
-                      disabled={!!busy}
-                    />
-                  )}
-
-                  {/* Reload */}
-                  {isActive && (
-                    <ReloadButton
-                      onClick={() => doAction(plugin.id, 'Reloading', () => api.reloadPlugin(plugin.id))}
-                      disabled={!!busy}
-                    />
-                  )}
-
-                  {/* Update */}
-                  {update && (
-                    <button
-                      onClick={() => doAction(plugin.id, 'Updating', () => api.updatePlugin(plugin.id))}
-                      disabled={!!busy}
-                      className="p-1.5 rounded-lg transition-colors disabled:opacity-50"
-                      style={{ color: 'var(--accent-warn)' }}
-                      onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in oklch, var(--accent-warn) 10%, transparent)'; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-                      title={`Update to v${update.latestVersion}`}
-                    >
-                      <RefreshCw size={15} />
-                    </button>
-                  )}
-
-                  {/* Uninstall */}
-                  {confirmUninstall === plugin.id ? (
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => uninstall(plugin.id)}
-                        className="px-2 py-1 rounded text-xs transition-colors"
-                        style={{ background: 'var(--accent-danger)', color: 'var(--fg)' }}
-                      >
-                        Confirm
-                      </button>
-                      <CancelButton onClick={() => setConfirmUninstall(null)} />
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setConfirmUninstall(plugin.id)}
-                      disabled={!!busy}
-                      className="p-1.5 rounded-lg transition-colors disabled:opacity-50"
-                      style={{ color: 'var(--accent-danger)' }}
-                      onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in oklch, var(--accent-danger) 10%, transparent)'; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-                      title="Uninstall plugin"
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  )}
-                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
+            );
+          })}
+        </div>
+      )}
+    </Section>
   );
 }
 
-function IconActionButton({
-  onClick,
-  title,
-  icon,
+function PluginIconBtn({
+  onClick, title, color, icon, disabled,
 }: {
   onClick: () => void;
   title: string;
+  color: string;
   icon: React.ReactNode;
+  disabled?: boolean;
 }) {
-  const [hovered, setHovered] = useState(false);
   return (
     <button
       onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      className="p-1.5 rounded-lg transition-colors"
+      disabled={disabled}
       title={title}
+      aria-label={title}
+      className="p-1.5 rounded-lg transition-colors"
       style={{
-        color: hovered ? 'var(--fg)' : 'var(--fg-3)',
-        background: hovered ? 'var(--bg-hover)' : 'transparent',
+        color, background: 'transparent', border: 'none',
+        cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1,
       }}
+      onMouseEnter={e => { if (!disabled) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
     >
       {icon}
-    </button>
-  );
-}
-
-function DisableButton({
-  onClick,
-  disabled,
-}: {
-  onClick: () => void;
-  disabled: boolean;
-}) {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <button
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      disabled={disabled}
-      className="p-1.5 rounded-lg transition-colors disabled:opacity-50"
-      title="Disable plugin"
-      style={{
-        color: hovered ? 'var(--accent-warn)' : 'var(--fg-3)',
-        background: hovered ? 'color-mix(in oklch, var(--accent-warn) 10%, transparent)' : 'transparent',
-      }}
-    >
-      <ToggleRight size={15} />
-    </button>
-  );
-}
-
-function ReloadButton({
-  onClick,
-  disabled,
-}: {
-  onClick: () => void;
-  disabled: boolean;
-}) {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <button
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      disabled={disabled}
-      className="p-1.5 rounded-lg transition-colors disabled:opacity-50"
-      title="Reload plugin"
-      style={{
-        color: hovered ? 'var(--accent)' : 'var(--fg-3)',
-        background: hovered ? 'var(--accent-soft)' : 'transparent',
-      }}
-    >
-      <RotateCcw size={15} />
-    </button>
-  );
-}
-
-function CancelButton({ onClick }: { onClick: () => void }) {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <button
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      className="px-2 py-1 rounded text-xs transition-colors"
-      style={{ color: hovered ? 'var(--fg)' : 'var(--fg-3)' }}
-    >
-      Cancel
     </button>
   );
 }
@@ -806,18 +637,13 @@ function CancelButton({ onClick }: { onClick: () => void }) {
 /* ─── Status dot ─── */
 
 function StatusDot({ state }: { state: InstalledPlugin['state'] }) {
-  if (state === 'active') {
-    return <span className="inline-block w-2 h-2 rounded-full mt-1" style={{ background: 'var(--accent-good)' }} />;
-  }
-  if (state === 'error') {
-    return <span className="inline-block w-2 h-2 rounded-full mt-1" style={{ background: 'var(--accent-danger)' }} />;
-  }
-  return (
-    <span
-      className="inline-block w-2 h-2 rounded-full mt-1"
-      style={{ background: 'var(--fg-4)' }}
-    />
-  );
+  const colors: Record<InstalledPlugin['state'], string> = {
+    active: 'var(--accent-good)',
+    error: 'var(--accent-danger)',
+    disabled: 'var(--fg-4)',
+    unloaded: 'var(--fg-4)',
+  };
+  return <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: colors[state] }} />;
 }
 
 function StateLabel({ state }: { state: InstalledPlugin['state'] }) {
@@ -827,8 +653,7 @@ function StateLabel({ state }: { state: InstalledPlugin['state'] }) {
         className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
         style={{ background: 'color-mix(in oklch, var(--accent-good) 20%, transparent)', color: 'var(--accent-good)' }}
       >
-        <CheckCircle size={10} />
-        Active
+        <CheckCircle size={10} /> Active
       </span>
     );
   }
@@ -838,8 +663,7 @@ function StateLabel({ state }: { state: InstalledPlugin['state'] }) {
         className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
         style={{ background: 'color-mix(in oklch, var(--accent-danger) 20%, transparent)', color: 'var(--accent-danger)' }}
       >
-        <XCircle size={10} />
-        Error
+        <XCircle size={10} /> Error
       </span>
     );
   }
@@ -873,38 +697,39 @@ function PluginSettingsPanel({
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
   const [expanded, setExpanded] = useState(true);
-  const [headerHovered, setHeaderHovered] = useState(false);
-  const [closeHovered, setCloseHovered] = useState(false);
 
   const adminSettings = plugin.settings.filter(s => !s.perUser);
   const userSettings = plugin.settings.filter(s => s.perUser);
 
-  // Load current settings from the global settings store
-  useEffect(() => {
-    (async () => {
-      try {
-        setLoading(true);
-        const all = await api.getSettings();
-        const initial: Record<string, unknown> = {};
-        plugin.settings.forEach(s => {
-          const key = `plugin:${plugin.id}:${s.key}`;
-          initial[s.key] = key in all ? all[key] : s.default;
-        });
-        setValues(initial);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load settings');
-      } finally {
-        setLoading(false);
-      }
-    })();
+  const loadValues = useCallback(async () => {
+    try {
+      setLoading(true);
+      const all = await api.getSettings();
+      const initial: Record<string, unknown> = {};
+      plugin.settings.forEach(s => {
+        const key = `plugin:${plugin.id}:${s.key}`;
+        initial[s.key] = key in all ? all[key] : s.default;
+      });
+      setValues(initial);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load settings');
+    } finally {
+      setLoading(false);
+    }
   }, [plugin]);
+
+  useEffect(() => {
+    void (async () => {
+      await loadValues();
+    })();
+  }, [loadValues]);
 
   const setValue = (key: string, value: unknown) => {
     setValues(prev => ({ ...prev, [key]: value }));
     setSaved(false);
   };
 
-  const save = async () => {
+  const save = useCallback(async () => {
     try {
       setSaving(true);
       setError('');
@@ -922,52 +747,51 @@ function PluginSettingsPanel({
     } finally {
       setSaving(false);
     }
-  };
+  }, [plugin, values]);
 
   return (
     <div
-      className="mb-4 rounded-lg border"
-      style={{ borderColor: 'var(--accent)', background: 'var(--accent-soft)' }}
+      style={{
+        marginBottom: 14,
+        borderRadius: 6,
+        border: '1px solid var(--accent)',
+        background: 'var(--accent-soft)',
+      }}
     >
-      {/* Panel header */}
       <button
         onClick={() => setExpanded(v => !v)}
-        onMouseEnter={() => setHeaderHovered(true)}
-        onMouseLeave={() => setHeaderHovered(false)}
-        className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium transition-colors"
-        style={{ color: headerHovered ? 'var(--fg)' : 'var(--accent)' }}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '10px 12px', background: 'transparent', border: 'none',
+          color: 'var(--accent)', cursor: 'pointer',
+          fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 500,
+        }}
       >
-        <div className="flex items-center gap-2">
-          <Settings size={15} />
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Settings size={14} />
           Settings — {plugin.name}
-        </div>
-        <div className="flex items-center gap-2">
-          <button
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span
+            role="button"
+            tabIndex={0}
             onClick={e => { e.stopPropagation(); onClose(); }}
-            onMouseEnter={() => setCloseHovered(true)}
-            onMouseLeave={() => setCloseHovered(false)}
-            className="p-0.5 rounded transition-colors"
-            style={{ color: closeHovered ? 'var(--fg)' : 'var(--fg-3)' }}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onClose(); } }}
+            aria-label="Close settings"
+            style={{ padding: 2, display: 'inline-flex', color: 'var(--fg-3)' }}
           >
-            <X size={14} />
-          </button>
-          {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        </div>
+            <X size={13} />
+          </span>
+          {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+        </span>
       </button>
 
       {expanded && (
-        <div className="px-4 pb-4">
-          {error && (
-            <div
-              className="mb-3 px-3 py-2 border rounded-lg text-xs"
-              style={{ background: 'color-mix(in oklch, var(--accent-danger) 10%, transparent)', borderColor: 'color-mix(in oklch, var(--accent-danger) 30%, transparent)', color: 'var(--accent-danger)' }}
-            >
-              {error}
-            </div>
-          )}
+        <div style={{ padding: '0 12px 12px 12px' }}>
+          {error && <div style={errorBoxStyle}>{error}</div>}
 
           {loading ? (
-            <div className="text-sm py-2" style={{ color: 'var(--fg-3)' }}>Loading settings...</div>
+            <div style={helpText}>Loading settings...</div>
           ) : (
             <>
               {adminSettings.length > 0 && (
@@ -989,18 +813,20 @@ function PluginSettingsPanel({
                 />
               )}
 
-              <div className="flex items-center gap-3 mt-4">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12 }}>
                 <button
                   onClick={save}
                   disabled={saving}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
-                  style={{ background: 'var(--accent)', color: '#fff' }}
+                  style={{
+                    ...primaryBtn, opacity: saving ? 0.5 : 1,
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                  }}
                 >
-                  <Save size={14} />
-                  {saving ? 'Saving...' : 'Save'}
+                  <Save size={12} />
+                  {saving ? 'Saving…' : 'Save'}
                 </button>
                 {saved && (
-                  <span className="text-xs flex items-center gap-1" style={{ color: 'var(--accent-good)' }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--accent-good)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                     <CheckCircle size={12} /> Saved
                   </span>
                 )}
@@ -1014,11 +840,7 @@ function PluginSettingsPanel({
 }
 
 function SettingsGroup({
-  title,
-  subtitle,
-  settings,
-  values,
-  onChange,
+  title, subtitle, settings, values, onChange,
 }: {
   title: string;
   subtitle: string;
@@ -1027,12 +849,17 @@ function SettingsGroup({
   onChange: (key: string, value: unknown) => void;
 }) {
   return (
-    <div className="mb-4">
-      <div className="mb-2">
-        <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--fg)' }}>{title}</p>
-        <p className="text-xs" style={{ color: 'var(--fg-4)' }}>{subtitle}</p>
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ marginBottom: 8 }}>
+        <div style={{
+          fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.08em',
+          textTransform: 'uppercase', color: 'var(--fg)', fontWeight: 600,
+        }}>
+          {title}
+        </div>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--fg-4)' }}>{subtitle}</div>
       </div>
-      <div className="space-y-3">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {settings.map(s => (
           <SettingField key={s.key} decl={s} value={values[s.key]} onChange={v => onChange(s.key, v)} />
         ))}
@@ -1042,36 +869,33 @@ function SettingsGroup({
 }
 
 function SettingField({
-  decl,
-  value,
-  onChange,
+  decl, value, onChange,
 }: {
   decl: SettingDecl;
   value: unknown;
   onChange: (v: unknown) => void;
 }) {
-  const [focused, setFocused] = useState(false);
-  const inputClass = 'border rounded-lg px-3 py-1.5 text-sm focus:outline-none transition-colors';
-  const inputDynamicStyle: CSSProperties = {
-    ...inputStyle,
-    borderColor: focused ? 'var(--accent)' : 'var(--line)',
-  };
-
   if (decl.type === 'boolean') {
     const checked = Boolean(value);
     return (
-      <label className="flex items-center justify-between gap-3 cursor-pointer">
-        <span className="text-sm" style={{ color: 'var(--fg)' }}>{decl.label}</span>
+      <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, cursor: 'pointer' }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--fg)' }}>{decl.label}</span>
         <button
           onClick={() => onChange(!checked)}
-          className="relative inline-flex h-5 w-9 items-center rounded-full transition-colors"
-          style={{ background: checked ? 'var(--accent)' : 'var(--fg-4)' }}
+          style={{
+            position: 'relative', display: 'inline-flex', alignItems: 'center',
+            height: 20, width: 36, borderRadius: 999, border: 'none',
+            background: checked ? 'var(--accent)' : 'var(--fg-4)', cursor: 'pointer',
+            transition: 'background 120ms',
+          }}
         >
           <span
-            className={`inline-block h-3.5 w-3.5 rounded-full transform transition-transform ${
-              checked ? 'translate-x-4' : 'translate-x-0.5'
-            }`}
-            style={{ background: 'var(--fg)' }}
+            style={{
+              display: 'inline-block', height: 14, width: 14, borderRadius: '50%',
+              background: 'var(--fg)',
+              transform: checked ? 'translateX(18px)' : 'translateX(2px)',
+              transition: 'transform 120ms',
+            }}
           />
         </button>
       </label>
@@ -1080,34 +904,26 @@ function SettingField({
 
   if (decl.type === 'number') {
     return (
-      <div className="flex items-center justify-between gap-3">
-        <label className="text-sm" style={{ color: 'var(--fg)' }}>{decl.label}</label>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <label style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--fg)' }}>{decl.label}</label>
         <input
           type="number"
-          value={value as number ?? 0}
+          value={(value as number) ?? 0}
           onChange={e => onChange(Number(e.target.value))}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          className={`w-28 text-right ${inputClass}`}
-          style={inputDynamicStyle}
+          style={{ ...kitInputStyle, width: 120, textAlign: 'right' }}
         />
       </div>
     );
   }
 
-  // string (default)
   return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-sm" style={{ color: 'var(--fg)' }}>{decl.label}</label>
+    <Field label={decl.label}>
       <input
         type="text"
-        value={value as string ?? ''}
+        value={(value as string) ?? ''}
         onChange={e => onChange(e.target.value)}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        className={`w-full ${inputClass}`}
-        style={inputDynamicStyle}
+        style={kitInputStyle}
       />
-    </div>
+    </Field>
   );
 }
