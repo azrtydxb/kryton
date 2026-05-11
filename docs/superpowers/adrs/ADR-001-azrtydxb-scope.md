@@ -1,8 +1,16 @@
 # ADR-001: npm Scope Rename from `@kryton` to `@azrtydxb`
 
 **Date:** 2026-04-30
-**Status:** Accepted
+**Status:** Accepted (scope still in use; original `core`/`core-react` packages have been removed — see note below)
 **Sub-project:** Core Publishing (spec 5 of 5)
+
+> **2026-05-11 update.** `@azrtydxb/core` and `@azrtydxb/core-react` were
+> deleted from the monorepo as part of the SQLite/offline-sync removal
+> (PR #110). The `@azrtydxb` scope decision still stands and is in use
+> by the surviving published/internal packages: `@azrtydxb/sdk`,
+> `@azrtydxb/ui`, `@azrtydxb/server`, `@azrtydxb/client`, `@azrtydxb/notes`.
+> The package-publish workflow itself was removed with PR #110; no
+> packages are currently published to GitHub Packages from this repo.
 
 ## Context
 
