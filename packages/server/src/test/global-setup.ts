@@ -17,11 +17,9 @@ const MIGRATIONS_DIR = path.resolve(__dirname, "..", "db", "migrations");
 /**
  * Vitest global setup: boots a pgvector/pgvector:pg16 container, creates the
  * `vector` extension, runs the Drizzle migrations, and exposes the connection
- * URI via `process.env.TEST_DATABASE_URL` for subsequent test files.
- *
- * Note: this does NOT replace `DATABASE_URL`. The existing test suite still
- * targets Prisma + SQLite via `DATABASE_URL=file:./data/kryton-test.db`. This
- * infrastructure is dormant until tests opt in via `createTestDb()`.
+ * URI via `process.env.TEST_DATABASE_URL` for subsequent test files. The
+ * `build-test-app` helper promotes `TEST_DATABASE_URL` to `POSTGRES_URL` so
+ * `dbPlugin` initialises against this container.
  */
 export async function setup(): Promise<void> {
   container = await new PostgreSqlContainer("pgvector/pgvector:pg16")

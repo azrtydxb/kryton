@@ -11,14 +11,12 @@ declare module "fastify" {
 
 /**
  * Decorates the Fastify instance with a Drizzle (`app.db`) client backed by a
- * pg.Pool.
+ * pg.Pool. Drizzle is Kryton's sole data layer.
  *
- * Phase 1 of the Postgres + Drizzle migration: registered alongside the
- * existing Prisma plugin. If `POSTGRES_URL` is not configured (e.g. in the
- * current test suite, which still targets SQLite via Prisma), the plugin
- * skips runtime initialization but the `app.db` type augmentation remains in
- * effect so downstream code can be typed against it. A later phase makes
- * Postgres the only supported data layer and removes this fallback.
+ * If `POSTGRES_URL` is not set, the plugin warns and skips initialisation —
+ * this is tolerated only for tooling that boots the app without a database
+ * (e.g. the OpenAPI dump script). All test entry points and `npm start` must
+ * provide it.
  */
 export const dbPlugin = fp(async (app) => {
   const url = app.config.POSTGRES_URL;

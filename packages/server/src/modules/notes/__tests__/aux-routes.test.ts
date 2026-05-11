@@ -1,8 +1,8 @@
 /**
  * Smoke tests for notes-aux routes (attachments, canvas, history, backlinks).
  *
- * Builds a minimal Fastify app with stub decorators (`auth`, `prisma`,
- * `notes`, `knowledge`) rather than using `buildTestApp` directly — that
+ * Builds a minimal Fastify app with stub decorators (`auth`, `notes`,
+ * `knowledge`) rather than using `buildTestApp` directly — that
  * helper registers the full app graph including DB-backed plugins which is
  * heavy for route-level smoke tests.
  */

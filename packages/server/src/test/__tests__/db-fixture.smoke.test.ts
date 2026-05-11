@@ -15,10 +15,14 @@ describe("db-fixture smoke test (Postgres + Drizzle + testcontainers)", () => {
     await handle.close();
   });
 
-  it("round-trips a User row inside withTransaction", async () => {
-    const id = "smoke-user-1";
-    const email = `smoke-${Date.now()}@example.com`;
+  // Use a per-run id/email so the assertions are independent of any rows
+  // other test files may have written to the shared testcontainers Postgres
+  // (this fixture intentionally does NOT TRUNCATE — withTransaction's whole
+  // point is to isolate via rollback, not table truncation).
+  const id = `smoke-user-${Date.now()}`;
+  const email = `${id}@example.com`;
 
+  it("round-trips a User row inside withTransaction", async () => {
     const fetched = await handle.withTransaction(async (tx) => {
       await tx.insert(user).values({
         id,
@@ -33,9 +37,13 @@ describe("db-fixture smoke test (Postgres + Drizzle + testcontainers)", () => {
   });
 
   it("rolls back: the previous test's User row is not visible", async () => {
-    // Run a separate transaction; it should see no rows from the first test.
+    // Run a separate transaction; it should see no row with our smoke id
+    // (the previous test's insert was rolled back).
     const rows = await handle.withTransaction(async (tx) => {
-      return tx.select({ count: sql<number>`count(*)::int` }).from(user);
+      return tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(user)
+        .where(eq(user.id, id));
     });
     expect(rows[0]?.count).toBe(0);
   });

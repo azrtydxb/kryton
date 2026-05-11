@@ -10,13 +10,11 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3001),
   HOST: z.string().default("0.0.0.0"),
 
-  DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
-
   /**
-   * Postgres connection string for the Drizzle data layer. Optional during
-   * Phase 1 of the Postgres + Drizzle migration — when unset, the Drizzle
-   * plugin skips registration and the legacy Prisma+SQLite stack remains the
-   * sole data layer at runtime.
+   * Postgres connection string for the Drizzle data layer. Drizzle is the
+   * sole data layer after Phase 8 of the Postgres migration (Prisma fully
+   * removed). Still optional at schema level — `dbPlugin` validates presence
+   * at registration time so test harnesses can short-circuit without it.
    */
   POSTGRES_URL: z.string().optional(),
 
