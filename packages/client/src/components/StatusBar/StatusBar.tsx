@@ -10,8 +10,10 @@ import type { CSSProperties } from 'react';
 
 interface StatusBarProps {
   notePath: string | null;
-  line: number;
-  col: number;
+  /** Editor cursor line — null when not in edit mode (no cursor). */
+  line: number | null;
+  /** Editor cursor column — null when not in edit mode. */
+  col: number | null;
   wordCount: number;
   /** Optional link counts surfaced when the parent has them. */
   outgoingCount?: number;
@@ -61,7 +63,9 @@ export function StatusBar({
       <span>{tagsCount} tags</span>
       <div style={{ flex: 1 }} />
       <span>{wordCount.toLocaleString()} words</span>
-      <span>Ln {line}, Col {col}</span>
+      {line !== null && col !== null && (
+        <span>Ln {line}, Col {col}</span>
+      )}
       <span>{encoding}</span>
       <span>Markdown</span>
     </div>
