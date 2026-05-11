@@ -6,6 +6,16 @@ import { moveToTrash } from "./trash.service.js";
 import { saveHistorySnapshot } from "./history.service.js";
 import { trashItem } from "../../../db/schema/notes.js";
 import { noteShare } from "../../../db/schema/sharing.js";
+import { NotFoundError } from "../../../lib/errors.js";
+
+function isEnoent(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    (err as { code?: unknown }).code === "ENOENT"
+  );
+}
 
 /**
  * Cross-module decorator surfaces that the notes module relies on:
@@ -88,8 +98,27 @@ export class NoteService {
     const fullPath = path.join(notesDir, notePath);
     ensureWithinBase(fullPath, notesDir);
 
-    const content = await fs.readFile(fullPath, "utf-8");
-    const stat = await fs.stat(fullPath);
+    let content: string;
+    let stat: Awaited<ReturnType<typeof fs.stat>>;
+    try {
+      content = await fs.readFile(fullPath, "utf-8");
+      stat = await fs.stat(fullPath);
+    } catch (err) {
+      // ENOENT (file gone) and ENOTDIR (parent component isn't a directory
+      // because the caller tacked extra segments onto a leaf path) both mean
+      // "no note here." Map to 404 instead of letting the global error
+      // handler surface them as 500.
+      if (
+        isEnoent(err) ||
+        (typeof err === "object" &&
+          err !== null &&
+          "code" in err &&
+          (err as { code?: unknown }).code === "ENOTDIR")
+      ) {
+        throw new NotFoundError(`Note not found: ${notePath}`);
+      }
+      throw err;
+    }
     const title = this.extractTitle(content, notePath);
 
     return { path: notePath, content, title, modifiedAt: stat.mtime };

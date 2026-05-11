@@ -5,6 +5,8 @@ import { fromNodeHeaders } from "better-auth/node";
 import { createAuth, type Auth } from "../modules/identity/auth-config.js";
 import { AuthError, ForbiddenError } from "../lib/errors.js";
 import { user } from "../db/schema/auth.js";
+import { settings } from "../db/schema/settings.js";
+import { GLOBAL_USER_ID } from "../lib/pathUtils.js";
 
 export interface AuthUser {
   id: string;
@@ -193,6 +195,31 @@ export const authPlugin = fp(async (app) => {
   };
 
   app.decorate("auth", api);
+
+  // Public auth config — read by the login page to decide which sign-in
+  // affordances to show. Registered BEFORE the better-auth catch-all so the
+  // specific path takes precedence over `/api/auth/*`. No auth required.
+  app.route({
+    method: "GET",
+    url: "/api/auth/config",
+    schema: { hide: true },
+    handler: async () => {
+      const rows = await app.db.query.settings.findMany({
+        where: eq(settings.key, "registration_mode"),
+      });
+      const row = rows.find((r) => r.userId === GLOBAL_USER_ID) ?? rows[0];
+      const registrationMode = (row?.value as string | undefined) ?? "open";
+      return {
+        registrationMode,
+        // OAuth + SMTP are not wired in this build. Surfaced here so the
+        // login page can hide the relevant buttons cleanly instead of probing
+        // and getting a 404.
+        googleEnabled: false,
+        githubEnabled: false,
+        smtpEnabled: false,
+      };
+    },
+  });
 
   // Mount Better Auth catch-all. We use Fastify's raw request/response to avoid
   // body parsing conflicts.
