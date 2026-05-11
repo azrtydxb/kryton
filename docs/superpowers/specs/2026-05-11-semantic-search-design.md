@@ -1,16 +1,14 @@
 # Semantic Search Design
 
 **Date**: 2026-05-11
-**Status**: **Provisional — must be rewritten after the Postgres + Drizzle migration lands.**
-**Prerequisite**: [Postgres + Drizzle Migration](2026-05-11-postgres-drizzle-migration-design.md) ships first.
+**Status**: **Decisions resolved — ready for plan.**
+**Prerequisite**: ✅ [Postgres + Drizzle Migration](2026-05-11-postgres-drizzle-migration-design.md) shipped (PR #109).
 
-> ## ⚠️ Rewrite required after the migration
+> ## Spec status
 >
-> This spec was drafted before Kryton's Postgres + Drizzle migration. The pgvector-based design below is the **intended direction**, but every concrete detail — table definitions, query shapes, Drizzle helpers available (e.g., the `vector` import path), Fastify plugin wiring, test setup — is based on assumptions about what the post-migration codebase will look like.
+> Postgres + Drizzle + pgvector are live on master (PR #109 + #110 + audit fixes). MiniSearch is gone; lexical search runs through Postgres `tsvector` already. This spec has been refreshed against the real codebase: Drizzle v0.45.2 `vector` helper, real schema-file layout, real Fastify plugin patterns, real `SearchService.indexNote()` integration point.
 >
-> **Do not use this spec to drive a plan.** Once the migration is merged to `master`, revisit this document end-to-end against the real code, update every code snippet to match what's actually there, re-verify the schema decisions against the real Drizzle setup, and flip the status to `Decisions resolved — ready for plan` before writing the implementation plan.
->
-> Decisions Q1–Q6 captured here are still valid; the implementation specifics are not.
+> Q1–Q6 decisions stand. Three additional implementation decisions locked in (see "Implementation Decisions" below): API namespace, async-with-durable-queue write path, readiness payload shape.
 
 ## Problem
 
@@ -79,24 +77,52 @@ Mirrors NovaMem's `local-transformers` provider exactly:
 A single Drizzle-managed table on the same Postgres instance Kryton already runs on. The `pgvector` extension is installed once at first boot (via the Postgres init script declared in the migration spec); no per-request extension loading is needed.
 
 ```ts
-// packages/server/src/db/schema/embeddings.ts (Drizzle)
-import { pgTable, text, integer, timestamp, primaryKey, index } from "drizzle-orm/pg-core";
-import { vector } from "drizzle-orm/pg-core";   // pgvector helper, drizzle-orm v0.31+
+// packages/server/src/db/schema/embeddings.ts (Drizzle v0.45.2)
+import { sql } from "drizzle-orm";
+import { pgTable, text, integer, timestamp, primaryKey, index, vector } from "drizzle-orm/pg-core";
+import { user } from "./auth.js";
 
-export const noteEmbeddingChunk = pgTable("NoteEmbeddingChunk", {
-  userId:     text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
-  notePath:   text("note_path").notNull(),
-  chunkIndex: integer("chunk_index").notNull(),
-  chunkText:  text("chunk_text").notNull(),
-  embedding:  vector("embedding", { dimensions: 384 }).notNull(),
-  modifiedAt: timestamp("modified_at", { withTimezone: true }).notNull(),
-}, (t) => ({
-  pk: primaryKey({ columns: [t.userId, t.notePath, t.chunkIndex] }),
-  hnsw: index("note_embedding_hnsw_idx")
-    .using("hnsw", t.embedding.op("vector_cosine_ops")),
-  userPath: index("note_embedding_user_path_idx").on(t.userId, t.notePath),
-}));
+export const noteEmbeddingChunk = pgTable(
+  "NoteEmbeddingChunk",
+  {
+    userId:     text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    notePath:   text("note_path").notNull(),
+    chunkIndex: integer("chunk_index").notNull(),
+    chunkText:  text("chunk_text").notNull(),
+    embedding:  vector("embedding", { dimensions: 384 }).notNull(),
+    modifiedAt: timestamp("modified_at", { withTimezone: true }).notNull(),
+  },
+  (t) => ({
+    pk:       primaryKey({ columns: [t.userId, t.notePath, t.chunkIndex] }),
+    hnswIdx:  index("note_embedding_hnsw_idx")
+                .using("hnsw", t.embedding.op("vector_cosine_ops")),
+    userPath: index("note_embedding_user_path_idx").on(t.userId, t.notePath),
+  }),
+);
+
+// Durable queue for async embedding work. The notes-watcher writes a row
+// when a file changes, the embed worker drains it. Survives crashes /
+// docker restarts.
+export const embedJob = pgTable(
+  "EmbedJob",
+  {
+    userId:     text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    notePath:   text("note_path").notNull(),
+    op:         text("op").notNull(), // "upsert" | "delete"
+    enqueuedAt: timestamp("enqueued_at", { withTimezone: true }).notNull().defaultNow(),
+    attempts:   integer("attempts").notNull().default(0),
+    error:      text("error"),
+  },
+  (t) => ({
+    pk:    primaryKey({ columns: [t.userId, t.notePath] }),
+    queue: index("embed_job_queue_idx").on(t.enqueuedAt),
+  }),
+);
 ```
+
+The embed-job table is keyed on `(userId, notePath)` so repeat writes to the same note coalesce into one queued row — the watcher just runs `INSERT ... ON CONFLICT DO UPDATE SET op = excluded.op, enqueuedAt = NOW(), attempts = 0`. The worker pops the oldest row, embeds it, deletes the job (or bumps `attempts` + sets `error` on failure).
+
+Both tables get registered in `db/schema/index.ts` alongside the existing seven schema files.
 
 Vector and metadata in **one row** — no rowid hashing, no two-table join inside KNN, no extension-load dance. The HNSW index gives sub-50ms KNN at hundreds of thousands of vectors with pre-filtering on `userId` baked into the query plan.
 
@@ -134,50 +160,72 @@ const CHUNK_OVERLAP = 32;
 const MAX_CHUNKS_PER_NOTE = 64;  // safety bound for pathological notes
 ```
 
-#### Indexing pipeline
+#### Indexing pipeline — slots into the existing watcher
 
-Reuses the patterns already proven by `SearchIndexManager` and `notes-watcher`:
+The real codebase has no MiniSearch reconcile module any more (deleted in Phase 6 of #109). Instead:
 
-1. **Write path** — `notes.writeContent()` triggers `embedQueue.enqueue({ op: "upsert", userId, notePath })`.
-2. **Rename** — emits `delete(oldPath)` + `upsert(newPath)`.
-3. **Delete** — emits `delete(notePath)`.
-4. **Watcher reconcile** — chokidar already reconciles `SearchIndex` against the filesystem (see `search-index-reconcile.ts`); the same pass touches `NoteEmbeddingChunk` so out-of-band edits trigger re-embedding.
-5. **Backfill** — first-run script walks each user's notes dir and embeds anything missing. Reuses the existing per-user backfill harness.
+- `SearchService.indexNote(notePath, content, userId)` writes the `SearchIndex` row, including the `tsv` generated column (lexical FTS).
+- `SearchService.removeFromIndex(notePath, userId)` deletes the row.
+- `SearchService.renameInIndex(oldPath, newPath, userId)` re-keys the row.
+- These three methods are called by `notes-watcher.ts` (chokidar) and by `services/backfill/search-index-backfill.ts` (cold-start reconcile on first authed request).
 
-Queue properties:
-- Single-process, in-memory, durable across crashes via a small `EmbedJob` Prisma table (path + op + enqueuedAt). On boot, drain pending jobs before accepting new ones.
-- Concurrency = 1 by default (CPU embed model on shared Node loop); configurable.
-- Coalescing: if a note is queued for `upsert` multiple times before processing, only the latest version embeds.
+The embedder follows the **same** call sites — every place that calls `SearchService.indexNote/removeFromIndex/renameInIndex` also enqueues an embed job. Concretely:
+
+1. **Write / Rename / Delete** — at each `SearchService` mutation point, also `INSERT INTO "EmbedJob" ... ON CONFLICT (userId, notePath) DO UPDATE SET op = excluded.op, enqueuedAt = NOW(), attempts = 0`. Coalesces repeat writes.
+2. **Watcher reconcile** — chokidar's `add`/`change`/`unlink` events flow through the same `SearchService` mutation methods → same job enqueue. No separate code path.
+3. **Backfill** — `search-index-backfill.ts` (the file added by PR #111) already walks the user dir on first authed request and calls `indexNote` for any file not yet indexed. Adding embed enqueues here is one line per call site.
+
+**Worker loop:**
+
+A single in-process loop (Fastify plugin `plugins/embedder.ts`) drains `EmbedJob`:
+
+- Pop the row with the oldest `enqueuedAt`, take a row-level advisory lock (`pg_try_advisory_xact_lock(hashtext(userId || notePath))`) so multi-process safe.
+- For `upsert`: read the file from disk → chunk → embed each chunk → `INSERT INTO "NoteEmbeddingChunk" ... ON CONFLICT (userId, notePath, chunkIndex) DO UPDATE`.
+- For `delete`: `DELETE FROM "NoteEmbeddingChunk" WHERE user_id = $1 AND note_path = $2`.
+- On success: `DELETE FROM "EmbedJob" WHERE (userId, notePath) = ($1, $2)`.
+- On failure: `UPDATE "EmbedJob" SET attempts = attempts + 1, error = $err`. After `attempts >= 3`, leave the row but stop retrying (admin can re-enqueue by writing the note again).
+
+Concurrency: 1 worker per server process by default. The advisory lock means horizontal scale-out is safe; the default-1 ceiling is a CPU-bound-embedding consideration, not a correctness one.
+
+**Boot drain:** on `app.ready`, the embedder plugin warms the model in the background (see "Boot behavior" below). Once the model is hot, the worker starts polling. The `EmbedJob` table is drained gradually; a pending row count is exposed via the readiness endpoint so the UI can show progress.
 
 #### API surface
 
-New routes under `/api/knowledge/`:
+Kryton's lexical search lives at `GET /api/search/?q=...`. Rather than spawning a new namespace, semantic and (later) hybrid become **modes on the same route**:
 
 ```
-POST /api/knowledge/semantic-search
-  body  { q: string, limit?: number }
-  resp  { hits: Array<{ notePath, title, snippet, score, chunkIndex }> }
+GET /api/search/?q=...&mode=lexical          (default — current behavior)
+GET /api/search/?q=...&mode=semantic         (Phase A)
+GET /api/search/?q=...&mode=hybrid           (Phase C)
+  resp  { hits: Array<{ path, title, snippet, score, mode, chunkIndex? }> }
 
-GET  /api/knowledge/semantic-ready
-  resp  { ready: boolean, provider: string, model?: string, dimensions: number }
+GET /api/search/semantic/ready
+  resp  {
+    ready:        boolean,
+    provider:     "pgvector-local" | "novamem" | "off",
+    model?:       string,
+    dimensions:   number,
+    pendingJobs:  number,   // EmbedJob rows queued for the calling user
+  }
 
-POST /api/knowledge/reindex             (admin / per-user)
-  body  { scope: "self" | "all" }
+POST /api/search/semantic/reindex            (per-user; admin can scope: "all")
+  body  { scope?: "self" | "all" }
+  resp  { enqueued: number }
 ```
 
-The existing `/api/knowledge/search` route stays untouched (lexical only). The UI picks which one to hit based on the search mode toggle.
+If `mode=semantic` is requested while `provider === "off"` (env-disabled) or `ready === false`, the route returns 503 with the readiness payload — UI falls back to a lexical retry. Reindex enqueues `op: "upsert"` rows for every `SearchIndex` row owned by the calling user; the worker drains them.
 
 #### Boot behavior — pre-warm, not block (Q2: B)
 
-On server start the embedder kicks off a non-blocking background job:
+The embedder Fastify plugin (`packages/server/src/plugins/embedder.ts`) wires:
 
-1. Fastify boots and accepts traffic immediately (lexical search works from second 0).
-2. Background job: dynamic-import Transformers.js → load MiniLM ONNX → embed a single warm-up sentence to populate the runtime caches.
-3. While loading, `/api/knowledge/semantic-ready` returns `{ ready: false, eta?: number }`. Semantic search routes return 503 with the same payload.
-4. When done, `semantic-ready` flips to `{ ready: true, provider: "sqlite-vec-local", model: "Xenova/all-MiniLM-L6-v2", dimensions: 384 }`.
-5. UI polls `semantic-ready` once on app load + on demand when the user flips the search mode to semantic; shows a "warming up…" pill while not ready.
+1. **Boot:** Fastify accepts traffic immediately (lexical search works from second 0).
+2. **Background warm-up:** dynamic-import `@xenova/transformers` → load `Xenova/all-MiniLM-L6-v2` ONNX → embed a single warm-up sentence to populate the runtime caches. ~5–15 s on a cold CPU. While loading, `embedderState.ready === false`.
+3. **Readiness endpoint:** `GET /api/search/semantic/ready` returns `{ ready, provider, model, dimensions, pendingJobs }`. Semantic-mode search returns 503 with the same payload until `ready === true`.
+4. **Worker start:** once ready, the worker loop polls the `EmbedJob` table on a 200 ms interval (poll-and-sleep — postgres `LISTEN/NOTIFY` is a future optimisation).
+5. **UI behavior:** polls `semantic-ready` once on app load + when the user toggles to semantic; shows a "warming up…" pill until ready, then a small `N notes indexing` pill while `pendingJobs > 0`.
 
-This avoids the "server feels stuck on every restart" experience during dev iteration while keeping search latency predictable once the model is hot.
+The embedder plugin is the **sole** consumer of `@xenova/transformers` — kept behind a dynamic import so the heavy dep only loads when `SEMANTIC_PROVIDER !== "off"`.
 
 #### UI integration
 
@@ -202,11 +250,11 @@ Once Phase A is stable, add `SemanticProvider` implementation `novamem` that:
 
 **Selection rules (Q6):**
 
-- Provider chosen during install: `SEMANTIC_PROVIDER=sqlite-vec-local` (default) or `SEMANTIC_PROVIDER=novamem`.
+- Provider chosen during install: `SEMANTIC_PROVIDER=pgvector-local` (default), `SEMANTIC_PROVIDER=novamem`, or `SEMANTIC_PROVIDER=off`.
 - Never auto-detected, never the default. A self-hoster who hasn't already deployed NovaMem doesn't get prompted to install it.
 - The web UI does **not** expose runtime provider switching — changing providers requires a re-index, which is an install/migration operation, not a per-session toggle.
 
-**Postgres co-tenancy (separate decision):** Phase B is *also* the natural moment to migrate Kryton from SQLite to Postgres, because (a) NovaMem already runs on Postgres + drizzle + pgvector, (b) shared identity via better-auth lets Kryton's `userId` IS NovaMem's `userId`, (c) pgvector solves the multi-tenant scan-cost problem from Q3 natively. **This migration is out of scope for this spec and will get its own design doc when Phase B is on the table.**
+**Postgres co-tenancy (separate decision):** Kryton is already on Postgres + Drizzle + pgvector (PR #109). Sharing a Postgres cluster with NovaMem is now a config decision rather than a migration — both speak the same dialect. Identity sharing via better-auth (Kryton's `userId` = NovaMem's `userId`) is still a separate piece of work and gets its own design doc when Phase B is on the table.
 
 ### Phase C — Hybrid search across all layers (matches NovaMem's model)
 
@@ -245,8 +293,8 @@ LIMIT $limit;
 
 Phase C fuses **three** signal sources, not two, mirroring how NovaMem's `memory_search` ranks (Q5/hybrid intent):
 
-1. **Lexical** — MiniSearch BM25-style score from `SearchIndex`.
-2. **Semantic** — cosine similarity from `sqlite-vec` (or NovaMem if Phase B active).
+1. **Lexical** — Postgres `tsvector` rank from `SearchIndex.tsv` (already in place — see `search-query.ts`).
+2. **Semantic** — cosine similarity from `NoteEmbeddingChunk.embedding` via pgvector's `<=>` operator.
 3. **Graph** — proximity in the wikilink graph (`GraphEdge`). A note that's 1 hop from a strongly-matching note gets a small boost; 2 hops, smaller. Beyond 3 hops, no signal.
 
 Fusion via weighted reciprocal rank fusion:
@@ -259,18 +307,18 @@ score = w_l / (k + rank_lexical)
 
 Defaults: `w_l = 0.4`, `w_s = 0.4`, `w_g = 0.2`, `k = 60` (standard RRF). Per-user override stored in `Settings`.
 
-A new route `POST /api/knowledge/hybrid-search` orchestrates the three calls in parallel and fuses. UI mode toggle becomes `lexical | semantic | hybrid`, and `hybrid` becomes the new default.
+Surface: `GET /api/search/?q=...&mode=hybrid`. UI mode toggle becomes `lexical | semantic | hybrid`, and `hybrid` becomes the new default once Phase C lands.
 
-When the NovaMem provider is active in Phase B, the hybrid call short-circuits — NovaMem already does all three fusions natively, so we just proxy `memory_search` and skip Kryton's local fusion math.
+When the NovaMem provider is active in Phase B, hybrid mode short-circuits — NovaMem already does all three fusions natively, so we just proxy `memory_search` and skip Kryton's local fusion math.
 
 ### Multi-platform: server-only, online-only
 
 **Hard rule across all platforms:** clients (web, mobile, desktop) never run an embedder, never store vectors locally. Only the server embeds notes, only the server embeds queries, only the server stores vectors. All clients are online-only consumers of the semantic-search API — consistent with the post-sync-removal architecture (see `2026-05-11-remove-sqlite-and-offline-sync-design.md`).
 
-| Scenario       | Lexical search          | Semantic search                                                 |
-|----------------|-------------------------|-----------------------------------------------------------------|
-| **Online**     | Server API call         | API call to `/api/knowledge/semantic-search` (server embeds query + runs KNN) |
-| **Offline**    | Returns connection error | Returns connection error                                       |
+| Scenario       | Lexical search                   | Semantic search                                                 |
+|----------------|----------------------------------|-----------------------------------------------------------------|
+| **Online**     | `GET /api/search/?q=...`         | `GET /api/search/?q=...&mode=semantic` (server embeds query + runs KNN) |
+| **Offline**    | Returns connection error          | Returns connection error                                       |
 
 There is no offline mode for either search type — the entire app requires a connection (online-only architecture).
 
@@ -319,12 +367,20 @@ Provider is set **at install/deployment time only** — there is no runtime UI f
 
 | #  | Question                                  | Decision                                                                                          |
 |----|-------------------------------------------|---------------------------------------------------------------------------------------------------|
-| Q1 | Dependency footprint                       | **A — always bundle.** `@xenova/transformers` + `sqlite-vec` ship with the server image.          |
-| Q2 | First-run model load                       | **B — pre-warm in background.** Server boots immediately; semantic routes return 503 + readiness payload until ready; UI polls `/semantic-ready`. |
-| Q3 | Multi-tenant scan cost                     | **Resolved natively by pgvector.** HNSW with `WHERE user_id = $1` filtering happens inside the index scan — no candidate over-fetching. The Phase A switch from sqlite-vec to pgvector (now that the Postgres migration ships first) closes this for free. |
+| Q1 | Dependency footprint                       | **A — always bundle.** `@xenova/transformers` ships with the server image (dynamic-imported so it only loads when `SEMANTIC_PROVIDER !== "off"`). pgvector ships in the Postgres image (already there). |
+| Q2 | First-run model load                       | **B — pre-warm in background.** Server boots immediately; semantic routes return 503 + readiness payload until ready; UI polls `/api/search/semantic/ready`. |
+| Q3 | Multi-tenant scan cost                     | **Resolved natively by pgvector.** HNSW with `WHERE user_id = $1` filtering happens inside the index scan — no candidate over-fetching. |
 | Q4 | Chunk-vs-note dedup                        | **A — dedup by notePath.** Top-N results show one row per note (highest-scoring chunk).           |
-| Q5 | Multi-platform embedding                   | **Server-only, hard rule.** Clients never embed and never store vectors. Online-only architecture (sync v2 + offline support removed; see `2026-05-11-remove-sqlite-and-offline-sync-design.md`). |
-| Q6 | NovaMem coupling                           | **Install-time choice only.** `sqlite-vec-local` is the default; `novamem` is opt-in via `SEMANTIC_PROVIDER=novamem` at deployment. Never auto-detected, never the default, no runtime UI switch. |
+| Q5 | Multi-platform embedding                   | **Server-only, hard rule.** Clients never embed and never store vectors. Online-only architecture (sync v2 + offline support removed in PR #110). |
+| Q6 | NovaMem coupling                           | **Install-time choice only.** `pgvector-local` is the default; `novamem` is opt-in via `SEMANTIC_PROVIDER=novamem` at deployment. Never auto-detected, never the default, no runtime UI switch. |
+
+### Implementation decisions (post-migration spec refresh)
+
+| #  | Question                                  | Decision                                                                                          |
+|----|-------------------------------------------|---------------------------------------------------------------------------------------------------|
+| I1 | API namespace                              | **Mode parameter on `/api/search/`.** `?mode=lexical|semantic|hybrid` on the existing route. Single endpoint covers all three modes; consistent with how the lexical FTS is already served. Readiness + reindex are sub-routes (`/api/search/semantic/ready`, `/api/search/semantic/reindex`). |
+| I2 | Write-time embedding                        | **Durable queue (B).** `INSERT INTO "EmbedJob" ... ON CONFLICT DO UPDATE` from each `SearchService` mutation site → in-process worker drains. File-save POST returns immediately; embedding catches up async; survives crashes. |
+| I3 | Readiness payload                            | `{ ready, provider, model?, dimensions, pendingJobs }`. Client uses `ready` to gate semantic queries and `pendingJobs > 0` to show a small "N notes indexing" pill in the SearchBar. |
 
 ## Deferred — separate design docs
 
