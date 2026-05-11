@@ -158,7 +158,7 @@ export default fp(async (app) => {
 ```yaml
 services:
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: kryton
       POSTGRES_PASSWORD: kryton
@@ -229,7 +229,7 @@ git commit -m "feat(server): scaffold drizzle + postgres infrastructure
 
 Adds drizzle-orm, drizzle-kit, pg, and testcontainers; wires a Db
 plugin onto Fastify alongside the existing Prisma plugin. Empty schema.
-docker-compose ships postgres:16-alpine with the pgvector extension
+docker-compose ships pgvector/pgvector:pg16 with the pgvector extension
 pre-installed via the postgres-init script."
 ```
 
@@ -617,7 +617,7 @@ import { PostgreSqlContainer } from "@testcontainers/postgresql";
 let container: Awaited<ReturnType<PostgreSqlContainer["start"]>>;
 
 export async function setup() {
-  container = await new PostgreSqlContainer("postgres:16-alpine")
+  container = await new PostgreSqlContainer("pgvector/pgvector:pg16")
     .withDatabase("kryton_test")
     .withUsername("kryton")
     .withPassword("kryton")
@@ -705,7 +705,7 @@ jobs:
   build:
     services:
       postgres:
-        image: postgres:16-alpine
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: kryton
           POSTGRES_PASSWORD: kryton

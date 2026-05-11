@@ -46,7 +46,7 @@ Not in scope:
 | Lexical search           | `MiniSearch` (in-memory, mirrored from `SearchIndex`)| Postgres `tsvector` + GIN index on `notes.tsv`         |
 | Vector search            | n/a (deferred)                                       | n/a (still deferred; `pgvector` extension installed now, used by semantic spec) |
 | Test DB                  | SQLite file per test                                 | Real Postgres via `@testcontainers/postgresql`         |
-| Dev DB                   | SQLite file                                          | `postgres:16-alpine` in docker-compose                 |
+| Dev DB                   | SQLite file                                          | `pgvector/pgvector:pg16` in docker-compose                 |
 | CI DB                    | SQLite file                                          | GitHub Actions `services.postgres`                     |
 
 ### Schema Translation
@@ -188,7 +188,7 @@ Note: better-auth's Drizzle adapter expects specific table/column names. We may 
 ```yaml
 services:
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: kryton
       POSTGRES_PASSWORD: kryton
@@ -229,7 +229,7 @@ Existing tests use a SQLite file per test. New strategy:
 - **DB-touching tests**: spin up a real Postgres via `@testcontainers/postgresql`. Each test file gets a fresh container; `drizzle-kit migrate` runs against it; the test runs; the container tears down. Slower than SQLite-per-test but accurate.
 - **Optimization**: `vitest`'s `globalSetup` spins up one shared container per test process, with each test running inside a transaction that's rolled back at teardown. Same pattern NovaMem uses in its server tests.
 
-CI: GitHub Actions `services.postgres:16-alpine` is the simpler alternative for end-to-end tests where transaction-per-test isn't viable. Both approaches coexist; the integration test runner picks one.
+CI: GitHub Actions `services.pgvector/pgvector:pg16` is the simpler alternative for end-to-end tests where transaction-per-test isn't viable. Both approaches coexist; the integration test runner picks one.
 
 ### CI Pipeline Updates
 
@@ -238,7 +238,7 @@ The `build` job in `.github/workflows/ci.yml` needs:
 ```yaml
 services:
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     env:
       POSTGRES_USER: kryton
       POSTGRES_PASSWORD: kryton
