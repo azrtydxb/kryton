@@ -1,7 +1,10 @@
 import path from "node:path";
 import fs from "node:fs/promises";
 import { createRequire } from "node:module";
+import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
+
+import { installedPlugin } from "../../../db/schema/settings.js";
 import type {
   PluginInstance,
   PluginManifest,
@@ -15,7 +18,7 @@ import type { PluginWebSocket } from "./plugin-websocket.js";
 
 const require = createRequire(import.meta.url);
 
-type Prisma = FastifyInstance["prisma"];
+type Db = FastifyInstance["db"];
 
 interface SimpleLogger {
   info: (msg: string, ...args: unknown[]) => void;
@@ -29,7 +32,7 @@ export interface PluginManagerDeps {
   pluginRouter: PluginRouter;
   healthMonitor: PluginHealthMonitor;
   apiFactory: PluginApiFactory;
-  prisma: Prisma;
+  db: Db;
   logger: SimpleLogger;
   pluginWebSocket?: PluginWebSocket;
 }
@@ -57,9 +60,9 @@ export class PluginManager {
     error: string | null = null,
   ): Promise<void> {
     try {
-      await this.deps.prisma.installedPlugin.upsert({
-        where: { id: manifest.id },
-        create: {
+      await this.deps.db
+        .insert(installedPlugin)
+        .values({
           id: manifest.id,
           name: manifest.name,
           version: manifest.version,
@@ -69,21 +72,24 @@ export class PluginManager {
           error,
           manifest: manifest as unknown as object,
           enabled: state !== "error" && state !== "unloaded",
-        },
-        update: {
-          name: manifest.name,
-          version: manifest.version,
-          description: manifest.description ?? "",
-          author: manifest.author ?? "",
-          state,
-          error,
-          manifest: manifest as unknown as object,
-          // Don't overwrite `enabled` here — that's the user's
-          // sticky choice. enable() / disable() set it explicitly.
-          // The previous behaviour reset it on every boot, so a
-          // disabled plugin would re-enable as soon as discovery ran.
-        },
-      });
+        })
+        .onConflictDoUpdate({
+          target: installedPlugin.id,
+          set: {
+            name: manifest.name,
+            version: manifest.version,
+            description: manifest.description ?? "",
+            author: manifest.author ?? "",
+            state,
+            error,
+            manifest: manifest as unknown as object,
+            updatedAt: new Date(),
+            // Don't overwrite `enabled` here — that's the user's
+            // sticky choice. enable() / disable() set it explicitly.
+            // The previous behaviour reset it on every boot, so a
+            // disabled plugin would re-enable as soon as discovery ran.
+          },
+        });
     } catch (err) {
       this.deps.logger.error(`Failed to persist state for ${manifest.id}: ${(err as Error).message}`);
     }
@@ -91,10 +97,10 @@ export class PluginManager {
 
   private async persistEnabled(pluginId: string, enabled: boolean): Promise<void> {
     try {
-      await this.deps.prisma.installedPlugin.update({
-        where: { id: pluginId },
-        data: { enabled },
-      });
+      await this.deps.db
+        .update(installedPlugin)
+        .set({ enabled, updatedAt: new Date() })
+        .where(eq(installedPlugin.id, pluginId));
     } catch (err) {
       this.deps.logger.error(`Failed to update enabled for ${pluginId}: ${(err as Error).message}`);
     }
@@ -262,9 +268,9 @@ export class PluginManager {
 
     // Read sticky enabled-state from the DB so plugins that the admin
     // explicitly disabled stay disabled across restarts.
-    const installed = await this.deps.prisma.installedPlugin.findMany({
-      select: { id: true, enabled: true },
-    });
+    const installed = await this.deps.db
+      .select({ id: installedPlugin.id, enabled: installedPlugin.enabled })
+      .from(installedPlugin);
     const enabledMap = new Map(installed.map((p) => [p.id, p.enabled]));
 
     const entries = await fs.readdir(this.deps.pluginsDir, { withFileTypes: true });

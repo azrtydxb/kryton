@@ -1,10 +1,12 @@
 import path from "node:path";
 import fs from "node:fs/promises";
+import { eq } from "drizzle-orm";
 import type { FastifyPluginAsync } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { validatePluginId } from "../../../lib/pathUtils.js";
 import { NotFoundError, ValidationError, AppError } from "../../../lib/errors.js";
+import { installedPlugin } from "../../../db/schema/settings.js";
 import type { PluginManager } from "../services/manager.js";
 import type { PluginRegistryService } from "../services/registry.service.js";
 
@@ -258,7 +260,7 @@ export const pluginsRoutes = (deps: PluginsRoutesDeps): FastifyPluginAsync =>
       },
       async () => {
         try {
-          const installed = await app.prisma.installedPlugin.findMany();
+          const installed = await app.db.query.installedPlugin.findMany();
           return registry.checkForUpdates(
             installed.map((p) => ({ id: p.id, version: p.version })),
           );
@@ -388,7 +390,7 @@ export const pluginsRoutes = (deps: PluginsRoutesDeps): FastifyPluginAsync =>
             // Directory may not exist
           }
 
-          await app.prisma.installedPlugin.delete({ where: { id } });
+          await app.db.delete(installedPlugin).where(eq(installedPlugin.id, id));
           // Note: PluginStorage entries are intentionally kept to preserve user data
 
           return { id, state: "unloaded", uninstalled: true };
