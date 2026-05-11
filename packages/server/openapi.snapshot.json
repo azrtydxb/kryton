@@ -1161,6 +1161,516 @@
         ]
       }
     },
+    "/api/admin/tunnel/reconnect": {
+      "post": {
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "accepted": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "accepted"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Force a tunnel reconnect attempt (admin)",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/admin/tunnel/stats": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "window",
+            "required": false,
+            "schema": {
+              "default": "24h",
+              "enum": [
+                "24h",
+                "7d",
+                "30d"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "bytes_in": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "bytes_out": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "daily": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "bytes_in": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "bytes_out": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "date": {
+                            "type": "string"
+                          },
+                          "requests": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "date",
+                          "requests",
+                          "bytes_in",
+                          "bytes_out"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "requests": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "since": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    },
+                    "window": {
+                      "enum": [
+                        "24h",
+                        "7d",
+                        "30d"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "window",
+                    "requests",
+                    "bytes_in",
+                    "bytes_out",
+                    "daily",
+                    "since"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Get tunnel traffic stats (admin)",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/admin/tunnel/status": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        },
+                        "state": {
+                          "enum": [
+                            "idle"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "message"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "state": {
+                          "enum": [
+                            "connecting"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "state"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "connectedAt": {
+                          "maximum": 9007199254740991,
+                          "minimum": -9007199254740991,
+                          "type": "integer"
+                        },
+                        "sessionId": {
+                          "type": "string"
+                        },
+                        "state": {
+                          "enum": [
+                            "open"
+                          ],
+                          "type": "string"
+                        },
+                        "subdomain": {
+                          "type": "string"
+                        },
+                        "tokenExpiresAt": {
+                          "maximum": 9007199254740991,
+                          "minimum": -9007199254740991,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "subdomain",
+                        "sessionId",
+                        "connectedAt",
+                        "tokenExpiresAt"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "lastError": {
+                          "type": "string"
+                        },
+                        "nextAttemptAt": {
+                          "maximum": 9007199254740991,
+                          "minimum": -9007199254740991,
+                          "type": "integer"
+                        },
+                        "state": {
+                          "enum": [
+                            "backoff"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "nextAttemptAt",
+                        "lastError"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        },
+                        "reason": {
+                          "enum": [
+                            "invalid-jwt",
+                            "revoked-jwt",
+                            "subscription-inactive",
+                            "duplicate-instance",
+                            "unknown"
+                          ],
+                          "type": "string"
+                        },
+                        "state": {
+                          "enum": [
+                            "fatal"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "reason",
+                        "message"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "state": {
+                          "enum": [
+                            "closing"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "state"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Get tunnel status (admin)",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
+    "/api/admin/tunnel/token": {
+      "delete": {
+        "responses": {
+          "204": {
+            "description": "Default Response"
+          }
+        },
+        "summary": "Clear the tunnel JWT (admin)",
+        "tags": [
+          "platform"
+        ]
+      },
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "token": {
+                    "pattern": "^eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "token"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        },
+                        "state": {
+                          "enum": [
+                            "idle"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "message"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "state": {
+                          "enum": [
+                            "connecting"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "state"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "connectedAt": {
+                          "maximum": 9007199254740991,
+                          "minimum": -9007199254740991,
+                          "type": "integer"
+                        },
+                        "sessionId": {
+                          "type": "string"
+                        },
+                        "state": {
+                          "enum": [
+                            "open"
+                          ],
+                          "type": "string"
+                        },
+                        "subdomain": {
+                          "type": "string"
+                        },
+                        "tokenExpiresAt": {
+                          "maximum": 9007199254740991,
+                          "minimum": -9007199254740991,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "subdomain",
+                        "sessionId",
+                        "connectedAt",
+                        "tokenExpiresAt"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "lastError": {
+                          "type": "string"
+                        },
+                        "nextAttemptAt": {
+                          "maximum": 9007199254740991,
+                          "minimum": -9007199254740991,
+                          "type": "integer"
+                        },
+                        "state": {
+                          "enum": [
+                            "backoff"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "nextAttemptAt",
+                        "lastError"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        },
+                        "reason": {
+                          "enum": [
+                            "invalid-jwt",
+                            "revoked-jwt",
+                            "subscription-inactive",
+                            "duplicate-instance",
+                            "unknown"
+                          ],
+                          "type": "string"
+                        },
+                        "state": {
+                          "enum": [
+                            "fatal"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "reason",
+                        "message"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "state": {
+                          "enum": [
+                            "closing"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "state"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Set the tunnel JWT (admin)",
+        "tags": [
+          "platform"
+        ]
+      }
+    },
     "/api/admin/users": {
       "get": {
         "responses": {
