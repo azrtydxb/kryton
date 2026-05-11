@@ -1,26 +1,22 @@
 import { useState, useCallback, FormEvent, CSSProperties } from 'react';
 import { Settings, User, Fingerprint, Key, Shield, X, Palette } from 'lucide-react';
 
-const inputStyle: CSSProperties = {
-  background: 'var(--bg-2)',
-  borderColor: 'var(--line)',
-  color: 'var(--fg)',
-};
 const dialogStyle: CSSProperties = { background: 'var(--bg-1)' };
 const borderLine: CSSProperties = { borderColor: 'var(--line)' };
-const labelStyle: CSSProperties = { color: 'var(--fg-3)' };
-const headingStyle: CSSProperties = { color: 'var(--fg)' };
-const mutedStyle: CSSProperties = { color: 'var(--fg-3)' };
-const submitStyle: CSSProperties = {
-  background: 'var(--accent)',
-  color: '#fff',
-};
 const ghostHoverBase: CSSProperties = { color: 'var(--fg-3)' };
 import { authApi } from '../lib/api';
 import { PasskeyManagerContent } from '../components/Security/PasskeyManager';
 import { ApiKeyManager } from '../components/ApiKeys/ApiKeyManager';
 import { TwoFactorManager } from '../components/Security/TwoFactorManager';
 import { AppearanceSection } from '../components/Settings/AppearanceSection';
+import {
+  Section,
+  Field,
+  Toolbar,
+  inputStyle as kitInputStyle,
+  primaryBtn,
+  helpText,
+} from '../components/Settings/settings-kit';
 
 type Tab = 'profile' | 'appearance' | 'passkeys' | 'api-keys' | '2fa';
 
@@ -61,69 +57,76 @@ function ProfileSection() {
     }
   }, [currentPw, newPw, confirmPw]);
 
+  const focusRing = (e: React.FocusEvent<HTMLInputElement>): void => {
+    e.currentTarget.style.boxShadow = '0 0 0 2px var(--accent-soft)';
+  };
+  const blurRing = (e: React.FocusEvent<HTMLInputElement>): void => {
+    e.currentTarget.style.boxShadow = 'none';
+  };
+
   return (
-    <div className="max-w-sm space-y-4">
-      <div>
-        <h3 className="text-sm font-medium mb-1" style={headingStyle}>Change Password</h3>
-        <p className="text-xs" style={mutedStyle}>Update your account password.</p>
-      </div>
-      <form onSubmit={handlePasswordChange} className="space-y-3">
-        <div>
-          <label htmlFor="current-password" className="block text-xs mb-1" style={labelStyle}>Current Password</label>
-          <input
-            id="current-password"
-            type="password"
-            value={currentPw}
-            onChange={e => setCurrentPw(e.target.value)}
-            required
-            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none"
-            style={inputStyle}
-            onFocus={e => { e.currentTarget.style.boxShadow = '0 0 0 2px var(--accent-soft)'; }}
-            onBlur={e => { e.currentTarget.style.boxShadow = 'none'; }}
-          />
-        </div>
-        <div>
-          <label htmlFor="new-password" className="block text-xs mb-1" style={labelStyle}>New Password</label>
-          <input
-            id="new-password"
-            type="password"
-            value={newPw}
-            onChange={e => setNewPw(e.target.value)}
-            required
-            minLength={8}
-            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none"
-            style={inputStyle}
-            onFocus={e => { e.currentTarget.style.boxShadow = '0 0 0 2px var(--accent-soft)'; }}
-            onBlur={e => { e.currentTarget.style.boxShadow = 'none'; }}
-          />
-        </div>
-        <div>
-          <label htmlFor="confirm-password" className="block text-xs mb-1" style={labelStyle}>Confirm New Password</label>
-          <input
-            id="confirm-password"
-            type="password"
-            value={confirmPw}
-            onChange={e => setConfirmPw(e.target.value)}
-            required
-            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none"
-            style={inputStyle}
-            onFocus={e => { e.currentTarget.style.boxShadow = '0 0 0 2px var(--accent-soft)'; }}
-            onBlur={e => { e.currentTarget.style.boxShadow = 'none'; }}
-          />
-        </div>
-        {pwError && <div className="text-xs" style={{ color: 'var(--accent-danger)' }}>{pwError}</div>}
-        {pwSuccess && <div className="text-xs" style={{ color: 'var(--accent-good)' }}>Password changed successfully!</div>}
-        <div className="flex pt-1">
-          <button
-            type="submit"
-            disabled={pwLoading}
-            className="rounded-md text-sm font-medium transition-colors disabled:opacity-50"
-            style={{ ...submitStyle, padding: '8px 16px' }}
-          >
-            {pwLoading ? 'Changing...' : 'Change Password'}
-          </button>
-        </div>
-      </form>
+    <div style={{ color: 'var(--fg-1)', maxWidth: 420 }}>
+      <Section title="password">
+        <div style={helpText}>Update your account password.</div>
+        <form onSubmit={handlePasswordChange}>
+          <Field label="current password">
+            <input
+              id="current-password"
+              type="password"
+              value={currentPw}
+              onChange={(e) => setCurrentPw(e.target.value)}
+              required
+              style={kitInputStyle}
+              onFocus={focusRing}
+              onBlur={blurRing}
+            />
+          </Field>
+          <Field label="new password">
+            <input
+              id="new-password"
+              type="password"
+              value={newPw}
+              onChange={(e) => setNewPw(e.target.value)}
+              required
+              minLength={8}
+              style={kitInputStyle}
+              onFocus={focusRing}
+              onBlur={blurRing}
+            />
+          </Field>
+          <Field label="confirm new password">
+            <input
+              id="confirm-password"
+              type="password"
+              value={confirmPw}
+              onChange={(e) => setConfirmPw(e.target.value)}
+              required
+              style={kitInputStyle}
+              onFocus={focusRing}
+              onBlur={blurRing}
+            />
+          </Field>
+          {pwError && (
+            <div style={{ ...helpText, color: 'var(--accent-danger)', marginBottom: 8 }}>
+              {pwError}
+            </div>
+          )}
+          {pwSuccess && (
+            <div style={{ ...helpText, color: 'var(--accent-good)', marginBottom: 8 }}>
+              Password changed successfully.
+            </div>
+          )}
+          <Toolbar>
+            <button
+              type="submit"
+              disabled={pwLoading}
+              style={{ ...primaryBtn, opacity: pwLoading ? 0.6 : 1, cursor: pwLoading ? 'not-allowed' : 'pointer' }}
+            >
+              {pwLoading ? 'Changing…' : 'Change Password'}
+            </button>
+          </Toolbar>
+        </form>
+      </Section>
     </div>
   );
 }
