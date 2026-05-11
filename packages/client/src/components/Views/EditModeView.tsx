@@ -3,7 +3,6 @@ import { useDebouncedCallback } from 'use-debounce';
 import { FileNode } from '../../lib/api';
 import { Editor, type EditorCursorState, type EditorHandle, EditorTabStrip, ModePills } from '../Editor/Editor';
 import { Preview } from '../Preview/Preview';
-import { useUIStore } from '../../stores/uiStore';
 // OutgoingLinksPanel intentionally removed to match design handoff: the
 // editor surface has only the tab strip + body + EditorMeta (28px). Outgoing
 // link metadata is surfaced through EditorMeta's `N outgoing` token.
@@ -34,6 +33,8 @@ interface EditModeViewProps {
   /** retained for parent API compatibility; edit/split views don't render
      a backlinks panel — backlinks live inside the preview body's tail. */
   onNoteSelect?: (path: string) => void;
+  /** Close a tab by path. Handles next-focus / clearing the active note. */
+  onTabClose?: (path: string) => void;
   onLinkClick: (name: string) => void;
   onCreateNote: (name: string) => void;
 }
@@ -45,7 +46,7 @@ export function EditModeView({
   getCodeFenceRenderer,
   onAutoSave, onCancel, onToggleStar, onPdfExport,
   onContentChange, onCursorStateChange,
-  onLinkClick, onCreateNote, onNoteSelect,
+  onLinkClick, onCreateNote, onNoteSelect, onTabClose,
 }: EditModeViewProps) {
   const hasChanges = editContent !== originalContent;
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('unchanged');
@@ -136,13 +137,7 @@ export function EditModeView({
             activeTitle={activeNote.title}
             dirty={dirty}
             onSelect={(p) => onNoteSelect?.(p)}
-            onClose={(p) => {
-              const next = useUIStore.getState().closeTab(p);
-              if (p === activeNote.path) {
-                onCancel();
-                if (next) onNoteSelect?.(next);
-              }
-            }}
+            onClose={(p) => onTabClose?.(p)}
           />
         </div>
         <div style={{

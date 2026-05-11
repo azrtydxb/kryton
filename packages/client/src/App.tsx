@@ -209,6 +209,7 @@ function AppContent() {
     toggleStar,
     toggleActiveNoteStar,
     handleNoteSelect,
+    handleTabClose,
     handleLinkClick,
     handleCreateNoteFromLink,
     handleDailyNote,
@@ -360,6 +361,7 @@ function AppContent() {
                   onContentChange={setEditContent}
                   onCursorStateChange={setCursorState}
                   onNoteSelect={handleNoteSelect}
+                  onTabClose={handleTabClose}
                   onLinkClick={handleLinkClick}
                   onCreateNote={handleCreateNoteFromLink}
                 />
@@ -374,6 +376,7 @@ function AppContent() {
                   onToggleStar={toggleActiveNoteStar}
                   onPdfExport={handlePdfExport}
                   onNoteSelect={handleNoteSelect}
+                  onTabClose={handleTabClose}
                   onLinkClick={handleLinkClick}
                   onCreateNote={handleCreateNoteFromLink}
                   onRestored={() => notes.openNote(notes.activeNote!.path)}

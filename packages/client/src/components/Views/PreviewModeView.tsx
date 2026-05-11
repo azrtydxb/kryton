@@ -23,6 +23,8 @@ interface PreviewModeViewProps {
   /** retained for parent API compatibility; backlinks live inline at the
      bottom of the preview body, no separate rail. */
   onNoteSelect?: (path: string) => void;
+  /** Close a tab by path; routed up to handleTabClose. */
+  onTabClose?: (path: string) => void;
   onLinkClick: (name: string) => void;
   onCreateNote: (name: string) => void;
   onRestored?: () => void;
@@ -141,7 +143,7 @@ function VersionPreviewModal({ notePath, version, allNotes, onClose, onRestore }
 export function PreviewModeView({
   activeNote, isStarred, allNotes, previewRef,
   onEdit, onShare, onToggleStar,
-  onLinkClick, onCreateNote, onRestored, getCodeFenceRenderer, onNoteSelect,
+  onLinkClick, onCreateNote, onRestored, getCodeFenceRenderer, onNoteSelect, onTabClose,
 }: PreviewModeViewProps) {
   // History panel is controlled by the top-bar History button via the UI
   // store so it can be toggled both from the per-note "history" pill and
@@ -240,10 +242,7 @@ export function PreviewModeView({
             activeTitle={activeNote.title}
             dirty={false}
             onSelect={(p) => onNoteSelect?.(p)}
-            onClose={(p) => {
-              const next = useUIStore.getState().closeTab(p);
-              if (p === activeNote.path && next) onNoteSelect?.(next);
-            }}
+            onClose={(p) => onTabClose?.(p)}
           />
         </div>
         <div style={{

@@ -317,11 +317,11 @@ function Tab({ path, label, active, dirty, onSelect, onClose }: TabProps) {
 export function EditorTabStrip({ activePath, activeTitle, dirty, onSelect, onClose }: EditorTabStripProps) {
   const openTabs = useUIStore((s) => s.openTabs);
 
-  // Defensive: if the active note isn't yet in openTabs (e.g. very first
-  // render before handleNoteSelect's store mutation flushes), surface it
-  // anyway so the strip never looks empty while a note is loaded.
+  // If a load races ahead of the store update (active note set but tabs
+  // not yet flushed), surface the active path so the strip isn't briefly
+  // empty. Once openTabs catches up, this branch falls through to the
+  // store-driven list.
   const tabs = useMemo(() => {
-    if (openTabs.length === 0) return activePath ? [activePath] : [];
     if (activePath && !openTabs.includes(activePath)) return [...openTabs, activePath];
     return openTabs;
   }, [openTabs, activePath]);

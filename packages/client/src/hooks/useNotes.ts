@@ -134,6 +134,10 @@ export function useNotes(userId?: string) {
     setActiveNote(prev => prev ? { ...prev, content } : null);
   }, []);
 
+  const closeActiveNote = useCallback(() => {
+    setActiveNote(null);
+  }, []);
+
   return {
     tree,
     activeNote,
@@ -141,6 +145,7 @@ export function useNotes(userId?: string) {
     saving,
     error,
     openNote,
+    closeActiveNote,
     updateContent,
     setActiveNoteContent,
     createNote,
