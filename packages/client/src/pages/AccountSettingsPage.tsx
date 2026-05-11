@@ -113,12 +113,12 @@ function ProfileSection() {
         </div>
         {pwError && <div className="text-xs" style={{ color: 'var(--accent-danger)' }}>{pwError}</div>}
         {pwSuccess && <div className="text-xs" style={{ color: 'var(--accent-good)' }}>Password changed successfully!</div>}
-        <div className="flex gap-2 pt-1">
+        <div className="flex pt-1">
           <button
             type="submit"
             disabled={pwLoading}
-            className="flex-1 rounded-lg py-2 text-sm font-medium transition-colors disabled:opacity-50"
-            style={submitStyle}
+            className="rounded-md text-sm font-medium transition-colors disabled:opacity-50"
+            style={{ ...submitStyle, padding: '8px 16px' }}
           >
             {pwLoading ? 'Changing...' : 'Change Password'}
           </button>
@@ -162,19 +162,39 @@ export default function AccountSettingsPage({ onClose }: { onClose: () => void }
           </button>
         </div>
 
-        {/* Tabs — wider per-tab padding + explicit container gap so the
-            next tab's icon doesn't run into the previous tab's label. */}
-        <div className="flex border-b px-6 gap-4" style={borderLine}>
+        {/* Tabs — mode-pill pattern from prototype/app/graph.jsx: active tab
+            sits in an accent-soft tinted pill (no underline). Inactive tabs
+            are fg-3 with transparent bg. Container has its own subtle gap
+            and a single border-b for visual separation. */}
+        <div
+          className="flex items-center px-4 py-2 border-b"
+          style={{ ...borderLine, gap: 2 }}
+        >
           {TABS.map(t => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className="flex items-center gap-2 px-2 py-3 text-sm font-medium border-b-2 transition-colors"
-              style={tab === t.key
-                ? { borderColor: 'var(--accent)', color: 'var(--accent)' }
-                : { borderColor: 'transparent', color: 'var(--fg-3)' }}
+              className="flex items-center gap-1.5 text-sm font-medium transition-colors"
+              style={{
+                padding: '6px 10px',
+                borderRadius: 6,
+                background: tab === t.key ? 'var(--accent-soft)' : 'transparent',
+                color: tab === t.key ? 'var(--accent)' : 'var(--fg-3)',
+              }}
+              onMouseEnter={(e) => {
+                if (tab !== t.key) {
+                  e.currentTarget.style.background = 'var(--bg-hover)';
+                  e.currentTarget.style.color = 'var(--fg)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (tab !== t.key) {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.color = 'var(--fg-3)';
+                }
+              }}
             >
-              <t.icon size={16} />
+              <t.icon size={14} />
               {t.label}
             </button>
           ))}
