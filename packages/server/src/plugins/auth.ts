@@ -1,8 +1,10 @@
 import fp from "fastify-plugin";
 import type { FastifyRequest } from "fastify";
+import { eq } from "drizzle-orm";
 import { fromNodeHeaders } from "better-auth/node";
 import { createAuth, type Auth } from "../modules/identity/auth-config.js";
 import { AuthError, ForbiddenError } from "../lib/errors.js";
+import { user } from "../db/schema/auth.js";
 
 export interface AuthUser {
   id: string;
@@ -75,7 +77,6 @@ export const authPlugin = fp(async (app) => {
       if (request.authContext) return request.authContext;
 
       const authHeader = request.headers.authorization;
-      const prisma = app.prisma;
 
       // Personal Access Token (kryton_ prefix)
       if (authHeader?.startsWith("Bearer kryton_")) {
@@ -83,15 +84,15 @@ export const authPlugin = fp(async (app) => {
         const keyData = await app.identity.apiKey.validate(rawKey);
         if (!keyData) return null;
 
-        const user = await prisma.user.findUnique({
-          where: { id: keyData.userId },
-          select: { id: true, email: true, name: true, role: true, disabled: true },
+        const found = await app.db.query.user.findFirst({
+          where: eq(user.id, keyData.userId),
+          columns: { id: true, email: true, name: true, role: true, disabled: true },
         });
-        if (!user) return null;
-        if (user.disabled) throw new ForbiddenError("Account is disabled");
+        if (!found) return null;
+        if (found.disabled) throw new ForbiddenError("Account is disabled");
 
         const ctx: AuthContext = {
-          user: { id: user.id, email: user.email, name: user.name, role: user.role },
+          user: { id: found.id, email: found.email, name: found.name, role: found.role },
           apiKey: { id: keyData.keyId, scope: keyData.scope },
           agentId: null,
         };
@@ -104,9 +105,9 @@ export const authPlugin = fp(async (app) => {
         const rawToken = authHeader.slice(7);
         const agentValidation = await app.agents.service.validateToken(rawToken);
         if (agentValidation) {
-          const owner = await prisma.user.findUnique({
-            where: { id: agentValidation.ownerUserId },
-            select: { id: true, email: true, name: true, role: true, disabled: true },
+          const owner = await app.db.query.user.findFirst({
+            where: eq(user.id, agentValidation.ownerUserId),
+            columns: { id: true, email: true, name: true, role: true, disabled: true },
           });
           if (!owner) return null;
           if (owner.disabled) throw new ForbiddenError("Account is disabled");
@@ -229,4 +230,4 @@ export const authPlugin = fp(async (app) => {
       reply.send(buf);
     },
   });
-}, { name: "auth", dependencies: ["db", "prisma"] });
+}, { name: "auth", dependencies: ["db"] });

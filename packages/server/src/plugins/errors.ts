@@ -1,16 +1,36 @@
 import fp from "fastify-plugin";
 import { ZodError } from "zod";
 import { hasZodFastifySchemaValidationErrors } from "fastify-type-provider-zod";
-import { Prisma } from "../generated/prisma/client.js";
 import {
   AppError,
   classifyError,
   ConflictError,
-  NotFoundError,
 } from "../lib/errors.js";
 
 interface ErrorBody {
   error: { code: string; message: string; details?: unknown };
+}
+
+/**
+ * Minimal shape of a `pg` `DatabaseError`. We avoid importing the concrete
+ * class to keep this plugin decoupled from the driver package — any error
+ * with a string `code` from PostgreSQL will be matched (SQLSTATE codes).
+ */
+interface PgError {
+  code: string;
+  detail?: string;
+  table?: string;
+  constraint?: string;
+  column?: string;
+}
+
+function isPgError(err: unknown): err is PgError {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    typeof (err as { code: unknown }).code === "string"
+  );
 }
 
 function toErrorBody(err: AppError): ErrorBody {
@@ -23,14 +43,33 @@ function toErrorBody(err: AppError): ErrorBody {
   };
 }
 
-function mapPrismaError(err: Prisma.PrismaClientKnownRequestError): AppError {
+/**
+ * Map a Postgres `DatabaseError` (SQLSTATE) to our `AppError` hierarchy.
+ * Returns null when the code isn't a known constraint violation — the
+ * caller should fall through to generic error handling.
+ *
+ * P2025 (Prisma's "record not found") has no Postgres equivalent — Drizzle
+ * returns `undefined` / empty arrays for missing rows, so call sites raise
+ * `NotFoundError` themselves.
+ */
+function mapPgError(err: PgError): AppError | null {
   switch (err.code) {
-    case "P2002":
-      return new ConflictError("Resource already exists", { fields: err.meta?.target });
-    case "P2025":
-      return new NotFoundError();
+    case "23505": // unique_violation
+      return new ConflictError("Resource already exists", {
+        constraint: err.constraint,
+        detail: err.detail,
+      });
+    case "23503": // foreign_key_violation
+      return new ConflictError("Referenced resource does not exist", {
+        constraint: err.constraint,
+        detail: err.detail,
+      });
+    case "22001": // string_data_right_truncation
+      return classifyError(
+        new Error(err.detail ?? "Value too long for column"),
+      );
     default:
-      return classifyError(err);
+      return null;
   }
 }
 
@@ -72,10 +111,12 @@ export const errorsPlugin = fp(async (app) => {
       return;
     }
 
-    if (err instanceof Prisma.PrismaClientKnownRequestError) {
-      const mapped = mapPrismaError(err);
-      reply.status(mapped.statusCode).send(toErrorBody(mapped));
-      return;
+    if (isPgError(err)) {
+      const mapped = mapPgError(err);
+      if (mapped) {
+        reply.status(mapped.statusCode).send(toErrorBody(mapped));
+        return;
+      }
     }
 
     // Fastify rate-limit error
