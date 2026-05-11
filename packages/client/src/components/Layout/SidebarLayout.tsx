@@ -1,6 +1,7 @@
 import { FileNode } from '../../lib/api';
 import { Sidebar } from '../Sidebar/Sidebar';
 import { Icons } from '../Icons';
+import { formatShortcut } from '../../lib/platform';
 
 interface SharedNote {
   id: string;
@@ -67,7 +68,7 @@ export function SidebarLayout({
         <button
           type="button"
           aria-label="Expand sidebar"
-          title="Expand sidebar (⌘B)"
+          title={`Expand sidebar (${formatShortcut(['mod', 'B'])})`}
           onClick={() => setSidebarOpen(true)}
           style={{
             width: 26,

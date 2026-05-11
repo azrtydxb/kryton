@@ -6,11 +6,12 @@
  */
 import type { CSSProperties } from 'react';
 import { Icons } from '../Icons';
+import { formatShortcut } from '../../lib/platform';
 
 const monoFamily = 'var(--font-mono)';
 
 interface Shortcut {
-  keys: string[];
+  keys: string;
   label: string;
 }
 
@@ -27,16 +28,12 @@ const cardStyle: CSSProperties = {
 };
 
 export function EmptyStateView() {
-  const isMac =
-    typeof navigator !== 'undefined' && navigator.platform.toLowerCase().includes('mac');
-  const mod = isMac ? '⌘' : 'Ctrl';
-
   const shortcuts: Shortcut[] = [
-    { keys: [mod, 'N'], label: 'new note' },
-    { keys: [mod, 'P'], label: 'quick switcher' },
-    { keys: [mod, 'K'], label: 'search' },
-    { keys: [mod, 'B'], label: 'toggle sidebar' },
-    { keys: [mod, 'G'], label: 'graph view' },
+    { label: 'new note', keys: formatShortcut(['mod', 'N']) },
+    { label: 'quick switcher', keys: formatShortcut(['mod', 'P']) },
+    { label: 'search', keys: formatShortcut(['mod', 'K']) },
+    { label: 'toggle sidebar', keys: formatShortcut(['mod', 'B']) },
+    { label: 'graph view', keys: formatShortcut(['mod', 'G']) },
   ];
 
   return (
@@ -94,11 +91,11 @@ export function EmptyStateView() {
   );
 }
 
-function ShortcutRow({ keys, label }: { keys: string[]; label: string }) {
+function ShortcutRow({ keys, label }: { keys: string; label: string }) {
   return (
     <>
       <span style={{ textAlign: 'right' }}>
-        <span className="kbd">{keys.join('')}</span>
+        <span className="kbd">{keys}</span>
       </span>
       <span>{label}</span>
     </>

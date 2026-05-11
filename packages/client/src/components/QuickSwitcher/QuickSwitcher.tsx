@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { FileNode } from '../../lib/api';
 import { Icons } from '../Icons';
+import { formatShortcut } from '../../lib/platform';
 
 interface QuickSwitcherProps {
   notes: FileNode[];
@@ -64,9 +65,8 @@ export function QuickSwitcher({
   const [idx, setIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const isMac =
-    typeof navigator !== 'undefined' && navigator.platform.toLowerCase().includes('mac');
-  const mod = isMac ? '⌘' : 'Ctrl';
+  // Modifier glyph for the footer kbd badge (⌘ on mac, Ctrl elsewhere).
+  const mod = formatShortcut(['mod']);
 
   useEffect(() => {
     const t = setTimeout(() => inputRef.current?.focus(), 30);
@@ -81,35 +81,35 @@ export function QuickSwitcher({
         kind: 'command',
         icon: <Icons.Plus size={13} />,
         label: 'New note',
-        hint: `${mod}N`,
+        hint: formatShortcut(['mod', 'N']),
         onActivate: onNewNote,
       },
       {
         kind: 'command',
         icon: <Icons.FolderPlus size={13} />,
         label: 'New folder',
-        hint: `${mod}⇧N`,
+        hint: formatShortcut(['mod', 'shift', 'N']),
         onActivate: onNewFolder,
       },
       {
         kind: 'command',
         icon: <Icons.Calendar size={13} />,
         label: 'Daily note',
-        hint: `${mod}D`,
+        hint: formatShortcut(['mod', 'D']),
         onActivate: onDailyNote,
       },
       {
         kind: 'command',
         icon: <Icons.Network size={13} />,
         label: 'Graph view',
-        hint: `${mod}G`,
+        hint: formatShortcut(['mod', 'G']),
         onActivate: onGraphView,
       },
       {
         kind: 'command',
         icon: <Icons.Settings size={13} />,
         label: 'Settings',
-        hint: `${mod},`,
+        hint: formatShortcut(['mod', ',']),
         onActivate: onSettings,
       },
     ];

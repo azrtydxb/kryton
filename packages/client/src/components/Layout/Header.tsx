@@ -11,6 +11,7 @@ import { UserMenu } from './UserMenu';
 import { Icons } from '../Icons';
 import { usePrefs } from '../../stores/prefsStore';
 import { useUIStore } from '../../stores/uiStore';
+import { formatShortcut } from '../../lib/platform';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -35,7 +36,7 @@ interface HeaderProps {
   onNewNote?: () => void;
 }
 
-const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
+// isMac/modKey now live in lib/platform.ts — kept the import above.
 
 /**
  * Per-prototype breadcrumb:  `~/notes › <filename>.md`
@@ -147,7 +148,7 @@ export function Header({
   const setShowAccountSettings = useUIStore((s) => s.setShowAccountSettings);
   const historyDisabled = !activeNotePath;
 
-  const kbdLabel = isMac ? '⌘K' : 'Ctrl K';
+  const kbdLabel = formatShortcut(['mod', 'K']);
 
   return (
     <header
@@ -190,7 +191,7 @@ export function Header({
 
       {/* right cluster */}
       {onNewNote && (
-        <HeaderBtn onClick={onNewNote} title="New note (Ctrl+Shift+N)" ariaLabel="New note">
+        <HeaderBtn onClick={onNewNote} title={`New note (${formatShortcut(['mod', 'shift', 'N'])})`} ariaLabel="New note">
           <Icons.Plus size={14} />
         </HeaderBtn>
       )}

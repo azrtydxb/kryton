@@ -4,6 +4,7 @@ import { api, FileNode, TagData } from '../../lib/api';
 import { FileTree, FavoritesSection } from '@azrtydxb/ui';
 import { useUIStore } from '../../stores/uiStore';
 import { Icons } from '../Icons';
+import { formatShortcut } from '../../lib/platform';
 
 interface SharedNote {
   id: string;
@@ -351,7 +352,7 @@ export function Sidebar({
         {onCollapse && (
           <button
             onClick={onCollapse}
-            title="Collapse sidebar (⌘B)"
+            title={`Collapse sidebar (${formatShortcut(['mod', 'B'])})`}
             aria-label="Collapse sidebar"
             style={{
               width: 26, height: 26, borderRadius: 5,
@@ -421,7 +422,7 @@ export function Sidebar({
                     fontStyle: 'italic',
                   }}
                 >
-                  No favorites yet · ⌘⇧S
+                  No favorites yet · {formatShortcut(['mod', 'shift', 'S'])}
                 </div>
               ) : (
                 <FavoritesSection
@@ -442,7 +443,7 @@ export function Sidebar({
             label="Files"
             actions={
               <div style={{ display: 'flex', gap: 2 }}>
-                <IconBtn onClick={dispatchCreateRootFile} title="New note (Ctrl+Shift+N)">
+                <IconBtn onClick={dispatchCreateRootFile} title={`New note (${formatShortcut(['mod', 'shift', 'N'])})`}>
                   <Icons.Plus size={12} />
                 </IconBtn>
                 <IconBtn onClick={dispatchCreateRootFolder} title="New folder">
