@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, CSSProperties, FormEvent } from 'react';
 import {
   X, Users, Ticket, Settings, Trash2, ShieldCheck, ShieldOff,
-  UserX, UserCheck, Plus, Copy, Check, Key, Package,
+  UserX, UserCheck, Plus, Copy, Check, Key, Package, Globe,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { request } from '../lib/api';
 import { PluginsTab } from './PluginsTab';
+import { TunnelTab } from './TunnelTab';
 import { Section, Field, Toolbar } from '../components/Settings/settings-kit';
 import {
   helpText,
@@ -59,13 +60,14 @@ interface InviteCode {
   createdAt: string;
 }
 
-type Tab = 'users' | 'invites' | 'settings' | 'plugins';
+type Tab = 'users' | 'invites' | 'settings' | 'plugins' | 'tunnel';
 
 const TABS: { key: Tab; label: string; icon: typeof Users }[] = [
   { key: 'users', label: 'Users', icon: Users },
   { key: 'invites', label: 'Invite Codes', icon: Ticket },
   { key: 'settings', label: 'Settings', icon: Settings },
   { key: 'plugins', label: 'Plugins', icon: Package },
+  { key: 'tunnel', label: 'Tunnel', icon: Globe },
 ];
 
 export default function AdminPage({ onClose }: { onClose: () => void }) {
@@ -149,6 +151,7 @@ export default function AdminPage({ onClose }: { onClose: () => void }) {
           {tab === 'invites' && <InvitesSection />}
           {tab === 'settings' && <SettingsSection />}
           {tab === 'plugins' && <PluginsTab />}
+          {tab === 'tunnel' && <TunnelTab />}
         </div>
       </div>
     </div>
