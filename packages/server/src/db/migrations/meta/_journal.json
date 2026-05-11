@@ -15,6 +15,13 @@
       "when": 1778511771961,
       "tag": "0001_nebulous_red_shift",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778520744015,
+      "tag": "0002_huge_mariko_yashida",
+      "breakpoints": true
     }
   ]
 }
