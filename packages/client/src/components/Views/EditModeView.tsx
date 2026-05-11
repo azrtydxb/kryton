@@ -2,6 +2,7 @@ import { ComponentType, useRef, useState, useEffect } from 'react';
 import { useDebouncedCallback } from 'use-debounce';
 import { FileNode } from '../../lib/api';
 import { Editor, type EditorCursorState, type EditorHandle, EditorTabStrip, ModePills } from '../Editor/Editor';
+import { EditorToolbar } from '../Editor/EditorToolbar';
 import { Preview } from '../Preview/Preview';
 // OutgoingLinksPanel intentionally removed to match design handoff: the
 // editor surface has only the tab strip + body + EditorMeta (28px). Outgoing
@@ -169,6 +170,10 @@ export function EditModeView({
           pane has only the tab strip + mode pills above the body, no separate
           toolbar row. In-editor formatting goes through keyboard shortcuts;
           plugin-supplied buttons live in the status bar via PluginSlot. */}
+
+      {/* Formatting toolbar — shown only when the editor surface is active
+          (edit or split). Pure-preview mode hides it. */}
+      {showEditor && <EditorToolbar editorRef={editorRef} />}
 
       {/* Body */}
       <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
