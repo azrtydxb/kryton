@@ -24,6 +24,8 @@ export async function resetKnowledgeTestDb(handle: TestDbHandle): Promise<void> 
     TRUNCATE TABLE
       "GraphEdge",
       "SearchIndex",
+      "EmbedJob",
+      "NoteEmbeddingChunk",
       "NoteShare",
       "User"
     RESTART IDENTITY CASCADE
@@ -38,6 +40,13 @@ export interface KnowledgeTestAppOptions {
    * for any test that exercises the routes against a real DB.
    */
   dbHandle?: TestDbHandle;
+  /**
+   * Optionally decorate `app.embedderState`. Without this, the SearchService
+   * `enqueueEmbedJob` short-circuit reads `undefined` (treated as not "off"),
+   * so jobs ARE written. Pass `"off"` to verify the no-op path, or
+   * `"pgvector-local"` to verify jobs land without the real worker running.
+   */
+  embedderProvider?: "off" | "pgvector-local" | "novamem";
 }
 
 /**
@@ -54,6 +63,14 @@ export async function buildKnowledgeTestApp(
 
   if (opts.dbHandle) {
     app.decorate("db", opts.dbHandle.db);
+  }
+
+  if (opts.embedderProvider) {
+    app.decorate("embedderState", {
+      ready: false,
+      provider: opts.embedderProvider,
+      dimensions: 384,
+    });
   }
 
   const user = opts.user ?? null;
