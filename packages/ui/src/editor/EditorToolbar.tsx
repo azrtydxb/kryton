@@ -1,3 +1,15 @@
+/**
+ * EditorToolbar — formatting action bar for the NoteEditor.
+ *
+ * Decoupled from any specific editor engine: it fires `onCommand(commandName)`
+ * and consumers wire it to CodeMirror, a contenteditable, or an iframe-based
+ * editor. Includes a view-mode toggle (edit / split / preview).
+ *
+ * Styling matches the rest of the Kryton chrome — `--bg-1` surface with a
+ * `--line` bottom border, 36px tall, mono iconography, `--accent` hover tint.
+ * Tooltips come from the native `title` attribute and adapt to the OS
+ * (`⌘B` on macOS, `Ctrl+B` everywhere else).
+ */
 import * as React from "react";
 import {
   Bold,
@@ -21,27 +33,24 @@ import {
   Eye,
   Pencil,
 } from "lucide-react";
-import { cn } from "../lib/utils";
 
 export type ViewMode = "edit" | "preview" | "split";
 
+const IS_MAC =
+  typeof navigator !== "undefined" && navigator.platform.toLowerCase().includes("mac");
+const MOD = IS_MAC ? "⌘" : "Ctrl";
+const SHIFT = IS_MAC ? "⇧" : "Shift";
+const SEP = IS_MAC ? "" : "+";
+
+/** Format a keyboard shortcut hint for tooltips. */
+function kbd(...parts: string[]): string {
+  return parts.join(SEP);
+}
+
 export interface EditorToolbarProps {
-  /**
-   * Called when a formatting action should be applied. Receives a command
-   * string that consumers can map to their editor instance.
-   *
-   * Commands: `"bold"`, `"italic"`, `"strikethrough"`, `"code"`, `"link"`,
-   * `"image"`, `"heading1"`, `"heading2"`, `"heading3"`, `"ul"`, `"ol"`,
-   * `"checkbox"`, `"blockquote"`, `"hr"`, `"table"`, `"undo"`, `"redo"`.
-   */
   onCommand: (command: string) => void;
-  /**
-   * Called when the user requests a file upload (e.g. pasted/dropped image).
-   */
   onUploadImage?: (file: File) => void;
-  /** Current view mode. */
   viewMode?: ViewMode;
-  /** Called when the user toggles the view mode. */
   onViewModeChange?: (mode: ViewMode) => void;
   className?: string;
 }
@@ -57,18 +66,34 @@ function ToolbarButton({
   onClick: () => void;
   active?: boolean;
 }) {
+  const [hover, setHover] = React.useState(false);
+  const tinted = active || hover;
   return (
     <button
       type="button"
       onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
       aria-label={title}
+      aria-pressed={active}
       title={title}
-      className={cn(
-        "rounded p-1.5 transition-colors",
-        active
-          ? "bg-violet-500/20 text-violet-400"
-          : "text-gray-400 hover:bg-gray-700/50 hover:text-gray-200",
-      )}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: 28,
+        height: 28,
+        borderRadius: 6,
+        background: active
+          ? "var(--accent-soft)"
+          : hover
+            ? "var(--bg-hover)"
+            : "transparent",
+        color: tinted ? "var(--accent)" : "var(--fg-3)",
+        border: "none",
+        cursor: "pointer",
+        transition: "background 120ms, color 120ms",
+      }}
     >
       <Icon size={15} aria-hidden="true" />
     </button>
@@ -76,16 +101,19 @@ function ToolbarButton({
 }
 
 function ToolbarSep() {
-  return <div className="mx-0.5 h-4 w-px bg-gray-700/50" aria-hidden="true" />;
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        width: 1,
+        height: 18,
+        margin: "0 6px",
+        background: "var(--line)",
+      }}
+    />
+  );
 }
 
-/**
- * EditorToolbar — formatting action bar for the NoteEditor.
- *
- * Decoupled from any specific editor engine: it fires `onCommand(commandName)`
- * and consumers wire it to CodeMirror, a contenteditable, or an iframe-based
- * editor. Includes a view-mode toggle (edit / split / preview).
- */
 export function EditorToolbar({
   onCommand,
   onUploadImage,
@@ -106,26 +134,34 @@ export function EditorToolbar({
 
   return (
     <div
-      className={cn(
-        "flex shrink-0 flex-wrap items-center gap-0.5 border-b border-gray-700/50 bg-surface-900/80 px-2 py-1",
-        className,
-      )}
+      className={className}
       role="toolbar"
       aria-label="Editor formatting toolbar"
+      style={{
+        display: "flex",
+        flexWrap: "wrap",
+        alignItems: "center",
+        flexShrink: 0,
+        gap: 4,
+        height: 36,
+        padding: "0 8px",
+        background: "var(--bg-1)",
+        borderBottom: "1px solid var(--line)",
+      }}
     >
       {/* Hidden file input for image upload */}
       <input
         ref={fileInputRef}
         type="file"
         accept="image/*"
-        className="hidden"
+        style={{ display: "none" }}
         onChange={handleFileChange}
         aria-hidden="true"
       />
 
       {/* History */}
-      <ToolbarButton icon={Undo2} title="Undo (Ctrl+Z)" onClick={() => onCommand("undo")} />
-      <ToolbarButton icon={Redo2} title="Redo (Ctrl+Shift+Z)" onClick={() => onCommand("redo")} />
+      <ToolbarButton icon={Undo2} title={`Undo (${kbd(MOD, "Z")})`} onClick={() => onCommand("undo")} />
+      <ToolbarButton icon={Redo2} title={`Redo (${kbd(MOD, SHIFT, "Z")})`} onClick={() => onCommand("redo")} />
       <ToolbarSep />
 
       {/* Headings */}
@@ -135,8 +171,8 @@ export function EditorToolbar({
       <ToolbarSep />
 
       {/* Inline formatting */}
-      <ToolbarButton icon={Bold} title="Bold (Ctrl+B)" onClick={() => onCommand("bold")} />
-      <ToolbarButton icon={Italic} title="Italic (Ctrl+I)" onClick={() => onCommand("italic")} />
+      <ToolbarButton icon={Bold} title={`Bold (${kbd(MOD, "B")})`} onClick={() => onCommand("bold")} />
+      <ToolbarButton icon={Italic} title={`Italic (${kbd(MOD, "I")})`} onClick={() => onCommand("italic")} />
       <ToolbarButton icon={Strikethrough} title="Strikethrough" onClick={() => onCommand("strikethrough")} />
       <ToolbarButton icon={Code} title="Inline code" onClick={() => onCommand("code")} />
       <ToolbarSep />
@@ -156,7 +192,7 @@ export function EditorToolbar({
       {/* Lists */}
       <ToolbarButton icon={List} title="Bullet list" onClick={() => onCommand("ul")} />
       <ToolbarButton icon={ListOrdered} title="Numbered list" onClick={() => onCommand("ol")} />
-      <ToolbarButton icon={CheckSquare} title="Checkbox" onClick={() => onCommand("checkbox")} />
+      <ToolbarButton icon={CheckSquare} title="Task list" onClick={() => onCommand("checkbox")} />
       <ToolbarSep />
 
       {/* Block formatting */}
@@ -167,7 +203,7 @@ export function EditorToolbar({
       {/* View mode toggle */}
       {onViewModeChange && (
         <>
-          <div className="flex-1" />
+          <div style={{ flex: 1 }} />
           <ToolbarButton
             icon={Pencil}
             title="Edit mode"
