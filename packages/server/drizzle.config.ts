@@ -3,9 +3,8 @@ import { defineConfig } from "drizzle-kit";
 /**
  * Drizzle Kit configuration for schema generation, migrations, and studio.
  *
- * Uses POSTGRES_URL during Phase 1 (Drizzle scaffolded alongside Prisma+SQLite).
- * A later phase will consolidate to DATABASE_URL once the Prisma stack is
- * removed.
+ * Reads connection from POSTGRES_URL (the single DB env var consumed at
+ * runtime; DATABASE_URL was retired alongside Prisma in Phase 8).
  */
 export default defineConfig({
   schema: "./src/db/schema/index.ts",
@@ -13,7 +12,6 @@ export default defineConfig({
   dialect: "postgresql",
   dbCredentials: {
     url:
-      process.env.DATABASE_URL ??
       process.env.POSTGRES_URL ??
       "postgresql://kryton:kryton@localhost:5432/kryton",
   },

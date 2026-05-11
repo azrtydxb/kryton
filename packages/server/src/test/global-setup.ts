@@ -20,8 +20,19 @@ const MIGRATIONS_DIR = path.resolve(__dirname, "..", "db", "migrations");
  * URI via `process.env.TEST_DATABASE_URL` for subsequent test files. The
  * `build-test-app` helper promotes `TEST_DATABASE_URL` to `POSTGRES_URL` so
  * `dbPlugin` initialises against this container.
+ *
+ * If `TEST_DATABASE_URL` is already set (e.g. CI provides a Postgres service
+ * container), reuse that database instead of starting testcontainers. The
+ * caller is responsible for ensuring pgvector is installed and migrations are
+ * applied — in CI both happen in dedicated workflow steps before tests run.
  */
 export async function setup(): Promise<void> {
+  if (process.env.TEST_DATABASE_URL) {
+    // Reuse caller-provided database (CI service container). Migrations and
+    // pgvector are expected to already be applied.
+    return;
+  }
+
   container = await new PostgreSqlContainer("pgvector/pgvector:pg16")
     .withDatabase("kryton_test")
     .withUsername("kryton")
