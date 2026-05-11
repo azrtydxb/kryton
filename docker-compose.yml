@@ -1,13 +1,39 @@
 services:
+  postgres:
+    # pgvector/pgvector:pg16 is the upstream Postgres 16 image with pgvector
+    # pre-installed. The plan calls for postgres:16-alpine + pre-installed
+    # pgvector — that combination doesn't exist in a single official image,
+    # so we use the pgvector-maintained Postgres 16 image instead. The init
+    # script in ./packages/server/docker/postgres-init/ enables the extension.
+    image: pgvector/pgvector:pg16
+    environment:
+      - POSTGRES_USER=kryton
+      - POSTGRES_PASSWORD=kryton
+      - POSTGRES_DB=kryton
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./packages/server/docker/postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kryton -d kryton"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   kryton:
     build: .
     ports:
       - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
     volumes:
       - ./notes:/notes
       - kryton-data:/data
     environment:
       - DATABASE_URL=file:/data/kryton.db
+      - POSTGRES_URL=postgresql://kryton:kryton@postgres:5432/kryton
       # Required: generate with: openssl rand -hex 32
       - BETTER_AUTH_SECRET=change-me-use-openssl-rand-hex-32
       # Optional: set to your public URL for OAuth/passkey support
@@ -16,3 +42,4 @@ services:
 
 volumes:
   kryton-data:
+  postgres-data:

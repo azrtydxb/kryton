@@ -7,6 +7,7 @@ import { zodPlugin } from "./plugins/zod.js";
 import { telemetryPlugin } from "./plugins/telemetry.js";
 import { securityPlugin } from "./plugins/security.js";
 import { rateLimitPlugin } from "./plugins/rate-limit.js";
+import { dbPlugin } from "./plugins/db.js";
 import { prismaPlugin } from "./plugins/prisma.js";
 import { cedarPlugin } from "./plugins/cedar.js";
 import { authPlugin } from "./plugins/auth.js";
@@ -57,6 +58,9 @@ export async function buildApp({
   await app.register(telemetryPlugin);
   await app.register(securityPlugin, { config });
   await app.register(rateLimitPlugin, { config });
+  // Drizzle is registered BEFORE Prisma so the new data layer is available
+  // first; both coexist during Phase 1 of the Postgres + Drizzle migration.
+  await app.register(dbPlugin);
   await app.register(prismaPlugin);
   await app.register(cedarPlugin);
   await app.register(authPlugin);
