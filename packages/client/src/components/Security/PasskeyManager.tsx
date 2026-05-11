@@ -29,7 +29,7 @@ const inputStyle: CSSProperties = {
 
 const primaryBtnStyle: CSSProperties = {
   background: 'var(--accent)',
-  color: 'var(--accent-fg)',
+  color: '#fff',
 };
 
 const ghostBtnStyle: CSSProperties = {

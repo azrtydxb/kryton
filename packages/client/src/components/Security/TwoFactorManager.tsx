@@ -11,9 +11,16 @@ const inputStyle: CSSProperties = {
   color: 'var(--fg)',
 };
 
+// Primary CTA — solid accent. `--accent-fg` produces dark-on-light-violet
+// (WCAG AA, but visually weak); explicit `#fff` reads more clearly as a
+// primary action surface and matches the convention used elsewhere on the
+// app for "ready to commit" buttons.
 const primaryBtnStyle: CSSProperties = {
   background: 'var(--accent)',
-  color: 'var(--accent-fg)',
+  color: '#fff',
+  padding: '8px 16px',
+  borderRadius: 6,
+  fontWeight: 500,
 };
 
 const ghostBtnStyle: CSSProperties = {

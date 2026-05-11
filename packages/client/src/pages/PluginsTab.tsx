@@ -58,7 +58,7 @@ const inputStyle: CSSProperties = {
 
 const tabActiveStyle: CSSProperties = {
   background: 'var(--accent)',
-  color: 'var(--accent-fg)',
+  color: '#fff',
 };
 
 const tabInactiveStyle: CSSProperties = {
@@ -458,7 +458,7 @@ function InstallButton({
       onClick={onClick}
       disabled={disabled}
       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-      style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
+      style={{ background: 'var(--accent)', color: '#fff' }}
     >
       <Download size={13} />
       {label}
@@ -994,7 +994,7 @@ function PluginSettingsPanel({
                   onClick={save}
                   disabled={saving}
                   className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
-                  style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
+                  style={{ background: 'var(--accent)', color: '#fff' }}
                 >
                   <Save size={14} />
                   {saving ? 'Saving...' : 'Save'}

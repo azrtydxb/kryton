@@ -13,7 +13,7 @@ const headingStyle: CSSProperties = { color: 'var(--fg)' };
 const mutedStyle: CSSProperties = { color: 'var(--fg-3)' };
 const submitStyle: CSSProperties = {
   background: 'var(--accent)',
-  color: 'var(--accent-fg)',
+  color: '#fff',
 };
 const ghostHoverBase: CSSProperties = { color: 'var(--fg-3)' };
 import { authApi } from '../lib/api';
@@ -162,13 +162,14 @@ export default function AccountSettingsPage({ onClose }: { onClose: () => void }
           </button>
         </div>
 
-        {/* Tabs */}
-        <div className="flex border-b px-6" style={borderLine}>
+        {/* Tabs — wider per-tab padding + explicit container gap so the
+            next tab's icon doesn't run into the previous tab's label. */}
+        <div className="flex border-b px-6 gap-4" style={borderLine}>
           {TABS.map(t => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className="flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors"
+              className="flex items-center gap-2 px-2 py-3 text-sm font-medium border-b-2 transition-colors"
               style={tab === t.key
                 ? { borderColor: 'var(--accent)', color: 'var(--accent)' }
                 : { borderColor: 'transparent', color: 'var(--fg-3)' }}

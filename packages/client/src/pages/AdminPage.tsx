@@ -11,7 +11,7 @@ const inputSmallStyle: CSSProperties = {
   color: 'var(--fg)',
 };
 const ghostBtnStyle: CSSProperties = { color: 'var(--fg-3)' };
-const accentBtnStyle: CSSProperties = { background: 'var(--accent)', color: 'var(--accent-fg)' };
+const accentBtnStyle: CSSProperties = { background: 'var(--accent)', color: '#fff' };
 import { useAuth } from '../hooks/useAuth';
 import { request } from '../lib/api';
 import { X, Users, Ticket, Settings, Trash2, ShieldCheck, ShieldOff, UserX, UserCheck, Plus, Copy, Check, Key, Package } from 'lucide-react';
