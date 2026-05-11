@@ -47,8 +47,6 @@
     "build": "tsc -b && npm run copy-assets",
     "copy-assets": "node scripts/copy-assets.mjs",
     "clean": "rm -rf dist",
-    "generate": "tsx scripts/generate-schema.ts",
-    "verify-generated": "tsx scripts/verify-generated.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"

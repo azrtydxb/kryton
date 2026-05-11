@@ -40,13 +40,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # verify-generated step removed in phase 9: its input
-      # (packages/server/prisma/schema.prisma) was deleted in phase 8 along
-      # with the rest of Prisma. The committed generated files in
-      # packages/core/src/generated are now stable artifacts. A follow-up
-      # should either delete the scripts entirely or rewrite them to read
-      # from the drizzle schema.
-
       - name: Build shared packages (core, core-react, ui)
         run: npm run build:core
 

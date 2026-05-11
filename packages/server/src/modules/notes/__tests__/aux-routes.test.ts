@@ -67,8 +67,7 @@ async function buildAuxTestApp(
   };
   app.decorate("auth", authStub as never);
 
-  // Attachments now go through app.db / Drizzle directly. No prisma stub
-  // needed for these routes.
+  // Attachments go through app.db (Drizzle) directly.
 
   // Stub the cross-module decorators the routes consume.
   const userDirOf = async (userId: string): Promise<string> => {
