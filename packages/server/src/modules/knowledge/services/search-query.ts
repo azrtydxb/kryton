@@ -12,6 +12,10 @@ export interface SearchResult {
   modifiedAt: Date;
   isShared?: boolean;
   ownerUserId?: string;
+  /** Relevance score. ts_rank for lexical, cosine similarity for semantic. */
+  score?: number;
+  /** Index of the best-matching chunk (semantic only). */
+  chunkIndex?: number;
 }
 
 interface IndexRow {
@@ -21,10 +25,11 @@ interface IndexRow {
   content: string;
   tags: string;
   modifiedAt: Date;
+  rank?: number;
 }
 
 function rowToResult(r: IndexRow, query: string): SearchResult {
-  return {
+  const result: SearchResult = {
     path: r.notePath,
     title: r.title,
     snippet: query.trim()
@@ -33,6 +38,8 @@ function rowToResult(r: IndexRow, query: string): SearchResult {
     tags: parseTags(r.tags),
     modifiedAt: r.modifiedAt,
   };
+  if (typeof r.rank === "number") result.score = r.rank;
+  return result;
 }
 
 /**
@@ -67,10 +74,11 @@ export async function search(
         title,
         content,
         tags,
-        "modifiedAt"
+        "modifiedAt",
+        ts_rank(tsv, q) AS rank
       FROM "SearchIndex", websearch_to_tsquery('english', ${trimmed}) AS q
       WHERE "userId" = ${userId} AND tsv @@ q
-      ORDER BY ts_rank(tsv, q) DESC
+      ORDER BY rank DESC
       LIMIT ${limit}
     `)) as unknown as { rows: IndexRow[] };
     ownMapped = rows.rows.map((r) => rowToResult(r, trimmed));
@@ -125,7 +133,8 @@ export async function search(
             title,
             content,
             tags,
-            "modifiedAt"
+            "modifiedAt",
+            ts_rank(tsv, q) AS rank
           FROM "SearchIndex", websearch_to_tsquery('english', ${trimmed}) AS q
           WHERE tsv @@ q
             AND ("notePath", "userId") IN (
@@ -136,7 +145,7 @@ export async function search(
                 sql`, `,
               )}
             )
-          ORDER BY ts_rank(tsv, q) DESC
+          ORDER BY rank DESC
           LIMIT ${limit}
         `)) as unknown as { rows: IndexRow[] };
         rows = result.rows;

@@ -47,6 +47,26 @@ export interface KnowledgeTestAppOptions {
    * `"pgvector-local"` to verify jobs land without the real worker running.
    */
   embedderProvider?: "off" | "pgvector-local" | "novamem";
+  /**
+   * Optional full embedderState override. When set, this is decorated
+   * verbatim and takes precedence over `embedderProvider`. Useful for
+   * semantic search tests that need `ready: true` + a fake embedder.
+   */
+  embedderState?: {
+    ready: boolean;
+    provider: "off" | "pgvector-local" | "novamem";
+    model?: string;
+    dimensions: number;
+    embedder?: {
+      embed(texts: string[]): Promise<Float32Array[]>;
+      embedQuery(text: string): Promise<Float32Array>;
+      readonly model: string;
+      readonly dimensions: number;
+    };
+    worker?: {
+      pendingCount(userId?: string): Promise<number>;
+    };
+  };
 }
 
 /**
@@ -65,7 +85,9 @@ export async function buildKnowledgeTestApp(
     app.decorate("db", opts.dbHandle.db);
   }
 
-  if (opts.embedderProvider) {
+  if (opts.embedderState) {
+    app.decorate("embedderState", opts.embedderState as never);
+  } else if (opts.embedderProvider) {
     app.decorate("embedderState", {
       ready: false,
       provider: opts.embedderProvider,

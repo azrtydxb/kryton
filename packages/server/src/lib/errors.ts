@@ -57,6 +57,12 @@ export class InternalError extends AppError {
   }
 }
 
+export class ServiceUnavailableError extends AppError {
+  constructor(message = "Service unavailable", details?: unknown) {
+    super(message, 503, "SERVICE_UNAVAILABLE", details);
+  }
+}
+
 /**
  * Best-effort classifier for unknown errors. Used as a fallback when no
  * specific AppError subtype was thrown.
