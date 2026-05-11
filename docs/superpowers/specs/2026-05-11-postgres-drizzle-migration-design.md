@@ -1,7 +1,7 @@
 # Postgres + Drizzle Migration Design
 
 **Date**: 2026-05-11
-**Status**: Draft
+**Status**: Implemented (2026-05-11)
 **Mode**: Big-bang. No backwards compatibility. No data migration. Dev-only — nothing running in production.
 
 ## Problem
@@ -321,3 +321,15 @@ This sequencing keeps tests green at every commit and surfaces problems incremen
 - **Multi-region Postgres / read replicas / connection pooler (PgBouncer).** Not needed at current scale.
 - **Per-row security via Postgres RLS.** Kryton already enforces tenant isolation at the application layer; RLS is overkill until shared multi-tenant hosting becomes a concern.
 - **Database backup tooling.** Out of scope; users use their own Postgres backup tools.
+
+---
+
+## Implementation Notes (2026-05-11)
+
+The migration landed in ten phases on `feat/postgres-drizzle` (PR #109). A few intentional deviations from the original design are worth recording:
+
+- **Postgres image**: The plan called for `postgres:16-alpine` with pgvector preinstalled. That combination doesn't exist in a single official image, so the compose stack uses `pgvector/pgvector:pg16` instead. The init script under `packages/server/docker/postgres-init/` runs `CREATE EXTENSION IF NOT EXISTS vector;` on first boot.
+- **Env var name**: We chose `POSTGRES_URL` rather than reusing `DATABASE_URL`. Phase 8 dropped `DATABASE_URL` entirely (it was SQLite-shaped — `file:./data/kryton.db`) so a clean new name avoided every stale config carrying the wrong value forward.
+- **Testcontainers / CI reuse**: The vitest global-setup honours `TEST_DATABASE_URL`. When set (CI provides a Postgres service container), the global-setup skips booting its own testcontainer and reuses the externally-provisioned database. This avoids the ~6s container boot per CI run and the corresponding redundant pgvector install.
+- **Phase reordering**: Phase 7 (test infrastructure — testcontainers, transaction-per-test) was pulled forward to between original Phases 2 and 3 so that auth-adapter and module-rewrite phases could land with real DB-backed tests already in place. Phase 10 (Prisma deletion) was pulled forward to before the CI swap, so Phase 9 could land a CI pipeline that targets only Postgres rather than a transitional dual-stack one.
+- **Generated artifacts**: `packages/core/src/generated/{schema.sql,types.ts,entities.ts}` were originally produced by `packages/core/scripts/generate-schema.ts` reading `prisma/schema.prisma`. Prisma is gone, but those files are still consumed by `@azrtydxb/core` consumers, so they are now frozen committed artifacts. The codegen scripts (`generate-schema.ts`, `verify-generated.ts`, the entire `scripts/lib/` walker) and the SQLite-era `packages/server/scripts/migrate.mjs`/`migration-verify.ts` have been deleted.

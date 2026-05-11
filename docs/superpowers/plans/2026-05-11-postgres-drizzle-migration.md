@@ -1,5 +1,7 @@
 # Postgres + Drizzle Migration Implementation Plan
 
+**Status**: Implemented (2026-05-11). All ten phases complete; PR #109. See the spec's "Implementation Notes" section for deviations.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Spec**: [`2026-05-11-postgres-drizzle-migration-design.md`](../specs/2026-05-11-postgres-drizzle-migration-design.md)
@@ -50,9 +52,9 @@ DELETED:
 
 ## Worktree Setup
 
-- [ ] **Step 0.1: Use the `using-git-worktrees` skill** to create an isolated workspace for the `feat/postgres-drizzle` branch off `master`.
+- [x] **Step 0.1: Use the `using-git-worktrees` skill** to create an isolated workspace for the `feat/postgres-drizzle` branch off `master`.
 
-- [ ] **Step 0.2: Verify clean baseline.**
+- [x] **Step 0.2: Verify clean baseline.**
 
 Run: `pnpm test`
 Expected: all tests pass on master (the state immediately after PR 107 + PR 92 merged).
@@ -75,7 +77,7 @@ The goal of Phase 1 is to get Postgres running locally and Drizzle wired up, wit
 - Modify: `docker-compose.yml`
 - Create: `packages/server/docker/postgres-init/01-extensions.sql`
 
-- [ ] **Step 1.1: Install dependencies.**
+- [x] **Step 1.1: Install dependencies.**
 
 ```bash
 cd packages/server
@@ -83,7 +85,7 @@ pnpm add drizzle-orm pg
 pnpm add -D drizzle-kit @types/pg @testcontainers/postgresql
 ```
 
-- [ ] **Step 1.2: Create `drizzle.config.ts`.**
+- [x] **Step 1.2: Create `drizzle.config.ts`.**
 
 ```ts
 // packages/server/drizzle.config.ts
@@ -101,7 +103,7 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 1.3: Create `db/client.ts`.**
+- [x] **Step 1.3: Create `db/client.ts`.**
 
 ```ts
 // packages/server/src/db/client.ts
@@ -117,7 +119,7 @@ export function createDbClient(databaseUrl: string, poolSize = 10) {
 }
 ```
 
-- [ ] **Step 1.4: Create empty `db/schema/index.ts`.**
+- [x] **Step 1.4: Create empty `db/schema/index.ts`.**
 
 ```ts
 // packages/server/src/db/schema/index.ts
@@ -125,7 +127,7 @@ export function createDbClient(databaseUrl: string, poolSize = 10) {
 export {};
 ```
 
-- [ ] **Step 1.5: Create Fastify plugin `plugins/db.ts`.**
+- [x] **Step 1.5: Create Fastify plugin `plugins/db.ts`.**
 
 ```ts
 // packages/server/src/plugins/db.ts
@@ -151,9 +153,9 @@ export default fp(async (app) => {
 });
 ```
 
-- [ ] **Step 1.6: Register the plugin in `app.ts`.** Add `await app.register(dbPlugin)` before the Prisma plugin registration so Drizzle is available first.
+- [x] **Step 1.6: Register the plugin in `app.ts`.** Add `await app.register(dbPlugin)` before the Prisma plugin registration so Drizzle is available first.
 
-- [ ] **Step 1.7: Add Postgres service to `docker-compose.yml`.**
+- [x] **Step 1.7: Add Postgres service to `docker-compose.yml`.**
 
 ```yaml
 services:
@@ -184,14 +186,14 @@ volumes:
   kryton-pgdata:
 ```
 
-- [ ] **Step 1.8: Create the init script for `pgvector`.**
+- [x] **Step 1.8: Create the init script for `pgvector`.**
 
 ```sql
 -- packages/server/docker/postgres-init/01-extensions.sql
 CREATE EXTENSION IF NOT EXISTS vector;
 ```
 
-- [ ] **Step 1.9: Add `db:*` scripts to `packages/server/package.json`.**
+- [x] **Step 1.9: Add `db:*` scripts to `packages/server/package.json`.**
 
 ```json
 {
@@ -204,7 +206,7 @@ CREATE EXTENSION IF NOT EXISTS vector;
 }
 ```
 
-- [ ] **Step 1.10: Boot the Postgres container and verify connectivity.**
+- [x] **Step 1.10: Boot the Postgres container and verify connectivity.**
 
 ```bash
 docker compose up -d postgres
@@ -213,12 +215,12 @@ docker compose exec postgres psql -U kryton -d kryton -c "SELECT extname FROM pg
 
 Expected: `vector` listed alongside `plpgsql`.
 
-- [ ] **Step 1.11: Run the test suite to confirm no regressions.**
+- [x] **Step 1.11: Run the test suite to confirm no regressions.**
 
 Run: `pnpm test`
 Expected: all existing tests still pass (Prisma is still the active ORM; nothing app-level changed yet).
 
-- [ ] **Step 1.12: Commit.**
+- [x] **Step 1.12: Commit.**
 
 ```bash
 git add packages/server/package.json packages/server/drizzle.config.ts \
@@ -241,7 +243,7 @@ Translate the Prisma schema model-by-model into Drizzle table definitions. Group
 
 **Reference**: `packages/server/prisma/schema.prisma` is the source of truth for what each table needs.
 
-- [ ] **Step 2.1: Create the `tsvector` custom type.**
+- [x] **Step 2.1: Create the `tsvector` custom type.**
 
 ```ts
 // packages/server/src/db/types.ts
@@ -252,7 +254,7 @@ export const tsvector = customType<{ data: string; driverData: string }>({
 });
 ```
 
-- [ ] **Step 2.2: Translate auth tables into `schema/auth.ts`.**
+- [x] **Step 2.2: Translate auth tables into `schema/auth.ts`.**
 
 This is the most rule-bound file: better-auth has opinionated column names. Generate the schema using better-auth's CLI if available (`pnpm exec better-auth generate --adapter drizzle`); otherwise hand-translate following `packages/server/prisma/schema.prisma`'s `User`, `Session`, `Account`, `Verification`, `Passkey`, `TwoFactor`, `ApiKey` models.
 
@@ -260,9 +262,9 @@ Expose all tables + create a Drizzle `relations()` block defining the foreign-ke
 
 Re-export from `schema/index.ts`.
 
-- [ ] **Step 2.3: Translate `schema/settings.ts`** — `Settings`, `InstalledPlugin`, `PluginStorage`. Re-export.
+- [x] **Step 2.3: Translate `schema/settings.ts`** — `Settings`, `InstalledPlugin`, `PluginStorage`. Re-export.
 
-- [ ] **Step 2.4: Translate `schema/notes.ts`.**
+- [x] **Step 2.4: Translate `schema/notes.ts`.**
 
 Includes `SearchIndex` (now with the `tsvector` generated column for lexical search — see spec), `GraphEdge`, `NoteVersion`, `NoteRevision`, `Attachment`, `Folder`, `Tag`, `NoteTag`, `TrashItem`.
 
@@ -290,17 +292,17 @@ export const searchIndex = pgTable("SearchIndex", {
 
 Re-export from `schema/index.ts`.
 
-- [ ] **Step 2.5: Translate `schema/sharing.ts`** — `NoteShare`, `AccessRequest`, `InviteCode`. Re-export.
+- [x] **Step 2.5: Translate `schema/sharing.ts`** — `NoteShare`, `AccessRequest`, `InviteCode`. Re-export.
 
-- [ ] **Step 2.6: Translate `schema/sync.ts`** — `SyncDeletion`, `SyncCursor`, `YjsDocument`, `YjsUpdate`. The two Yjs tables use `bytea` columns (Drizzle `bytea` helper) for binary CRDT payloads. Re-export.
+- [x] **Step 2.6: Translate `schema/sync.ts`** — `SyncDeletion`, `SyncCursor`, `YjsDocument`, `YjsUpdate`. The two Yjs tables use `bytea` columns (Drizzle `bytea` helper) for binary CRDT payloads. Re-export.
 
-- [ ] **Step 2.7: Translate `schema/agents.ts`** — `Agent`, `AgentToken`. Re-export.
+- [x] **Step 2.7: Translate `schema/agents.ts`** — `Agent`, `AgentToken`. Re-export.
 
-- [ ] **Step 2.8: Declare relations in `schema/index.ts`.**
+- [x] **Step 2.8: Declare relations in `schema/index.ts`.**
 
 Drizzle's relational query API requires a `relations()` declaration per table that participates in joins. Walk the Prisma schema's relations and declare equivalents. Keep declarations next to the tables (each `schema/*.ts` file declares relations for its tables; `index.ts` re-exports).
 
-- [ ] **Step 2.9: Generate the initial migration.**
+- [x] **Step 2.9: Generate the initial migration.**
 
 ```bash
 cd packages/server
@@ -316,7 +318,7 @@ Eyeball the generated SQL. Common issues to fix at the schema level (not the SQL
 
 If the SQL is wrong, fix the schema and re-run `db:generate`. Never edit `0000_init.sql` by hand.
 
-- [ ] **Step 2.10: Apply the migration against the local Postgres.**
+- [x] **Step 2.10: Apply the migration against the local Postgres.**
 
 ```bash
 DATABASE_URL=postgres://kryton:kryton@localhost:5432/kryton pnpm db:migrate
@@ -330,7 +332,7 @@ docker compose exec postgres psql -U kryton -d kryton -c "\dt"
 
 Expected: 28 tables present.
 
-- [ ] **Step 2.11: Commit.**
+- [x] **Step 2.11: Commit.**
 
 ```bash
 git add packages/server/src/db/schema/ packages/server/src/db/types.ts \
@@ -353,7 +355,7 @@ with pgvector pre-installed."
 - Modify: `packages/server/src/auth/index.ts` (or wherever `betterAuth({...})` is configured)
 - Modify: `packages/server/src/plugins/auth.ts` (or equivalent)
 
-- [ ] **Step 3.1: Swap the adapter in the better-auth config.**
+- [x] **Step 3.1: Swap the adapter in the better-auth config.**
 
 ```ts
 // packages/server/src/auth/index.ts
@@ -372,18 +374,18 @@ export function createAuth(db: Db) {
 }
 ```
 
-- [ ] **Step 3.2: Update the auth plugin to construct the auth instance with `app.db` instead of `app.prisma`.**
+- [x] **Step 3.2: Update the auth plugin to construct the auth instance with `app.db` instead of `app.prisma`.**
 
-- [ ] **Step 3.3: Run the auth test suite.**
+- [x] **Step 3.3: Run the auth test suite.**
 
 Run: `pnpm test -- auth`
 Expected: every auth test still passes against Postgres (the existing tests touch the DB; they'll use the testcontainers harness once Phase 7 lands — for now, point them at the local docker compose Postgres).
 
-- [ ] **Step 3.4: Manual smoke test.**
+- [x] **Step 3.4: Manual smoke test.**
 
 Boot the server (`pnpm dev`), sign up a new user via the UI, log in, log out. Verify the rows landed in `User`, `Session`, `Account` tables (via `psql`).
 
-- [ ] **Step 3.5: Commit.**
+- [x] **Step 3.5: Commit.**
 
 ```bash
 git commit -m "feat(server): swap better-auth from prisma adapter to drizzle"
@@ -407,62 +409,62 @@ Group by directory and tackle one group per task.
 
 Most auth code already migrated in Phase 3, but check any direct Prisma calls in middleware, plugins, or session-handling utilities.
 
-- [ ] **Step 4.A.1:** `grep -rn "app\.prisma\." packages/server/src/auth/`. List call sites.
-- [ ] **Step 4.A.2:** Rewrite each using Drizzle's `db.select()` / `db.insert()` / `db.update()` / `db.delete()` builders. Use the schema imports.
-- [ ] **Step 4.A.3:** Run `pnpm test -- auth`. Expected pass.
-- [ ] **Step 4.A.4:** Commit `refactor(server/auth): migrate query layer to drizzle`.
+- [x] **Step 4.A.1:** `grep -rn "app\.prisma\." packages/server/src/auth/`. List call sites.
+- [x] **Step 4.A.2:** Rewrite each using Drizzle's `db.select()` / `db.insert()` / `db.update()` / `db.delete()` builders. Use the schema imports.
+- [x] **Step 4.A.3:** Run `pnpm test -- auth`. Expected pass.
+- [x] **Step 4.A.4:** Commit `refactor(server/auth): migrate query layer to drizzle`.
 
 ### Task 4.B: `modules/settings/`
 
-- [ ] **Step 4.B.1–4:** Audit, rewrite, test, commit. Same shape as 4.A.
+- [x] **Step 4.B.1–4:** Audit, rewrite, test, commit. Same shape as 4.A.
 
 ### Task 4.C: `modules/notes/` (largest)
 
 This is the highest-touch module. Subdivide if needed:
 
-- [ ] **Step 4.C.1:** Audit `packages/server/src/modules/notes/`. Expect 10–15 files.
-- [ ] **Step 4.C.2:** Convert `services/notes-service.ts` (or equivalent main service). Test.
-- [ ] **Step 4.C.3:** Convert `services/folder-service.ts`. Test.
-- [ ] **Step 4.C.4:** Convert `services/version-service.ts` (note versions / revisions). Test.
-- [ ] **Step 4.C.5:** Convert `services/attachment-service.ts`. Test.
-- [ ] **Step 4.C.6:** Convert `services/tag-service.ts`. Test.
-- [ ] **Step 4.C.7:** Convert `services/trash-service.ts`. Test.
-- [ ] **Step 4.C.8:** Convert `routes/*` (route handlers that touch Prisma directly). Test.
-- [ ] **Step 4.C.9:** Run full `pnpm test -- notes`. Expected pass.
-- [ ] **Step 4.C.10:** Commit `refactor(server/notes): migrate query layer to drizzle`.
+- [x] **Step 4.C.1:** Audit `packages/server/src/modules/notes/`. Expect 10–15 files.
+- [x] **Step 4.C.2:** Convert `services/notes-service.ts` (or equivalent main service). Test.
+- [x] **Step 4.C.3:** Convert `services/folder-service.ts`. Test.
+- [x] **Step 4.C.4:** Convert `services/version-service.ts` (note versions / revisions). Test.
+- [x] **Step 4.C.5:** Convert `services/attachment-service.ts`. Test.
+- [x] **Step 4.C.6:** Convert `services/tag-service.ts`. Test.
+- [x] **Step 4.C.7:** Convert `services/trash-service.ts`. Test.
+- [x] **Step 4.C.8:** Convert `routes/*` (route handlers that touch Prisma directly). Test.
+- [x] **Step 4.C.9:** Run full `pnpm test -- notes`. Expected pass.
+- [x] **Step 4.C.10:** Commit `refactor(server/notes): migrate query layer to drizzle`.
 
 ### Task 4.D: `modules/sharing/`
 
-- [ ] **Steps 4.D.1–4:** Audit, rewrite, test, commit.
+- [x] **Steps 4.D.1–4:** Audit, rewrite, test, commit.
 
 ### Task 4.E: `modules/sync/` (Yjs persistence + sync v2 cursors)
 
 The Yjs binary payloads need verification — `bytea` round-trips correctly via `pg` only if the Drizzle column type matches (`customType` of `bytea` returning a `Buffer`).
 
-- [ ] **Step 4.E.1:** Audit `packages/server/src/modules/sync/` and `modules/collab/`.
-- [ ] **Step 4.E.2:** Rewrite query sites.
-- [ ] **Step 4.E.3:** Write or run a smoke test: save a 1 MB Yjs update, read it back, assert bytes match.
-- [ ] **Step 4.E.4:** Run `pnpm test -- sync collab`. Expected pass.
-- [ ] **Step 4.E.5:** Commit `refactor(server/sync,collab): migrate query layer to drizzle`.
+- [x] **Step 4.E.1:** Audit `packages/server/src/modules/sync/` and `modules/collab/`.
+- [x] **Step 4.E.2:** Rewrite query sites.
+- [x] **Step 4.E.3:** Write or run a smoke test: save a 1 MB Yjs update, read it back, assert bytes match.
+- [x] **Step 4.E.4:** Run `pnpm test -- sync collab`. Expected pass.
+- [x] **Step 4.E.5:** Commit `refactor(server/sync,collab): migrate query layer to drizzle`.
 
 ### Task 4.F: `modules/agents/` (MCP)
 
-- [ ] **Steps 4.F.1–4:** Audit, rewrite, test, commit.
+- [x] **Steps 4.F.1–4:** Audit, rewrite, test, commit.
 
 ### Task 4.G: `modules/knowledge/` (search routes only; index manager comes out in Phase 5)
 
-- [ ] **Step 4.G.1:** Audit only the route handlers and helpers. Skip `services/search-index.ts` and `services/search-query.ts` — those die in Phase 5.
-- [ ] **Step 4.G.2:** Rewrite remaining call sites. Commit.
+- [x] **Step 4.G.1:** Audit only the route handlers and helpers. Skip `services/search-index.ts` and `services/search-query.ts` — those die in Phase 5.
+- [x] **Step 4.G.2:** Rewrite remaining call sites. Commit.
 
 ### Task 4.H: Plugins, middleware, miscellany
 
-- [ ] **Step 4.H.1:** Final audit. `grep -rn "app\.prisma\." packages/server/src` must return 0 results, **except** in `plugins/prisma.ts` (which stays until Phase 10).
-- [ ] **Step 4.H.2:** Run the entire server test suite.
+- [x] **Step 4.H.1:** Final audit. `grep -rn "app\.prisma\." packages/server/src` must return 0 results, **except** in `plugins/prisma.ts` (which stays until Phase 10).
+- [x] **Step 4.H.2:** Run the entire server test suite.
 
 Run: `pnpm test --workspace=packages/server`
 Expected: all tests pass.
 
-- [ ] **Step 4.H.3:** Commit any straggler conversions.
+- [x] **Step 4.H.3:** Commit any straggler conversions.
 
 ---
 
@@ -475,7 +477,7 @@ Expected: all tests pass.
 - Modify: `packages/server/src/app.ts` (remove MiniSearch warm-up hooks)
 - Modify: `packages/server/src/modules/knowledge/routes/search.routes.ts` (no change to public API contract)
 
-- [ ] **Step 5.1: Rewrite the search query.**
+- [x] **Step 5.1: Rewrite the search query.**
 
 ```ts
 // packages/server/src/modules/knowledge/services/search-query.ts
@@ -518,35 +520,35 @@ export async function search(db: Db, query: string, userId: string, limit = 50):
 
 Then also add a snippet generator that uses `ts_headline` (Postgres's native snippet extractor) instead of the manual snippet helper.
 
-- [ ] **Step 5.2: Update `search-helpers.ts` to use `ts_headline` for snippet rendering.** Or compute snippets in JS still, if the existing test suite asserts a specific format — preserve test compatibility.
+- [x] **Step 5.2: Update `search-helpers.ts` to use `ts_headline` for snippet rendering.** Or compute snippets in JS still, if the existing test suite asserts a specific format — preserve test compatibility.
 
-- [ ] **Step 5.3: Delete `search-index.ts`.**
+- [x] **Step 5.3: Delete `search-index.ts`.**
 
 ```bash
 git rm packages/server/src/modules/knowledge/services/search-index.ts
 ```
 
-- [ ] **Step 5.4: Delete `search-index-reconcile.ts`.**
+- [x] **Step 5.4: Delete `search-index-reconcile.ts`.**
 
 ```bash
 git rm packages/server/src/modules/notes/services/backfill/search-index-reconcile.ts
 ```
 
-- [ ] **Step 5.5: Remove MiniSearch warm-up hooks from `app.ts`** (the `SearchIndexManager` instantiation and any `buildIndex` calls during boot).
+- [x] **Step 5.5: Remove MiniSearch warm-up hooks from `app.ts`** (the `SearchIndexManager` instantiation and any `buildIndex` calls during boot).
 
-- [ ] **Step 5.6: Remove the `minisearch` dependency.**
+- [x] **Step 5.6: Remove the `minisearch` dependency.**
 
 ```bash
 cd packages/server
 pnpm remove minisearch
 ```
 
-- [ ] **Step 5.7: Run the search test suite.**
+- [x] **Step 5.7: Run the search test suite.**
 
 Run: `pnpm test -- search`
 Expected: all tests pass. If tests asserted MiniSearch-specific behaviors (e.g., fuzzy matching tolerance), they need to be re-pointed at Postgres FTS semantics — adjust expectations to match `websearch_to_tsquery` behavior (handles `"phrases"`, `OR`, `-exclude`).
 
-- [ ] **Step 5.8: Commit.**
+- [x] **Step 5.8: Commit.**
 
 ```bash
 git commit -m "refactor(server/knowledge): replace MiniSearch with postgres tsvector
@@ -565,7 +567,7 @@ Net code reduction: ~600 lines deleted, ~80 lines added."
 
 **Files:** (no source changes — this is verification)
 
-- [ ] **Step 6.1: Write an end-to-end Yjs persistence integration test** if one doesn't exist.
+- [x] **Step 6.1: Write an end-to-end Yjs persistence integration test** if one doesn't exist.
 
 ```ts
 // packages/server/src/modules/collab/__tests__/yjs-persistence.test.ts
@@ -585,15 +587,15 @@ it("round-trips Yjs updates through Postgres bytea", async () => {
 });
 ```
 
-- [ ] **Step 6.2: Run the test, observe pass.**
+- [x] **Step 6.2: Run the test, observe pass.**
 
-- [ ] **Step 6.3: Run the full collab test suite.** Expected: pass.
+- [x] **Step 6.3: Run the full collab test suite.** Expected: pass.
 
-- [ ] **Step 6.4: Manual smoke test.**
+- [x] **Step 6.4: Manual smoke test.**
 
 Two clients connect to the same note via WebSocket → both edit → close → reopen → verify content is intact. Verify the `YjsDocument` and `YjsUpdate` rows look correct in `psql`.
 
-- [ ] **Step 6.5: Commit any test additions.**
+- [x] **Step 6.5: Commit any test additions.**
 
 ```bash
 git commit -m "test(server/collab): yjs bytea round-trip integration test"
@@ -608,7 +610,7 @@ git commit -m "test(server/collab): yjs bytea round-trip integration test"
 - Modify: `packages/server/vitest.config.ts`
 - Create: `packages/server/src/test/global-setup.ts`
 
-- [ ] **Step 7.1: Add a global vitest setup that starts a shared Postgres container.**
+- [x] **Step 7.1: Add a global vitest setup that starts a shared Postgres container.**
 
 ```ts
 // packages/server/src/test/global-setup.ts
@@ -651,7 +653,7 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 7.2: Create a `withTransaction` helper for tests.**
+- [x] **Step 7.2: Create a `withTransaction` helper for tests.**
 
 ```ts
 // packages/server/src/test/db-fixture.ts
@@ -676,16 +678,16 @@ export function createTestDb() {
 }
 ```
 
-- [ ] **Step 7.3: Update test setup helpers to use the new fixture.** Convert any per-file `beforeAll` blocks that created SQLite files to use `createTestDb()`.
+- [x] **Step 7.3: Update test setup helpers to use the new fixture.** Convert any per-file `beforeAll` blocks that created SQLite files to use `createTestDb()`.
 
-- [ ] **Step 7.4: Run the full server test suite.**
+- [x] **Step 7.4: Run the full server test suite.**
 
 Run: `pnpm test --workspace=packages/server`
 Expected: all tests pass, slower than before but correct.
 
-- [ ] **Step 7.5: Re-enable file parallelism where safe.** If most tests use the transaction-per-test pattern, `fileParallelism: true` works. Tests that need committed state get a separate test container or run serially.
+- [x] **Step 7.5: Re-enable file parallelism where safe.** If most tests use the transaction-per-test pattern, `fileParallelism: true` works. Tests that need committed state get a separate test container or run serially.
 
-- [ ] **Step 7.6: Commit.**
+- [x] **Step 7.6: Commit.**
 
 ```bash
 git commit -m "test(server): migrate test harness to postgres testcontainers"
@@ -698,7 +700,7 @@ git commit -m "test(server): migrate test harness to postgres testcontainers"
 **Files:**
 - Modify: `.github/workflows/ci.yml`
 
-- [ ] **Step 8.1: Replace the "Prepare test database" step.**
+- [x] **Step 8.1: Replace the "Prepare test database" step.**
 
 ```yaml
 jobs:
@@ -732,9 +734,9 @@ jobs:
       # Drop the old "mkdir packages/server/data + prisma db push" step
 ```
 
-- [ ] **Step 8.2: Verify CI runs green** by pushing the branch and watching `gh pr checks`.
+- [x] **Step 8.2: Verify CI runs green** by pushing the branch and watching `gh pr checks`.
 
-- [ ] **Step 8.3: Commit.**
+- [x] **Step 8.3: Commit.**
 
 ```bash
 git commit -m "ci: switch test database from sqlite to postgres + pgvector"
@@ -750,7 +752,7 @@ git commit -m "ci: switch test database from sqlite to postgres + pgvector"
 - Modify: `docker-compose.yml` (final pass)
 - Modify: `.env.example`
 
-- [ ] **Step 9.1: Update `.env.example`.**
+- [x] **Step 9.1: Update `.env.example`.**
 
 ```bash
 DATABASE_URL=postgres://kryton:kryton@postgres:5432/kryton
@@ -760,7 +762,7 @@ MIGRATE_ON_BOOT=true
 
 Remove any `DATABASE_URL=file:./data/kryton.db` references.
 
-- [ ] **Step 9.2: Add `MIGRATE_ON_BOOT` handling to `app.ts`.**
+- [x] **Step 9.2: Add `MIGRATE_ON_BOOT` handling to `app.ts`.**
 
 ```ts
 if (process.env.MIGRATE_ON_BOOT === "true") {
@@ -770,11 +772,11 @@ if (process.env.MIGRATE_ON_BOOT === "true") {
 }
 ```
 
-- [ ] **Step 9.3: Update install docs.** Single-line change in most cases: "Kryton requires Postgres 16+ with the pgvector extension. The bundled `docker-compose.yml` provides this out of the box; for BYOPG set `DATABASE_URL`."
+- [x] **Step 9.3: Update install docs.** Single-line change in most cases: "Kryton requires Postgres 16+ with the pgvector extension. The bundled `docker-compose.yml` provides this out of the box; for BYOPG set `DATABASE_URL`."
 
-- [ ] **Step 9.4: Update `OPENAPI` env var docs if needed.** No semantic change, but the `.env` examples may show SQLite paths.
+- [x] **Step 9.4: Update `OPENAPI` env var docs if needed.** No semantic change, but the `.env` examples may show SQLite paths.
 
-- [ ] **Step 9.5: Test the full Docker stack.**
+- [x] **Step 9.5: Test the full Docker stack.**
 
 ```bash
 docker compose down -v
@@ -783,7 +785,7 @@ docker compose up --build
 
 Open the app, sign up, create a note. Verify it landed in Postgres.
 
-- [ ] **Step 9.6: Commit.**
+- [x] **Step 9.6: Commit.**
 
 ```bash
 git commit -m "chore: docker compose + docs reflect postgres-only setup"
@@ -801,7 +803,7 @@ git commit -m "chore: docker compose + docs reflect postgres-only setup"
 - Modify: `packages/server/src/app.ts` (remove prisma plugin registration)
 - Modify: any test file still importing from Prisma types
 
-- [ ] **Step 10.1: Confirm no remaining references.**
+- [x] **Step 10.1: Confirm no remaining references.**
 
 ```bash
 grep -rln "@prisma/client\|app\.prisma\|generated/prisma" packages/server/src
@@ -809,27 +811,27 @@ grep -rln "@prisma/client\|app\.prisma\|generated/prisma" packages/server/src
 
 Expected: 0 results.
 
-- [ ] **Step 10.2: Delete the directories.**
+- [x] **Step 10.2: Delete the directories.**
 
 ```bash
 git rm -r packages/server/prisma packages/server/src/generated/prisma packages/server/src/plugins/prisma.ts
 ```
 
-- [ ] **Step 10.3: Remove Prisma from dependencies.**
+- [x] **Step 10.3: Remove Prisma from dependencies.**
 
 ```bash
 cd packages/server
 pnpm remove @prisma/client prisma
 ```
 
-- [ ] **Step 10.4: Update `packages/server/package.json`** to remove any `prisma:generate`, `prisma:migrate`, etc., scripts.
+- [x] **Step 10.4: Update `packages/server/package.json`** to remove any `prisma:generate`, `prisma:migrate`, etc., scripts.
 
-- [ ] **Step 10.5: Run the full test suite.**
+- [x] **Step 10.5: Run the full test suite.**
 
 Run: `pnpm test --workspace=packages/server`
 Expected: pass.
 
-- [ ] **Step 10.6: Run lint + typecheck across the workspace.**
+- [x] **Step 10.6: Run lint + typecheck across the workspace.**
 
 ```bash
 pnpm run lint
@@ -839,18 +841,18 @@ pnpm --filter @azrtydxb/client typecheck
 
 Expected: zero warnings, zero errors.
 
-- [ ] **Step 10.7: Refresh the OpenAPI snapshot if any schema-derived response shapes drifted.**
+- [x] **Step 10.7: Refresh the OpenAPI snapshot if any schema-derived response shapes drifted.**
 
 ```bash
 pnpm --filter @azrtydxb/server openapi:dump
 git diff packages/server/openapi.snapshot.json   # eyeball
 ```
 
-- [ ] **Step 10.8: Final smoke test against the running stack.**
+- [x] **Step 10.8: Final smoke test against the running stack.**
 
 `docker compose up`. Walk every major user flow: sign up, log in, create a note, edit it, save, restore an old version, share a note, search (lexical), view the graph, install a plugin, run an agent.
 
-- [ ] **Step 10.9: Commit.**
+- [x] **Step 10.9: Commit.**
 
 ```bash
 git commit -m "chore(server): delete prisma — drizzle migration complete
@@ -866,18 +868,18 @@ this commit forward, drizzle-orm is Kryton's sole data layer."
 
 Before merging the branch to master, all of the following must hold:
 
-- [ ] `grep -rln "prisma\|@prisma" packages/server/src` returns 0 results
-- [ ] `grep -rln "MiniSearch\|minisearch" packages/server/src` returns 0 results
-- [ ] `pnpm test --workspace=packages/server` passes 100%
-- [ ] `pnpm run lint` passes with 0 warnings
-- [ ] `pnpm --filter @azrtydxb/server typecheck` passes
-- [ ] `pnpm --filter @azrtydxb/client typecheck` passes
-- [ ] `pnpm --filter @azrtydxb/server openapi:check` passes (snapshot up to date)
-- [ ] CI is green on the feature branch
-- [ ] `docker compose up` from a fresh clone succeeds — sign-up → log in → create note → search → version restore all work end-to-end
-- [ ] `packages/server/data/` directory no longer exists in `.gitignore` (it was SQLite-only)
-- [ ] `.env.example` documents `DATABASE_URL` for Postgres
-- [ ] Spec `2026-05-11-semantic-search-design.md` can be revisited and re-finalized against the now-real Drizzle/pgvector setup
+- [x] `grep -rln "prisma\|@prisma" packages/server/src` returns 0 results
+- [x] `grep -rln "MiniSearch\|minisearch" packages/server/src` returns 0 results
+- [x] `pnpm test --workspace=packages/server` passes 100%
+- [x] `pnpm run lint` passes with 0 warnings
+- [x] `pnpm --filter @azrtydxb/server typecheck` passes
+- [x] `pnpm --filter @azrtydxb/client typecheck` passes
+- [x] `pnpm --filter @azrtydxb/server openapi:check` passes (snapshot up to date)
+- [x] CI is green on the feature branch
+- [x] `docker compose up` from a fresh clone succeeds — sign-up → log in → create note → search → version restore all work end-to-end
+- [x] `packages/server/data/` directory no longer exists in `.gitignore` (it was SQLite-only)
+- [x] `.env.example` documents `DATABASE_URL` for Postgres
+- [x] Spec `2026-05-11-semantic-search-design.md` can be revisited and re-finalized against the now-real Drizzle/pgvector setup
 
 ## Finishing
 
