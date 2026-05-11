@@ -37,6 +37,9 @@ export function useAppCallbacks(state: AppState) {
   const handleNoteSelect = useCallback((path: string) => {
     if (!path.startsWith('shared:')) {
       notes.openNote(path);
+      // Keep the tab strip in sync — opening a note adds it (idempotent)
+      // and selecting an already-open one just leaves the tab where it is.
+      useUIStore.getState().openTab(path);
     }
     setEditing(false);
     setEditContent(null);

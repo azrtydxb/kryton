@@ -33,6 +33,10 @@ interface UIState {
   /** Per-note version-history dropdown — toggled by the top-bar History
    *  button when a note is active; consumed by PreviewModeView. */
   showNoteHistory: boolean;
+  /** Ordered list of note paths currently open in the tab strip.
+   *  Opening a note adds it (if absent) and makes it active; closing a tab
+   *  removes its path and falls back to the previous tab as active. */
+  openTabs: string[];
 
   // Editor
   cursorState: { line: number; col: number; wordCount: number };
@@ -57,6 +61,10 @@ interface UIState {
   setShowAccessRequests: SetState<boolean>;
   setShowAccountSettings: SetState<boolean>;
   setShowNoteHistory: SetState<boolean>;
+  /** Open or focus a tab for `path`. Appends if absent; idempotent. */
+  openTab: (path: string) => void;
+  /** Close the tab for `path`. Returns the next path to activate (or null). */
+  closeTab: (path: string) => string | null;
 
   // Compound actions
   enterEditMode: (content: string) => void;
@@ -92,6 +100,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   showAccessRequests: false,
   showAccountSettings: false,
   showNoteHistory: false,
+  openTabs: [],
   cursorState: { line: 1, col: 1, wordCount: 0 },
 
   // Setters — all support updater functions
@@ -115,6 +124,23 @@ export const useUIStore = create<UIState>((set, get) => ({
   setShowAccountSettings: (v) => set({ showAccountSettings: resolve(v, get().showAccountSettings) }),
   setShowNoteHistory: (v) => set({ showNoteHistory: resolve(v, get().showNoteHistory) }),
 
+  openTab: (path) => {
+    const tabs = get().openTabs;
+    if (tabs.includes(path)) return;
+    set({ openTabs: [...tabs, path] });
+  },
+  closeTab: (path) => {
+    const tabs = get().openTabs;
+    const idx = tabs.indexOf(path);
+    if (idx === -1) return null;
+    const next = tabs.filter((p) => p !== path);
+    set({ openTabs: next });
+    // Activate neighbour (prefer left, fall back to right) so the user
+    // doesn't drop into an empty view when closing the focused tab.
+    if (next.length === 0) return null;
+    return next[Math.max(0, idx - 1)] ?? next[0];
+  },
+
   enterEditMode: (content) => set({ editing: true, editContent: content, originalContent: content }),
   cancelEdit: () => set({ editing: false, editContent: null, originalContent: null }),
   reset: () => set({
@@ -135,6 +161,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     showAccessRequests: false,
     showAccountSettings: false,
     showNoteHistory: false,
+    openTabs: [],
     cursorState: { line: 1, col: 1, wordCount: 0 },
   }),
 }));

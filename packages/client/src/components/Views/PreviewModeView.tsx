@@ -239,6 +239,11 @@ export function PreviewModeView({
             activePath={activeNote.path}
             activeTitle={activeNote.title}
             dirty={false}
+            onSelect={(p) => onNoteSelect?.(p)}
+            onClose={(p) => {
+              const next = useUIStore.getState().closeTab(p);
+              if (p === activeNote.path && next) onNoteSelect?.(next);
+            }}
           />
         </div>
         <div style={{

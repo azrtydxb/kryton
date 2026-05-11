@@ -3,6 +3,7 @@ import { useDebouncedCallback } from 'use-debounce';
 import { FileNode } from '../../lib/api';
 import { Editor, type EditorCursorState, type EditorHandle, EditorTabStrip, ModePills } from '../Editor/Editor';
 import { Preview } from '../Preview/Preview';
+import { useUIStore } from '../../stores/uiStore';
 // OutgoingLinksPanel intentionally removed to match design handoff: the
 // editor surface has only the tab strip + body + EditorMeta (28px). Outgoing
 // link metadata is surfaced through EditorMeta's `N outgoing` token.
@@ -134,7 +135,14 @@ export function EditModeView({
             activePath={activeNote.path}
             activeTitle={activeNote.title}
             dirty={dirty}
-            onClose={onCancel}
+            onSelect={(p) => onNoteSelect?.(p)}
+            onClose={(p) => {
+              const next = useUIStore.getState().closeTab(p);
+              if (p === activeNote.path) {
+                onCancel();
+                if (next) onNoteSelect?.(next);
+              }
+            }}
           />
         </div>
         <div style={{

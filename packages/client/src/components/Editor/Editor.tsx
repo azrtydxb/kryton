@@ -1,6 +1,7 @@
 import {
   useRef,
   useState,
+  useMemo,
   useImperativeHandle,
   forwardRef,
   type CSSProperties,
@@ -8,6 +9,7 @@ import {
 import { EditorView, type EditorPlugin, type EditorState } from '@azrtydxb/ui';
 import { Icons } from '../Icons';
 import { usePrefs, type EditorLayout } from '../../stores/prefsStore';
+import { useUIStore } from '../../stores/uiStore';
 
 export interface EditorCursorState {
   line: number;
@@ -183,91 +185,172 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 /* -------------------------------------------------------------------------- */
 
 interface EditorTabStripProps {
+  /** Path of the currently-active tab. Comes from useAppState.notes.activeNote. */
   activePath: string;
+  /** Display title (used to derive the basename when the path lacks a .md). */
   activeTitle: string;
-  /** When true, the dirty-pulse dot is shown (replaces the "saved" check briefly). */
+  /** When true the active tab shows a saving-pulse instead of the green "saved" dot. */
   dirty?: boolean;
-  onClose?: () => void;
+  /** Called when the user selects a different tab. */
+  onSelect: (path: string) => void;
+  /** Called when the user closes a tab. */
+  onClose: (path: string) => void;
 }
 
-/**
- * Single-tab strip — the existing client only tracks one active note,
- * so we render a single tab. Designed to extend to multi-tab later.
- */
-export function EditorTabStrip({ activePath, activeTitle, dirty, onClose }: EditorTabStripProps) {
-  void dirty;
-  void onClose;
+function basenameOf(path: string, fallback: string): string {
+  const base = path.split('/').filter(Boolean).pop() || fallback;
+  return base.endsWith('.md') ? base : `${fallback}.md`;
+}
 
+interface TabProps {
+  path: string;
+  label: string;
+  active: boolean;
+  dirty: boolean;
+  onSelect: () => void;
+  onClose: () => void;
+}
+
+/** A single chip in the tab strip — file icon, basename, saved/saving pill, X. */
+function Tab({ path, label, active, dirty, onSelect, onClose }: TabProps) {
+  const [hovered, setHovered] = useState(false);
   return (
     <div
+      role="tab"
+      aria-selected={active}
+      onClick={onSelect}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      title={path}
       style={{
-        display: 'flex',
+        display: 'inline-flex',
         alignItems: 'center',
+        gap: 8,
         height: 38,
-        background: 'var(--bg)',
-        flexShrink: 0,
+        padding: '0 10px 0 12px',
+        cursor: active ? 'default' : 'pointer',
+        background: active ? 'var(--bg)' : 'transparent',
+        borderRight: '1px solid var(--line)',
+        color: active ? 'var(--fg)' : 'var(--fg-3)',
+        minWidth: 0,
+        maxWidth: 240,
       }}
     >
-      <div
+      <Icons.FileText size={13} style={{ color: active ? 'var(--accent)' : 'var(--fg-4)' }} />
+      <span
+        className="mono"
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          padding: '0 12px',
-          minWidth: 0,
-          maxWidth: 280,
+          fontFamily: 'var(--font-mono)',
+          fontSize: 12,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
         }}
       >
-        <Icons.FileText size={13} style={{ color: 'var(--accent)' }} />
-        <span
-          className="mono"
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 12,
-            color: 'var(--fg)',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-          title={activePath}
-        >
-          {(() => {
-            const basename = activePath.split('/').filter(Boolean).pop() || activeTitle;
-            return basename.endsWith('.md') ? basename : `${activeTitle}.md`;
-          })()}
-        </span>
-        {/* Saved-status pill per prototype/app/editor.jsx EditorTabBar — always
-            shows the green pulsing dot + literal "saved" label. */}
+        {label}
+      </span>
+      {active && (
         <span
           className="mono"
           style={{
             display: 'inline-flex',
             alignItems: 'center',
             gap: 4,
-            marginLeft: 4,
+            marginLeft: 2,
             padding: '2px 6px',
             borderRadius: 3,
             background: 'var(--bg-1)',
             border: '1px solid var(--line)',
             fontSize: 10,
-            fontFamily: 'var(--font-mono)',
             color: 'var(--fg-3)',
           }}
         >
           <span
-            className="dot pulse"
+            className={dirty ? 'dot pulse' : 'dot pulse'}
             style={{
               width: 5,
               height: 5,
               borderRadius: '50%',
-              background: 'var(--accent-good)',
+              background: dirty ? 'var(--accent-warn)' : 'var(--accent-good)',
               boxShadow: 'none',
             }}
             aria-hidden
           />
-          saved
+          {dirty ? 'saving' : 'saved'}
         </span>
-      </div>
+      )}
+      <button
+        type="button"
+        aria-label={`Close ${label}`}
+        title={`Close ${label}`}
+        onClick={(e) => { e.stopPropagation(); onClose(); }}
+        style={{
+          marginLeft: 2,
+          width: 18,
+          height: 18,
+          borderRadius: 3,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'transparent',
+          color: 'var(--fg-3)',
+          // Hide unless the tab is hovered or active — avoids visual clutter
+          // when many tabs are open and the user isn't aiming at any of them.
+          visibility: hovered || active ? 'visible' : 'hidden',
+          cursor: 'pointer',
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--fg)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-3)'; }}
+      >
+        <Icons.X size={10} />
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Multi-tab strip — renders every entry in `useUIStore.openTabs`. Clicking
+ * a tab activates its note via `onSelect`; clicking the X closes the tab
+ * and falls back to the previous tab as active (handled by the store's
+ * `closeTab` action which returns the next path to focus).
+ */
+export function EditorTabStrip({ activePath, activeTitle, dirty, onSelect, onClose }: EditorTabStripProps) {
+  const openTabs = useUIStore((s) => s.openTabs);
+
+  // Defensive: if the active note isn't yet in openTabs (e.g. very first
+  // render before handleNoteSelect's store mutation flushes), surface it
+  // anyway so the strip never looks empty while a note is loaded.
+  const tabs = useMemo(() => {
+    if (openTabs.length === 0) return activePath ? [activePath] : [];
+    if (activePath && !openTabs.includes(activePath)) return [...openTabs, activePath];
+    return openTabs;
+  }, [openTabs, activePath]);
+
+  if (tabs.length === 0) return null;
+
+  return (
+    <div
+      role="tablist"
+      style={{
+        display: 'flex',
+        alignItems: 'stretch',
+        height: 38,
+        background: 'var(--bg-1)',
+        flexShrink: 0,
+        overflowX: 'auto',
+      }}
+    >
+      {tabs.map((path) => (
+        <Tab
+          key={path}
+          path={path}
+          label={basenameOf(path, path === activePath ? activeTitle : (path.split('/').pop() || path).replace(/\.md$/, ''))}
+          active={path === activePath}
+          dirty={path === activePath && !!dirty}
+          onSelect={() => { if (path !== activePath) onSelect(path); }}
+          onClose={() => onClose(path)}
+        />
+      ))}
     </div>
   );
 }
