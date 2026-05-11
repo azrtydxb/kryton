@@ -29,6 +29,15 @@ export interface Painter {
   measureText(text: string, fontSize: number, fontFamily: string): number;
 }
 
+/**
+ * Local-mode tier:
+ *   "primary"   = active note + its 1-hop neighbours (full colour)
+ *   "secondary" = 2-hop neighbours (gray ghost dots)
+ *   "hidden"    = farther than 2 hops — not drawn
+ * In global mode every node is "primary" (no ghosting, no hiding).
+ */
+export type LocalTier = "primary" | "secondary" | "hidden";
+
 export interface SceneNode {
   node: GraphNode;
   position: NodePosition;
@@ -37,7 +46,7 @@ export interface SceneNode {
   isStarred: boolean;
   isShared: boolean;
   isVisible: boolean;
-  isInLocalSet: boolean;
+  tier: LocalTier;
 }
 
 export interface SceneEdge {
@@ -45,7 +54,7 @@ export interface SceneEdge {
   toPosition: NodePosition;
   isActive: boolean;
   isHovered: boolean;
-  isInLocalSet: boolean;
+  tier: LocalTier;
 }
 
 export interface Scene {
@@ -57,4 +66,17 @@ export interface Scene {
   theme: "light" | "dark";
   /** Mode-aware: local mode ghosts non-set elements. */
   mode: "global" | "local";
+  /** When true, draw every node's label. Otherwise labels render on hover/active only. */
+  showAllLabels?: boolean;
+  /** Optional design-token overrides resolved from CSS variables at draw time. */
+  tokens?: {
+    bg2: string;
+    fg1: string;
+    fg3: string;
+    fg4: string;
+    line: string;
+    accent: string;
+    accent2: string;
+    accentSoft: string;
+  };
 }

@@ -1,6 +1,7 @@
 import { FileNode } from '../../lib/api';
 import { Sidebar } from '../Sidebar/Sidebar';
 import { Icons } from '../Icons';
+import { formatShortcut } from '../../lib/platform';
 
 interface SharedNote {
   id: string;
@@ -41,7 +42,6 @@ interface SidebarLayoutProps {
 export function SidebarLayout({
   sidebarOpen, setSidebarOpen,
   mobileMenuOpen, setMobileMenuOpen,
-  sidebarWidth,
   tree, activeNotePath, starredPaths, sharedNotes,
   onSelect, onCreateNote, onDeleteNote, onRenameNote,
   onCreateFolder, onDeleteFolder, onRenameFolder,
@@ -49,6 +49,55 @@ export function SidebarLayout({
   onTagSelect,
   children,
 }: SidebarLayoutProps) {
+  // Desktop closed state: a narrow 36px rail with just the expand button so
+  // the user can re-open the sidebar (the bible's prototype omits this
+  // because it has no toggle; we keep it to stay reachable).
+  if (!sidebarOpen && !mobileMenuOpen) {
+    return (
+      <aside
+        className="hidden md:flex flex-shrink-0"
+        style={{
+          width: 36,
+          background: 'var(--bg-1)',
+          borderRight: '1px solid var(--line)',
+          flexDirection: 'column',
+          alignItems: 'center',
+          paddingTop: 10,
+        }}
+      >
+        <button
+          type="button"
+          aria-label="Expand sidebar"
+          title={`Expand sidebar (${formatShortcut(['mod', 'B'])})`}
+          onClick={() => setSidebarOpen(true)}
+          style={{
+            width: 26,
+            height: 26,
+            borderRadius: 5,
+            background: 'transparent',
+            border: '1px solid transparent',
+            color: 'var(--fg-3)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            transition: 'color 120ms, background 120ms',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = 'var(--fg)';
+            e.currentTarget.style.background = 'var(--bg-hover)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = 'var(--fg-3)';
+            e.currentTarget.style.background = 'transparent';
+          }}
+        >
+          <Icons.PanelLeft size={14} />
+        </button>
+      </aside>
+    );
+  }
+
   return (
     <>
       {/* Mobile overlay */}
@@ -60,43 +109,16 @@ export function SidebarLayout({
         />
       )}
 
-      {/* Collapsed bar (desktop only) — shown when the full sidebar is closed */}
-      <div
-        className={`hidden ${sidebarOpen ? 'md:hidden' : 'md:flex'} flex-col items-center flex-shrink-0`}
-        style={{
-          width: 36,
-          background: 'var(--bg-1)',
-          borderRight: '1px solid var(--line)',
-          padding: '6px 0',
-        }}
-      >
-        <button
-          onClick={() => setSidebarOpen(true)}
-          aria-label="Open sidebar"
-          title="Open sidebar (Ctrl+B)"
-          style={{
-            width: 28, height: 28, borderRadius: 5,
-            color: 'var(--fg-3)',
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--fg)'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-3)'; }}
-        >
-          <Icons.PanelLeft size={14} />
-        </button>
-      </div>
-
-      {/* Full sidebar */}
+      {/* Full sidebar — fixed 260px width per design */}
       <aside
         className={`
           ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
           md:translate-x-0
-          ${sidebarOpen ? '' : 'md:!w-0 md:overflow-hidden md:border-r-0'}
           fixed md:relative inset-y-0 left-0 z-40 md:z-0
           flex-shrink-0
         `}
         style={{
-          width: sidebarOpen ? `${sidebarWidth}px` : undefined,
+          width: '260px',
           background: 'var(--bg-1)',
           borderRight: '1px solid var(--line)',
           display: 'flex', flexDirection: 'column',

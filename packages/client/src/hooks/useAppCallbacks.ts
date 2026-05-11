@@ -37,12 +37,35 @@ export function useAppCallbacks(state: AppState) {
   const handleNoteSelect = useCallback((path: string) => {
     if (!path.startsWith('shared:')) {
       notes.openNote(path);
+      // Keep the tab strip in sync — opening a note adds it (idempotent)
+      // and selecting an already-open one just leaves the tab where it is.
+      useUIStore.getState().openTab(path);
     }
     setEditing(false);
     setEditContent(null);
     setOriginalContent(null);
     setMobileMenuOpen(false);
   }, [notes, setEditing, setEditContent, setOriginalContent, setMobileMenuOpen]);
+
+  /**
+   * Close the tab for `path` and pick the next tab (or empty state) to show.
+   * Centralised here so every view's tab strip uses the same flow.
+   */
+  const handleTabClose = useCallback((path: string) => {
+    const next = useUIStore.getState().closeTab(path);
+    if (path !== notes.activeNote?.path) return;
+    // We just closed the active tab. If there's a neighbour, focus it;
+    // otherwise clear the active note so the empty state renders and the
+    // tab strip collapses to zero.
+    if (next) {
+      notes.openNote(next);
+    } else {
+      notes.closeActiveNote();
+      setEditing(false);
+      setEditContent(null);
+      setOriginalContent(null);
+    }
+  }, [notes, setEditing, setEditContent, setOriginalContent]);
 
   const handleLinkClick = useCallback((noteName: string) => {
     const findNote = (nodes: typeof notes.tree): string | null => {
@@ -197,7 +220,8 @@ export function useAppCallbacks(state: AppState) {
 
   return {
     toggleStar, toggleActiveNoteStar,
-    handleNoteSelect, handleLinkClick, handleCreateNoteFromLink,
+    handleNoteSelect, handleTabClose,
+    handleLinkClick, handleCreateNoteFromLink,
     handleDailyNote, handleCreateFromTemplate, handleTemplateSelected,
     handleOutlineJump, handleNewNote, handleRenameNote, handlePdfExport,
     enterEditMode, saveEdit, saveEditInPlace, cancelEdit,

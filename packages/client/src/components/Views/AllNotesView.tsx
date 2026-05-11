@@ -84,9 +84,8 @@ const headerStyle: CSSProperties = {
   alignItems: 'center',
   gap: 10,
   height: 38,
-  padding: '0 14px',
+  padding: '0 16px',
   borderBottom: '1px solid var(--line)',
-  background: 'var(--bg-1)',
   flexShrink: 0,
 };
 
@@ -103,30 +102,14 @@ function segmentBtn(active: boolean): CSSProperties {
   return {
     padding: '3px 9px',
     borderRadius: 4,
-    fontSize: 11.5,
+    fontSize: 11,
     fontFamily: 'var(--font-mono)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.06em',
     color: active ? 'var(--accent)' : 'var(--fg-2)',
     background: active ? 'var(--accent-soft)' : 'transparent',
     border: 'none',
     cursor: 'pointer',
   };
 }
-
-const bottomRail: CSSProperties = {
-  height: 28,
-  padding: '0 14px',
-  borderTop: '1px solid var(--line)',
-  background: 'var(--bg-1)',
-  display: 'flex',
-  alignItems: 'center',
-  gap: 12,
-  fontFamily: 'var(--font-mono)',
-  fontSize: 11,
-  color: 'var(--fg-3)',
-  flexShrink: 0,
-};
 
 export function AllNotesView({
   tree,
@@ -180,11 +163,12 @@ export function AllNotesView({
       }}
     >
       <div style={headerStyle}>
-        <Icons.Inbox size={16} style={{ color: 'var(--fg-3)' }} />
+        <Icons.Inbox size={14} style={{ color: 'var(--accent)' }} />
         <span
+          className="mono"
           style={{
-            fontFamily: 'var(--font-sans)',
-            fontSize: 14,
+            fontFamily: 'var(--font-mono)',
+            fontSize: 13,
             color: 'var(--fg)',
           }}
         >
@@ -194,11 +178,8 @@ export function AllNotesView({
           className="mono"
           style={{
             fontFamily: 'var(--font-mono)',
-            fontSize: 11.5,
-            color: 'var(--fg-3)',
-            background: 'var(--bg-2)',
-            padding: '1px 6px',
-            borderRadius: 4,
+            fontSize: 11,
+            color: 'var(--fg-4)',
           }}
         >
           {notes.length}
@@ -228,8 +209,6 @@ export function AllNotesView({
             padding: '3px 8px',
             fontSize: 11.5,
             fontFamily: 'var(--font-mono)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.04em',
             cursor: 'pointer',
           }}
           aria-label="Sort notes"
@@ -273,7 +252,7 @@ export function AllNotesView({
                   alignItems: 'center',
                   width: '100%',
                   minHeight: rowHeight,
-                  padding: '8px 14px',
+                  padding: '11px 16px',
                   borderBottom: '1px solid var(--line)',
                   textAlign: 'left',
                   color: 'var(--fg-1)',
@@ -303,9 +282,9 @@ export function AllNotesView({
                   aria-label={n.starred ? 'Unstar' : 'Star'}
                 >
                   {n.starred ? (
-                    <Icons.StarOn size={13} style={{ color: 'var(--accent-warn)' }} />
+                    <Icons.StarOn size={12} style={{ color: 'var(--accent-warn)' }} />
                   ) : (
-                    <Icons.FileText size={13} style={{ color: 'var(--fg-3)' }} />
+                    <Icons.FileText size={12} style={{ color: 'var(--fg-3)' }} />
                   )}
                 </span>
                 <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -322,21 +301,19 @@ export function AllNotesView({
                   >
                     {n.title}
                   </div>
-                  {n.parent && (
-                    <div
-                      className="mono"
-                      style={{
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: 11,
-                        color: 'var(--fg-3)',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {n.parent}
-                    </div>
-                  )}
+                  <div
+                    className="mono"
+                    style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 11,
+                      color: 'var(--fg-3)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {n.path}
+                  </div>
                 </div>
                 <div style={{ display: 'flex', gap: 4 }}>
                   {n.tags.slice(0, 3).map((t) => (
@@ -427,21 +404,21 @@ export function AllNotesView({
                     className="mono"
                     style={{
                       fontFamily: 'var(--font-mono)',
-                      fontSize: 11,
+                      fontSize: 10.5,
                       color: 'var(--fg-3)',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
                     }}
                   >
-                    {n.parent || '/'}
+                    {n.path}
                   </span>
                 </div>
                 <div
                   style={{
                     fontFamily: 'var(--font-sans)',
                     fontSize: 14,
-                    fontWeight: 500,
+                    fontWeight: 600,
                     color: 'var(--fg)',
                     lineHeight: 1.3,
                   }}
@@ -470,12 +447,12 @@ export function AllNotesView({
                   className="mono"
                   style={{
                     fontFamily: 'var(--font-mono)',
-                    fontSize: 11,
-                    color: 'var(--fg-3)',
+                    fontSize: 10.5,
+                    color: 'var(--fg-4)',
                   }}
                 >
                   {n.words !== null && n.words !== undefined ? `${n.words}w · ` : ''}
-                  updated {formatDate(n.updated)}
+                  updated {n.updated !== null && n.updated !== undefined ? new Date(n.updated).toLocaleDateString() : '—'}
                 </div>
               </button>
             ))}
@@ -483,15 +460,6 @@ export function AllNotesView({
         )}
       </div>
 
-      <div style={bottomRail}>
-        <span>
-          {sorted.length} {sorted.length === 1 ? 'note' : 'notes'}
-        </span>
-        <span style={{ color: 'var(--fg-4)' }}>·</span>
-        <span>view: {view}</span>
-        <span style={{ color: 'var(--fg-4)' }}>·</span>
-        <span>sort: {sort}</span>
-      </div>
     </div>
   );
 }

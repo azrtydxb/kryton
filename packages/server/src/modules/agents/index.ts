@@ -2,6 +2,7 @@ import fp from "fastify-plugin";
 import type { FastifyPluginAsync } from "fastify";
 import { AgentService } from "./services/agent.service.js";
 import { agentsRoutes } from "./routes/agents.routes.js";
+import { agentsOnlineRoutes } from "./routes/agents-online.routes.js";
 import { sseMcpRoutes, streamableMcpRoutes } from "./mcp/server.js";
 
 declare module "fastify" {
@@ -17,6 +18,8 @@ const agentsModuleImpl: FastifyPluginAsync = async (app) => {
   app.decorate("agents", { service: agentService });
 
   await app.register(agentsRoutes({ agentService }), { prefix: "/api/agents" });
+  // Live MCP-session indicators for the sidebar agents-online footer.
+  await app.register(agentsOnlineRoutes, { prefix: "/api/agents" });
   // MCP transports — Streamable HTTP + SSE share /api/mcp.
   // Streamable HTTP owns POST/GET/DELETE on the bare prefix; SSE adds
   // GET /sse and POST /messages.

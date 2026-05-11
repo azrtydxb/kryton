@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useCallback, useState } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { AuthProvider } from './hooks/useAuth';
 import { PluginSlotRegistry, PluginProvider, usePluginSlots } from '@azrtydxb/ui';
 import { ClientPluginManager } from './plugins/PluginManager';
@@ -41,8 +41,9 @@ import { EmptyStateView } from './components/Views/EmptyStateView';
 import { ModalsContainer } from './components/Modals/ModalsContainer';
 import { ErrorToast } from './components/Toast/ErrorToast';
 import { ToastContainer } from './components/Toast/ToastContainer';
+import { NoteHistoryPopover } from './components/NoteHistoryPopover/NoteHistoryPopover';
 import { StatusBar } from './components/StatusBar/StatusBar';
-import { FileNode } from './lib/api';
+import { api, FileNode } from './lib/api';
 import LoginPage from './pages/LoginPage';
 
 export default function App() {
@@ -67,17 +68,70 @@ function AppStatusBar({
   noteContent: string | null;
 }) {
   const cursorState = useUIStore((s) => s.cursorState);
+  const editing = useUIStore((s) => s.editing);
 
-  // Derive outgoing-link and tag counts from the active note's content so the
-  // status bar tracks the live document, not just file metadata. Strip
-  // fenced code blocks first so wikilinks/hashtags inside snippets don't
-  // inflate the counts.
+  // Backlinks count is server-derived (live indexer); cached so the bar
+  // reflects current cross-references without forcing extra fetches.
+  const backlinksQuery = useQuery({
+    queryKey: ['backlinks-count', notePath],
+    queryFn: () => (notePath ? api.getBacklinks(notePath) : Promise.resolve([])),
+    enabled: !!notePath,
+    staleTime: 5_000,
+  });
+  const backlinksCount = backlinksQuery.data?.length ?? 0;
+
+  // Derive outgoing-link, tag, and word counts from the active note's content
+  // so the status bar tracks the live document. For the word count we strip
+  // every markdown syntax marker that a reader wouldn't count as a word —
+  // headings, list bullets, blockquote arrows, bold/italic emphasis,
+  // strikethroughs, inline code, code fences, and wiki/markdown link wrappers
+  // — so '# Title' counts as one word ('Title'), '**bold**' as one ('bold'),
+  // and '[link](url)' as one ('link').
   const { outgoing, tags, words } = useMemo(() => {
     if (!noteContent) return { outgoing: 0, tags: 0, words: 0 };
-    const stripped = noteContent.replace(/```[\s\S]*?```/g, '').replace(/`[^`]*`/g, '');
-    const outgoingMatches = stripped.match(/\[\[[^\]]+\]\]/g) || [];
-    const tagMatches = stripped.match(/(^|\s)#[A-Za-z][\w-]*/g) || [];
-    const wordMatches = stripped.match(/\S+/g) || [];
+    // Count outgoing wikilinks and tags from the raw text (before stripping
+    // markdown) since those constructs ARE the thing being counted.
+    const outgoingMatches = noteContent.match(/\[\[[^\]]+\]\]/g) || [];
+    const tagMatches = noteContent.match(/(^|\s)#[A-Za-z][\w-]*/g) || [];
+
+    // Word count uses a markdown-aware strip so syntax tokens don't pollute
+    // the result. Order matters: remove fences first, then inline markers.
+    const cleaned = noteContent
+      // Front-matter
+      .replace(/^---[\s\S]*?---\n*/m, '')
+      // Fenced code blocks
+      .replace(/```[\s\S]*?```/g, ' ')
+      // Inline code
+      .replace(/`[^`]*`/g, ' ')
+      // Wikilinks: [[Target|Label]] or [[Target]] → keep the visible label
+      .replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, '$2')
+      .replace(/\[\[([^\]]+)\]\]/g, '$1')
+      // Markdown links: [text](url) → text; image alts dropped entirely
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+      .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+      // Reference-style link targets like '[1]: http://…'
+      .replace(/^\s*\[[^\]]+\]:\s.*$/gm, '')
+      // HTML tags
+      .replace(/<[^>]+>/g, ' ')
+      // Heading markers '# ' '## ' …, list bullets '- ', '* ', '+ ',
+      // ordered-list markers '1. ', blockquote arrows '> '
+      .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+      .replace(/^\s*[-*+]\s+/gm, '')
+      .replace(/^\s*\d+\.\s+/gm, '')
+      .replace(/^\s*>\s?/gm, '')
+      // Horizontal rules
+      .replace(/^\s*([-*_])\1{2,}\s*$/gm, ' ')
+      // Emphasis markers (keep inner text)
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/__([^_]+)__/g, '$1')
+      .replace(/\*([^*]+)\*/g, '$1')
+      .replace(/_([^_]+)_/g, '$1')
+      // Strikethrough
+      .replace(/~~([^~]+)~~/g, '$1')
+      // Task list markers
+      .replace(/^\s*[-*+]?\s*\[[ xX]\]\s+/gm, '');
+
+    const wordMatches = cleaned.match(/[A-Za-z0-9][A-Za-z0-9'_-]*/g) || [];
     return {
       outgoing: outgoingMatches.length,
       tags: tagMatches.length,
@@ -90,10 +144,15 @@ function AppStatusBar({
       <PluginSlot slot="statusbar-left" />
       <StatusBar
         notePath={notePath}
-        line={cursorState.line}
-        col={cursorState.col}
-        wordCount={cursorState.wordCount || words}
+        // Ln/Col is only meaningful in edit mode (no cursor in preview).
+        line={editing ? cursorState.line : null}
+        col={editing ? cursorState.col : null}
+        // Editor's reported word count uses raw doc.split — prefer the
+        // preview-rendered count when not editing (or when the editor count
+        // is zero, e.g. fresh mount).
+        wordCount={editing && cursorState.wordCount ? cursorState.wordCount : words}
         outgoingCount={outgoing}
+        backlinksCount={backlinksCount}
         tagsCount={tags}
       />
       <PluginSlot slot="statusbar-right" />
@@ -105,10 +164,16 @@ function AppModals({
   noteTree,
   onTemplateSelected,
   onNoteSelect,
+  onNewNote,
+  onDailyNote,
+  onGraphView,
 }: {
   noteTree: FileNode[];
   onTemplateSelected: (content: string) => void;
   onNoteSelect: (path: string) => void;
+  onNewNote?: () => void;
+  onDailyNote?: () => void;
+  onGraphView?: () => void;
 }) {
   const showTemplatePicker = useUIStore((s) => s.showTemplatePicker);
   const setShowTemplatePicker = useUIStore((s) => s.setShowTemplatePicker);
@@ -142,6 +207,10 @@ function AppModals({
       onCloseShareDialog={() => setShowShareDialog(false)}
       onCloseAccessRequests={() => setShowAccessRequests(false)}
       onCloseAccountSettings={() => setShowAccountSettings(false)}
+      onNewNote={onNewNote}
+      onDailyNote={onDailyNote}
+      onGraphView={onGraphView}
+      onSettings={() => setShowAccountSettings(true)}
     />
   );
 }
@@ -188,6 +257,7 @@ function AppContent() {
     toggleStar,
     toggleActiveNoteStar,
     handleNoteSelect,
+    handleTabClose,
     handleLinkClick,
     handleCreateNoteFromLink,
     handleDailyNote,
@@ -234,8 +304,8 @@ function AppContent() {
 
   if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-white dark:bg-surface-950">
-        <div className="text-gray-500 dark:text-gray-400">Loading...</div>
+      <div className="h-screen flex items-center justify-center" style={{ background: 'var(--bg)' }}>
+        <div style={{ color: 'var(--fg-3)' }}>Loading...</div>
       </div>
     );
   }
@@ -245,7 +315,7 @@ function AppContent() {
   }
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-white dark:bg-surface-950">
+    <div className="h-screen flex flex-col overflow-hidden" style={{ background: 'var(--bg)' }}>
       <Header
         mobileMenuOpen={mobileMenuOpen}
         setMobileMenuOpen={setMobileMenuOpen}
@@ -310,7 +380,6 @@ function AppContent() {
                 starredPaths={starredPaths}
                 onNoteSelect={(p) => { handleNoteSelect(p); setView('note'); }}
                 fullscreen
-                mode="global"
               />
             ) : view === 'tags' ? (
               <TagsView
@@ -340,6 +409,7 @@ function AppContent() {
                   onContentChange={setEditContent}
                   onCursorStateChange={setCursorState}
                   onNoteSelect={handleNoteSelect}
+                  onTabClose={handleTabClose}
                   onLinkClick={handleLinkClick}
                   onCreateNote={handleCreateNoteFromLink}
                 />
@@ -354,6 +424,7 @@ function AppContent() {
                   onToggleStar={toggleActiveNoteStar}
                   onPdfExport={handlePdfExport}
                   onNoteSelect={handleNoteSelect}
+                  onTabClose={handleTabClose}
                   onLinkClick={handleLinkClick}
                   onCreateNote={handleCreateNoteFromLink}
                   onRestored={() => notes.openNote(notes.activeNote!.path)}
@@ -402,10 +473,18 @@ function AppContent() {
 
       <ToastContainer />
 
+      <NoteHistoryPopover
+        activePath={notes.activeNote?.path ?? null}
+        onRestored={() => notes.activeNote && notes.openNote(notes.activeNote.path)}
+      />
+
       <AppModals
         noteTree={notes.tree}
         onTemplateSelected={handleTemplateSelected}
         onNoteSelect={handleNoteSelect}
+        onNewNote={callbacks.handleNewNote}
+        onDailyNote={callbacks.handleDailyNote}
+        onGraphView={() => setView('graph')}
       />
     </div>
   );

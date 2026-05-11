@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import type { CSSProperties } from 'react';
 import {
   Search, Package, Download, RefreshCw, Trash2, Settings,
   CheckCircle, XCircle, AlertCircle, ChevronRight, ChevronDown,
@@ -42,6 +43,30 @@ function semverGt(a: string, b: string): boolean {
   return false;
 }
 
+/* ─────────────────────────── shared styles ─────────────────────────── */
+
+const surfaceBox: CSSProperties = {
+  background: 'var(--bg-2)',
+  borderColor: 'var(--line)',
+};
+
+const inputStyle: CSSProperties = {
+  background: 'var(--bg-2)',
+  borderColor: 'var(--line)',
+  color: 'var(--fg)',
+};
+
+const tabActiveStyle: CSSProperties = {
+  background: 'var(--accent)',
+  color: '#fff',
+};
+
+const tabInactiveStyle: CSSProperties = {
+  background: 'var(--bg-2)',
+  color: 'var(--fg-3)',
+  borderColor: 'var(--line)',
+};
+
 /* ═══════════════════════════════════════════════════════════════
    Main PluginsTab — sub-view switcher
 ═══════════════════════════════════════════════════════════════ */
@@ -64,26 +89,16 @@ export function PluginsTab() {
     <div>
       {/* Sub-view toggle */}
       <div className="flex gap-2 mb-6">
-        <button
+        <TabButton
+          active={subView === 'installed'}
           onClick={() => setSubView('installed')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            subView === 'installed'
-              ? 'bg-violet-600 text-white'
-              : 'bg-surface-800 text-gray-400 hover:text-gray-200 border border-gray-700/50'
-          }`}
-        >
-          Installed
-        </button>
-        <button
+          label="Installed"
+        />
+        <TabButton
+          active={subView === 'browse'}
           onClick={() => setSubView('browse')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            subView === 'browse'
-              ? 'bg-violet-600 text-white'
-              : 'bg-surface-800 text-gray-400 hover:text-gray-200 border border-gray-700/50'
-          }`}
-        >
-          Browse Registry
-        </button>
+          label="Browse Registry"
+        />
       </div>
 
       {subView === 'browse' && (
@@ -96,6 +111,32 @@ export function PluginsTab() {
         <InstalledPlugins onUninstalled={refreshInstalledIds} />
       )}
     </div>
+  );
+}
+
+function TabButton({
+  active,
+  onClick,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const style: CSSProperties = active
+    ? tabActiveStyle
+    : { ...tabInactiveStyle, color: hovered ? 'var(--fg)' : 'var(--fg-3)' };
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${active ? '' : 'border'}`}
+      style={style}
+    >
+      {label}
+    </button>
   );
 }
 
@@ -117,6 +158,8 @@ function RegistryBrowse({
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [installing, setInstalling] = useState<Set<string>>(new Set());
   const [installError, setInstallError] = useState<Record<string, string>>({});
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [clearHovered, setClearHovered] = useState(false);
 
   const fetchRegistry = useCallback(async () => {
     try {
@@ -172,7 +215,11 @@ function RegistryBrowse({
     return (
       <div className="space-y-3">
         {[1, 2, 3].map(i => (
-          <div key={i} className="h-24 rounded-lg bg-surface-800 animate-pulse border border-gray-700/30" />
+          <div
+            key={i}
+            className="h-24 rounded-lg animate-pulse border"
+            style={surfaceBox}
+          />
         ))}
       </div>
     );
@@ -180,9 +227,12 @@ function RegistryBrowse({
 
   if (error) {
     return (
-      <div className="px-4 py-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm flex items-center justify-between">
+      <div
+        className="px-4 py-3 border rounded-lg text-sm flex items-center justify-between"
+        style={{ background: 'color-mix(in oklch, var(--accent-danger) 10%, transparent)', borderColor: 'color-mix(in oklch, var(--accent-danger) 30%, transparent)', color: 'var(--accent-danger)' }}
+      >
         <span>{error}</span>
-        <button onClick={fetchRegistry} className="ml-3 text-red-300 hover:text-red-200 underline text-xs">
+        <button onClick={fetchRegistry} className="ml-3 underline text-xs" style={{ color: 'var(--accent-danger)' }}>
           Retry
         </button>
       </div>
@@ -194,18 +244,31 @@ function RegistryBrowse({
       {/* Search + tag filters */}
       <div className="mb-4 flex flex-col gap-3">
         <div className="relative">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Search
+            size={15}
+            className="absolute left-3 top-1/2 -translate-y-1/2"
+            style={{ color: 'var(--fg-3)' }}
+          />
           <input
             type="text"
             value={query}
             onChange={e => setQuery(e.target.value)}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setSearchFocused(false)}
             placeholder="Search plugins..."
-            className="w-full pl-9 pr-4 py-2 bg-surface-800 border border-gray-700/50 rounded-lg text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-violet-500/50"
+            className="w-full pl-9 pr-4 py-2 border rounded-lg text-sm focus:outline-none transition-colors"
+            style={{
+              ...inputStyle,
+              borderColor: searchFocused ? 'var(--accent)' : 'var(--line)',
+            }}
           />
           {query && (
             <button
               onClick={() => setQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200"
+              onMouseEnter={() => setClearHovered(true)}
+              onMouseLeave={() => setClearHovered(false)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
+              style={{ color: clearHovered ? 'var(--fg)' : 'var(--fg-3)' }}
             >
               <X size={13} />
             </button>
@@ -214,18 +277,12 @@ function RegistryBrowse({
         {allTags.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {allTags.map(tag => (
-              <button
+              <TagChip
                 key={tag}
+                tag={tag}
+                active={activeTag === tag}
                 onClick={() => setActiveTag(activeTag === tag ? null : tag)}
-                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                  activeTag === tag
-                    ? 'bg-violet-500/30 text-violet-300 border border-violet-500/50'
-                    : 'bg-gray-700/50 text-gray-400 border border-gray-700/30 hover:border-gray-600 hover:text-gray-300'
-                }`}
-              >
-                <Tag size={10} />
-                {tag}
-              </button>
+              />
             ))}
           </div>
         )}
@@ -233,7 +290,7 @@ function RegistryBrowse({
 
       {/* Plugin cards */}
       {filtered.length === 0 ? (
-        <div className="text-center text-gray-500 py-12 text-sm">
+        <div className="text-center py-12 text-sm" style={{ color: 'var(--fg-4)' }}>
           No plugins match your search.
         </div>
       ) : (
@@ -245,65 +302,167 @@ function RegistryBrowse({
             const incompatible = semverGt(plugin.minKrytonVersion, KRYTON_VERSION);
 
             return (
-              <div
+              <PluginCard
                 key={plugin.id}
-                className="flex items-start justify-between px-4 py-4 rounded-lg bg-surface-800 border border-gray-700/30 hover:border-gray-600/50 transition-colors"
-              >
-                <div className="flex items-start gap-3 flex-1 min-w-0">
-                  <div className="mt-0.5 p-2 rounded-lg bg-violet-500/10 text-violet-400 shrink-0">
-                    <Package size={16} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-medium text-white">{plugin.name}</span>
-                      <span className="text-xs text-gray-500">v{plugin.version}</span>
-                      <span className="text-xs text-gray-500">by {plugin.author}</span>
-                      {isInstalled && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-300">
-                          <CheckCircle size={10} />
-                          Installed
-                        </span>
-                      )}
-                      {incompatible && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/20 text-amber-300">
-                          <AlertCircle size={10} />
-                          Requires v{plugin.minKrytonVersion}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-400 mt-1 leading-relaxed">{plugin.description}</p>
-                    {plugin.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mt-2">
-                        {plugin.tags.map(tag => (
-                          <span key={tag} className="px-1.5 py-0.5 rounded text-xs bg-gray-700/50 text-gray-400">
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    {err && (
-                      <p className="text-xs text-red-400 mt-1">{err}</p>
-                    )}
-                  </div>
-                </div>
-                <div className="ml-4 shrink-0">
-                  {!isInstalled && (
-                    <button
-                      onClick={() => install(plugin.id)}
-                      disabled={isInstalling || incompatible}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 text-white text-xs font-medium hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      <Download size={13} />
-                      {isInstalling ? 'Installing...' : 'Install'}
-                    </button>
-                  )}
-                </div>
-              </div>
+                plugin={plugin}
+                isInstalled={isInstalled}
+                isInstalling={isInstalling}
+                err={err}
+                incompatible={incompatible}
+                onInstall={() => install(plugin.id)}
+              />
             );
           })}
         </div>
       )}
     </div>
+  );
+}
+
+function TagChip({
+  tag,
+  active,
+  onClick,
+}: {
+  tag: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const baseClass = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors border';
+  const style: CSSProperties = active
+    ? {
+      background: 'var(--accent-soft)',
+      color: 'var(--accent)',
+      borderColor: 'var(--accent)',
+    }
+    : {
+      background: 'var(--bg-2)',
+      color: hovered ? 'var(--fg)' : 'var(--fg-3)',
+      borderColor: hovered ? 'var(--line-strong)' : 'var(--line)',
+    };
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className={baseClass}
+      style={style}
+    >
+      <Tag size={10} />
+      {tag}
+    </button>
+  );
+}
+
+function PluginCard({
+  plugin,
+  isInstalled,
+  isInstalling,
+  err,
+  incompatible,
+  onInstall,
+}: {
+  plugin: RegistryPlugin;
+  isInstalled: boolean;
+  isInstalling: boolean;
+  err?: string;
+  incompatible: boolean;
+  onInstall: () => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="flex items-start justify-between px-4 py-4 rounded-lg border transition-colors"
+      style={{
+        background: 'var(--bg-2)',
+        borderColor: hovered ? 'var(--line-strong)' : 'var(--line)',
+      }}
+    >
+      <div className="flex items-start gap-3 flex-1 min-w-0">
+        <div
+          className="mt-0.5 p-2 rounded-lg shrink-0"
+          style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
+        >
+          <Package size={16} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-medium" style={{ color: 'var(--fg)' }}>{plugin.name}</span>
+            <span className="text-xs" style={{ color: 'var(--fg-4)' }}>v{plugin.version}</span>
+            <span className="text-xs" style={{ color: 'var(--fg-4)' }}>by {plugin.author}</span>
+            {isInstalled && (
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                style={{ background: 'color-mix(in oklch, var(--accent-good) 20%, transparent)', color: 'var(--accent-good)' }}
+              >
+                <CheckCircle size={10} />
+                Installed
+              </span>
+            )}
+            {incompatible && (
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                style={{ background: 'color-mix(in oklch, var(--accent-warn) 20%, transparent)', color: 'var(--accent-warn)' }}
+              >
+                <AlertCircle size={10} />
+                Requires v{plugin.minKrytonVersion}
+              </span>
+            )}
+          </div>
+          <p className="text-xs mt-1 leading-relaxed" style={{ color: 'var(--fg-3)' }}>{plugin.description}</p>
+          {plugin.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {plugin.tags.map(tag => (
+                <span
+                  key={tag}
+                  className="px-1.5 py-0.5 rounded text-xs"
+                  style={{ background: 'var(--bg-2)', color: 'var(--fg-3)' }}
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+          {err && (
+            <p className="text-xs mt-1" style={{ color: 'var(--accent-danger)' }}>{err}</p>
+          )}
+        </div>
+      </div>
+      <div className="ml-4 shrink-0">
+        {!isInstalled && (
+          <InstallButton
+            onClick={onInstall}
+            disabled={isInstalling || incompatible}
+            label={isInstalling ? 'Installing...' : 'Install'}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function InstallButton({
+  onClick,
+  disabled,
+  label,
+}: {
+  onClick: () => void;
+  disabled: boolean;
+  label: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      style={{ background: 'var(--accent)', color: '#fff' }}
+    >
+      <Download size={13} />
+      {label}
+    </button>
   );
 }
 
@@ -370,7 +529,11 @@ function InstalledPlugins({ onUninstalled }: { onUninstalled: () => void }) {
     return (
       <div className="space-y-3">
         {[1, 2].map(i => (
-          <div key={i} className="h-20 rounded-lg bg-surface-800 animate-pulse border border-gray-700/30" />
+          <div
+            key={i}
+            className="h-20 rounded-lg animate-pulse border"
+            style={surfaceBox}
+          />
         ))}
       </div>
     );
@@ -378,9 +541,12 @@ function InstalledPlugins({ onUninstalled }: { onUninstalled: () => void }) {
 
   if (error) {
     return (
-      <div className="px-4 py-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm flex items-center justify-between">
+      <div
+        className="px-4 py-3 border rounded-lg text-sm flex items-center justify-between"
+        style={{ background: 'color-mix(in oklch, var(--accent-danger) 10%, transparent)', borderColor: 'color-mix(in oklch, var(--accent-danger) 30%, transparent)', color: 'var(--accent-danger)' }}
+      >
         <span>{error}</span>
-        <button onClick={fetchAll} className="ml-3 text-red-300 hover:text-red-200 underline text-xs">
+        <button onClick={fetchAll} className="ml-3 underline text-xs" style={{ color: 'var(--accent-danger)' }}>
           Retry
         </button>
       </div>
@@ -389,7 +555,7 @@ function InstalledPlugins({ onUninstalled }: { onUninstalled: () => void }) {
 
   if (plugins.length === 0) {
     return (
-      <div className="text-center text-gray-500 py-12 text-sm">
+      <div className="text-center py-12 text-sm" style={{ color: 'var(--fg-4)' }}>
         No plugins installed yet. Browse the registry to find plugins.
       </div>
     );
@@ -416,7 +582,8 @@ function InstalledPlugins({ onUninstalled }: { onUninstalled: () => void }) {
           return (
             <div
               key={plugin.id}
-              className="px-4 py-4 rounded-lg bg-surface-800 border border-gray-700/30"
+              className="px-4 py-4 rounded-lg border"
+              style={surfaceBox}
             >
               <div className="flex items-start justify-between gap-3">
                 {/* Left: status dot + info */}
@@ -426,26 +593,29 @@ function InstalledPlugins({ onUninstalled }: { onUninstalled: () => void }) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-medium text-white">{plugin.name}</span>
-                      <span className="text-xs text-gray-500">v{plugin.version}</span>
-                      <span className="text-xs text-gray-500">by {plugin.author}</span>
+                      <span className="text-sm font-medium" style={{ color: 'var(--fg)' }}>{plugin.name}</span>
+                      <span className="text-xs" style={{ color: 'var(--fg-4)' }}>v{plugin.version}</span>
+                      <span className="text-xs" style={{ color: 'var(--fg-4)' }}>by {plugin.author}</span>
                       <StateLabel state={plugin.state} />
                       {update && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/20 text-amber-300">
+                        <span
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                          style={{ background: 'color-mix(in oklch, var(--accent-warn) 20%, transparent)', color: 'var(--accent-warn)' }}
+                        >
                           <AlertCircle size={10} />
                           v{update.latestVersion} available
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{plugin.description}</p>
+                    <p className="text-xs mt-0.5 leading-relaxed" style={{ color: 'var(--fg-3)' }}>{plugin.description}</p>
                     {isError && plugin.error && (
-                      <p className="text-xs text-red-400 mt-1 font-mono">{plugin.error}</p>
+                      <p className="text-xs mt-1 font-mono" style={{ color: 'var(--accent-danger)' }}>{plugin.error}</p>
                     )}
                     {err && (
-                      <p className="text-xs text-red-400 mt-1">{err}</p>
+                      <p className="text-xs mt-1" style={{ color: 'var(--accent-danger)' }}>{err}</p>
                     )}
                     {busy && (
-                      <p className="text-xs text-gray-500 mt-1">{busy}...</p>
+                      <p className="text-xs mt-1" style={{ color: 'var(--fg-4)' }}>{busy}...</p>
                     )}
                   </div>
                 </div>
@@ -454,13 +624,11 @@ function InstalledPlugins({ onUninstalled }: { onUninstalled: () => void }) {
                 <div className="flex items-center gap-1 shrink-0">
                   {/* Settings (only if plugin has settings) */}
                   {plugin.settings && plugin.settings.length > 0 && (
-                    <button
+                    <IconActionButton
                       onClick={() => setSettingsPlugin(plugin)}
-                      className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700/50 transition-colors"
                       title="Plugin settings"
-                    >
-                      <Settings size={15} />
-                    </button>
+                      icon={<Settings size={15} />}
+                    />
                   )}
 
                   {/* Enable / Disable toggle */}
@@ -468,32 +636,27 @@ function InstalledPlugins({ onUninstalled }: { onUninstalled: () => void }) {
                     <button
                       onClick={() => doAction(plugin.id, 'Enabling', () => api.enablePlugin(plugin.id))}
                       disabled={!!busy}
-                      className="p-1.5 rounded-lg text-green-400 hover:bg-green-500/10 transition-colors disabled:opacity-50"
+                      className="p-1.5 rounded-lg transition-colors disabled:opacity-50"
+                      style={{ color: 'var(--accent-good)' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in oklch, var(--accent-good) 10%, transparent)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
                       title="Enable plugin"
                     >
                       <ToggleLeft size={15} />
                     </button>
                   ) : (
-                    <button
+                    <DisableButton
                       onClick={() => doAction(plugin.id, 'Disabling', () => api.disablePlugin(plugin.id))}
                       disabled={!!busy}
-                      className="p-1.5 rounded-lg text-gray-400 hover:text-yellow-400 hover:bg-yellow-500/10 transition-colors disabled:opacity-50"
-                      title="Disable plugin"
-                    >
-                      <ToggleRight size={15} />
-                    </button>
+                    />
                   )}
 
                   {/* Reload */}
                   {isActive && (
-                    <button
+                    <ReloadButton
                       onClick={() => doAction(plugin.id, 'Reloading', () => api.reloadPlugin(plugin.id))}
                       disabled={!!busy}
-                      className="p-1.5 rounded-lg text-gray-400 hover:text-violet-400 hover:bg-violet-500/10 transition-colors disabled:opacity-50"
-                      title="Reload plugin"
-                    >
-                      <RotateCcw size={15} />
-                    </button>
+                    />
                   )}
 
                   {/* Update */}
@@ -501,7 +664,10 @@ function InstalledPlugins({ onUninstalled }: { onUninstalled: () => void }) {
                     <button
                       onClick={() => doAction(plugin.id, 'Updating', () => api.updatePlugin(plugin.id))}
                       disabled={!!busy}
-                      className="p-1.5 rounded-lg text-amber-400 hover:bg-amber-500/10 transition-colors disabled:opacity-50"
+                      className="p-1.5 rounded-lg transition-colors disabled:opacity-50"
+                      style={{ color: 'var(--accent-warn)' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in oklch, var(--accent-warn) 10%, transparent)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
                       title={`Update to v${update.latestVersion}`}
                     >
                       <RefreshCw size={15} />
@@ -513,22 +679,21 @@ function InstalledPlugins({ onUninstalled }: { onUninstalled: () => void }) {
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => uninstall(plugin.id)}
-                        className="px-2 py-1 rounded text-xs bg-red-500 text-white hover:bg-red-600 transition-colors"
+                        className="px-2 py-1 rounded text-xs transition-colors"
+                        style={{ background: 'var(--accent-danger)', color: 'var(--fg)' }}
                       >
                         Confirm
                       </button>
-                      <button
-                        onClick={() => setConfirmUninstall(null)}
-                        className="px-2 py-1 rounded text-xs text-gray-400 hover:text-white transition-colors"
-                      >
-                        Cancel
-                      </button>
+                      <CancelButton onClick={() => setConfirmUninstall(null)} />
                     </div>
                   ) : (
                     <button
                       onClick={() => setConfirmUninstall(plugin.id)}
                       disabled={!!busy}
-                      className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                      className="p-1.5 rounded-lg transition-colors disabled:opacity-50"
+                      style={{ color: 'var(--accent-danger)' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in oklch, var(--accent-danger) 10%, transparent)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
                       title="Uninstall plugin"
                     >
                       <Trash2 size={15} />
@@ -544,22 +709,124 @@ function InstalledPlugins({ onUninstalled }: { onUninstalled: () => void }) {
   );
 }
 
+function IconActionButton({
+  onClick,
+  title,
+  icon,
+}: {
+  onClick: () => void;
+  title: string;
+  icon: React.ReactNode;
+}) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="p-1.5 rounded-lg transition-colors"
+      title={title}
+      style={{
+        color: hovered ? 'var(--fg)' : 'var(--fg-3)',
+        background: hovered ? 'var(--bg-hover)' : 'transparent',
+      }}
+    >
+      {icon}
+    </button>
+  );
+}
+
+function DisableButton({
+  onClick,
+  disabled,
+}: {
+  onClick: () => void;
+  disabled: boolean;
+}) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      disabled={disabled}
+      className="p-1.5 rounded-lg transition-colors disabled:opacity-50"
+      title="Disable plugin"
+      style={{
+        color: hovered ? 'var(--accent-warn)' : 'var(--fg-3)',
+        background: hovered ? 'color-mix(in oklch, var(--accent-warn) 10%, transparent)' : 'transparent',
+      }}
+    >
+      <ToggleRight size={15} />
+    </button>
+  );
+}
+
+function ReloadButton({
+  onClick,
+  disabled,
+}: {
+  onClick: () => void;
+  disabled: boolean;
+}) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      disabled={disabled}
+      className="p-1.5 rounded-lg transition-colors disabled:opacity-50"
+      title="Reload plugin"
+      style={{
+        color: hovered ? 'var(--accent)' : 'var(--fg-3)',
+        background: hovered ? 'var(--accent-soft)' : 'transparent',
+      }}
+    >
+      <RotateCcw size={15} />
+    </button>
+  );
+}
+
+function CancelButton({ onClick }: { onClick: () => void }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="px-2 py-1 rounded text-xs transition-colors"
+      style={{ color: hovered ? 'var(--fg)' : 'var(--fg-3)' }}
+    >
+      Cancel
+    </button>
+  );
+}
+
 /* ─── Status dot ─── */
 
 function StatusDot({ state }: { state: InstalledPlugin['state'] }) {
   if (state === 'active') {
-    return <span className="inline-block w-2 h-2 rounded-full bg-green-400 mt-1" />;
+    return <span className="inline-block w-2 h-2 rounded-full mt-1" style={{ background: 'var(--accent-good)' }} />;
   }
   if (state === 'error') {
-    return <span className="inline-block w-2 h-2 rounded-full bg-red-400 mt-1" />;
+    return <span className="inline-block w-2 h-2 rounded-full mt-1" style={{ background: 'var(--accent-danger)' }} />;
   }
-  return <span className="inline-block w-2 h-2 rounded-full bg-gray-500 mt-1" />;
+  return (
+    <span
+      className="inline-block w-2 h-2 rounded-full mt-1"
+      style={{ background: 'var(--fg-4)' }}
+    />
+  );
 }
 
 function StateLabel({ state }: { state: InstalledPlugin['state'] }) {
   if (state === 'active') {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-300">
+      <span
+        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+        style={{ background: 'color-mix(in oklch, var(--accent-good) 20%, transparent)', color: 'var(--accent-good)' }}
+      >
         <CheckCircle size={10} />
         Active
       </span>
@@ -567,7 +834,10 @@ function StateLabel({ state }: { state: InstalledPlugin['state'] }) {
   }
   if (state === 'error') {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/20 text-red-300">
+      <span
+        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+        style={{ background: 'color-mix(in oklch, var(--accent-danger) 20%, transparent)', color: 'var(--accent-danger)' }}
+      >
         <XCircle size={10} />
         Error
       </span>
@@ -575,7 +845,10 @@ function StateLabel({ state }: { state: InstalledPlugin['state'] }) {
   }
   if (state === 'disabled' || state === 'unloaded') {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-700/50 text-gray-400">
+      <span
+        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+        style={{ background: 'var(--bg-2)', color: 'var(--fg-3)' }}
+      >
         Disabled
       </span>
     );
@@ -600,6 +873,8 @@ function PluginSettingsPanel({
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
   const [expanded, setExpanded] = useState(true);
+  const [headerHovered, setHeaderHovered] = useState(false);
+  const [closeHovered, setCloseHovered] = useState(false);
 
   const adminSettings = plugin.settings.filter(s => !s.perUser);
   const userSettings = plugin.settings.filter(s => s.perUser);
@@ -650,11 +925,17 @@ function PluginSettingsPanel({
   };
 
   return (
-    <div className="mb-4 rounded-lg border border-violet-500/30 bg-violet-500/5">
+    <div
+      className="mb-4 rounded-lg border"
+      style={{ borderColor: 'var(--accent)', background: 'var(--accent-soft)' }}
+    >
       {/* Panel header */}
       <button
         onClick={() => setExpanded(v => !v)}
-        className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-violet-300 hover:text-white transition-colors"
+        onMouseEnter={() => setHeaderHovered(true)}
+        onMouseLeave={() => setHeaderHovered(false)}
+        className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium transition-colors"
+        style={{ color: headerHovered ? 'var(--fg)' : 'var(--accent)' }}
       >
         <div className="flex items-center gap-2">
           <Settings size={15} />
@@ -663,7 +944,10 @@ function PluginSettingsPanel({
         <div className="flex items-center gap-2">
           <button
             onClick={e => { e.stopPropagation(); onClose(); }}
-            className="p-0.5 rounded text-gray-400 hover:text-white transition-colors"
+            onMouseEnter={() => setCloseHovered(true)}
+            onMouseLeave={() => setCloseHovered(false)}
+            className="p-0.5 rounded transition-colors"
+            style={{ color: closeHovered ? 'var(--fg)' : 'var(--fg-3)' }}
           >
             <X size={14} />
           </button>
@@ -674,13 +958,16 @@ function PluginSettingsPanel({
       {expanded && (
         <div className="px-4 pb-4">
           {error && (
-            <div className="mb-3 px-3 py-2 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-xs">
+            <div
+              className="mb-3 px-3 py-2 border rounded-lg text-xs"
+              style={{ background: 'color-mix(in oklch, var(--accent-danger) 10%, transparent)', borderColor: 'color-mix(in oklch, var(--accent-danger) 30%, transparent)', color: 'var(--accent-danger)' }}
+            >
               {error}
             </div>
           )}
 
           {loading ? (
-            <div className="text-gray-400 text-sm py-2">Loading settings...</div>
+            <div className="text-sm py-2" style={{ color: 'var(--fg-3)' }}>Loading settings...</div>
           ) : (
             <>
               {adminSettings.length > 0 && (
@@ -706,13 +993,14 @@ function PluginSettingsPanel({
                 <button
                   onClick={save}
                   disabled={saving}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-violet-600 text-white text-sm font-medium hover:bg-violet-500 disabled:opacity-50 transition-colors"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+                  style={{ background: 'var(--accent)', color: '#fff' }}
                 >
                   <Save size={14} />
                   {saving ? 'Saving...' : 'Save'}
                 </button>
                 {saved && (
-                  <span className="text-xs text-green-400 flex items-center gap-1">
+                  <span className="text-xs flex items-center gap-1" style={{ color: 'var(--accent-good)' }}>
                     <CheckCircle size={12} /> Saved
                   </span>
                 )}
@@ -741,8 +1029,8 @@ function SettingsGroup({
   return (
     <div className="mb-4">
       <div className="mb-2">
-        <p className="text-xs font-semibold text-gray-300 uppercase tracking-wider">{title}</p>
-        <p className="text-xs text-gray-500">{subtitle}</p>
+        <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--fg)' }}>{title}</p>
+        <p className="text-xs" style={{ color: 'var(--fg-4)' }}>{subtitle}</p>
       </div>
       <div className="space-y-3">
         {settings.map(s => (
@@ -762,24 +1050,28 @@ function SettingField({
   value: unknown;
   onChange: (v: unknown) => void;
 }) {
-  const inputBase =
-    'bg-surface-800 border border-gray-700/50 rounded-lg px-3 py-1.5 text-sm text-gray-100 focus:outline-none focus:border-violet-500/50';
+  const [focused, setFocused] = useState(false);
+  const inputClass = 'border rounded-lg px-3 py-1.5 text-sm focus:outline-none transition-colors';
+  const inputDynamicStyle: CSSProperties = {
+    ...inputStyle,
+    borderColor: focused ? 'var(--accent)' : 'var(--line)',
+  };
 
   if (decl.type === 'boolean') {
     const checked = Boolean(value);
     return (
       <label className="flex items-center justify-between gap-3 cursor-pointer">
-        <span className="text-sm text-gray-300">{decl.label}</span>
+        <span className="text-sm" style={{ color: 'var(--fg)' }}>{decl.label}</span>
         <button
           onClick={() => onChange(!checked)}
-          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-            checked ? 'bg-violet-600' : 'bg-gray-600'
-          }`}
+          className="relative inline-flex h-5 w-9 items-center rounded-full transition-colors"
+          style={{ background: checked ? 'var(--accent)' : 'var(--fg-4)' }}
         >
           <span
-            className={`inline-block h-3.5 w-3.5 rounded-full bg-white transform transition-transform ${
+            className={`inline-block h-3.5 w-3.5 rounded-full transform transition-transform ${
               checked ? 'translate-x-4' : 'translate-x-0.5'
             }`}
+            style={{ background: 'var(--fg)' }}
           />
         </button>
       </label>
@@ -789,12 +1081,15 @@ function SettingField({
   if (decl.type === 'number') {
     return (
       <div className="flex items-center justify-between gap-3">
-        <label className="text-sm text-gray-300">{decl.label}</label>
+        <label className="text-sm" style={{ color: 'var(--fg)' }}>{decl.label}</label>
         <input
           type="number"
           value={value as number ?? 0}
           onChange={e => onChange(Number(e.target.value))}
-          className={`w-28 text-right ${inputBase}`}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          className={`w-28 text-right ${inputClass}`}
+          style={inputDynamicStyle}
         />
       </div>
     );
@@ -803,12 +1098,15 @@ function SettingField({
   // string (default)
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-sm text-gray-300">{decl.label}</label>
+      <label className="text-sm" style={{ color: 'var(--fg)' }}>{decl.label}</label>
       <input
         type="text"
         value={value as string ?? ''}
         onChange={e => onChange(e.target.value)}
-        className={`w-full ${inputBase}`}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        className={`w-full ${inputClass}`}
+        style={inputDynamicStyle}
       />
     </div>
   );

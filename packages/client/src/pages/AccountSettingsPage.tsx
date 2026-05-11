@@ -1,10 +1,20 @@
-import { useState, useCallback, FormEvent } from 'react';
+import { useState, useCallback, FormEvent, CSSProperties } from 'react';
 import { Settings, User, Fingerprint, Key, Shield, X, Palette } from 'lucide-react';
+
+const dialogStyle: CSSProperties = { background: 'var(--bg-1)' };
+const borderLine: CSSProperties = { borderColor: 'var(--line)' };
+const ghostHoverBase: CSSProperties = { color: 'var(--fg-3)' };
 import { authApi } from '../lib/api';
 import { PasskeyManagerContent } from '../components/Security/PasskeyManager';
 import { ApiKeyManager } from '../components/ApiKeys/ApiKeyManager';
 import { TwoFactorManager } from '../components/Security/TwoFactorManager';
 import { AppearanceSection } from '../components/Settings/AppearanceSection';
+import { Section, Field, Toolbar } from '../components/Settings/settings-kit';
+import {
+  inputStyle as kitInputStyle,
+  primaryBtn,
+  helpText,
+} from '../components/Settings/settings-kit-styles';
 
 type Tab = 'profile' | 'appearance' | 'passkeys' | 'api-keys' | '2fa';
 
@@ -45,59 +55,76 @@ function ProfileSection() {
     }
   }, [currentPw, newPw, confirmPw]);
 
+  const focusRing = (e: React.FocusEvent<HTMLInputElement>): void => {
+    e.currentTarget.style.boxShadow = '0 0 0 2px var(--accent-soft)';
+  };
+  const blurRing = (e: React.FocusEvent<HTMLInputElement>): void => {
+    e.currentTarget.style.boxShadow = 'none';
+  };
+
   return (
-    <div className="max-w-sm space-y-4">
-      <div>
-        <h3 className="text-sm font-medium text-gray-200 mb-1">Change Password</h3>
-        <p className="text-xs text-gray-500">Update your account password.</p>
-      </div>
-      <form onSubmit={handlePasswordChange} className="space-y-3">
-        <div>
-          <label htmlFor="current-password" className="block text-xs text-gray-400 mb-1">Current Password</label>
-          <input
-            id="current-password"
-            type="password"
-            value={currentPw}
-            onChange={e => setCurrentPw(e.target.value)}
-            required
-            className="w-full bg-surface-800 border border-gray-700/50 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
-          />
-        </div>
-        <div>
-          <label htmlFor="new-password" className="block text-xs text-gray-400 mb-1">New Password</label>
-          <input
-            id="new-password"
-            type="password"
-            value={newPw}
-            onChange={e => setNewPw(e.target.value)}
-            required
-            minLength={8}
-            className="w-full bg-surface-800 border border-gray-700/50 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
-          />
-        </div>
-        <div>
-          <label htmlFor="confirm-password" className="block text-xs text-gray-400 mb-1">Confirm New Password</label>
-          <input
-            id="confirm-password"
-            type="password"
-            value={confirmPw}
-            onChange={e => setConfirmPw(e.target.value)}
-            required
-            className="w-full bg-surface-800 border border-gray-700/50 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
-          />
-        </div>
-        {pwError && <div className="text-red-400 text-xs">{pwError}</div>}
-        {pwSuccess && <div className="text-green-400 text-xs">Password changed successfully!</div>}
-        <div className="flex gap-2 pt-1">
-          <button
-            type="submit"
-            disabled={pwLoading}
-            className="flex-1 bg-violet-500 text-white rounded-lg py-2 text-sm font-medium hover:bg-violet-600 transition-colors disabled:opacity-50"
-          >
-            {pwLoading ? 'Changing...' : 'Change Password'}
-          </button>
-        </div>
-      </form>
+    <div style={{ color: 'var(--fg-1)', maxWidth: 420 }}>
+      <Section title="password">
+        <div style={helpText}>Update your account password.</div>
+        <form onSubmit={handlePasswordChange}>
+          <Field label="current password">
+            <input
+              id="current-password"
+              type="password"
+              value={currentPw}
+              onChange={(e) => setCurrentPw(e.target.value)}
+              required
+              style={kitInputStyle}
+              onFocus={focusRing}
+              onBlur={blurRing}
+            />
+          </Field>
+          <Field label="new password">
+            <input
+              id="new-password"
+              type="password"
+              value={newPw}
+              onChange={(e) => setNewPw(e.target.value)}
+              required
+              minLength={8}
+              style={kitInputStyle}
+              onFocus={focusRing}
+              onBlur={blurRing}
+            />
+          </Field>
+          <Field label="confirm new password">
+            <input
+              id="confirm-password"
+              type="password"
+              value={confirmPw}
+              onChange={(e) => setConfirmPw(e.target.value)}
+              required
+              style={kitInputStyle}
+              onFocus={focusRing}
+              onBlur={blurRing}
+            />
+          </Field>
+          {pwError && (
+            <div style={{ ...helpText, color: 'var(--accent-danger)', marginBottom: 8 }}>
+              {pwError}
+            </div>
+          )}
+          {pwSuccess && (
+            <div style={{ ...helpText, color: 'var(--accent-good)', marginBottom: 8 }}>
+              Password changed successfully.
+            </div>
+          )}
+          <Toolbar>
+            <button
+              type="submit"
+              disabled={pwLoading}
+              style={{ ...primaryBtn, opacity: pwLoading ? 0.6 : 1, cursor: pwLoading ? 'not-allowed' : 'pointer' }}
+            >
+              {pwLoading ? 'Changing…' : 'Change Password'}
+            </button>
+          </Toolbar>
+        </form>
+      </Section>
     </div>
   );
 }
@@ -107,43 +134,71 @@ export default function AccountSettingsPage({ onClose }: { onClose: () => void }
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center"
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'oklch(0 0 0 / 0.6)' }}
       onClick={onClose}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="account-settings-title"
-        className="bg-surface-900 rounded-xl shadow-2xl w-[90vw] max-w-2xl max-h-[85vh] overflow-hidden flex flex-col"
+        className="rounded-xl shadow-2xl w-[90vw] max-w-2xl overflow-hidden flex flex-col"
+        // Fixed height (not max-height) so the header + tab strip stay
+        // anchored as the user switches between sections. The content
+        // panel scrolls within its own pane.
+        style={{ ...dialogStyle, height: 'min(640px, 85vh)' }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700/50">
+        <div className="flex items-center justify-between px-6 py-4 border-b" style={borderLine}>
           <div className="flex items-center gap-2">
-            <Settings size={18} className="text-violet-400" />
-            <h2 id="account-settings-title" className="text-lg font-semibold text-white">Account Settings</h2>
+            <Settings size={18} style={{ color: 'var(--accent)' }} />
+            <h2 id="account-settings-title" className="text-lg font-semibold" style={{ color: 'var(--fg)' }}>Account Settings</h2>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700/50 transition-colors"
+            className="p-1.5 rounded-lg transition-colors"
+            style={ghostHoverBase}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--fg)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-3)'; }}
           >
             <X size={18} />
           </button>
         </div>
 
-        {/* Tabs */}
-        <div className="flex border-b border-gray-700/50 px-6">
+        {/* Tabs — mode-pill pattern from prototype/app/graph.jsx: active tab
+            sits in an accent-soft tinted pill (no underline). Inactive tabs
+            are fg-3 with transparent bg. Container has its own subtle gap
+            and a single border-b for visual separation. */}
+        <div
+          className="flex items-center px-4 py-2 border-b"
+          style={{ ...borderLine, gap: 2 }}
+        >
           {TABS.map(t => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                tab === t.key
-                  ? 'border-violet-500 text-violet-400'
-                  : 'border-transparent text-gray-400 hover:text-gray-200'
-              }`}
+              className="flex items-center gap-1.5 text-sm font-medium transition-colors"
+              style={{
+                padding: '6px 10px',
+                borderRadius: 6,
+                background: tab === t.key ? 'var(--accent-soft)' : 'transparent',
+                color: tab === t.key ? 'var(--accent)' : 'var(--fg-3)',
+              }}
+              onMouseEnter={(e) => {
+                if (tab !== t.key) {
+                  e.currentTarget.style.background = 'var(--bg-hover)';
+                  e.currentTarget.style.color = 'var(--fg)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (tab !== t.key) {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.color = 'var(--fg-3)';
+                }
+              }}
             >
-              <t.icon size={16} />
+              <t.icon size={14} />
               {t.label}
             </button>
           ))}

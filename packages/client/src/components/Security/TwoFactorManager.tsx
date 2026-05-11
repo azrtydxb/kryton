@@ -1,9 +1,55 @@
 import { useState, useEffect, useCallback, FormEvent } from 'react';
-import { Shield, ShieldCheck, Copy, Check } from 'lucide-react';
+import { ShieldCheck, Copy, Check } from 'lucide-react';
 import QRCode from 'qrcode';
 import { authClient } from '../../lib/auth-client';
+import { Section, Field, Toolbar } from '../Settings/settings-kit';
+import {
+  helpText,
+  inputStyle,
+  primaryBtn,
+  ghostBtn,
+  dangerBtn,
+} from '../Settings/settings-kit-styles';
 
 type SetupStep = 'idle' | 'confirm-password' | 'scan-qr' | 'verify' | 'backup-codes';
+
+// Small bg-2 chip matching the visual language of AppearanceSection pills.
+const chipStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 8,
+  padding: '8px 12px',
+  background: 'var(--bg-2)',
+  border: '1px solid var(--line)',
+  borderRadius: 5,
+  fontFamily: 'var(--font-mono)',
+  fontSize: 12,
+  color: 'var(--fg)',
+} as const;
+
+const dotStyle = {
+  width: 6,
+  height: 6,
+  borderRadius: 999,
+  background: 'var(--accent-good)',
+} as const;
+
+// QR wrapper: bg-2 padded container holds a white QR plate (must stay light
+// for scanners). Mirrors the chip style at a larger scale.
+const qrWrapStyle = {
+  display: 'inline-block',
+  padding: 12,
+  background: 'var(--bg-2)',
+  border: '1px solid var(--line)',
+  borderRadius: 5,
+} as const;
+
+const qrPlateStyle = {
+  display: 'inline-block',
+  padding: 8,
+  background: '#fff',
+  borderRadius: 4,
+} as const;
 
 export function TwoFactorManager() {
   const session = authClient.useSession();
@@ -113,50 +159,62 @@ export function TwoFactorManager() {
     await session.refetch();
   }, [session]);
 
-  const inputClass = "w-full bg-surface-800 border border-gray-700/50 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500/50";
-  const btnPrimary = "flex-1 bg-violet-500 text-white rounded-lg py-2 text-sm font-medium hover:bg-violet-600 transition-colors disabled:opacity-50";
-  const btnSecondary = "px-4 py-2 text-sm text-gray-400 hover:text-gray-200 transition-colors";
-
   return (
-    <div className="max-w-sm space-y-4">
-      <div>
-        <h3 className="text-sm font-medium text-gray-200 mb-1 flex items-center gap-2">
-          {twoFactorEnabled
-            ? <><ShieldCheck size={16} className="text-green-400" /> Two-Factor Authentication</>
-            : <><Shield size={16} className="text-gray-400" /> Two-Factor Authentication</>
-          }
-        </h3>
-        <p className="text-xs text-gray-500">
-          {twoFactorEnabled
-            ? 'Your account is protected with TOTP two-factor authentication.'
-            : 'Add an extra layer of security using an authenticator app.'}
-        </p>
-      </div>
+    <Section title="two-factor authentication">
+      <p style={helpText}>
+        {twoFactorEnabled
+          ? 'Your account is protected with TOTP two-factor authentication.'
+          : 'Add an extra layer of security using an authenticator app.'}
+      </p>
 
-      {error && <div className="text-red-400 text-xs">{error}</div>}
+      {twoFactorEnabled && step === 'idle' && (
+        <div style={{ marginBottom: 12 }}>
+          <span style={chipStyle}>
+            <span style={dotStyle} />
+            <ShieldCheck size={14} style={{ color: 'var(--accent-good)' }} />
+            2fa is enabled
+          </span>
+        </div>
+      )}
+
+      {error && (
+        <div
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 12,
+            color: 'var(--accent-danger)',
+            marginBottom: 12,
+          }}
+        >
+          {error}
+        </div>
+      )}
 
       {/* Idle state */}
       {step === 'idle' && !twoFactorEnabled && (
-        <button onClick={handleStartSetup} className="bg-violet-500 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-violet-600 transition-colors">
-          Enable 2FA
-        </button>
+        <Toolbar>
+          <button onClick={handleStartSetup} style={primaryBtn}>
+            Enable 2FA
+          </button>
+        </Toolbar>
       )}
 
       {step === 'idle' && twoFactorEnabled && !showDisableConfirm && (
-        <button
-          onClick={() => { setShowDisableConfirm(true); setError(''); setDisablePassword(''); }}
-          className="border border-red-500/50 text-red-400 rounded-lg px-4 py-2 text-sm font-medium hover:bg-red-500/10 transition-colors"
-        >
-          Disable 2FA
-        </button>
+        <Toolbar>
+          <button
+            onClick={() => { setShowDisableConfirm(true); setError(''); setDisablePassword(''); }}
+            style={dangerBtn}
+          >
+            Disable 2FA
+          </button>
+        </Toolbar>
       )}
 
       {/* Disable confirm */}
       {showDisableConfirm && (
-        <form onSubmit={handleDisable} className="space-y-3">
-          <p className="text-xs text-yellow-400">Enter your password to confirm disabling 2FA.</p>
-          <div>
-            <label htmlFor="2fa-disable-password" className="block text-xs text-gray-400 mb-1">Password</label>
+        <form onSubmit={handleDisable}>
+          <p style={helpText}>Enter your password to confirm disabling 2FA.</p>
+          <Field label="password">
             <input
               id="2fa-disable-password"
               type="password"
@@ -164,26 +222,25 @@ export function TwoFactorManager() {
               onChange={e => setDisablePassword(e.target.value)}
               required
               autoFocus
-              className={inputClass}
+              style={inputStyle}
             />
-          </div>
-          <div className="flex gap-2">
-            <button type="submit" disabled={loading} className={btnPrimary}>
+          </Field>
+          <Toolbar>
+            <button type="submit" disabled={loading} style={{ ...dangerBtn, opacity: loading ? 0.5 : 1 }}>
               {loading ? 'Disabling...' : 'Confirm Disable'}
             </button>
-            <button type="button" onClick={() => setShowDisableConfirm(false)} className={btnSecondary}>
+            <button type="button" onClick={() => setShowDisableConfirm(false)} style={ghostBtn}>
               Cancel
             </button>
-          </div>
+          </Toolbar>
         </form>
       )}
 
-      {/* Step 1: Confirm password to get TOTP URI */}
+      {/* Step 1: Confirm password */}
       {step === 'confirm-password' && (
-        <form onSubmit={handleConfirmPassword} className="space-y-3">
-          <p className="text-xs text-gray-400">Enter your password to begin setup.</p>
-          <div>
-            <label htmlFor="2fa-confirm-password" className="block text-xs text-gray-400 mb-1">Password</label>
+        <form onSubmit={handleConfirmPassword}>
+          <p style={helpText}>Enter your password to begin setup.</p>
+          <Field label="password">
             <input
               id="2fa-confirm-password"
               type="password"
@@ -191,58 +248,72 @@ export function TwoFactorManager() {
               onChange={e => setPassword(e.target.value)}
               required
               autoFocus
-              className={inputClass}
+              style={inputStyle}
             />
-          </div>
-          <div className="flex gap-2">
-            <button type="submit" disabled={loading} className={btnPrimary}>
+          </Field>
+          <Toolbar>
+            <button type="submit" disabled={loading} style={{ ...primaryBtn, opacity: loading ? 0.5 : 1 }}>
               {loading ? 'Generating...' : 'Continue'}
             </button>
-            <button type="button" onClick={() => setStep('idle')} className={btnSecondary}>
+            <button type="button" onClick={() => setStep('idle')} style={ghostBtn}>
               Cancel
             </button>
-          </div>
+          </Toolbar>
         </form>
       )}
 
-      {/* Step 2: Scan QR code */}
+      {/* Step 2: Scan QR */}
       {step === 'scan-qr' && (
-        <div className="space-y-3">
-          <p className="text-xs text-gray-400">
+        <div>
+          <p style={helpText}>
             Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.).
           </p>
           {qrDataUrl ? (
-            <div className="bg-white p-3 rounded-lg inline-block">
-              <img src={qrDataUrl} alt="TOTP QR Code" width={200} height={200} />
+            <div style={{ marginBottom: 12 }}>
+              <span style={qrWrapStyle}>
+                <span style={qrPlateStyle}>
+                  <img src={qrDataUrl} alt="TOTP QR Code" width={200} height={200} style={{ display: 'block' }} />
+                </span>
+              </span>
             </div>
           ) : (
-            <div className="bg-surface-800 rounded-lg p-3 text-xs text-gray-400 break-all">
+            <div
+              style={{
+                background: 'var(--bg-2)',
+                border: '1px solid var(--line)',
+                borderRadius: 5,
+                padding: 12,
+                fontFamily: 'var(--font-mono)',
+                fontSize: 11,
+                color: 'var(--fg-3)',
+                wordBreak: 'break-all',
+                marginBottom: 12,
+              }}
+            >
               {totpURI}
             </div>
           )}
-          <p className="text-xs text-gray-500">
+          <p style={helpText}>
             Can't scan? Manually enter the secret key from the URI above into your app.
           </p>
-          <button
-            onClick={() => { setStep('verify'); setError(''); }}
-            className="w-full bg-violet-500 text-white rounded-lg py-2 text-sm font-medium hover:bg-violet-600 transition-colors"
-          >
-            I've scanned it — Continue
-          </button>
-          <button type="button" onClick={() => setStep('idle')} className="w-full text-center text-xs text-gray-500 hover:text-gray-300">
-            Cancel
-          </button>
+          <Toolbar>
+            <button onClick={() => { setStep('verify'); setError(''); }} style={primaryBtn}>
+              I've scanned it — Continue
+            </button>
+            <button type="button" onClick={() => setStep('idle')} style={ghostBtn}>
+              Cancel
+            </button>
+          </Toolbar>
         </div>
       )}
 
-      {/* Step 3: Verify TOTP code */}
+      {/* Step 3: Verify TOTP */}
       {step === 'verify' && (
-        <form onSubmit={handleVerifyTOTP} className="space-y-3">
-          <p className="text-xs text-gray-400">
+        <form onSubmit={handleVerifyTOTP}>
+          <p style={helpText}>
             Enter the 6-digit code from your authenticator app to confirm setup.
           </p>
-          <div>
-            <label htmlFor="2fa-totp-code" className="block text-xs text-gray-400 mb-1">Authentication Code</label>
+          <Field label="verification code">
             <input
               id="2fa-totp-code"
               type="text"
@@ -254,51 +325,74 @@ export function TwoFactorManager() {
               required
               autoFocus
               placeholder="000000"
-              className={inputClass + " tracking-widest text-center text-lg"}
+              style={{ ...inputStyle, letterSpacing: '0.3em', maxWidth: 180 }}
             />
-          </div>
-          <div className="flex gap-2">
-            <button type="submit" disabled={loading || totpCode.length !== 6} className={btnPrimary}>
+          </Field>
+          <Toolbar>
+            <button
+              type="submit"
+              disabled={loading || totpCode.length !== 6}
+              style={{ ...primaryBtn, opacity: loading || totpCode.length !== 6 ? 0.5 : 1 }}
+            >
               {loading ? 'Verifying...' : 'Verify & Enable'}
             </button>
-            <button type="button" onClick={() => setStep('scan-qr')} className={btnSecondary}>
+            <button type="button" onClick={() => setStep('scan-qr')} style={ghostBtn}>
               Back
             </button>
-          </div>
+          </Toolbar>
         </form>
       )}
 
       {/* Step 4: Backup codes */}
       {step === 'backup-codes' && (
-        <div className="space-y-3">
-          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
-            <p className="text-xs text-yellow-300 font-medium mb-1">Save your backup codes</p>
-            <p className="text-xs text-yellow-400/80">
-              Store these in a safe place. Each code can only be used once to recover access if you lose your authenticator.
-            </p>
-          </div>
-          <div className="bg-surface-800 rounded-lg p-3 grid grid-cols-2 gap-1.5">
+        <div>
+          <p style={{ ...helpText, color: 'var(--accent-warn)' }}>
+            Save your backup codes. Store them in a safe place — each code can only be used once
+            to recover access if you lose your authenticator.
+          </p>
+          <div
+            style={{
+              background: 'var(--bg-2)',
+              border: '1px solid var(--line)',
+              borderRadius: 5,
+              padding: 12,
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: 6,
+              marginBottom: 12,
+            }}
+          >
             {backupCodes.map((code, i) => (
-              <span key={i} className="font-mono text-xs text-gray-200 text-center py-1 bg-surface-950 rounded px-2">
+              <span
+                key={i}
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 12,
+                  color: 'var(--fg)',
+                  background: 'var(--bg)',
+                  border: '1px solid var(--line)',
+                  borderRadius: 4,
+                  padding: '4px 8px',
+                }}
+              >
                 {code}
               </span>
             ))}
           </div>
-          <button
-            onClick={handleCopyBackupCodes}
-            className="flex items-center gap-2 text-xs text-violet-400 hover:text-violet-300 transition-colors"
-          >
-            {copiedCodes ? <Check size={14} /> : <Copy size={14} />}
-            {copiedCodes ? 'Copied!' : 'Copy all codes'}
-          </button>
-          <button
-            onClick={handleFinish}
-            className="w-full bg-violet-500 text-white rounded-lg py-2 text-sm font-medium hover:bg-violet-600 transition-colors"
-          >
-            Done — 2FA is enabled
-          </button>
+          <Toolbar>
+            <button onClick={handleFinish} style={primaryBtn}>
+              I've saved them
+            </button>
+            <button
+              onClick={handleCopyBackupCodes}
+              style={{ ...ghostBtn, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            >
+              {copiedCodes ? <Check size={12} /> : <Copy size={12} />}
+              {copiedCodes ? 'Copied' : 'Copy codes'}
+            </button>
+          </Toolbar>
         </div>
       )}
-    </div>
+    </Section>
   );
 }

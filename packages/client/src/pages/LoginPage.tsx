@@ -65,7 +65,7 @@ const primaryBtnStyle: CSSProperties = {
   padding: '10px 16px',
   borderRadius: 6,
   background: 'var(--accent)',
-  color: 'var(--accent-fg)',
+  color: '#fff',
   fontFamily: monoFamily,
   fontSize: 12.5,
   fontWeight: 600,

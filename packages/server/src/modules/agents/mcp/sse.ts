@@ -12,6 +12,7 @@ import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { buildMcpServer } from "./build-server.js";
 import { authenticateMcpRequest } from "./auth.js";
+import * as activeSessions from "./active-sessions.js";
 import { createLogger } from "../../../lib/logger.js";
 
 const log = createLogger("mcp-sse");
@@ -52,6 +53,7 @@ export const sseMcpRoutes: FastifyPluginAsync = async (app) => {
     const s = sessions.get(sid);
     if (!s) return;
     sessions.delete(sid);
+    activeSessions.unregister(sid);
     clearInterval(s.keepalive);
     try {
       await s.mcpServer.close();
@@ -124,6 +126,15 @@ export const sseMcpRoutes: FastifyPluginAsync = async (app) => {
         keepalive,
       };
       sessions.set(sessionId, entry);
+      // clientInfo for SSE arrives in the POST /messages initialize call;
+      // we register with no name now and updateClientInfo when it arrives.
+      activeSessions.register({
+        sessionId,
+        userId: auth.userId,
+        transport: "sse",
+        startedAt: Date.now(),
+        lastActivity: Date.now(),
+      });
 
       const teardown = (): void => {
         void closeSession(sessionId);
@@ -157,6 +168,26 @@ export const sseMcpRoutes: FastifyPluginAsync = async (app) => {
         return;
       }
       entry.lastActivity = Date.now();
+      activeSessions.touch(sid);
+      // Initialize message carries clientInfo — capture it for the
+      // agents-online indicator (Claude Desktop, Cursor, …).
+      const body = request.body;
+      if (body && typeof body === "object" && !Array.isArray(body)) {
+        const method = (body as { method?: unknown }).method;
+        if (method === "initialize") {
+          const params = (body as { params?: unknown }).params;
+          if (params && typeof params === "object" && !Array.isArray(params)) {
+            const info = (params as { clientInfo?: unknown }).clientInfo;
+            if (info && typeof info === "object" && !Array.isArray(info)) {
+              const { name, version } = info as { name?: unknown; version?: unknown };
+              activeSessions.updateClientInfo(sid, {
+                clientName: typeof name === "string" ? name : undefined,
+                clientVersion: typeof version === "string" ? version : undefined,
+              });
+            }
+          }
+        }
+      }
 
       reply.hijack();
       try {

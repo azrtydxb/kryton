@@ -1,7 +1,15 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
-import { Fingerprint, Plus, Trash2, X } from 'lucide-react';
+import { Fingerprint, Trash2, X } from 'lucide-react';
 import { authClient } from '../../lib/auth-client';
+import { Section, Field, Toolbar } from '../Settings/settings-kit';
+import {
+  helpText,
+  inputStyle,
+  primaryBtn,
+  ghostBtn,
+  dangerBtn,
+} from '../Settings/settings-kit-styles';
 
 interface PasskeyData {
   id: string;
@@ -14,6 +22,28 @@ interface PasskeyManagerProps {
   open: boolean;
   onClose: () => void;
 }
+
+const rowStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  background: 'var(--bg-1)',
+  border: '1px solid var(--line)',
+  borderRadius: 6,
+  padding: '10px 12px',
+  marginBottom: 8,
+};
+
+const errorStyle: CSSProperties = {
+  ...helpText,
+  marginBottom: 12,
+  padding: '8px 10px',
+  borderRadius: 5,
+  background: 'color-mix(in oklch, var(--accent-danger) 10%, transparent)',
+  border: '1px solid color-mix(in oklch, var(--accent-danger) 30%, transparent)',
+  color: 'var(--accent-danger)',
+  fontFamily: 'var(--font-mono)',
+};
 
 export function PasskeyManagerContent() {
   const [passkeys, setPasskeys] = useState<PasskeyData[]>([]);
@@ -86,124 +116,175 @@ export function PasskeyManagerContent() {
   };
 
   return (
-    <>
-      <p className="text-xs text-gray-400 mb-4">
+    <div style={{ color: 'var(--fg-1)' }}>
+      <p style={helpText}>
         Passkeys let you sign in with your fingerprint, face, or device PIN instead of a password.
       </p>
 
-      {/* Error */}
-      {error && (
-        <div className="mb-4 rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 text-xs text-red-400">
-          {error}
-        </div>
-      )}
+      {error && <div style={errorStyle}>{error}</div>}
 
-      {/* Passkey list */}
-      <div className="space-y-2 mb-4 max-h-60 overflow-y-auto">
+      <Section title="passkeys">
         {loading ? (
-          <div className="text-center py-6 text-gray-500 text-sm">Loading passkeys...</div>
+          <div style={helpText}>Loading passkeys...</div>
         ) : passkeys.length === 0 ? (
-          <div className="text-center py-6 text-gray-500 text-sm">No passkeys registered yet.</div>
+          <div style={helpText}>No passkeys registered yet.</div>
         ) : (
-          passkeys.map(pk => (
-            <div
-              key={pk.id}
-              className="flex items-center justify-between rounded-lg bg-surface-800 border border-gray-700/50 px-3 py-2"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="text-sm text-gray-200 truncate">
-                  {pk.name || 'Unnamed passkey'}
+          <div style={{ marginBottom: 14 }}>
+            {passkeys.map(pk => (
+              <div key={pk.id} style={rowStyle}>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div
+                    style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 12,
+                      color: 'var(--fg)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {pk.name || 'Unnamed passkey'}
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 11,
+                      color: 'var(--fg-3)',
+                      marginTop: 2,
+                    }}
+                  >
+                    Added {new Date(pk.createdAt).toLocaleDateString()}
+                  </div>
                 </div>
-                <div className="text-xs text-gray-500">
-                  Added {new Date(pk.createdAt).toLocaleDateString()}
-                </div>
+                {confirmDeleteId === pk.id ? (
+                  <div style={{ display: 'flex', gap: 6, marginLeft: 8 }}>
+                    <button
+                      onClick={() => handleDeletePasskey(pk.id)}
+                      disabled={deletingId === pk.id}
+                      style={{ ...dangerBtn, opacity: deletingId === pk.id ? 0.5 : 1 }}
+                    >
+                      {deletingId === pk.id ? '...' : 'Confirm'}
+                    </button>
+                    <button onClick={() => setConfirmDeleteId(null)} style={ghostBtn}>
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setConfirmDeleteId(pk.id)}
+                    style={{
+                      ...ghostBtn,
+                      padding: 6,
+                      marginLeft: 8,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      color: 'var(--fg-3)',
+                    }}
+                    aria-label="Delete passkey"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
               </div>
-              {confirmDeleteId === pk.id ? (
-                <div className="flex items-center gap-1 ml-2">
-                  <button
-                    onClick={() => handleDeletePasskey(pk.id)}
-                    disabled={deletingId === pk.id}
-                    className="text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded bg-red-500/10 disabled:opacity-50"
-                  >
-                    {deletingId === pk.id ? '...' : 'Confirm'}
-                  </button>
-                  <button
-                    onClick={() => setConfirmDeleteId(null)}
-                    className="text-xs text-gray-400 hover:text-gray-200 px-2 py-1"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setConfirmDeleteId(pk.id)}
-                  className="ml-2 p-1.5 text-gray-500 hover:text-red-400 transition-colors"
-                  aria-label="Delete passkey"
-                >
-                  <Trash2 size={14} />
-                </button>
-              )}
-            </div>
-          ))
-        )}
-      </div>
-
-      {/* Add passkey */}
-      {showNamePrompt ? (
-        <div className="space-y-2">
-          <input
-            type="text"
-            value={newPasskeyName}
-            onChange={e => setNewPasskeyName(e.target.value)}
-            placeholder="Passkey name (optional)"
-            autoFocus
-            className="w-full bg-surface-800 border border-gray-700/50 rounded-lg px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
-            onKeyDown={e => { if (e.key === 'Enter') handleAddPasskey(); }}
-          />
-          <div className="flex gap-2">
-            <button
-              onClick={handleAddPasskey}
-              disabled={adding}
-              className="flex-1 bg-violet-500 text-white rounded-lg py-2 text-sm font-medium hover:bg-violet-600 transition-colors disabled:opacity-50"
-            >
-              {adding ? 'Registering...' : 'Register Passkey'}
-            </button>
-            <button
-              onClick={() => { setShowNamePrompt(false); setNewPasskeyName(''); }}
-              className="px-3 py-2 text-sm text-gray-400 hover:text-gray-200 transition-colors"
-            >
-              Cancel
-            </button>
+            ))}
           </div>
-        </div>
-      ) : (
-        <button
-          onClick={() => setShowNamePrompt(true)}
-          className="w-full flex items-center justify-center gap-2 rounded-lg border border-dashed border-gray-600 px-4 py-2.5 text-sm font-medium text-gray-300 hover:border-violet-500 hover:text-violet-400 transition-colors"
-        >
-          <Plus size={16} />
-          Add Passkey
-        </button>
-      )}
-    </>
+        )}
+
+        {showNamePrompt ? (
+          <>
+            <Field label="name">
+              <input
+                type="text"
+                value={newPasskeyName}
+                onChange={e => setNewPasskeyName(e.target.value)}
+                placeholder="Passkey name (optional)"
+                autoFocus
+                style={inputStyle}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') handleAddPasskey();
+                }}
+              />
+            </Field>
+            <Toolbar>
+              <button
+                onClick={handleAddPasskey}
+                disabled={adding}
+                style={{ ...primaryBtn, opacity: adding ? 0.5 : 1 }}
+              >
+                {adding ? 'Registering...' : 'Register'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowNamePrompt(false);
+                  setNewPasskeyName('');
+                }}
+                style={ghostBtn}
+              >
+                Cancel
+              </button>
+            </Toolbar>
+          </>
+        ) : (
+          <Toolbar>
+            <button onClick={() => setShowNamePrompt(true)} style={primaryBtn}>
+              Add Passkey
+            </button>
+          </Toolbar>
+        )}
+      </Section>
+    </div>
   );
 }
 
 export function PasskeyManager({ open, onClose }: PasskeyManagerProps) {
   if (!open) return null;
   return createPortal(
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'oklch(0 0 0 / 0.6)' }}
+      onClick={onClose}
+    >
       <div
-        className="bg-surface-900 rounded-xl shadow-2xl w-full max-w-md p-6 border border-gray-700/50"
+        style={{
+          background: 'var(--bg-1)',
+          border: '1px solid var(--line)',
+          borderRadius: 8,
+          padding: 20,
+          width: '100%',
+          maxWidth: 480,
+          boxShadow: '0 20px 40px oklch(0 0 0 / 0.4)',
+        }}
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Fingerprint size={20} className="text-violet-400" />
-            <h3 className="text-lg font-semibold text-gray-100">Passkeys</h3>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: 14,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Fingerprint size={18} style={{ color: 'var(--accent)' }} />
+            <h3
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 13,
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                color: 'var(--fg)',
+                margin: 0,
+              }}
+            >
+              Passkeys
+            </h3>
           </div>
-          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-200 transition-colors" aria-label="Close">
-            <X size={18} />
+          <button
+            onClick={onClose}
+            style={{ ...ghostBtn, padding: 6, display: 'inline-flex', alignItems: 'center' }}
+            aria-label="Close"
+          >
+            <X size={16} />
           </button>
         </div>
         <PasskeyManagerContent />

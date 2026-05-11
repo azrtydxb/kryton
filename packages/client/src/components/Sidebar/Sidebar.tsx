@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState, ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { api, FileNode, TagData } from '../../lib/api';
 import { FileTree, FavoritesSection } from '@azrtydxb/ui';
 import { useUIStore } from '../../stores/uiStore';
 import { Icons } from '../Icons';
+import { formatShortcut } from '../../lib/platform';
 
 interface SharedNote {
   id: string;
@@ -81,7 +83,7 @@ function SectionHeader({
         onClick={() => setOpen(!open)}
         style={{
           display: 'inline-flex', alignItems: 'center',
-          color: 'inherit', width: 16, height: 16,
+          color: 'inherit',
         }}
         aria-label={open ? `Collapse ${label}` : `Expand ${label}`}
       >
@@ -92,7 +94,7 @@ function SectionHeader({
       </button>
       <span>{label}</span>
       {count !== undefined && (
-        <span style={{ color: 'var(--fg-4)' }}>{count}</span>
+        <span className="mono" style={{ color: 'var(--fg-4)' }}>{count}</span>
       )}
       <div style={{ flex: 1 }} />
       {actions}
@@ -140,10 +142,11 @@ function NavRow({
     <button
       onClick={onClick}
       style={{
+        position: 'relative',
         display: 'flex', alignItems: 'center', gap: 8,
-        width: '100%', height: 'var(--row, 24px)',
+        width: '100%', height: 28,
         padding: '0 8px', borderRadius: 6,
-        color: active ? 'var(--accent)' : 'var(--fg-1)',
+        color: active ? 'var(--fg)' : 'var(--fg-2)',
         background: active ? 'var(--accent-soft)' : 'transparent',
         textAlign: 'left',
         fontSize: 'var(--fs-base)',
@@ -152,7 +155,15 @@ function NavRow({
       onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--bg-hover)'; }}
       onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
     >
-      <span style={{ color: active ? 'var(--accent)' : 'var(--fg-3)', display: 'inline-flex' }}>{icon}</span>
+      {active && (
+        <span
+          style={{
+            position: 'absolute', left: 0, top: 4, bottom: 4,
+            width: 2, background: 'var(--accent)', borderRadius: 2,
+          }}
+        />
+      )}
+      <span style={{ color: active ? 'var(--accent)' : undefined, display: 'inline-flex' }}>{icon}</span>
       <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
       {hint !== undefined && hint !== null && (
         <span className="mono" style={{ color: 'var(--fg-4)', fontSize: 11 }}>{hint}</span>
@@ -161,24 +172,37 @@ function NavRow({
   );
 }
 
-function AgentAvatar({ label, title }: { label: string; title: string }) {
-  return (
-    <span
-      title={title}
-      className="mono"
-      style={{
-        width: 16, height: 16, borderRadius: '50%',
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        background: 'var(--bg-2)', border: '1px solid var(--line)',
-        fontSize: 9.5, color: 'var(--fg-2)',
-      }}
-    >
-      {label}
-    </span>
-  );
-}
+/**
+ * Sidebar footer — live MCP status driven by /api/agents:
+ *   - mcp-health probe decides whether the chip is "MCP" (green-pulsing,
+ *     transport reachable) or "MCP offline" (gray, transport down).
+ *   - agents/online drives the "N agents online" count. The pluralisation
+ *     and the count are real, not the hard-coded "2" mock.
+ *
+ * Both queries refetch every 10s. Failure modes:
+ *   - mcp-health rejecting → chip turns gray "MCP offline".
+ *   - online returning 0 → "0 agents online". (No avatar list — the prior
+ *     "C / ↗" pills were decorative placeholders not tied to any client.)
+ */
+function AgentsFooter() {
+  const healthQuery = useQuery({
+    queryKey: ['mcp-health'],
+    queryFn: () => api.getMcpHealth(),
+    refetchInterval: 10_000,
+    retry: 1,
+  });
+  const onlineQuery = useQuery({
+    queryKey: ['agents-online'],
+    queryFn: () => api.getAgentsOnline(),
+    refetchInterval: 10_000,
+    retry: 1,
+  });
+  const healthy = healthQuery.data?.status === 'ok';
+  const count = onlineQuery.data?.count ?? 0;
+  const titles = (onlineQuery.data?.clients ?? [])
+    .map((c) => c.name || `${c.transport} session`)
+    .join(', ');
 
-function AgentsFooter({ agents = 0 }: { agents?: number }) {
   return (
     <div
       className="mono"
@@ -192,26 +216,32 @@ function AgentsFooter({ agents = 0 }: { agents?: number }) {
       }}
     >
       <span
+        title={healthy ? 'MCP transport reachable' : 'MCP transport unreachable'}
         style={{
           display: 'inline-flex', alignItems: 'center', gap: 5,
           padding: '2px 6px', borderRadius: 3,
-          background: 'var(--accent-soft)', color: 'var(--accent)',
+          background: healthy ? 'var(--accent-soft)' : 'var(--bg-2)',
+          color: healthy ? 'var(--accent)' : 'var(--fg-3)',
+          border: healthy ? 'none' : '1px solid var(--line)',
         }}
       >
         <span
-          className="pulse"
+          className={healthy ? 'dot pulse' : 'dot'}
           style={{
             display: 'inline-block',
             width: 5, height: 5, borderRadius: '50%',
-            background: 'var(--accent)',
+            background: healthy ? 'var(--accent)' : 'var(--fg-4)',
+            boxShadow: 'none',
           }}
         />
-        MCP
+        {healthy ? 'MCP' : 'MCP offline'}
       </span>
-      <span style={{ color: 'var(--fg-3)' }}>{agents} agents online</span>
-      <div style={{ flex: 1 }} />
-      <AgentAvatar label="C" title="Claude" />
-      <AgentAvatar label="↗" title="Cursor" />
+      <span
+        style={{ color: 'var(--fg-3)' }}
+        title={titles || undefined}
+      >
+        {count} {count === 1 ? 'agent' : 'agents'} online
+      </span>
     </div>
   );
 }
@@ -286,6 +316,7 @@ export function Sidebar({
         display: 'flex', flexDirection: 'column',
         width: '100%', height: '100%',
         background: 'var(--bg-1)',
+        borderRight: '1px solid var(--line)',
         fontSize: 'var(--fs-base)',
         color: 'var(--fg-1)',
       }}
@@ -307,7 +338,7 @@ export function Sidebar({
           <Icons.Logo size={18} />
           <span
             className="mono"
-            style={{ fontWeight: 600, color: 'var(--fg)', fontSize: 14, letterSpacing: 0.3 }}
+            style={{ fontWeight: 600, color: 'var(--fg)', letterSpacing: 0.5 }}
           >
             kryton
           </span>
@@ -321,7 +352,7 @@ export function Sidebar({
         {onCollapse && (
           <button
             onClick={onCollapse}
-            title="Collapse sidebar (Ctrl+B)"
+            title={`Collapse sidebar (${formatShortcut(['mod', 'B'])})`}
             aria-label="Collapse sidebar"
             style={{
               width: 26, height: 26, borderRadius: 5,
@@ -381,7 +412,7 @@ export function Sidebar({
             count={starredPaths.size}
           />
           {favOpen && (
-            <div style={{ marginBottom: 4 }}>
+            <div style={{ marginBottom: 8 }}>
               {starredPaths.size === 0 ? (
                 <div
                   style={{
@@ -391,7 +422,7 @@ export function Sidebar({
                     fontStyle: 'italic',
                   }}
                 >
-                  No favorites yet · Ctrl+Shift+S
+                  No favorites yet · {formatShortcut(['mod', 'shift', 'S'])}
                 </div>
               ) : (
                 <FavoritesSection
@@ -410,10 +441,9 @@ export function Sidebar({
             open={filesOpen}
             setOpen={setFilesOpen}
             label="Files"
-            count={noteCount}
             actions={
               <div style={{ display: 'flex', gap: 2 }}>
-                <IconBtn onClick={dispatchCreateRootFile} title="New note (Ctrl+Shift+N)">
+                <IconBtn onClick={dispatchCreateRootFile} title={`New note (${formatShortcut(['mod', 'shift', 'N'])})`}>
                   <Icons.Plus size={12} />
                 </IconBtn>
                 <IconBtn onClick={dispatchCreateRootFolder} title="New folder">
@@ -457,10 +487,10 @@ export function Sidebar({
                 display: 'flex',
                 flexWrap: 'wrap',
                 gap: 4,
-                padding: '2px 6px 12px',
+                padding: '2px 6px 8px',
               }}
             >
-              {tags.map(({ tag, count }) => (
+              {tags.slice(0, 11).map(({ tag, count }) => (
                 <button
                   key={tag}
                   className="mono"

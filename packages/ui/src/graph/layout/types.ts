@@ -34,6 +34,13 @@ export interface LayoutHandle {
   unpin(id: string): void;
   /** Inject kinetic energy after a structural change. */
   reheat(alpha: number): void;
+  /**
+   * Switch the pinned/anchor node without recreating the layout. Existing
+   * positions are preserved so the cluster morphs smoothly toward the new
+   * equilibrium instead of snapping to a fresh random init. Pass null to
+   * release the current pin (no node anchored).
+   */
+  setActive(id: string | null): void;
   /** Update viewport bounds; the layout may rescale ring radii etc. */
   setBounds(width: number, height: number): void;
   /** Tear down internal state, free references. */

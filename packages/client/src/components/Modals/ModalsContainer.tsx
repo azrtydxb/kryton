@@ -23,6 +23,11 @@ interface ModalsContainerProps {
   onCloseShareDialog: () => void;
   onCloseAccessRequests: () => void;
   onCloseAccountSettings: () => void;
+  /** Command-palette command handlers — wired into QuickSwitcher's Commands group. */
+  onNewNote?: () => void;
+  onDailyNote?: () => void;
+  onGraphView?: () => void;
+  onSettings?: () => void;
 }
 
 export function ModalsContainer({
@@ -32,6 +37,7 @@ export function ModalsContainer({
   onNoteSelect, onCloseQuickSwitcher,
   onCloseAdmin, onCloseShareDialog, onCloseAccessRequests,
   onCloseAccountSettings,
+  onNewNote, onDailyNote, onGraphView, onSettings,
 }: ModalsContainerProps) {
   return (
     <>
@@ -39,7 +45,15 @@ export function ModalsContainer({
         <TemplatePicker onSelect={onTemplateSelected} onClose={onCloseTemplatePicker} noteTitle="New Note" />
       )}
       {showQuickSwitcher && (
-        <QuickSwitcher notes={noteTree} onSelect={onNoteSelect} onClose={onCloseQuickSwitcher} />
+        <QuickSwitcher
+          notes={noteTree}
+          onSelect={onNoteSelect}
+          onClose={onCloseQuickSwitcher}
+          onNewNote={onNewNote}
+          onDailyNote={onDailyNote}
+          onGraphView={onGraphView}
+          onSettings={onSettings}
+        />
       )}
       {showAdmin && <AdminPage onClose={onCloseAdmin} />}
       {showShareDialog && shareTarget && (

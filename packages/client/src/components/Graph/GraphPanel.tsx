@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect, type CSSProperties } from 're
 import { createPortal } from 'react-dom';
 import { GraphView } from '@azrtydxb/ui';
 import type { HoveredNodeInfo } from '@azrtydxb/ui';
-import { GraphData, api } from '../../lib/api';
+import { GraphData } from '../../lib/api';
 import { Icons } from '../Icons';
 
 interface GraphPanelProps {
@@ -23,10 +23,7 @@ interface GraphPanelProps {
 }
 
 interface TooltipState {
-  x: number;
-  y: number;
   title: string;
-  preview: string;
   path: string;
 }
 
@@ -116,10 +113,11 @@ export function GraphPanel({
 
   const [expanded, setExpanded] = useState(false);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+  const [zoom, setZoom] = useState(1);
   const recenterRef = useRef<(() => void) | null>(null);
   const expandedRecenterRef = useRef<(() => void) | null>(null);
-  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const previewCacheRef = useRef<Map<string, string>>(new Map());
+  const canvasWrapRef = useRef<HTMLDivElement | null>(null);
+  const expandedCanvasWrapRef = useRef<HTMLDivElement | null>(null);
 
   // If no active note, force global mode (local is meaningless)
   const effectiveMode: 'local' | 'global' = activeNotePath ? mode : 'global';
@@ -148,35 +146,44 @@ export function GraphPanel({
     [onNoteSelect],
   );
 
-  // Hover handler — fetches preview for the info card.
+  // Hover handler — bible card shows only title + path.
   const handleHover = useCallback((node: HoveredNodeInfo | null) => {
-    if (hoverTimerRef.current) {
-      clearTimeout(hoverTimerRef.current);
-      hoverTimerRef.current = null;
-    }
     if (!node) {
       setTooltip(null);
       return;
     }
-    const cached = previewCacheRef.current.get(node.path);
-    if (cached !== undefined) {
-      setTooltip({ x: node.x, y: node.y, title: node.title, preview: cached, path: node.path });
-      return;
-    }
-    hoverTimerRef.current = setTimeout(async () => {
-      try {
-        const note = await api.getNote(node.path);
-        const body = note.content.replace(/^---[\s\S]*?---\n*/, '');
-        const lines = body.split('\n').filter((l) => l.trim()).slice(0, 3);
-        const preview = lines.join('\n').slice(0, 200);
-        previewCacheRef.current.set(node.path, preview);
-        setTooltip({ x: node.x, y: node.y, title: node.title, preview, path: node.path });
-      } catch {
-        previewCacheRef.current.set(node.path, '');
-        setTooltip({ x: node.x, y: node.y, title: node.title, preview: '', path: node.path });
-      }
-    }, 200);
+    setTooltip({ title: node.title, path: node.path });
   }, []);
+
+  // Dispatch a synthetic wheel event on the canvas wrapper to leverage
+  // useViewport.web's existing wheel-zoom handler. The factor used by
+  // applyWheelZoom is Math.exp(-deltaY / 300); we mirror it locally so
+  // the legend %% stays in sync with the actual transform.
+  const dispatchZoom = useCallback((deltaY: number) => {
+    const wrap = (expanded ? expandedCanvasWrapRef.current : canvasWrapRef.current);
+    const target = wrap?.querySelector('canvas') ?? wrap;
+    if (!target) return;
+    const rect = (target as Element).getBoundingClientRect();
+    const evt = new WheelEvent('wheel', {
+      deltaY,
+      clientX: rect.left + rect.width / 2,
+      clientY: rect.top + rect.height / 2,
+      bubbles: true,
+      cancelable: true,
+    });
+    target.dispatchEvent(evt);
+    setZoom((z) => {
+      const next = z * Math.exp(-deltaY / 300);
+      // Clamp to GRAPH_CONFIG.zoom range used by useViewport (0.2 .. 5 typical).
+      return Math.max(0.1, Math.min(10, next));
+    });
+  }, [expanded]);
+
+  const handleRecenter = useCallback(() => {
+    if (expanded) expandedRecenterRef.current?.();
+    else recenterRef.current?.();
+    setZoom(1);
+  }, [expanded]);
 
   const nodeCount = graphData?.nodes.length ?? 0;
   const edgeCount = graphData?.edges.length ?? 0;
@@ -228,7 +235,7 @@ export function GraphPanel({
 
   // Canvas overlay corner controls — per prototype/app/graph.jsx,
   // a vertical stack at top-right of the canvas: Center, Zoom in, Zoom out.
-  const renderCornerControls = (onExpand: (() => void) | null) => (
+  const renderCornerControls = () => (
     <div
       style={{
         position: 'absolute',
@@ -240,7 +247,7 @@ export function GraphPanel({
       <button
         type="button"
         style={gfxBtn}
-        onClick={() => (fullscreen ? expandedRecenterRef.current?.() : recenterRef.current?.())}
+        onClick={handleRecenter}
         aria-label="Recenter graph"
         title="Center"
         onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent)'; e.currentTarget.style.borderColor = 'var(--accent)'; }}
@@ -248,22 +255,21 @@ export function GraphPanel({
       >
         <Icons.Crosshair size={12} />
       </button>
-      {onExpand && (
-        <button
-          type="button"
-          style={gfxBtn}
-          onClick={onExpand}
-          aria-label="Expand graph"
-          title="Expand"
-          onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent)'; e.currentTarget.style.borderColor = 'var(--accent)'; }}
-          onMouseLeave={e => { e.currentTarget.style.color = 'var(--fg-2)'; e.currentTarget.style.borderColor = 'var(--line)'; }}
-        >
-          <Icons.Plus size={12} />
-        </button>
-      )}
       <button
         type="button"
         style={gfxBtn}
+        onClick={() => dispatchZoom(-100)}
+        aria-label="Zoom in"
+        title="Zoom in"
+        onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent)'; e.currentTarget.style.borderColor = 'var(--accent)'; }}
+        onMouseLeave={e => { e.currentTarget.style.color = 'var(--fg-2)'; e.currentTarget.style.borderColor = 'var(--line)'; }}
+      >
+        <Icons.Plus size={12} />
+      </button>
+      <button
+        type="button"
+        style={gfxBtn}
+        onClick={() => dispatchZoom(100)}
         aria-label="Zoom out"
         title="Zoom out"
         onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent)'; e.currentTarget.style.borderColor = 'var(--accent)'; }}
@@ -297,97 +303,36 @@ export function GraphPanel({
         link
       </span>
       <div style={{ flex: 1 }} />
-      <span style={{ color: 'var(--fg-4)' }}>100%</span>
+      <span>{Math.round(zoom * 100)}%</span>
     </div>
   );
 
   // ---- Hover info card ----
+  // Per prototype/app/graph.jsx (~line 116-123): corner-anchored at
+  // bottom-left, bg-2, line border, 6px radius, mono 11/fg-1, title
+  // 12/fg, subtitle fg-3 (inherits size from card root). No body
+  // preview, no action button.
   const renderHoverCard = (t: TooltipState) => (
     <div
       style={{
         position: 'absolute',
-        left: Math.min(t.x + 14, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 320),
-        top: Math.max(t.y - 70, 8),
-        maxWidth: 300,
-        background: 'var(--bg-1)',
-        border: '1px solid var(--line-strong)',
-        borderRadius: 8,
-        padding: 10,
+        left: 12,
+        bottom: 12,
+        padding: '8px 10px',
+        background: 'var(--bg-2)',
+        border: '1px solid var(--line)',
+        borderRadius: 6,
+        fontFamily: 'var(--font-mono)',
+        fontSize: 11,
+        color: 'var(--fg-1)',
         boxShadow: 'var(--shadow-md)',
+        maxWidth: 280,
         zIndex: 10,
-        pointerEvents: 'auto',
-        animation: 'kryton-fade-in 200ms ease-out',
+        pointerEvents: 'none',
       }}
     >
-      <div
-        style={{
-          fontFamily: 'var(--font-sans)',
-          fontSize: 13,
-          color: 'var(--fg)',
-          fontWeight: 500,
-          marginBottom: 4,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {t.title}
-      </div>
-      <div
-        className="mono"
-        style={{
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11,
-          color: 'var(--fg-3)',
-          marginBottom: 6,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {t.path}
-      </div>
-      {t.preview && (
-        <div
-          style={{
-            fontFamily: 'var(--font-sans)',
-            fontSize: 12,
-            color: 'var(--fg-2)',
-            lineHeight: 1.5,
-            marginBottom: 8,
-            display: '-webkit-box',
-            WebkitLineClamp: 3,
-            WebkitBoxOrient: 'vertical',
-            overflow: 'hidden',
-          }}
-        >
-          {t.preview}
-        </div>
-      )}
-      <button
-        type="button"
-        onClick={() => {
-          if (fullscreen) handleOverlayNoteSelect(t.path);
-          else onNoteSelect(t.path);
-        }}
-        className="mono"
-        style={{
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11,
-          letterSpacing: '0.06em',
-          textTransform: 'uppercase',
-          color: 'var(--accent)',
-          background: 'transparent',
-          border: 'none',
-          padding: 0,
-          cursor: 'pointer',
-          textDecoration: 'underline',
-          textDecorationStyle: 'dashed',
-          textUnderlineOffset: 3,
-        }}
-      >
-        open
-      </button>
+      <div style={{ color: 'var(--fg)', fontSize: 12, marginBottom: 2 }}>{t.title}</div>
+      <div style={{ color: 'var(--fg-3)' }}>{t.path}</div>
     </div>
   );
 
@@ -399,6 +344,7 @@ export function GraphPanel({
     height: '100%',
     width: fullscreen ? '100%' : undefined,
     background: 'var(--bg-1)',
+    borderLeft: fullscreen ? 'none' : '1px solid var(--line)',
     minWidth: 0,
     overflow: 'hidden',
   };
@@ -408,7 +354,7 @@ export function GraphPanel({
       <div style={containerStyle}>
         {renderHeader(fullscreen ? null : () => setExpanded(true))}
         {!expanded && (
-          <div className="bg-grid" style={{ flex: 1, display: 'flex', position: 'relative', overflow: 'hidden', minHeight: 0 }}>
+          <div ref={canvasWrapRef} className="bg-grid" style={{ flex: 1, display: 'flex', position: 'relative', overflow: 'hidden', minHeight: 0 }}>
             <GraphView
               graphData={graphData}
               loading={loading}
@@ -418,8 +364,9 @@ export function GraphPanel({
               onNodeHover={handleHover}
               recenterRef={recenterRef}
               starredPaths={starredPaths}
+              showAllLabels={fullscreen}
             />
-            {renderCornerControls(fullscreen ? null : () => setExpanded(true))}
+            {renderCornerControls()}
             {tooltip && renderHoverCard(tooltip)}
           </div>
         )}
@@ -468,14 +415,15 @@ export function GraphPanel({
               }}
             >
               <div style={railHeader}>
-                <Icons.Network size={14} style={{ color: 'var(--fg-3)' }} />
+                <Icons.Network size={13} style={{ color: 'var(--accent)' }} />
                 <span
                   className="mono"
                   style={{
-                    fontSize: 12,
-                    color: 'var(--fg-2)',
+                    fontSize: 11,
+                    color: 'var(--fg-3)',
                     fontFamily: 'var(--font-mono)',
-                    letterSpacing: '0.04em',
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
                   }}
                 >
                   graph
@@ -504,20 +452,8 @@ export function GraphPanel({
                     global
                   </button>
                 </div>
-                <button
-                  type="button"
-                  style={gfxBtn}
-                  onClick={() => {
-                    setExpanded(false);
-                    setTooltip(null);
-                  }}
-                  aria-label="Close fullscreen"
-                  title="Close"
-                >
-                  <Icons.X size={12} />
-                </button>
               </div>
-              <div className="bg-grid" style={{ flex: 1, display: 'flex', position: 'relative', minHeight: 0 }}>
+              <div ref={expandedCanvasWrapRef} className="bg-grid" style={{ flex: 1, display: 'flex', position: 'relative', minHeight: 0 }}>
                 <GraphView
                   graphData={graphData}
                   loading={loading}
@@ -527,8 +463,9 @@ export function GraphPanel({
                   onNodeHover={handleHover}
                   recenterRef={expandedRecenterRef}
                   starredPaths={starredPaths}
+                  showAllLabels
                 />
-                {renderCornerControls(null)}
+                {renderCornerControls()}
                 {tooltip && renderHoverCard(tooltip)}
               </div>
               {renderLegend()}

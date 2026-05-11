@@ -2,6 +2,7 @@ import { ComponentType, useRef, useState, useEffect } from 'react';
 import { useDebouncedCallback } from 'use-debounce';
 import { FileNode } from '../../lib/api';
 import { Editor, type EditorCursorState, type EditorHandle, EditorTabStrip, ModePills } from '../Editor/Editor';
+import { EditorToolbar } from '../Editor/EditorToolbar';
 import { Preview } from '../Preview/Preview';
 // OutgoingLinksPanel intentionally removed to match design handoff: the
 // editor surface has only the tab strip + body + EditorMeta (28px). Outgoing
@@ -33,6 +34,8 @@ interface EditModeViewProps {
   /** retained for parent API compatibility; edit/split views don't render
      a backlinks panel — backlinks live inside the preview body's tail. */
   onNoteSelect?: (path: string) => void;
+  /** Close a tab by path. Handles next-focus / clearing the active note. */
+  onTabClose?: (path: string) => void;
   onLinkClick: (name: string) => void;
   onCreateNote: (name: string) => void;
 }
@@ -44,7 +47,7 @@ export function EditModeView({
   getCodeFenceRenderer,
   onAutoSave, onCancel, onToggleStar, onPdfExport,
   onContentChange, onCursorStateChange,
-  onLinkClick, onCreateNote, onNoteSelect,
+  onLinkClick, onCreateNote, onNoteSelect, onTabClose,
 }: EditModeViewProps) {
   const hasChanges = editContent !== originalContent;
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('unchanged');
@@ -96,16 +99,6 @@ export function EditModeView({
   const showPreview = layout === 'preview' || layout === 'split';
   const dirty = hasChanges || saveStatus === 'saving' || saveStatus === 'unsaved';
 
-  const saveStatusLabel = (() => {
-    switch (saveStatus) {
-      case 'saving': return { text: 'saving…', color: 'var(--fg-3)' };
-      case 'saved':  return { text: 'saved',   color: 'var(--accent-good)' };
-      case 'error':  return { text: 'save failed', color: 'var(--accent-danger)' };
-      case 'unsaved': return { text: 'unsaved', color: 'var(--accent-warn)' };
-      default: return { text: '', color: 'var(--fg-3)' };
-    }
-  })();
-
   // Suppress unused variable warnings; resolvedTheme and allNotes are used
   // for future theming and wiki-link plugin wiring.
   void resolvedTheme;
@@ -116,7 +109,7 @@ export function EditModeView({
       onClick={props.onClick}
       title={props.title}
       style={{
-        width: 28, height: 28, borderRadius: 5,
+        width: 30, height: 30, borderRadius: 6,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         color: props.active ? 'var(--accent-warn)' : 'var(--fg-3)',
         background: 'transparent',
@@ -137,27 +130,22 @@ export function EditModeView({
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, background: 'var(--bg)' }}>
-      {/* Tab strip + actions row (single 32px row, shared bottom border) */}
+      {/* Tab strip + actions row (single 38px row, shared bottom border) */}
       <div style={{ display: 'flex', alignItems: 'stretch', background: 'var(--bg)', borderBottom: '1px solid var(--line)' }}>
         <div style={{ flex: 1, minWidth: 0, display: 'flex' }}>
           <EditorTabStrip
             activePath={activeNote.path}
             activeTitle={activeNote.title}
             dirty={dirty}
-            onClose={onCancel}
+            onSelect={(p) => onNoteSelect?.(p)}
+            onClose={(p) => onTabClose?.(p)}
           />
         </div>
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          padding: '0 8px 0 4px', height: 32,
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '0 12px 0 4px', height: 38,
         }}>
           <ModePills />
-          {/* tiny inline saved/saving indicator (mono, accent-good when 'saved') */}
-          {(saveStatus === 'saving' || saveStatus === 'saved' || saveStatus === 'error' || saveStatus === 'unsaved') && (
-            <span className="mono" style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: saveStatusLabel.color, minWidth: 56, textAlign: 'right' }}>
-              {saveStatusLabel.text}
-            </span>
-          )}
           {/* Star / Share / More — per prototype/app/editor.jsx EditorTabBar */}
           {headerBtn({
             onClick: onToggleStar,
@@ -182,6 +170,10 @@ export function EditModeView({
           pane has only the tab strip + mode pills above the body, no separate
           toolbar row. In-editor formatting goes through keyboard shortcuts;
           plugin-supplied buttons live in the status bar via PluginSlot. */}
+
+      {/* Formatting toolbar — shown only when the editor surface is active
+          (edit or split). Pure-preview mode hides it. */}
+      {showEditor && <EditorToolbar editorRef={editorRef} />}
 
       {/* Body */}
       <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>

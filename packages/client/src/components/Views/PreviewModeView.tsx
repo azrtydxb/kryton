@@ -1,4 +1,4 @@
-import { MutableRefObject, ComponentType, useState, useEffect, useRef } from 'react';
+import { MutableRefObject, ComponentType, useState, useEffect } from 'react';
 import { FileNode } from '../../lib/api';
 import { api, NoteVersion } from '../../lib/api';
 import { Preview } from '../Preview/Preview';
@@ -22,19 +22,12 @@ interface PreviewModeViewProps {
   /** retained for parent API compatibility; backlinks live inline at the
      bottom of the preview body, no separate rail. */
   onNoteSelect?: (path: string) => void;
+  /** Close a tab by path; routed up to handleTabClose. */
+  onTabClose?: (path: string) => void;
   onLinkClick: (name: string) => void;
   onCreateNote: (name: string) => void;
   onRestored?: () => void;
   getCodeFenceRenderer?: (language: string) => { component: ComponentType<{ content: string; notePath: string }> } | undefined;
-}
-
-function timeAgo(timestamp: number): string {
-  const seconds = Math.floor((Date.now() - timestamp) / 1000);
-  if (seconds < 60) return 'just now';
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
-  return new Date(timestamp).toLocaleDateString();
 }
 
 interface VersionPreviewModalProps {
@@ -140,51 +133,24 @@ function VersionPreviewModal({ notePath, version, allNotes, onClose, onRestore }
 export function PreviewModeView({
   activeNote, isStarred, allNotes, previewRef,
   onEdit, onShare, onToggleStar,
-  onLinkClick, onCreateNote, onRestored, getCodeFenceRenderer, onNoteSelect,
+  onLinkClick, onCreateNote, onRestored, getCodeFenceRenderer, onNoteSelect, onTabClose,
 }: PreviewModeViewProps) {
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [versions, setVersions] = useState<NoteVersion[]>([]);
-  const [loadingVersions, setLoadingVersions] = useState(false);
+  // Version history lives in <NoteHistoryPopover> at app level (see App.tsx)
+  // — it's anchored to the top-bar History button and renders for any view.
+  // The version-restore preview modal (VersionPreviewModal) is still owned
+  // here because it's a per-note diff overlay, not part of the history list.
   const [previewVersion, setPreviewVersion] = useState<NoteVersion | null>(null);
-  const [restoring, setRestoring] = useState<number | null>(null);
-  const historyPanelRef = useRef<HTMLDivElement | null>(null);
   const setPref = usePrefs((s) => s.setPref);
 
-  // Load versions when the panel opens
-  useEffect(() => {
-    if (!historyOpen) return;
-    setLoadingVersions(true);
-    api.listVersions(activeNote.path)
-      .then((data) => setVersions(data.versions))
-      .catch(() => setVersions([]))
-      .finally(() => setLoadingVersions(false));
-  }, [historyOpen, activeNote.path]);
-
-  // Close panel when clicking outside
-  useEffect(() => {
-    if (!historyOpen) return;
-    function handleClick(e: MouseEvent) {
-      if (historyPanelRef.current && !historyPanelRef.current.contains(e.target as Node)) {
-        setHistoryOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [historyOpen]);
-
-  async function handleRestore(timestamp: number) {
-    setRestoring(timestamp);
+  const handleRestore = async (timestamp: number): Promise<void> => {
     try {
       await api.restoreVersion(activeNote.path, timestamp);
-      setHistoryOpen(false);
       setPreviewVersion(null);
       onRestored?.();
     } catch {
       // Silently fail — user can try again
-    } finally {
-      setRestoring(null);
     }
-  }
+  };
 
   // Mode pill change: switching to "edit" or "split" enters edit mode.
   // "preview" keeps the user here.
@@ -228,6 +194,8 @@ export function PreviewModeView({
             activePath={activeNote.path}
             activeTitle={activeNote.title}
             dirty={false}
+            onSelect={(p) => onNoteSelect?.(p)}
+            onClose={(p) => onTabClose?.(p)}
           />
         </div>
         <div style={{
@@ -247,87 +215,14 @@ export function PreviewModeView({
             title: 'Share',
             children: <Icons.Share size={13} />,
           })}
-          <div style={{ position: 'relative' }} ref={historyPanelRef}>
-            {headerBtn({
-              onClick: () => setHistoryOpen((o) => !o),
-              title: 'More',
-              active: historyOpen,
-              children: <Icons.More size={13} />,
-            })}
-            {historyOpen && (
-              <div
-                style={{
-                  position: 'absolute', right: 0, top: 32, zIndex: 40,
-                  width: 280, background: 'var(--bg-1)', border: '1px solid var(--line)',
-                  borderRadius: 8, boxShadow: 'var(--shadow-md)', overflow: 'hidden',
-                }}
-              >
-                <div style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '8px 10px', borderBottom: '1px solid var(--line)',
-                  fontFamily: 'var(--font-mono)', fontSize: 10.5,
-                  letterSpacing: '0.08em', textTransform: 'uppercase',
-                  color: 'var(--fg-4)',
-                }}>
-                  <span>// version history</span>
-                  <button onClick={() => setHistoryOpen(false)} style={{ color: 'var(--fg-3)' }}>
-                    <Icons.X size={12} />
-                  </button>
-                </div>
-                <div style={{ maxHeight: 280, overflowY: 'auto' }}>
-                  {loadingVersions && (
-                    <p className="mono" style={{ padding: 14, fontSize: 11, color: 'var(--fg-4)', textAlign: 'center' }}>loading…</p>
-                  )}
-                  {!loadingVersions && versions.length === 0 && (
-                    <p className="mono" style={{ padding: 14, fontSize: 11, color: 'var(--fg-4)', textAlign: 'center' }}>no saved versions yet.</p>
-                  )}
-                  {!loadingVersions && versions.map((v) => (
-                    <div
-                      key={v.timestamp}
-                      style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        padding: '8px 10px', borderBottom: '1px solid var(--line)',
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-                    >
-                      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                        <span style={{ fontSize: 12, color: 'var(--fg-1)' }}>{timeAgo(v.timestamp)}</span>
-                        <span className="mono" style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--fg-4)' }}>
-                          {new Date(v.timestamp).toLocaleString()} · {(v.size / 1024).toFixed(1)} KB
-                        </span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0, marginLeft: 8 }}>
-                        <button
-                          onClick={() => setPreviewVersion(v)}
-                          title="Preview this version"
-                          style={{ width: 22, height: 22, borderRadius: 4, color: 'var(--fg-3)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--accent)'; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--fg-3)'; }}
-                        >
-                          <Icons.Eye size={12} />
-                        </button>
-                        <button
-                          onClick={() => handleRestore(v.timestamp)}
-                          disabled={restoring === v.timestamp}
-                          title="Restore this version"
-                          style={{
-                            width: 22, height: 22, borderRadius: 4, color: 'var(--fg-3)',
-                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                            opacity: restoring === v.timestamp ? 0.5 : 1,
-                          }}
-                          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--accent)'; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--fg-3)'; }}
-                        >
-                          <Icons.History size={12} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+          {/* "More" placeholder. Version history opens via the top-bar
+              History button which renders <NoteHistoryPopover> at app
+              level (see App.tsx). */}
+          {headerBtn({
+            onClick: () => { /* future per-note actions */ },
+            title: 'More',
+            children: <Icons.More size={13} />,
+          })}
         </div>
       </div>
 

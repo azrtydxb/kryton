@@ -1566,6 +1566,123 @@
         ]
       }
     },
+    "/api/agents/mcp-health": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "status": {
+                      "enum": [
+                        "ok"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "MCP transport reachability probe",
+        "tags": [
+          "agents"
+        ]
+      }
+    },
+    "/api/agents/online": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "clients": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "lastActivity": {
+                            "type": "number"
+                          },
+                          "name": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "sessionId": {
+                            "type": "string"
+                          },
+                          "startedAt": {
+                            "type": "number"
+                          },
+                          "transport": {
+                            "enum": [
+                              "sse",
+                              "streamable"
+                            ],
+                            "type": "string"
+                          },
+                          "version": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "sessionId",
+                          "name",
+                          "version",
+                          "transport",
+                          "startedAt",
+                          "lastActivity"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "count": {
+                      "maximum": 9007199254740991,
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "count",
+                    "clients"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "List MCP sessions currently connected for the calling user",
+        "tags": [
+          "agents"
+        ]
+      }
+    },
     "/api/agents/tokens/{tokenId}/revoke": {
       "post": {
         "parameters": [

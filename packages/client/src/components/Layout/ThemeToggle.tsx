@@ -70,7 +70,9 @@ export function ThemeToggle({ theme, setTheme }: ThemeToggleProps) {
       <button
         ref={buttonRef}
         onClick={() => setOpen(!open)}
-        className="btn-ghost p-2"
+        style={{ padding: 8, borderRadius: 6, color: 'var(--fg-3)', background: 'transparent' }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
         aria-label="Theme"
         title="Theme"
       >

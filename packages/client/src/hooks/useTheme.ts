@@ -13,14 +13,8 @@ function applyTheme(theme: Theme) {
   const resolved = theme === 'system' ? getSystemTheme() : theme;
   const root = document.documentElement;
 
-  // Explicitly add or remove — never rely on toggle()
-  if (resolved === 'dark') {
-    root.classList.add('dark');
-  } else {
-    root.classList.remove('dark');
-  }
-
-  // Sync data attribute for any non-Tailwind consumers
+  // Bible uses data-theme attribute exclusively; the dark: Tailwind variant
+  // is mapped to [data-theme="dark"] via @custom-variant in globals.css.
   root.dataset.theme = resolved;
 }
 

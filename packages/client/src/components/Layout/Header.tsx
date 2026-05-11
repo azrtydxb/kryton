@@ -10,6 +10,8 @@ import { MutableRefObject, useMemo } from 'react';
 import { UserMenu } from './UserMenu';
 import { Icons } from '../Icons';
 import { usePrefs } from '../../stores/prefsStore';
+import { useUIStore } from '../../stores/uiStore';
+import { formatShortcut } from '../../lib/platform';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -34,7 +36,7 @@ interface HeaderProps {
   onNewNote?: () => void;
 }
 
-const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
+// isMac/modKey now live in lib/platform.ts — kept the import above.
 
 /**
  * Per-prototype breadcrumb:  `~/notes › <filename>.md`
@@ -72,26 +74,44 @@ function Breadcrumb({ activeNotePath }: { activeNotePath: string | null }) {
 
 /** 30×30 icon button per prototype `HeaderBtn`. */
 function HeaderBtn({
-  onClick, title, ariaLabel, children,
+  onClick, title, ariaLabel, active, disabled, dataAttr, children,
 }: {
   onClick?: () => void;
   title?: string;
   ariaLabel?: string;
+  active?: boolean;
+  disabled?: boolean;
+  /** Optional data-* hook so other components can identify this button. */
+  dataAttr?: string;
   children: React.ReactNode;
 }) {
   return (
     <button
-      onClick={onClick}
+      onClick={disabled ? undefined : onClick}
       title={title}
       aria-label={ariaLabel ?? title}
+      aria-pressed={active}
+      disabled={disabled}
+      data-header-btn={dataAttr}
       style={{
         width: 30, height: 30, borderRadius: 6,
-        color: 'var(--fg-2)',
+        color: active ? 'var(--accent)' : 'var(--fg-2)',
+        background: active ? 'var(--accent-soft)' : 'transparent',
+        opacity: disabled ? 0.4 : 1,
+        cursor: disabled ? 'not-allowed' : 'pointer',
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         transition: 'background 120ms, color 120ms',
       }}
-      onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--fg)'; }}
-      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-2)'; }}
+      onMouseEnter={e => {
+        if (disabled || active) return;
+        e.currentTarget.style.background = 'var(--bg-hover)';
+        e.currentTarget.style.color = 'var(--fg)';
+      }}
+      onMouseLeave={e => {
+        if (disabled || active) return;
+        e.currentTarget.style.background = 'transparent';
+        e.currentTarget.style.color = 'var(--fg-2)';
+      }}
     >
       {children}
     </button>
@@ -120,7 +140,15 @@ export function Header({
     else searchInputRef.current?.focus();
   };
 
-  const kbdLabel = isMac ? '⌘K' : 'Ctrl K';
+  // History button toggles the per-note version dropdown via the UI store.
+  // The PreviewModeView (or any view rendering a note) subscribes to the
+  // same flag. When no note is active we disable the button.
+  const showNoteHistory = useUIStore((s) => s.showNoteHistory);
+  const setShowNoteHistory = useUIStore((s) => s.setShowNoteHistory);
+  const setShowAccountSettings = useUIStore((s) => s.setShowAccountSettings);
+  const historyDisabled = !activeNotePath;
+
+  const kbdLabel = formatShortcut(['mod', 'K']);
 
   return (
     <header
@@ -163,11 +191,20 @@ export function Header({
 
       {/* right cluster */}
       {onNewNote && (
-        <HeaderBtn onClick={onNewNote} title="New note (Ctrl+Shift+N)" ariaLabel="New note">
+        <HeaderBtn onClick={onNewNote} title={`New note (${formatShortcut(['mod', 'shift', 'N'])})`} ariaLabel="New note">
           <Icons.Plus size={14} />
         </HeaderBtn>
       )}
-      <HeaderBtn title="History" ariaLabel="History">
+      <HeaderBtn
+        onClick={() => setShowNoteHistory(!showNoteHistory)}
+        active={showNoteHistory && !historyDisabled}
+        disabled={historyDisabled}
+        title={historyDisabled ? 'Open a note to see its history' : 'Version history'}
+        ariaLabel="Version history"
+        // PreviewModeView's outside-click handler reads this attribute so it
+        // doesn't pre-emptively close the panel before our onClick toggles.
+        dataAttr="history-toggle"
+      >
         <Icons.History size={14} />
       </HeaderBtn>
       <HeaderBtn
@@ -177,7 +214,11 @@ export function Header({
       >
         {themePref === 'dark' ? <Icons.Sun size={14} /> : <Icons.Moon size={14} />}
       </HeaderBtn>
-      <HeaderBtn title="Settings" ariaLabel="Settings">
+      <HeaderBtn
+        onClick={() => setShowAccountSettings(true)}
+        title="Settings"
+        ariaLabel="Settings"
+      >
         <Icons.Settings size={14} />
       </HeaderBtn>
 
