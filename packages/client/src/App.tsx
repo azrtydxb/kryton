@@ -41,6 +41,7 @@ import { EmptyStateView } from './components/Views/EmptyStateView';
 import { ModalsContainer } from './components/Modals/ModalsContainer';
 import { ErrorToast } from './components/Toast/ErrorToast';
 import { ToastContainer } from './components/Toast/ToastContainer';
+import { NoteHistoryPopover } from './components/NoteHistoryPopover/NoteHistoryPopover';
 import { StatusBar } from './components/StatusBar/StatusBar';
 import { api, FileNode } from './lib/api';
 import LoginPage from './pages/LoginPage';
@@ -471,6 +472,11 @@ function AppContent() {
       <ErrorToast message={notes.error} onDismiss={() => notes.setError(null)} />
 
       <ToastContainer />
+
+      <NoteHistoryPopover
+        activePath={notes.activeNote?.path ?? null}
+        onRestored={() => notes.activeNote && notes.openNote(notes.activeNote.path)}
+      />
 
       <AppModals
         noteTree={notes.tree}
