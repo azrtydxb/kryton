@@ -9,6 +9,8 @@ export interface SearchResultItem {
   tags: string[];
   isShared?: boolean;
   ownerUserId?: string;
+  /** Relevance score (ts_rank for lexical, cosine sim for semantic). */
+  score?: number;
 }
 
 export interface SearchResultsProps {
@@ -68,7 +70,18 @@ export function SearchResults({
             <FileText size={15} className="text-gray-400 mt-0.5 flex-shrink-0" />
           )}
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-medium truncate">{result.title}</div>
+            <div className="flex items-center gap-2">
+              <div className="text-sm font-medium truncate flex-1">{result.title}</div>
+              {typeof result.score === "number" && (
+                <span
+                  className="text-[10px] text-gray-400 dark:text-gray-500 flex-shrink-0"
+                  style={{ fontFamily: "var(--font-mono, ui-monospace, monospace)" }}
+                  data-testid="result-score"
+                >
+                  score {result.score.toFixed(2)}
+                </span>
+              )}
+            </div>
             <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
               {result.path}
             </div>

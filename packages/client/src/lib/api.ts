@@ -21,6 +21,18 @@ export interface SearchResult {
   tags: string[];
   isShared?: boolean;
   ownerUserId?: string;
+  /** Relevance score: ts_rank for lexical, cosine similarity for semantic. */
+  score?: number;
+}
+
+export type SearchMode = "lexical" | "semantic" | "hybrid";
+
+export interface SemanticReady {
+  ready: boolean;
+  provider: "pgvector-local" | "novamem" | "off";
+  model?: string;
+  dimensions: number;
+  pendingJobs: number;
 }
 
 export interface GraphData {
@@ -194,7 +206,9 @@ export const api = {
     request<void>(`/folders-rename/${encodeURIComponent(path)}`, { method: 'POST', body: JSON.stringify({ newPath }) }),
 
   // Search
-  search: (query: string) => request<SearchResult[]>(`/search?q=${encodeURIComponent(query)}`),
+  search: (query: string, mode: SearchMode = "lexical") =>
+    request<SearchResult[]>(`/search?q=${encodeURIComponent(query)}&mode=${mode}`),
+  semanticReady: () => request<SemanticReady>('/search/semantic/ready'),
 
   // Graph
   getGraph: () => request<GraphData>('/graph'),
