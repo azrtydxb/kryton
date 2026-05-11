@@ -1,8 +1,13 @@
 # ADR-006: `NPM_PUBLISH_TOKEN` PAT Secret for Cross-Repo Package Publishing
 
 **Date:** 2026-04-30
-**Status:** Accepted
+**Status:** Superseded by [2026-05-11-remove-sqlite-and-offline-sync-design](../specs/2026-05-11-remove-sqlite-and-offline-sync-design.md) (2026-05-11)
 **Sub-project:** Core Publishing (spec 5 of 5)
+
+> **Superseded.** `@azrtydxb/core` and `@azrtydxb/core-react` have been
+> deleted from the monorepo (PR #110); no packages are published from
+> this repo any more. The `publish-core.yml` workflow that consumed this
+> token has been removed. Retained as historical context.
 
 ## Context
 

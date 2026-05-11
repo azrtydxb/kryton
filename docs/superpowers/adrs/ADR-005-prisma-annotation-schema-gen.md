@@ -1,8 +1,14 @@
 # ADR-005: `/// @sync` Prisma Annotations Drive Client SQLite Schema Generation
 
 **Date:** 2026-04-30
-**Status:** Accepted
+**Status:** Superseded by [2026-05-11-postgres-drizzle-migration-design](../specs/2026-05-11-postgres-drizzle-migration-design.md) + [2026-05-11-remove-sqlite-and-offline-sync-design](../specs/2026-05-11-remove-sqlite-and-offline-sync-design.md) (2026-05-11)
 **Sub-project:** Core (spec 1 of 5) + Server Sync v2 (spec 2 of 5)
+
+> **Superseded.** Prisma has been removed; the server runs on Drizzle +
+> Postgres. `@azrtydxb/core` is also gone (mobile/desktop are online-only
+> API consumers, so they don't need a client-side SQLite schema). The
+> `/// @sync` annotation machinery described below is dead code.
+> Retained as historical context.
 
 ## Context
 
