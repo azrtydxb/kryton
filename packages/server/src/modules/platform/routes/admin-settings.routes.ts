@@ -1,7 +1,9 @@
 import type { FastifyPluginAsync } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { GLOBAL_USER_ID } from "../../../lib/pathUtils.js";
+import { settings } from "../../../db/schema/settings.js";
 
 const registrationModeSchema = z.object({
   mode: z.enum(["open", "invite-only"]),
@@ -30,8 +32,8 @@ export const adminSettingsRoutes: FastifyPluginAsync = async (app) => {
       },
     },
     async () => {
-      const rows = await app.prisma.settings.findMany({
-        where: { key: "registration_mode" },
+      const rows = await app.db.query.settings.findMany({
+        where: eq(settings.key, "registration_mode"),
       });
       const row = rows.find((r) => r.userId === GLOBAL_USER_ID) ?? rows[0];
       const mode = row?.value ?? "open";
@@ -54,11 +56,13 @@ export const adminSettingsRoutes: FastifyPluginAsync = async (app) => {
     },
     async (req) => {
       const { mode } = req.body;
-      await app.prisma.settings.upsert({
-        where: { key_userId: { key: "registration_mode", userId: GLOBAL_USER_ID } },
-        create: { key: "registration_mode", userId: GLOBAL_USER_ID, value: mode },
-        update: { value: mode },
-      });
+      await app.db
+        .insert(settings)
+        .values({ key: "registration_mode", userId: GLOBAL_USER_ID, value: mode })
+        .onConflictDoUpdate({
+          target: [settings.key, settings.userId],
+          set: { value: mode, updatedAt: new Date() },
+        });
       return { mode };
     },
   );

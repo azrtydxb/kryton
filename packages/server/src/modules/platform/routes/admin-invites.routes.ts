@@ -1,8 +1,10 @@
 import crypto from "crypto";
 import type { FastifyPluginAsync } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
+import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { NotFoundError } from "../../../lib/errors.js";
+import { inviteCode } from "../../../db/schema/sharing.js";
 
 const createInviteSchema = z.object({
   expiresAt: z.string().datetime().optional(),
@@ -44,13 +46,14 @@ export const adminInvitesRoutes: FastifyPluginAsync = async (app) => {
       const user = await app.auth.requireUser(req);
       const code = crypto.randomBytes(4).toString("hex");
 
-      const saved = await app.prisma.inviteCode.create({
-        data: {
+      const [saved] = await app.db
+        .insert(inviteCode)
+        .values({
           code,
           createdById: user.id,
           expiresAt: req.body.expiresAt ? new Date(req.body.expiresAt) : null,
-        },
-      });
+        })
+        .returning();
       return saved;
     },
   );
@@ -68,9 +71,9 @@ export const adminInvitesRoutes: FastifyPluginAsync = async (app) => {
       },
     },
     async () => {
-      const invites = await app.prisma.inviteCode.findMany({
-        orderBy: { createdAt: "desc" },
-        select: {
+      const invites = await app.db.query.inviteCode.findMany({
+        orderBy: desc(inviteCode.createdAt),
+        columns: {
           id: true,
           code: true,
           createdById: true,
@@ -98,11 +101,13 @@ export const adminInvitesRoutes: FastifyPluginAsync = async (app) => {
     },
     async (req) => {
       const inviteId = req.params.id;
-      const invite = await app.prisma.inviteCode.findUnique({ where: { id: inviteId } });
+      const invite = await app.db.query.inviteCode.findFirst({
+        where: eq(inviteCode.id, inviteId),
+      });
       if (!invite) {
         throw new NotFoundError("Invite not found");
       }
-      await app.prisma.inviteCode.delete({ where: { id: inviteId } });
+      await app.db.delete(inviteCode).where(eq(inviteCode.id, inviteId));
       return { ok: true };
     },
   );

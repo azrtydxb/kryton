@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
+import { sql } from "drizzle-orm";
 import { z } from "zod";
 
 const healthResponseSchema = z.object({
@@ -42,7 +43,7 @@ export const healthRoutes: FastifyPluginAsync = async (app) => {
       const checks: Record<string, { ok: boolean; message?: string }> = {};
 
       try {
-        await app.prisma.$queryRaw`SELECT 1`;
+        await app.db.execute(sql`SELECT 1`);
         checks.database = { ok: true };
       } catch (err) {
         checks.database = { ok: false, message: err instanceof Error ? err.message : "unknown" };
