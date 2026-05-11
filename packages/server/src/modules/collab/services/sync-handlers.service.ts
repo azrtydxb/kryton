@@ -1,6 +1,20 @@
 import * as fsPromises from "fs/promises";
 import * as pathModule from "path";
-import type { PrismaClient } from "../../../generated/prisma/client.js";
+import { and, eq, sql } from "drizzle-orm";
+import type { Db } from "../../../db/client.js";
+import {
+  folder,
+  graphEdge,
+  noteRevision,
+  noteTag,
+  noteVersion,
+  searchIndex,
+  tag,
+  trashItem,
+} from "../../../db/schema/notes.js";
+import { noteShare } from "../../../db/schema/sharing.js";
+import { settings, installedPlugin } from "../../../db/schema/settings.js";
+import { syncCursor } from "../../../db/schema/sync.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -16,20 +30,28 @@ export interface HandlerResult {
   conflicts: Array<{ id: string; current_version: number; current_state: unknown }>;
 }
 
-export type TxClient = Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
+/** Drizzle Postgres transaction type. */
+export type TxClient = Parameters<Parameters<Db["transaction"]>[0]>[0];
 export type Handler = (userId: string, ops: EntityOp[], tx: TxClient) => Promise<HandlerResult>;
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Increment the per-user sync cursor and return its new value. Uses a single
+ * INSERT … ON CONFLICT DO UPDATE so concurrent writers don't lose updates.
+ */
 export async function incrementCursorIn(tx: TxClient, userId: string): Promise<bigint> {
-  const r = await tx.syncCursor.upsert({
-    where: { userId },
-    update: { cursor: { increment: 1n } },
-    create: { userId, cursor: 1n },
-  });
-  return r.cursor;
+  const [row] = await tx
+    .insert(syncCursor)
+    .values({ userId, cursor: 1n })
+    .onConflictDoUpdate({
+      target: syncCursor.userId,
+      set: { cursor: sql`${syncCursor.cursor} + 1` },
+    })
+    .returning({ cursor: syncCursor.cursor });
+  return row.cursor;
 }
 
 export function serializeBigInt<T extends Record<string, unknown>>(obj: T): Record<string, unknown> {
@@ -40,60 +62,67 @@ export function serializeBigInt<T extends Record<string, unknown>>(obj: T): Reco
   return out;
 }
 
-function makeCrudHandler(
-  model: string,
-  getId: (op: EntityOp) => string,
-  buildCreateData: (
-    userId: string,
-    op: Extract<EntityOp, { op: "create" }>,
-    cursor: bigint,
-  ) => Record<string, unknown>,
-  buildUpdateData: (
-    op: Extract<EntityOp, { op: "update" }>,
-    cursor: bigint,
-  ) => Record<string, unknown>,
-  findWhere: (userId: string, id: string) => Record<string, unknown>,
-  deleteWhere: (userId: string, id: string) => Record<string, unknown>,
+// ---------------------------------------------------------------------------
+// Generic CRUD handler factory (single-table, integer-version optimistic
+// concurrency, keyed by `id` column).
+// ---------------------------------------------------------------------------
+
+interface TableConfig {
+  /** Build the create row given userId, op fields, new cursor. */
+  buildCreate: (userId: string, fields: Record<string, unknown>, cursor: bigint) => Record<string, unknown>;
+  /** Build the update row given op fields, new cursor. */
+  buildUpdate: (fields: Record<string, unknown>, cursor: bigint) => Record<string, unknown>;
+}
+
+function makeCrudHandler<T extends { id: unknown; version: unknown }>(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  table: any,
+  cfg: TableConfig,
 ): Handler {
   return async (userId, ops, tx): Promise<HandlerResult> => {
     const accepted: HandlerResult["accepted"] = [];
     const conflicts: HandlerResult["conflicts"] = [];
-    const repo = (tx as unknown as Record<string, unknown>)[model] as {
-      findUnique: (args: unknown) => Promise<{ version: number } | null>;
-      create: (args: unknown) => Promise<{ id?: string; version: number }>;
-      update: (args: unknown) => Promise<{ version: number }>;
-      delete: (args: unknown) => Promise<unknown>;
-    };
 
     for (const op of ops) {
-      const id = getId(op);
+      const id = op.id;
       if (op.op === "create") {
         const cursor = await incrementCursorIn(tx, userId);
-        const data = buildCreateData(userId, op, cursor);
-        const created = await repo.create({ data });
-        accepted.push({ id, version: created.version ?? 1 });
+        const data = cfg.buildCreate(userId, op.fields, cursor);
+        const [created] = await tx
+          .insert(table)
+          .values(data)
+          .returning() as T[];
+        accepted.push({ id, version: (created.version as number | undefined) ?? 1 });
       } else if (op.op === "update") {
-        const cur = await repo.findUnique({ where: findWhere(userId, id) });
+        const cur = await tx
+          .select()
+          .from(table)
+          .where(eq(table.id, id))
+          .limit(1)
+          .then((rows: T[]) => rows[0] ?? null);
         if (!cur) {
           conflicts.push({ id, current_version: 0, current_state: null });
           continue;
         }
-        if (cur.version !== op.base_version) {
+        const curVersion = cur.version as number;
+        if (curVersion !== op.base_version) {
           conflicts.push({
             id,
-            current_version: cur.version,
+            current_version: curVersion,
             current_state: serializeBigInt(cur as unknown as Record<string, unknown>),
           });
           continue;
         }
         const cursor = await incrementCursorIn(tx, userId);
-        const updated = await repo.update({
-          where: findWhere(userId, id),
-          data: buildUpdateData(op, cursor),
-        });
-        accepted.push({ id, version: updated.version });
+        const data = cfg.buildUpdate(op.fields, cursor);
+        const [updated] = await tx
+          .update(table)
+          .set({ ...data, version: sql`${table.version} + 1` })
+          .where(eq(table.id, id))
+          .returning() as T[];
+        accepted.push({ id, version: updated.version as number });
       } else if (op.op === "delete") {
-        await repo.delete({ where: deleteWhere(userId, id) }).catch(() => {});
+        await tx.delete(table).where(eq(table.id, id));
         accepted.push({ id, version: 0 });
       }
     }
@@ -107,23 +136,15 @@ function makeCrudHandler(
 
 export function buildHandlers(notesRoot: string): Record<string, Handler> {
   return {
-    folders: makeCrudHandler(
-      "folder",
-      (op) => op.id,
-      (userId, op, cursor) => ({ ...op.fields, userId, version: 1, cursor }),
-      (op, cursor) => ({ ...op.fields, version: { increment: 1 }, cursor }),
-      (_userId, id) => ({ id }),
-      (_userId, id) => ({ id }),
-    ),
+    folders: makeCrudHandler(folder, {
+      buildCreate: (userId, fields, cursor) => ({ ...fields, userId, version: 1, cursor }),
+      buildUpdate: (fields, cursor) => ({ ...fields, cursor }),
+    }),
 
-    tags: makeCrudHandler(
-      "tag",
-      (op) => op.id,
-      (userId, op, cursor) => ({ ...op.fields, userId, version: 1, cursor }),
-      (op, cursor) => ({ ...op.fields, version: { increment: 1 }, cursor }),
-      (_userId, id) => ({ id }),
-      (_userId, id) => ({ id }),
-    ),
+    tags: makeCrudHandler(tag, {
+      buildCreate: (userId, fields, cursor) => ({ ...fields, userId, version: 1, cursor }),
+      buildUpdate: (fields, cursor) => ({ ...fields, cursor }),
+    }),
 
     note_tags: async (userId, ops, tx) => {
       const accepted: HandlerResult["accepted"] = [];
@@ -132,19 +153,32 @@ export function buildHandlers(notesRoot: string): Record<string, Handler> {
         if (op.op === "create") {
           const f = op.fields as { notePath: string; tagId: string };
           const cursor = await incrementCursorIn(tx, userId);
-          await tx.noteTag.upsert({
-            where: { userId_notePath_tagId: { userId, notePath: f.notePath, tagId: f.tagId } },
-            update: {},
-            create: { userId, notePath: f.notePath, tagId: f.tagId, version: 1, cursor },
-          });
+          await tx
+            .insert(noteTag)
+            .values({
+              userId,
+              notePath: f.notePath,
+              tagId: f.tagId,
+              version: 1,
+              cursor,
+            })
+            .onConflictDoNothing({
+              target: [noteTag.userId, noteTag.notePath, noteTag.tagId],
+            });
           accepted.push({ id: op.id, version: 1 });
         } else if (op.op === "delete") {
           const parts = op.id.split(":");
           if (parts.length === 3) {
             const [, notePath, tagId] = parts;
-            await tx.noteTag
-              .delete({ where: { userId_notePath_tagId: { userId, notePath, tagId } } })
-              .catch(() => {});
+            await tx
+              .delete(noteTag)
+              .where(
+                and(
+                  eq(noteTag.userId, userId),
+                  eq(noteTag.notePath, notePath),
+                  eq(noteTag.tagId, tagId),
+                ),
+              );
           }
           accepted.push({ id: op.id, version: 0 });
         }
@@ -159,9 +193,12 @@ export function buildHandlers(notesRoot: string): Record<string, Handler> {
         if (op.op === "create" || op.op === "update") {
           const f = op.fields as { key: string; value: string };
           if (op.op === "update") {
-            const cur = await tx.settings.findUnique({
-              where: { key_userId: { key: f.key, userId } },
-            });
+            const cur = await tx
+              .select()
+              .from(settings)
+              .where(and(eq(settings.key, f.key), eq(settings.userId, userId)))
+              .limit(1)
+              .then((rows) => rows[0] ?? null);
             if (cur && cur.version !== op.base_version) {
               conflicts.push({
                 id: op.id,
@@ -172,57 +209,81 @@ export function buildHandlers(notesRoot: string): Record<string, Handler> {
             }
           }
           const cursor = await incrementCursorIn(tx, userId);
-          const row = await tx.settings.upsert({
-            where: { key_userId: { key: f.key, userId } },
-            update: { value: f.value, version: { increment: 1 }, cursor },
-            create: { key: f.key, userId, value: f.value, version: 1, cursor },
-          });
+          const [row] = await tx
+            .insert(settings)
+            .values({ key: f.key, userId, value: f.value, version: 1, cursor })
+            .onConflictDoUpdate({
+              target: [settings.key, settings.userId],
+              set: {
+                value: f.value,
+                version: sql`${settings.version} + 1`,
+                cursor,
+                updatedAt: new Date(),
+              },
+            })
+            .returning();
           accepted.push({ id: op.id, version: row.version });
         } else if (op.op === "delete") {
           const parts = op.id.split(":");
           const key = parts.slice(1).join(":");
-          await tx.settings.delete({ where: { key_userId: { key, userId } } }).catch(() => {});
+          await tx
+            .delete(settings)
+            .where(and(eq(settings.key, key), eq(settings.userId, userId)));
           accepted.push({ id: op.id, version: 0 });
         }
       }
       return { accepted, conflicts };
     },
 
-    graph_edges: makeCrudHandler(
-      "graphEdge",
-      (op) => op.id,
-      (userId, op, cursor) => ({ ...op.fields, userId, version: 1, cursor }),
-      (op, cursor) => ({ ...op.fields, version: { increment: 1 }, cursor }),
-      (_userId, id) => ({ id }),
-      (_userId, id) => ({ id }),
-    ),
+    graph_edges: makeCrudHandler(graphEdge, {
+      buildCreate: (userId, fields, cursor) => ({ ...fields, userId, version: 1, cursor }),
+      buildUpdate: (fields, cursor) => ({ ...fields, cursor }),
+    }),
 
-    note_shares: makeCrudHandler(
-      "noteShare",
-      (op) => op.id,
-      (userId, op, cursor) => ({ ...op.fields, ownerUserId: userId, version: 1, cursor }),
-      (op, cursor) => ({ ...op.fields, version: { increment: 1 }, cursor }),
-      (_userId, id) => ({ id }),
-      (_userId, id) => ({ id }),
-    ),
+    note_shares: makeCrudHandler(noteShare, {
+      buildCreate: (userId, fields, cursor) => ({
+        ...fields,
+        ownerUserId: userId,
+        version: 1,
+        cursor,
+      }),
+      buildUpdate: (fields, cursor) => ({ ...fields, cursor }),
+    }),
 
-    trash_items: makeCrudHandler(
-      "trashItem",
-      (op) => op.id,
-      (_userId, op, cursor) => ({ ...op.fields, version: 1, cursor }),
-      (op, cursor) => ({ ...op.fields, version: { increment: 1 }, cursor }),
-      (_userId, id) => ({ id }),
-      (_userId, id) => ({ id }),
-    ),
+    trash_items: makeCrudHandler(trashItem, {
+      buildCreate: (_userId, fields, cursor) => ({ ...fields, version: 1, cursor }),
+      buildUpdate: (fields, cursor) => ({ ...fields, cursor }),
+    }),
 
-    installed_plugins: makeCrudHandler(
-      "installedPlugin",
-      (op) => op.id,
-      (_userId, op, cursor) => ({ ...op.fields, cursor }),
-      (op, cursor) => ({ ...op.fields, version: { increment: 1 }, cursor }),
-      (_userId, id) => ({ id }),
-      (_userId, id) => ({ id }),
-    ),
+    installed_plugins: async (userId, ops, tx) => {
+      // InstalledPlugin has no `version` column (uses `schemaVersion`) and the
+      // primary key is `id` (provided by caller), so we can't reuse the generic
+      // CRUD handler. Optimistic concurrency is not modelled for this table.
+      const accepted: HandlerResult["accepted"] = [];
+      const conflicts: HandlerResult["conflicts"] = [];
+      for (const op of ops) {
+        const id = op.id;
+        if (op.op === "create") {
+          const cursor = await incrementCursorIn(tx, userId);
+          await tx.insert(installedPlugin).values({
+            ...(op.fields as Record<string, unknown>),
+            cursor,
+          } as typeof installedPlugin.$inferInsert);
+          accepted.push({ id, version: 0 });
+        } else if (op.op === "update") {
+          const cursor = await incrementCursorIn(tx, userId);
+          await tx
+            .update(installedPlugin)
+            .set({ ...(op.fields as Record<string, unknown>), cursor })
+            .where(eq(installedPlugin.id, id));
+          accepted.push({ id, version: 0 });
+        } else if (op.op === "delete") {
+          await tx.delete(installedPlugin).where(eq(installedPlugin.id, id));
+          accepted.push({ id, version: 0 });
+        }
+      }
+      return { accepted, conflicts };
+    },
 
     notes: async (userId, ops, tx) => {
       const accepted: HandlerResult["accepted"] = [];
@@ -240,9 +301,14 @@ export function buildHandlers(notesRoot: string): Record<string, Handler> {
             modifiedAt?: number;
           };
           const filePath = pathModule.join(userDir, f.path);
-          const cur = await tx.noteVersion.findUnique({
-            where: { userId_notePath: { userId, notePath: f.path } },
-          });
+          const cur = await tx
+            .select()
+            .from(noteVersion)
+            .where(
+              and(eq(noteVersion.userId, userId), eq(noteVersion.notePath, f.path)),
+            )
+            .limit(1)
+            .then((rows) => rows[0] ?? null);
           if (op.op === "update" && cur && cur.version !== op.base_version) {
             conflicts.push({
               id: op.id,
@@ -261,9 +327,14 @@ export function buildHandlers(notesRoot: string): Record<string, Handler> {
           } catch {
             /* empty */
           }
-          const existingIdx = await tx.searchIndex.findFirst({
-            where: { userId, notePath: f.path },
-          });
+          const existingIdx = await tx
+            .select()
+            .from(searchIndex)
+            .where(
+              and(eq(searchIndex.userId, userId), eq(searchIndex.notePath, f.path)),
+            )
+            .limit(1)
+            .then((rows) => rows[0] ?? null);
           const existingTags: string[] = existingIdx
             ? (() => {
                 try {
@@ -275,42 +346,65 @@ export function buildHandlers(notesRoot: string): Record<string, Handler> {
             : [];
           const mergedTags = Array.from(new Set([...existingTags, ...tags]));
 
-          await tx.searchIndex.upsert({
-            where: { notePath_userId: { notePath: f.path, userId } },
-            update: {
-              title: f.title ?? existingIdx?.title ?? f.path,
-              tags: JSON.stringify(mergedTags),
-              modifiedAt: f.modifiedAt !== null && f.modifiedAt !== undefined ? new Date(f.modifiedAt) : new Date(),
-              content: f.content ?? existingIdx?.content ?? "",
-            },
-            create: {
+          await tx
+            .insert(searchIndex)
+            .values({
               notePath: f.path,
               userId,
               title: f.title ?? f.path,
               content: f.content ?? "",
               tags: JSON.stringify(mergedTags),
-              modifiedAt: f.modifiedAt !== null && f.modifiedAt !== undefined ? new Date(f.modifiedAt) : new Date(),
-            },
-          });
-
-          const nv = await tx.noteVersion.upsert({
-            where: { userId_notePath: { userId, notePath: f.path } },
-            update: { version: { increment: 1 }, cursor },
-            create: { userId, notePath: f.path, version: 1, cursor },
-          });
-
-          if (f.content !== null) {
-            await tx.noteRevision.create({
-              data: { userId, notePath: f.path, content: String(f.content) },
+              modifiedAt:
+                f.modifiedAt !== null && f.modifiedAt !== undefined
+                  ? new Date(f.modifiedAt)
+                  : new Date(),
+            })
+            .onConflictDoUpdate({
+              target: [searchIndex.notePath, searchIndex.userId],
+              set: {
+                title: f.title ?? existingIdx?.title ?? f.path,
+                tags: JSON.stringify(mergedTags),
+                modifiedAt:
+                  f.modifiedAt !== null && f.modifiedAt !== undefined
+                    ? new Date(f.modifiedAt)
+                    : new Date(),
+                content: f.content ?? existingIdx?.content ?? "",
+              },
             });
+
+          const [nv] = await tx
+            .insert(noteVersion)
+            .values({ userId, notePath: f.path, version: 1, cursor })
+            .onConflictDoUpdate({
+              target: [noteVersion.userId, noteVersion.notePath],
+              set: {
+                version: sql`${noteVersion.version} + 1`,
+                cursor,
+                updatedAt: new Date(),
+              },
+            })
+            .returning();
+
+          if (f.content !== null && f.content !== undefined) {
+            await tx
+              .insert(noteRevision)
+              .values({ userId, notePath: f.path, content: String(f.content) });
           }
 
           accepted.push({ id: op.id, version: nv.version, merged_value: { tags: mergedTags } });
         } else if (op.op === "delete") {
           const filePath = pathModule.join(userDir, op.id);
           await fsPromises.unlink(filePath).catch(() => {});
-          await tx.searchIndex.deleteMany({ where: { userId, notePath: op.id } });
-          await tx.noteVersion.deleteMany({ where: { userId, notePath: op.id } });
+          await tx
+            .delete(searchIndex)
+            .where(
+              and(eq(searchIndex.userId, userId), eq(searchIndex.notePath, op.id)),
+            );
+          await tx
+            .delete(noteVersion)
+            .where(
+              and(eq(noteVersion.userId, userId), eq(noteVersion.notePath, op.id)),
+            );
           accepted.push({ id: op.id, version: 0 });
         }
       }

@@ -1,12 +1,14 @@
 import type { FastifyPluginAsync } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
-import { Prisma } from "../../../generated/prisma/client.js";
+import { and, eq } from "drizzle-orm";
 import {
   ConflictError,
   ForbiddenError,
   NotFoundError,
   ValidationError,
 } from "../../../lib/errors.js";
+import { noteShare, accessRequest } from "../../../db/schema/sharing.js";
+import { user as userTable } from "../../../db/schema/auth.js";
 import {
   createShareBodySchema,
   updateShareBodySchema,
@@ -44,6 +46,13 @@ const serializeShare = (s: {
   cursor: s.cursor.toString(),
 });
 
+// Postgres unique_violation
+const isUniqueViolation = (err: unknown): boolean =>
+  typeof err === "object" &&
+  err !== null &&
+  "code" in err &&
+  (err as { code?: string }).code === "23505";
+
 export const sharesRoutes = (deps: SharesRoutesDeps): FastifyPluginAsync =>
   async (app) => {
     const typed = app.withTypeProvider<ZodTypeProvider>();
@@ -73,22 +82,20 @@ export const sharesRoutes = (deps: SharesRoutesDeps): FastifyPluginAsync =>
         }
 
         try {
-          const saved = await app.prisma.noteShare.create({
-            data: {
+          const [saved] = await app.db
+            .insert(noteShare)
+            .values({
               ownerUserId: ctx.user.id,
               path,
               isFolder: isFolder ?? false,
               sharedWithUserId,
               permission,
-            },
-          });
+            })
+            .returning();
           reply.status(201);
           return serializeShare(saved);
         } catch (err) {
-          if (
-            err instanceof Prisma.PrismaClientKnownRequestError &&
-            err.code === "P2002"
-          ) {
+          if (isUniqueViolation(err)) {
             throw new ConflictError("Share already exists");
           }
           throw err;
@@ -111,8 +118,8 @@ export const sharesRoutes = (deps: SharesRoutesDeps): FastifyPluginAsync =>
       },
       async (req) => {
         const user = await app.auth.requireUser(req);
-        const shares = await app.prisma.noteShare.findMany({
-          where: { ownerUserId: user.id },
+        const shares = await app.db.query.noteShare.findMany({
+          where: eq(noteShare.ownerUserId, user.id),
         });
         return shares.map(serializeShare);
       },
@@ -155,17 +162,18 @@ export const sharesRoutes = (deps: SharesRoutesDeps): FastifyPluginAsync =>
       },
       async (req) => {
         const ctx = await app.auth.requireAuth(req);
-        const share = await app.prisma.noteShare.findUnique({
-          where: { id: req.params.id },
+        const share = await app.db.query.noteShare.findFirst({
+          where: eq(noteShare.id, req.params.id),
         });
         if (!share) throw new NotFoundError("Share not found");
         if (share.ownerUserId !== ctx.user.id) {
           throw new ForbiddenError("Not the owner of this share");
         }
-        const updated = await app.prisma.noteShare.update({
-          where: { id: req.params.id },
-          data: { permission: req.body.permission },
-        });
+        const [updated] = await app.db
+          .update(noteShare)
+          .set({ permission: req.body.permission, updatedAt: new Date() })
+          .where(eq(noteShare.id, req.params.id))
+          .returning();
         return serializeShare(updated);
       },
     );
@@ -187,14 +195,14 @@ export const sharesRoutes = (deps: SharesRoutesDeps): FastifyPluginAsync =>
       },
       async (req) => {
         const ctx = await app.auth.requireAuth(req);
-        const share = await app.prisma.noteShare.findUnique({
-          where: { id: req.params.id },
+        const share = await app.db.query.noteShare.findFirst({
+          where: eq(noteShare.id, req.params.id),
         });
         if (!share) throw new NotFoundError("Share not found");
         if (share.ownerUserId !== ctx.user.id) {
           throw new ForbiddenError("Not the owner of this share");
         }
-        await app.prisma.noteShare.delete({ where: { id: req.params.id } });
+        await app.db.delete(noteShare).where(eq(noteShare.id, req.params.id));
         return { message: "Share revoked" };
       },
     );
@@ -222,30 +230,39 @@ export const accessRequestsRoutes: FastifyPluginAsync = async (app) => {
       const ctx = await app.auth.requireAuth(req);
       const { ownerUserId, notePath } = req.body;
 
-      const ownerUser = await app.prisma.user.findUnique({ where: { id: ownerUserId } });
+      const ownerUser = await app.db.query.user.findFirst({
+        where: eq(userTable.id, ownerUserId),
+      });
       if (!ownerUser) throw new ValidationError("Owner user not found");
 
-      const existing = await app.prisma.accessRequest.findFirst({
-        where: { requesterUserId: ctx.user.id, ownerUserId, notePath },
+      const existing = await app.db.query.accessRequest.findFirst({
+        where: and(
+          eq(accessRequest.requesterUserId, ctx.user.id),
+          eq(accessRequest.ownerUserId, ownerUserId),
+          eq(accessRequest.notePath, notePath),
+        ),
       });
       if (existing) {
         if (existing.status === "denied") {
-          return app.prisma.accessRequest.update({
-            where: { id: existing.id },
-            data: { status: "pending" },
-          });
+          const [updated] = await app.db
+            .update(accessRequest)
+            .set({ status: "pending", updatedAt: new Date() })
+            .where(eq(accessRequest.id, existing.id))
+            .returning();
+          return updated;
         }
         return existing;
       }
 
-      const saved = await app.prisma.accessRequest.create({
-        data: {
+      const [saved] = await app.db
+        .insert(accessRequest)
+        .values({
           requesterUserId: ctx.user.id,
           ownerUserId,
           notePath,
           status: "pending",
-        },
-      });
+        })
+        .returning();
       reply.status(201);
       return saved;
     },
@@ -266,12 +283,30 @@ export const accessRequestsRoutes: FastifyPluginAsync = async (app) => {
     },
     async (req) => {
       const user = await app.auth.requireUser(req);
-      return app.prisma.accessRequest.findMany({
-        where: { ownerUserId: user.id, status: "pending" },
-        include: {
-          requester: { select: { id: true, name: true, email: true } },
-        },
-      });
+      const rows = await app.db
+        .select({
+          id: accessRequest.id,
+          requesterUserId: accessRequest.requesterUserId,
+          ownerUserId: accessRequest.ownerUserId,
+          notePath: accessRequest.notePath,
+          status: accessRequest.status,
+          createdAt: accessRequest.createdAt,
+          updatedAt: accessRequest.updatedAt,
+          requester: {
+            id: userTable.id,
+            name: userTable.name,
+            email: userTable.email,
+          },
+        })
+        .from(accessRequest)
+        .innerJoin(userTable, eq(userTable.id, accessRequest.requesterUserId))
+        .where(
+          and(
+            eq(accessRequest.ownerUserId, user.id),
+            eq(accessRequest.status, "pending"),
+          ),
+        );
+      return rows;
     },
   );
 
@@ -290,8 +325,8 @@ export const accessRequestsRoutes: FastifyPluginAsync = async (app) => {
     },
     async (req) => {
       const user = await app.auth.requireUser(req);
-      return app.prisma.accessRequest.findMany({
-        where: { requesterUserId: user.id },
+      return app.db.query.accessRequest.findMany({
+        where: eq(accessRequest.requesterUserId, user.id),
       });
     },
   );
@@ -315,8 +350,8 @@ export const accessRequestsRoutes: FastifyPluginAsync = async (app) => {
     async (req) => {
       const ctx = await app.auth.requireAuth(req);
       const { action, permission } = req.body;
-      const reqRow = await app.prisma.accessRequest.findUnique({
-        where: { id: req.params.id },
+      const reqRow = await app.db.query.accessRequest.findFirst({
+        where: eq(accessRequest.id, req.params.id),
       });
       if (!reqRow) throw new NotFoundError("Access request not found");
       if (reqRow.ownerUserId !== ctx.user.id) {
@@ -327,25 +362,27 @@ export const accessRequestsRoutes: FastifyPluginAsync = async (app) => {
         if (!permission) {
           throw new ValidationError("permission is required when approving");
         }
-        await app.prisma.noteShare.create({
-          data: {
-            ownerUserId: reqRow.ownerUserId,
-            path: reqRow.notePath,
-            isFolder: false,
-            sharedWithUserId: reqRow.requesterUserId,
-            permission,
-          },
+        await app.db.insert(noteShare).values({
+          ownerUserId: reqRow.ownerUserId,
+          path: reqRow.notePath,
+          isFolder: false,
+          sharedWithUserId: reqRow.requesterUserId,
+          permission,
         });
-        return app.prisma.accessRequest.update({
-          where: { id: req.params.id },
-          data: { status: "approved" },
-        });
+        const [updated] = await app.db
+          .update(accessRequest)
+          .set({ status: "approved", updatedAt: new Date() })
+          .where(eq(accessRequest.id, req.params.id))
+          .returning();
+        return updated;
       }
 
-      return app.prisma.accessRequest.update({
-        where: { id: req.params.id },
-        data: { status: "denied" },
-      });
+      const [updated] = await app.db
+        .update(accessRequest)
+        .set({ status: "denied", updatedAt: new Date() })
+        .where(eq(accessRequest.id, req.params.id))
+        .returning();
+      return updated;
     },
   );
 };

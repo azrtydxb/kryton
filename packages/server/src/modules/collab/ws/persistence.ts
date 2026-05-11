@@ -1,8 +1,10 @@
 import * as Y from "yjs";
-import type { PrismaClient } from "../../../generated/prisma/client.js";
+import { asc, eq } from "drizzle-orm";
+import type { Db } from "../../../db/client.js";
+import { yjsDocument, yjsUpdate } from "../../../db/schema/sync.js";
 
 export class YjsPersistence {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly db: Db) {}
 
   /**
    * Load a Yjs document from the database. Applies the stored snapshot
@@ -10,15 +12,17 @@ export class YjsPersistence {
    * snapshot exists for this docId/userId pair.
    */
   async loadYjsDoc(docId: string, userId: string): Promise<Y.Doc | null> {
-    const row = await this.prisma.yjsDocument.findUnique({ where: { docId } });
+    const row = await this.db.query.yjsDocument.findFirst({
+      where: eq(yjsDocument.docId, docId),
+    });
     if (!row || row.userId !== userId) return null;
 
     const doc = new Y.Doc();
     Y.applyUpdate(doc, row.snapshot);
 
-    const updates = await this.prisma.yjsUpdate.findMany({
-      where: { docId },
-      orderBy: { id: "asc" },
+    const updates = await this.db.query.yjsUpdate.findMany({
+      where: eq(yjsUpdate.docId, docId),
+      orderBy: asc(yjsUpdate.id),
     });
     for (const u of updates) {
       Y.applyUpdate(doc, u.update);
@@ -33,14 +37,16 @@ export class YjsPersistence {
     const snapshot = Buffer.from(Y.encodeStateAsUpdate(doc));
     const stateVector = Buffer.from(Y.encodeStateVector(doc));
 
-    await this.prisma.$transaction([
-      this.prisma.yjsDocument.upsert({
-        where: { docId },
-        update: { snapshot, stateVector },
-        create: { docId, userId, snapshot, stateVector },
-      }),
-      this.prisma.yjsUpdate.deleteMany({ where: { docId } }),
-    ]);
+    await this.db.transaction(async (tx) => {
+      await tx
+        .insert(yjsDocument)
+        .values({ docId, userId, snapshot, stateVector })
+        .onConflictDoUpdate({
+          target: yjsDocument.docId,
+          set: { snapshot, stateVector, updatedAt: new Date() },
+        });
+      await tx.delete(yjsUpdate).where(eq(yjsUpdate.docId, docId));
+    });
   }
 
   /**
@@ -51,8 +57,10 @@ export class YjsPersistence {
     update: Uint8Array,
     agentId: string | null,
   ): Promise<void> {
-    await this.prisma.yjsUpdate.create({
-      data: { docId, update: Buffer.from(update), agentId },
+    await this.db.insert(yjsUpdate).values({
+      docId,
+      update: Buffer.from(update),
+      agentId,
     });
   }
 }

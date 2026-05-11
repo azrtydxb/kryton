@@ -37,10 +37,10 @@ declare module "fastify" {
  * Graceful shutdown: an `onClose` hook flushes all dirty Y.Docs to SQLite.
  */
 export const collabModule: FastifyPluginAsync = async (app) => {
-  const shareService = new ShareService(app.prisma);
+  const shareService = new ShareService(app.db);
   const notesRoot = process.env.NOTES_DIR ?? "/var/kryton/notes";
-  const syncService = new SyncService(app.prisma, notesRoot);
-  const persistence = new YjsPersistence(app.prisma);
+  const syncService = new SyncService(app.db, notesRoot);
+  const persistence = new YjsPersistence(app.db);
 
   let registry: YjsRegistry | null = null;
 

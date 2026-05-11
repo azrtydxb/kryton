@@ -1,6 +1,11 @@
 import type { FastifyPluginAsync } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
+import { and, desc, eq } from "drizzle-orm";
 import { ForbiddenError, NotFoundError, ValidationError } from "../../../lib/errors.js";
+import { agent } from "../../../db/schema/agents.js";
+import { noteRevision } from "../../../db/schema/notes.js";
+import { accessRequest } from "../../../db/schema/sharing.js";
+import { pluginStorage } from "../../../db/schema/settings.js";
 import {
   syncPullBodySchema,
   syncPullResponseSchema,
@@ -27,13 +32,15 @@ export const syncRoutes = (deps: SyncRoutesDeps): FastifyPluginAsync =>
     const enforceSyncAction = async (agentId: string | null): Promise<void> => {
       // Human users (no agentId) bypass policy checks.
       if (!agentId) return;
-      const agent = await app.prisma.agent.findUnique({ where: { id: agentId } });
-      if (!agent || !agent.policyText) {
+      const agentRow = await app.db.query.agent.findFirst({
+        where: eq(agent.id, agentId),
+      });
+      if (!agentRow || !agentRow.policyText) {
         throw new ForbiddenError("no policy attached to agent");
       }
       await app.cedar.enforce({
-        policy: agent.policyText,
-        principal: { type: "Kryton::Agent", id: agent.id },
+        policy: agentRow.policyText,
+        principal: { type: "Kryton::Agent", id: agentRow.id },
         action: 'Kryton::Action::"sync"',
         resource: SYNC_RESOURCE,
       });
@@ -113,26 +120,32 @@ export const syncRoutes = (deps: SyncRoutesDeps): FastifyPluginAsync =>
         const limit = Math.min(req.query.limit ?? 50, 200);
 
         if (entityType === "history") {
-          const rows = await app.prisma.noteRevision.findMany({
-            where: { userId: user.id, notePath: parentId },
-            orderBy: { createdAt: "desc" },
-            take: limit,
+          const rows = await app.db.query.noteRevision.findMany({
+            where: and(
+              eq(noteRevision.userId, user.id),
+              eq(noteRevision.notePath, parentId),
+            ),
+            orderBy: desc(noteRevision.createdAt),
+            limit,
           });
           return { entities: rows };
         }
 
         if (entityType === "access_requests") {
-          const rows = await app.prisma.accessRequest.findMany({
-            where: { ownerUserId: user.id, notePath: parentId },
-            take: limit,
+          const rows = await app.db.query.accessRequest.findMany({
+            where: and(
+              eq(accessRequest.ownerUserId, user.id),
+              eq(accessRequest.notePath, parentId),
+            ),
+            limit,
           });
           return { entities: rows };
         }
 
         if (entityType === "plugin_storage") {
-          const rows = await app.prisma.pluginStorage.findMany({
-            where: { pluginId: parentId },
-            take: limit,
+          const rows = await app.db.query.pluginStorage.findMany({
+            where: eq(pluginStorage.pluginId, parentId),
+            limit,
           });
           return { entities: rows };
         }
