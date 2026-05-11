@@ -141,8 +141,11 @@ export default function AccountSettingsPage({ onClose }: { onClose: () => void }
         role="dialog"
         aria-modal="true"
         aria-labelledby="account-settings-title"
-        className="rounded-xl shadow-2xl w-[90vw] max-w-2xl max-h-[85vh] overflow-hidden flex flex-col"
-        style={dialogStyle}
+        className="rounded-xl shadow-2xl w-[90vw] max-w-2xl overflow-hidden flex flex-col"
+        // Fixed height (not max-height) so the header + tab strip stay
+        // anchored as the user switches between sections. The content
+        // panel scrolls within its own pane.
+        style={{ ...dialogStyle, height: 'min(640px, 85vh)' }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
