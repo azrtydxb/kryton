@@ -2386,11 +2386,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Search notes */
+        /** Search notes (3-layer RRF fusion with lexical fallback) */
         get: {
             parameters: {
                 query: {
                     q: string;
+                    limit?: number;
                 };
                 header?: never;
                 path?: never;
@@ -2405,11 +2406,13 @@ export interface paths {
                     };
                     content: {
                         "application/json": {
+                            chunkIndex?: number;
                             isShared?: boolean;
                             /** Format: date-time */
                             modifiedAt: string;
                             ownerUserId?: string;
                             path: string;
+                            score?: number;
                             snippet: string;
                             tags: string[];
                             title: string;
@@ -2420,6 +2423,89 @@ export interface paths {
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/search/semantic/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Semantic search readiness + pending-job count */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            dimensions: number;
+                            model?: string;
+                            pendingJobs: number;
+                            /** @enum {string} */
+                            provider: "pgvector-local" | "novamem" | "off";
+                            ready: boolean;
+                        };
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/search/semantic/reindex": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Re-enqueue semantic embedding jobs for the calling user */
+        post: {
+            parameters: {
+                query?: {
+                    scope?: "self" | "all";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            enqueued: number;
+                        };
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;

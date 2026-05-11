@@ -21,6 +21,8 @@ export interface SearchResult {
   tags: string[];
   isShared?: boolean;
   ownerUserId?: string;
+  /** Relevance score: ts_rank for lexical, cosine similarity for semantic. */
+  score?: number;
 }
 
 export interface GraphData {
@@ -194,7 +196,8 @@ export const api = {
     request<void>(`/folders-rename/${encodeURIComponent(path)}`, { method: 'POST', body: JSON.stringify({ newPath }) }),
 
   // Search
-  search: (query: string) => request<SearchResult[]>(`/search?q=${encodeURIComponent(query)}`),
+  search: (query: string) =>
+    request<SearchResult[]>(`/search?q=${encodeURIComponent(query)}`),
 
   // Graph
   getGraph: () => request<GraphData>('/graph'),

@@ -50,6 +50,18 @@ const envSchema = z.object({
     .string()
     .default("true")
     .transform((s) => s !== "false"),
+
+  // ---------------------------------------------------------------------------
+  // Semantic search (Phase A)
+  // ---------------------------------------------------------------------------
+  // SEMANTIC_PROVIDER controls which embedder backs the worker. "off" disables
+  // the worker entirely (no model load, no polling) — used by tests so they
+  // don't download the 23 MB MiniLM model.
+  SEMANTIC_PROVIDER: z.enum(["pgvector-local", "novamem", "off"]).default("pgvector-local"),
+  SEMANTIC_MODEL: z.string().default("Xenova/all-MiniLM-L6-v2"),
+  SEMANTIC_DIMENSIONS: z.coerce.number().int().positive().default(384),
+  SEMANTIC_CHUNK_TOKENS: z.coerce.number().int().positive().default(256),
+  SEMANTIC_CHUNK_OVERLAP: z.coerce.number().int().positive().default(32),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { searchIndex } from "../../../db/schema/notes.js";
+import { embedJob } from "../../../db/schema/embeddings.js";
 import {
   parseFrontmatter,
   serializeTags,
@@ -69,6 +70,8 @@ export class SearchService {
           modifiedAt: now,
         },
       });
+
+    await this.enqueueEmbedJob(userId, notePath, "upsert");
   }
 
   async removeFromIndex(notePath: string, userId: string): Promise<void> {
@@ -77,6 +80,8 @@ export class SearchService {
       .where(
         and(eq(searchIndex.notePath, notePath), eq(searchIndex.userId, userId)),
       );
+
+    await this.enqueueEmbedJob(userId, notePath, "delete");
   }
 
   async renameInIndex(oldPath: string, newPath: string, userId: string): Promise<void> {
@@ -103,6 +108,36 @@ export class SearchService {
       tags: entry.tags,
       modifiedAt: entry.modifiedAt,
     });
+
+    await this.enqueueEmbedJob(userId, oldPath, "delete");
+    await this.enqueueEmbedJob(userId, newPath, "upsert");
+  }
+
+  /**
+   * Enqueue an async embed job for the given note. Skipped when the embedder
+   * is disabled (SEMANTIC_PROVIDER=off) — saves a write the worker would
+   * never drain. ON CONFLICT (userId, notePath) DO UPDATE coalesces repeat
+   * writes for the same note into a single queued row.
+   */
+  private async enqueueEmbedJob(
+    userId: string,
+    notePath: string,
+    op: "upsert" | "delete",
+  ): Promise<void> {
+    if (this.app.embedderState?.provider === "off") return;
+
+    await this.app.db
+      .insert(embedJob)
+      .values({ userId, notePath, op, attempts: 0 })
+      .onConflictDoUpdate({
+        target: [embedJob.userId, embedJob.notePath],
+        set: {
+          op,
+          enqueuedAt: sql`NOW()`,
+          attempts: 0,
+          error: null,
+        },
+      });
   }
 
   search(query: string, userId: string): Promise<SearchResult[]> {

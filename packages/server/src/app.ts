@@ -8,6 +8,7 @@ import { telemetryPlugin } from "./plugins/telemetry.js";
 import { securityPlugin } from "./plugins/security.js";
 import { rateLimitPlugin } from "./plugins/rate-limit.js";
 import { dbPlugin } from "./plugins/db.js";
+import { embedderPlugin } from "./plugins/embedder.js";
 import { cedarPlugin } from "./plugins/cedar.js";
 import { authPlugin } from "./plugins/auth.js";
 import { errorsPlugin } from "./plugins/errors.js";
@@ -59,6 +60,10 @@ export async function buildApp({
   await app.register(rateLimitPlugin, { config });
   // Drizzle is the sole data layer (Postgres + Drizzle migration complete).
   await app.register(dbPlugin);
+  // Embedder is registered immediately after db so app.embedderState is
+  // available to downstream modules. Model warm-up + worker start happen
+  // asynchronously in onReady — registration itself is non-blocking.
+  await app.register(embedderPlugin);
   await app.register(cedarPlugin);
   await app.register(authPlugin);
   await app.register(errorsPlugin);

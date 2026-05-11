@@ -3742,6 +3742,17 @@
               "minLength": 1,
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "exclusiveMinimum": 0,
+              "maximum": 100,
+              "type": "integer"
+            }
           }
         ],
         "responses": {
@@ -3752,6 +3763,11 @@
                   "items": {
                     "additionalProperties": false,
                     "properties": {
+                      "chunkIndex": {
+                        "maximum": 9007199254740991,
+                        "minimum": -9007199254740991,
+                        "type": "integer"
+                      },
                       "isShared": {
                         "type": "boolean"
                       },
@@ -3764,6 +3780,9 @@
                       },
                       "path": {
                         "type": "string"
+                      },
+                      "score": {
+                        "type": "number"
                       },
                       "snippet": {
                         "type": "string"
@@ -3794,7 +3813,106 @@
             "description": "Default Response"
           }
         },
-        "summary": "Search notes",
+        "summary": "Search notes (3-layer RRF fusion with lexical fallback)",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/api/search/semantic/ready": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "dimensions": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    },
+                    "model": {
+                      "type": "string"
+                    },
+                    "pendingJobs": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    },
+                    "provider": {
+                      "enum": [
+                        "pgvector-local",
+                        "novamem",
+                        "off"
+                      ],
+                      "type": "string"
+                    },
+                    "ready": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ready",
+                    "provider",
+                    "dimensions",
+                    "pendingJobs"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Semantic search readiness + pending-job count",
+        "tags": [
+          "knowledge"
+        ]
+      }
+    },
+    "/api/search/semantic/reindex": {
+      "post": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "default": "self",
+              "enum": [
+                "self",
+                "all"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "enqueued": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "enqueued"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Re-enqueue semantic embedding jobs for the calling user",
         "tags": [
           "knowledge"
         ]
