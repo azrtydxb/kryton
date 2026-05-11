@@ -16,3 +16,9 @@ pgdata/
 
 # Installed plugins (downloaded from registry at runtime)
 packages/server/plugins/
+
+# Per-user notes tree + leftover SQLite files (pre-Postgres-migration)
+packages/server/data/
+
+# Ad-hoc scratch dir (screenshots, throwaway notes)
+.tmp/
