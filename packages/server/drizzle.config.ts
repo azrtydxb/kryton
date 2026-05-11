@@ -9,10 +9,13 @@ import { defineConfig } from "drizzle-kit";
  */
 export default defineConfig({
   schema: "./src/db/schema/index.ts",
-  out: "./drizzle",
+  out: "./src/db/migrations",
   dialect: "postgresql",
   dbCredentials: {
-    url: process.env.POSTGRES_URL ?? "postgresql://kryton:kryton@localhost:5432/kryton",
+    url:
+      process.env.DATABASE_URL ??
+      process.env.POSTGRES_URL ??
+      "postgresql://kryton:kryton@localhost:5432/kryton",
   },
   strict: true,
   verbose: true,
