@@ -199,7 +199,9 @@ interface EditorTabStripProps {
 
 function basenameOf(path: string, fallback: string): string {
   const base = path.split('/').filter(Boolean).pop() || fallback;
-  return base.endsWith('.md') ? base : `${fallback}.md`;
+  // Drop the .md suffix — every Kryton note is markdown, so showing it
+  // adds visual noise without conveying anything.
+  return base.replace(/\.md$/, '');
 }
 
 interface TabProps {
