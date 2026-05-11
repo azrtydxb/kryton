@@ -30,9 +30,7 @@ services:
         condition: service_healthy
     volumes:
       - ./notes:/notes
-      - kryton-data:/data
     environment:
-      - DATABASE_URL=file:/data/kryton.db
       - POSTGRES_URL=postgresql://kryton:kryton@postgres:5432/kryton
       # Required: generate with: openssl rand -hex 32
       - BETTER_AUTH_SECRET=change-me-use-openssl-rand-hex-32
@@ -41,5 +39,4 @@ services:
       - BETTER_AUTH_URL=http://localhost:3000
 
 volumes:
-  kryton-data:
   postgres-data:

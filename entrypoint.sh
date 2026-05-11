@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-# Run smart migration with backup and legacy detection
-node scripts/migrate.mjs
+# Apply pending Drizzle migrations against POSTGRES_URL, then boot the server.
+node scripts/migrate-prod.mjs
 
-exec node dist/index.js
+exec node dist/server.js
