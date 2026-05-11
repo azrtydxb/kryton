@@ -23,6 +23,7 @@ import { knowledgeModule } from "./modules/knowledge/index.js";
 import { collabModule } from "./modules/collab/index.js";
 import { agentsModule } from "./modules/agents/index.js";
 import { pluginsModule } from "./modules/plugins/index.js";
+import { tunnelModule } from "./modules/tunnel/index.js";
 
 interface BuildAppOptions {
   config: AppConfig;
@@ -87,6 +88,10 @@ export async function buildApp({
   // now and wire it up in a follow-up once the notes module exposes
   // readNote/writeNote/deleteNote/scanDirectory on its decorator.
   await app.register(pluginsModule({ autoDiscover: discoverPlugins }));
+  // Tunnel module: reverse-tunnel client + admin REST. Standalone — has
+  // no cross-module dependencies. Registered last so other decorators
+  // are available if a future iteration needs them.
+  await app.register(tunnelModule);
 
   return app;
 }

@@ -71,3 +71,4 @@ export * from "./sharing.js";
 export * from "./collab.js";
 export * from "./agents.js";
 export * from "./embeddings.js";
+export * from "./tunnel.js";
