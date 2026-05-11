@@ -1,21 +1,45 @@
-import { useState, useEffect, useCallback, CSSProperties } from 'react';
+import { useState, useEffect, useCallback, CSSProperties, FormEvent } from 'react';
+import {
+  X, Users, Ticket, Settings, Trash2, ShieldCheck, ShieldOff,
+  UserX, UserCheck, Plus, Copy, Check, Key, Package,
+} from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
+import { request } from '../lib/api';
+import { PluginsTab } from './PluginsTab';
+import { Section, Field, Toolbar } from '../components/Settings/settings-kit';
+import {
+  helpText,
+  inputStyle as kitInputStyle,
+  primaryBtn,
+  ghostBtn,
+  dangerBtn,
+} from '../components/Settings/settings-kit-styles';
 
 const dialogStyle: CSSProperties = { background: 'var(--bg-1)' };
 const borderLine: CSSProperties = { borderColor: 'var(--line)' };
-const headingStyle: CSSProperties = { color: 'var(--fg)' };
 const mutedStyle: CSSProperties = { color: 'var(--fg-3)' };
-const cardStyle: CSSProperties = { background: 'var(--bg-2)', borderColor: 'var(--line)' };
-const inputSmallStyle: CSSProperties = {
-  background: 'var(--bg-2)',
-  borderColor: 'var(--line)',
-  color: 'var(--fg)',
+
+const errorBoxStyle: CSSProperties = {
+  ...helpText,
+  marginBottom: 12,
+  padding: '8px 10px',
+  borderRadius: 5,
+  background: 'color-mix(in oklch, var(--accent-danger) 10%, transparent)',
+  border: '1px solid color-mix(in oklch, var(--accent-danger) 30%, transparent)',
+  color: 'var(--accent-danger)',
+  fontFamily: 'var(--font-mono)',
 };
-const ghostBtnStyle: CSSProperties = { color: 'var(--fg-3)' };
-const accentBtnStyle: CSSProperties = { background: 'var(--accent)', color: '#fff' };
-import { useAuth } from '../hooks/useAuth';
-import { request } from '../lib/api';
-import { X, Users, Ticket, Settings, Trash2, ShieldCheck, ShieldOff, UserX, UserCheck, Plus, Copy, Check, Key, Package } from 'lucide-react';
-import { PluginsTab } from './PluginsTab';
+
+const rowStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  background: 'var(--bg-1)',
+  border: '1px solid var(--line)',
+  borderRadius: 6,
+  padding: '10px 12px',
+  marginBottom: 8,
+};
 
 interface AdminUser {
   id: string;
@@ -37,6 +61,13 @@ interface InviteCode {
 
 type Tab = 'users' | 'invites' | 'settings' | 'plugins';
 
+const TABS: { key: Tab; label: string; icon: typeof Users }[] = [
+  { key: 'users', label: 'Users', icon: Users },
+  { key: 'invites', label: 'Invite Codes', icon: Ticket },
+  { key: 'settings', label: 'Settings', icon: Settings },
+  { key: 'plugins', label: 'Plugins', icon: Package },
+];
+
 export default function AdminPage({ onClose }: { onClose: () => void }) {
   const { user } = useAuth();
   const [tab, setTab] = useState<Tab>('users');
@@ -51,41 +82,62 @@ export default function AdminPage({ onClose }: { onClose: () => void }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="admin-panel-title"
-        className="rounded-xl shadow-2xl w-[90vw] max-w-4xl max-h-[85vh] overflow-hidden flex flex-col"
-        style={dialogStyle}
+        className="rounded-xl shadow-2xl w-[90vw] max-w-2xl overflow-hidden flex flex-col"
+        style={{ ...dialogStyle, height: 'min(640px, 85vh)' }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b" style={borderLine}>
-          <h2 id="admin-panel-title" className="text-lg font-semibold" style={headingStyle}>Admin Panel</h2>
+          <div className="flex items-center gap-2">
+            <ShieldCheck size={18} style={{ color: 'var(--accent)' }} />
+            <h2 id="admin-panel-title" className="text-lg font-semibold" style={{ color: 'var(--fg)' }}>
+              Admin Panel
+            </h2>
+          </div>
           <button
             onClick={onClose}
             className="p-1.5 rounded-lg transition-colors"
-            style={ghostBtnStyle}
-            onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--fg)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--fg-3)'; }}
+            style={{ color: 'var(--fg-3)' }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = 'var(--bg-hover)';
+              e.currentTarget.style.color = 'var(--fg)';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = 'transparent';
+              e.currentTarget.style.color = 'var(--fg-3)';
+            }}
           >
             <X size={18} />
           </button>
         </div>
 
-        {/* Tabs */}
-        <div className="flex border-b px-6" style={borderLine}>
-          {([
-            { key: 'users' as Tab, label: 'Users', icon: Users },
-            { key: 'invites' as Tab, label: 'Invite Codes', icon: Ticket },
-            { key: 'settings' as Tab, label: 'Settings', icon: Settings },
-            { key: 'plugins' as Tab, label: 'Plugins', icon: Package },
-          ]).map(t => (
+        {/* Tabs — mode-pill pattern (matches AccountSettingsPage) */}
+        <div className="flex items-center px-4 py-2 border-b" style={{ ...borderLine, gap: 2 }}>
+          {TABS.map(t => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className="flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors"
-              style={tab === t.key
-                ? { borderColor: 'var(--accent)', color: 'var(--accent)' }
-                : { borderColor: 'transparent', color: 'var(--fg-3)' }}
+              className="flex items-center gap-1.5 text-sm font-medium transition-colors"
+              style={{
+                padding: '6px 10px',
+                borderRadius: 6,
+                background: tab === t.key ? 'var(--accent-soft)' : 'transparent',
+                color: tab === t.key ? 'var(--accent)' : 'var(--fg-3)',
+              }}
+              onMouseEnter={(e) => {
+                if (tab !== t.key) {
+                  e.currentTarget.style.background = 'var(--bg-hover)';
+                  e.currentTarget.style.color = 'var(--fg)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (tab !== t.key) {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.color = 'var(--fg-3)';
+                }
+              }}
             >
-              <t.icon size={16} />
+              <t.icon size={14} />
               {t.label}
             </button>
           ))}
@@ -132,7 +184,7 @@ function UsersSection({ currentUserId }: { currentUserId: string }) {
     })();
   }, [fetchUsers]);
 
-  const toggleDisabled = async (u: AdminUser) => {
+  const toggleDisabled = useCallback(async (u: AdminUser) => {
     try {
       const updated = await request<AdminUser>(`/admin/users/${u.id}`, {
         method: 'PUT',
@@ -142,9 +194,9 @@ function UsersSection({ currentUserId }: { currentUserId: string }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update user');
     }
-  };
+  }, []);
 
-  const toggleRole = async (u: AdminUser) => {
+  const toggleRole = useCallback(async (u: AdminUser) => {
     const newRole = u.role === 'admin' ? 'user' : 'admin';
     try {
       const updated = await request<AdminUser>(`/admin/users/${u.id}`, {
@@ -155,9 +207,9 @@ function UsersSection({ currentUserId }: { currentUserId: string }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update user');
     }
-  };
+  }, []);
 
-  const deleteUser = async (id: string) => {
+  const deleteUser = useCallback(async (id: string) => {
     try {
       await request<{ ok: boolean }>(`/admin/users/${id}`, { method: 'DELETE' });
       setUsers(prev => prev.filter(x => x.id !== id));
@@ -165,161 +217,155 @@ function UsersSection({ currentUserId }: { currentUserId: string }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete user');
     }
-  };
+  }, []);
 
-  if (loading) {
-    return <div className="text-sm" style={mutedStyle}>Loading users...</div>;
-  }
+  const submitResetPw = useCallback(async (id: string, e: FormEvent) => {
+    e.preventDefault();
+    try {
+      await request('/admin/users/' + id + '/reset-password', {
+        method: 'POST',
+        body: JSON.stringify({ newPassword: resetPwValue }),
+      });
+      setResetPwUser(null);
+      setResetPwValue('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Reset failed');
+    }
+  }, [resetPwValue]);
 
   return (
-    <div>
-      {error && (
-        <div
-          className="mb-4 px-3 py-2 border rounded-lg text-sm"
-          style={{ background: 'color-mix(in oklch, var(--accent-danger) 10%, transparent)', borderColor: 'color-mix(in oklch, var(--accent-danger) 30%, transparent)', color: 'var(--accent-danger)' }}
-        >
-          {error}
-        </div>
-      )}
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left border-b" style={{ ...mutedStyle, ...borderLine }}>
-              <th className="pb-3 font-medium">Name</th>
-              <th className="pb-3 font-medium">Email</th>
-              <th className="pb-3 font-medium">Role</th>
-              <th className="pb-3 font-medium">Status</th>
-              <th className="pb-3 font-medium">Joined</th>
-              <th className="pb-3 font-medium text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
+    <div style={{ color: 'var(--fg-1)' }}>
+      {error && <div style={errorBoxStyle}>{error}</div>}
+
+      <Section title="users">
+        <div style={helpText}>Manage application users — toggle roles, disable accounts, or reset passwords.</div>
+        {loading ? (
+          <div style={helpText}>Loading users...</div>
+        ) : users.length === 0 ? (
+          <div style={helpText}>No users found.</div>
+        ) : (
+          <div style={{ marginBottom: 8 }}>
             {users.map(u => {
               const isSelf = u.id === currentUserId;
               return (
-                <tr key={u.id} className="border-b" style={borderLine}>
-                  <td className="py-3" style={headingStyle}>{u.name || '-'}</td>
-                  <td className="py-3" style={{ color: 'var(--fg)' }}>{u.email}</td>
-                  <td className="py-3">
-                    <span
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-                      style={u.role === 'admin'
-                        ? { background: 'var(--accent-soft)', color: 'var(--accent)' }
-                        : { background: 'var(--bg-2)', color: 'var(--fg)' }}
-                    >
-                      {u.role === 'admin' ? <ShieldCheck size={12} /> : null}
-                      {u.role}
-                    </span>
-                  </td>
-                  <td className="py-3">
-                    <span
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-                      style={u.disabled
-                        ? { background: 'color-mix(in oklch, var(--accent-danger) 20%, transparent)', color: 'var(--accent-danger)' }
-                        : { background: 'color-mix(in oklch, var(--accent-good) 20%, transparent)', color: 'var(--accent-good)' }}
-                    >
-                      {u.disabled ? 'Disabled' : 'Active'}
-                    </span>
-                  </td>
-                  <td className="py-3" style={mutedStyle}>
-                    {new Date(u.createdAt).toLocaleDateString()}
-                  </td>
-                  <td className="py-3 text-right">
+                <div key={u.id} style={rowStyle}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--fg)',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {u.name || u.email}
+                      <span style={{ marginLeft: 8, color: 'var(--fg-3)', fontSize: 11 }}>
+                        {u.name ? u.email : ''}
+                      </span>
+                    </div>
+                    <div style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--fg-3)',
+                      marginTop: 2, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap',
+                    }}>
+                      <span
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                        style={u.role === 'admin'
+                          ? { background: 'var(--accent-soft)', color: 'var(--accent)' }
+                          : { background: 'var(--bg-2)', color: 'var(--fg)' }}
+                      >
+                        {u.role === 'admin' ? <ShieldCheck size={10} /> : null}
+                        {u.role}
+                      </span>
+                      <span
+                        className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                        style={u.disabled
+                          ? { background: 'color-mix(in oklch, var(--accent-danger) 20%, transparent)', color: 'var(--accent-danger)' }
+                          : { background: 'color-mix(in oklch, var(--accent-good) 20%, transparent)', color: 'var(--accent-good)' }}
+                      >
+                        {u.disabled ? 'Disabled' : 'Active'}
+                      </span>
+                      <span>Joined {new Date(u.createdAt).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 6, marginLeft: 8, alignItems: 'center' }}>
                     {isSelf ? (
-                      <span className="text-xs" style={mutedStyle}>(you)</span>
+                      <span style={{ ...mutedStyle, fontSize: 11, fontFamily: 'var(--font-mono)' }}>(you)</span>
+                    ) : confirmDelete === u.id ? (
+                      <>
+                        <button onClick={() => deleteUser(u.id)} style={dangerBtn}>Confirm</button>
+                        <button onClick={() => setConfirmDelete(null)} style={ghostBtn}>Cancel</button>
+                      </>
+                    ) : resetPwUser === u.id ? (
+                      <form onSubmit={e => submitResetPw(u.id, e)} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <input
+                          type="password"
+                          value={resetPwValue}
+                          onChange={e => setResetPwValue(e.target.value)}
+                          placeholder="New password"
+                          minLength={8}
+                          required
+                          style={{ ...kitInputStyle, width: 140, padding: '4px 8px', fontSize: 11 }}
+                          autoFocus
+                        />
+                        <button type="submit" style={primaryBtn}>Set</button>
+                        <button type="button" onClick={() => setResetPwUser(null)} style={ghostBtn}>Cancel</button>
+                      </form>
                     ) : (
-                      <div className="flex items-center justify-end gap-1">
-                        <button
+                      <>
+                        <IconBtn
                           onClick={() => toggleDisabled(u)}
-                          className="p-1.5 rounded-lg transition-colors"
-                          style={{ color: u.disabled ? 'var(--accent-good)' : 'var(--accent-warn)' }}
-                          onMouseEnter={e => { e.currentTarget.style.background = u.disabled
-                            ? 'color-mix(in oklch, var(--accent-good) 10%, transparent)'
-                            : 'color-mix(in oklch, var(--accent-warn) 10%, transparent)'; }}
-                          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
                           title={u.disabled ? 'Enable user' : 'Disable user'}
-                        >
-                          {u.disabled ? <UserCheck size={15} /> : <UserX size={15} />}
-                        </button>
-                        <button
+                          color={u.disabled ? 'var(--accent-good)' : 'var(--accent-warn)'}
+                          icon={u.disabled ? <UserCheck size={14} /> : <UserX size={14} />}
+                        />
+                        <IconBtn
                           onClick={() => toggleRole(u)}
-                          className="p-1.5 rounded-lg transition-colors"
-                          style={{ color: 'var(--accent)' }}
                           title={u.role === 'admin' ? 'Demote to user' : 'Promote to admin'}
-                        >
-                          {u.role === 'admin' ? <ShieldOff size={15} /> : <ShieldCheck size={15} />}
-                        </button>
-                        {confirmDelete === u.id ? (
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => deleteUser(u.id)}
-                              className="px-2 py-1 rounded text-xs transition-colors"
-                              style={{ background: 'var(--accent-danger)', color: 'var(--fg)' }}
-                            >
-                              Confirm
-                            </button>
-                            <button
-                              onClick={() => setConfirmDelete(null)}
-                              className="px-2 py-1 rounded text-xs transition-colors"
-                              style={mutedStyle}
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1">
-                            {resetPwUser === u.id ? (
-                              <form onSubmit={async (e) => {
-                                e.preventDefault();
-                                try {
-                                  await request('/admin/users/' + u.id + '/reset-password', { method: 'POST', body: JSON.stringify({ newPassword: resetPwValue }) });
-                                  setResetPwUser(null); setResetPwValue('');
-                                } catch (err) { setError(err instanceof Error ? err.message : 'Reset failed'); }
-                              }} className="flex items-center gap-1">
-                                <input type="password" value={resetPwValue} onChange={e => setResetPwValue(e.target.value)}
-                                  placeholder="New password" minLength={8} required
-                                  className="w-24 border rounded px-1.5 py-0.5 text-xs"
-                                  style={inputSmallStyle} />
-                                <button type="submit" className="text-xs" style={{ color: 'var(--accent-good)' }}>Set</button>
-                                <button type="button" onClick={() => setResetPwUser(null)} className="text-xs" style={mutedStyle}>✕</button>
-                              </form>
-                            ) : (
-                              <button
-                                onClick={() => { setResetPwUser(u.id); setResetPwValue(''); }}
-                                className="p-1.5 rounded-lg transition-colors"
-                                style={{ color: 'var(--accent-warn)' }}
-                                onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in oklch, var(--accent-warn) 10%, transparent)'; }}
-                                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-                                title="Reset password"
-                              >
-                                <Key size={15} />
-                              </button>
-                            )}
-                            <button
-                              onClick={() => setConfirmDelete(u.id)}
-                              className="p-1.5 rounded-lg transition-colors"
-                              style={{ color: 'var(--accent-danger)' }}
-                              onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in oklch, var(--accent-danger) 10%, transparent)'; }}
-                              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-                              title="Delete user"
-                            >
-                              <Trash2 size={15} />
-                            </button>
-                          </div>
-                        )}
-                      </div>
+                          color="var(--accent)"
+                          icon={u.role === 'admin' ? <ShieldOff size={14} /> : <ShieldCheck size={14} />}
+                        />
+                        <IconBtn
+                          onClick={() => { setResetPwUser(u.id); setResetPwValue(''); }}
+                          title="Reset password"
+                          color="var(--accent-warn)"
+                          icon={<Key size={14} />}
+                        />
+                        <IconBtn
+                          onClick={() => setConfirmDelete(u.id)}
+                          title="Delete user"
+                          color="var(--accent-danger)"
+                          icon={<Trash2 size={14} />}
+                        />
+                      </>
                     )}
-                  </td>
-                </tr>
+                  </div>
+                </div>
               );
             })}
-          </tbody>
-        </table>
-      </div>
-      {users.length === 0 && !loading && (
-        <div className="text-center py-8 text-sm" style={mutedStyle}>No users found.</div>
-      )}
+          </div>
+        )}
+      </Section>
     </div>
+  );
+}
+
+function IconBtn({
+  onClick, title, color, icon,
+}: {
+  onClick: () => void;
+  title: string;
+  color: string;
+  icon: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+      className="p-1.5 rounded-lg transition-colors"
+      style={{ color, background: 'transparent', border: 'none', cursor: 'pointer' }}
+      onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; }}
+      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+    >
+      {icon}
+    </button>
   );
 }
 
@@ -351,7 +397,7 @@ function InvitesSection() {
     })();
   }, [fetchInvites]);
 
-  const createInvite = async () => {
+  const createInvite = useCallback(async () => {
     try {
       setCreating(true);
       const invite = await request<InviteCode>('/admin/invites', {
@@ -364,23 +410,23 @@ function InvitesSection() {
     } finally {
       setCreating(false);
     }
-  };
+  }, []);
 
-  const deleteInvite = async (id: string) => {
+  const deleteInvite = useCallback(async (id: string) => {
     try {
       await request<{ ok: boolean }>(`/admin/invites/${id}`, { method: 'DELETE' });
       setInvites(prev => prev.filter(x => x.id !== id));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete invite');
     }
-  };
+  }, []);
 
-  const copyCode = (invite: InviteCode) => {
+  const copyCode = useCallback((invite: InviteCode) => {
     navigator.clipboard.writeText(invite.code).then(() => {
       setCopiedId(invite.id);
       setTimeout(() => setCopiedId(null), 2000);
     });
-  };
+  }, []);
 
   const getStatus = (invite: InviteCode): { label: string; style: CSSProperties } => {
     if (invite.usedBy) return { label: 'Used', style: { background: 'var(--bg-2)', color: 'var(--fg-3)' } };
@@ -390,76 +436,69 @@ function InvitesSection() {
     return { label: 'Unused', style: { background: 'color-mix(in oklch, var(--accent-good) 20%, transparent)', color: 'var(--accent-good)' } };
   };
 
-  if (loading) {
-    return <div className="text-sm" style={mutedStyle}>Loading invite codes...</div>;
-  }
-
   return (
-    <div>
-      {error && (
-        <div
-          className="mb-4 px-3 py-2 border rounded-lg text-sm"
-          style={{ background: 'color-mix(in oklch, var(--accent-danger) 10%, transparent)', borderColor: 'color-mix(in oklch, var(--accent-danger) 30%, transparent)', color: 'var(--accent-danger)' }}
-        >
-          {error}
+    <div style={{ color: 'var(--fg-1)' }}>
+      {error && <div style={errorBoxStyle}>{error}</div>}
+
+      <Section title="invite codes">
+        <div style={helpText}>Generate invite codes that allow new users to register when sign-up is restricted.</div>
+
+        <Toolbar>
+          <button
+            onClick={createInvite}
+            disabled={creating}
+            style={{ ...primaryBtn, opacity: creating ? 0.5 : 1, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+          >
+            <Plus size={13} />
+            {creating ? 'Creating…' : 'Create Invite'}
+          </button>
+        </Toolbar>
+
+        <div style={{ marginTop: 14 }}>
+          {loading ? (
+            <div style={helpText}>Loading invite codes...</div>
+          ) : invites.length === 0 ? (
+            <div style={helpText}>No invite codes yet.</div>
+          ) : (
+            invites.map(invite => {
+              const status = getStatus(invite);
+              return (
+                <div key={invite.id} style={rowStyle}>
+                  <div style={{ minWidth: 0, flex: 1, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <code style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--fg)',
+                      background: 'var(--bg-2)', padding: '3px 8px', borderRadius: 4,
+                    }}>
+                      {invite.code}
+                    </code>
+                    <IconBtn
+                      onClick={() => copyCode(invite)}
+                      title="Copy code"
+                      color={copiedId === invite.id ? 'var(--accent-good)' : 'var(--fg-3)'}
+                      icon={copiedId === invite.id ? <Check size={13} /> : <Copy size={13} />}
+                    />
+                    <span
+                      className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                      style={status.style}
+                    >
+                      {status.label}
+                    </span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--fg-3)' }}>
+                      Created {new Date(invite.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <IconBtn
+                    onClick={() => deleteInvite(invite.id)}
+                    title="Delete invite"
+                    color="var(--accent-danger)"
+                    icon={<Trash2 size={14} />}
+                  />
+                </div>
+              );
+            })
+          )}
         </div>
-      )}
-      <div className="mb-4">
-        <button
-          onClick={createInvite}
-          disabled={creating}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
-          style={accentBtnStyle}
-        >
-          <Plus size={16} />
-          {creating ? 'Creating...' : 'Create Invite'}
-        </button>
-      </div>
-      <div className="space-y-2">
-        {invites.map(invite => {
-          const status = getStatus(invite);
-          return (
-            <div
-              key={invite.id}
-              className="flex items-center justify-between px-4 py-3 rounded-lg border"
-              style={cardStyle}
-            >
-              <div className="flex items-center gap-4">
-                <code className="text-sm font-mono px-2.5 py-1 rounded" style={{ color: 'var(--fg)', background: 'var(--bg-2)' }}>
-                  {invite.code}
-                </code>
-                <button
-                  onClick={() => copyCode(invite)}
-                  className="p-1 transition-colors"
-                  style={ghostBtnStyle}
-                  title="Copy code"
-                >
-                  {copiedId === invite.id ? <Check size={14} style={{ color: 'var(--accent-good)' }} /> : <Copy size={14} />}
-                </button>
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={status.style}>
-                  {status.label}
-                </span>
-                <span className="text-xs" style={mutedStyle}>
-                  Created {new Date(invite.createdAt).toLocaleDateString()}
-                </span>
-              </div>
-              <button
-                onClick={() => deleteInvite(invite.id)}
-                className="p-1.5 rounded-lg transition-colors"
-                style={{ color: 'var(--accent-danger)' }}
-                onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in oklch, var(--accent-danger) 10%, transparent)'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-                title="Delete invite"
-              >
-                <Trash2 size={15} />
-              </button>
-            </div>
-          );
-        })}
-      </div>
-      {invites.length === 0 && !loading && (
-        <div className="text-center py-8 text-sm" style={mutedStyle}>No invite codes yet.</div>
-      )}
+      </Section>
     </div>
   );
 }
@@ -472,19 +511,24 @@ function SettingsSection() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    request<{ mode: string }>('/admin/settings/registration')
-      .then(data => {
-        setMode(data.mode);
-        setLoading(false);
-      })
-      .catch(err => {
-        setError(err instanceof Error ? err.message : 'Failed to load settings');
-        setLoading(false);
-      });
+  const loadSettings = useCallback(async () => {
+    try {
+      const data = await request<{ mode: string }>('/admin/settings/registration');
+      setMode(data.mode);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load settings');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const updateMode = async (newMode: string) => {
+  useEffect(() => {
+    void (async () => {
+      await loadSettings();
+    })();
+  }, [loadSettings]);
+
+  const updateMode = useCallback(async (newMode: string) => {
     try {
       setSaving(true);
       const data = await request<{ mode: string }>('/admin/settings/registration', {
@@ -498,53 +542,55 @@ function SettingsSection() {
     } finally {
       setSaving(false);
     }
-  };
+  }, []);
 
-  if (loading) {
-    return <div className="text-sm" style={mutedStyle}>Loading settings...</div>;
-  }
+  const modeBtnStyle = (active: boolean): CSSProperties => ({
+    flex: 1,
+    padding: '12px 16px',
+    borderRadius: 6,
+    border: `1px solid ${active ? 'var(--accent)' : 'var(--line)'}`,
+    background: active ? 'var(--accent-soft)' : 'transparent',
+    color: active ? 'var(--accent)' : 'var(--fg-3)',
+    cursor: 'pointer',
+    textAlign: 'left',
+    fontFamily: 'var(--font-mono)',
+    fontSize: 12,
+    transition: 'background 120ms, color 120ms, border-color 120ms',
+  });
 
   return (
-    <div>
-      {error && (
-        <div
-          className="mb-4 px-3 py-2 border rounded-lg text-sm"
-          style={{ background: 'color-mix(in oklch, var(--accent-danger) 10%, transparent)', borderColor: 'color-mix(in oklch, var(--accent-danger) 30%, transparent)', color: 'var(--accent-danger)' }}
-        >
-          {error}
-        </div>
-      )}
-      <div className="rounded-lg border p-6" style={cardStyle}>
-        <h3 className="font-medium mb-1" style={headingStyle}>Registration Mode</h3>
-        <p className="text-sm mb-4" style={mutedStyle}>
-          Control how new users can sign up for the application.
-        </p>
-        <div className="flex gap-3">
-          <button
-            onClick={() => updateMode('open')}
-            disabled={saving}
-            className="flex-1 px-4 py-3 rounded-lg border text-sm font-medium transition-colors disabled:opacity-50"
-            style={mode === 'open'
-              ? { borderColor: 'var(--accent)', background: 'var(--accent-soft)', color: 'var(--accent)' }
-              : { borderColor: 'var(--line)', color: 'var(--fg-3)' }}
-          >
-            <div className="font-medium mb-0.5">Open Registration</div>
-            <div className="text-xs opacity-70">Anyone can create an account</div>
-          </button>
-          <button
-            onClick={() => updateMode('invite-only')}
-            disabled={saving}
-            className="flex-1 px-4 py-3 rounded-lg border text-sm font-medium transition-colors disabled:opacity-50"
-            style={mode === 'invite-only'
-              ? { borderColor: 'var(--accent)', background: 'var(--accent-soft)', color: 'var(--accent)' }
-              : { borderColor: 'var(--line)', color: 'var(--fg-3)' }}
-          >
-            <div className="font-medium mb-0.5">Invite Only</div>
-            <div className="text-xs opacity-70">Requires a valid invite code</div>
-          </button>
-        </div>
-        {saving && <p className="text-xs mt-3" style={mutedStyle}>Saving...</p>}
-      </div>
+    <div style={{ color: 'var(--fg-1)' }}>
+      {error && <div style={errorBoxStyle}>{error}</div>}
+
+      <Section title="registration mode">
+        <div style={helpText}>Control how new users can sign up for the application.</div>
+
+        {loading ? (
+          <div style={helpText}>Loading settings...</div>
+        ) : (
+          <Field label="signup policy">
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => updateMode('open')}
+                disabled={saving}
+                style={{ ...modeBtnStyle(mode === 'open'), opacity: saving ? 0.5 : 1 }}
+              >
+                <div style={{ fontWeight: 600, marginBottom: 2 }}>Open Registration</div>
+                <div style={{ fontSize: 11, opacity: 0.75, textTransform: 'none' }}>Anyone can create an account</div>
+              </button>
+              <button
+                onClick={() => updateMode('invite-only')}
+                disabled={saving}
+                style={{ ...modeBtnStyle(mode === 'invite-only'), opacity: saving ? 0.5 : 1 }}
+              >
+                <div style={{ fontWeight: 600, marginBottom: 2 }}>Invite Only</div>
+                <div style={{ fontSize: 11, opacity: 0.75, textTransform: 'none' }}>Requires a valid invite code</div>
+              </button>
+            </div>
+            {saving && <div style={{ ...helpText, marginTop: 8 }}>Saving…</div>}
+          </Field>
+        )}
+      </Section>
     </div>
   );
 }
