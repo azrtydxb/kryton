@@ -358,11 +358,6 @@ export function QuickSwitcher({
             <span className="kbd">{mod}</span>
             <span className="kbd">↵</span> open in split
           </span>
-          <div style={{ flex: 1 }} />
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--accent)' }}>
-            <span className="dot pulse" style={{ background: 'var(--accent)' }} />
-            AI search ready
-          </span>
         </div>
       </div>
     </div>
