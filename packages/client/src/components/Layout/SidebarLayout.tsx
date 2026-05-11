@@ -1,5 +1,6 @@
 import { FileNode } from '../../lib/api';
 import { Sidebar } from '../Sidebar/Sidebar';
+import { Icons } from '../Icons';
 
 interface SharedNote {
   id: string;
@@ -47,10 +48,53 @@ export function SidebarLayout({
   onTagSelect,
   children,
 }: SidebarLayoutProps) {
-  // When the sidebar is closed on desktop, the column is not rendered at all
-  // (matching the prototype). The mobile drawer still uses the open flag.
+  // Desktop closed state: a narrow 36px rail with just the expand button so
+  // the user can re-open the sidebar (the bible's prototype omits this
+  // because it has no toggle; we keep it to stay reachable).
   if (!sidebarOpen && !mobileMenuOpen) {
-    return null;
+    return (
+      <aside
+        className="hidden md:flex flex-shrink-0"
+        style={{
+          width: 36,
+          background: 'var(--bg-1)',
+          borderRight: '1px solid var(--line)',
+          flexDirection: 'column',
+          alignItems: 'center',
+          paddingTop: 10,
+        }}
+      >
+        <button
+          type="button"
+          aria-label="Expand sidebar"
+          title="Expand sidebar (⌘B)"
+          onClick={() => setSidebarOpen(true)}
+          style={{
+            width: 26,
+            height: 26,
+            borderRadius: 5,
+            background: 'transparent',
+            border: '1px solid transparent',
+            color: 'var(--fg-3)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            transition: 'color 120ms, background 120ms',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = 'var(--fg)';
+            e.currentTarget.style.background = 'var(--bg-hover)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = 'var(--fg-3)';
+            e.currentTarget.style.background = 'transparent';
+          }}
+        >
+          <Icons.PanelLeft size={14} />
+        </button>
+      </aside>
+    );
   }
 
   return (
