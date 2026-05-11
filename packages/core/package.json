@@ -44,7 +44,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "npm run generate && tsc -b && npm run copy-assets",
+    "build": "tsc -b && npm run copy-assets",
     "copy-assets": "node scripts/copy-assets.mjs",
     "clean": "rm -rf dist",
     "generate": "tsx scripts/generate-schema.ts",
