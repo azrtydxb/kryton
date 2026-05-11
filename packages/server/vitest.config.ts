@@ -8,6 +8,7 @@ export default defineConfig({
     // when multiple test files share the same better-sqlite3 database.
     fileParallelism: false,
     include: ["src/**/__tests__/**/*.test.ts"],
+    globalSetup: ["./src/test/global-setup.ts"],
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov"],
