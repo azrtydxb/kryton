@@ -275,7 +275,7 @@ export function GraphPanel({
         onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent)'; e.currentTarget.style.borderColor = 'var(--accent)'; }}
         onMouseLeave={e => { e.currentTarget.style.color = 'var(--fg-2)'; e.currentTarget.style.borderColor = 'var(--line)'; }}
       >
-        <Icons.X size={12} style={{ transform: 'rotate(45deg)' }} />
+        <Icons.Minus size={12} />
       </button>
     </div>
   );
