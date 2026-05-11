@@ -1,6 +1,7 @@
 import { MutableRefObject, ComponentType, useState, useEffect, useRef } from 'react';
 import { FileNode } from '../../lib/api';
 import { api, NoteVersion } from '../../lib/api';
+import { useUIStore } from '../../stores/uiStore';
 import { Preview } from '../Preview/Preview';
 // OutgoingLinksPanel intentionally removed to match design handoff —
 // outgoing-link metadata is exposed through EditorMeta's `N outgoing`
@@ -142,7 +143,12 @@ export function PreviewModeView({
   onEdit, onShare, onToggleStar,
   onLinkClick, onCreateNote, onRestored, getCodeFenceRenderer, onNoteSelect,
 }: PreviewModeViewProps) {
-  const [historyOpen, setHistoryOpen] = useState(false);
+  // History panel is controlled by the top-bar History button via the UI
+  // store so it can be toggled both from the per-note "history" pill and
+  // from the header. Both call sites mutate the same flag.
+  const historyOpen = useUIStore((s) => s.showNoteHistory);
+  const setShowNoteHistory = useUIStore((s) => s.setShowNoteHistory);
+  const setHistoryOpen = setShowNoteHistory;
   const [versions, setVersions] = useState<NoteVersion[]>([]);
   const [loadingVersions, setLoadingVersions] = useState(false);
   const [previewVersion, setPreviewVersion] = useState<NoteVersion | null>(null);
@@ -160,17 +166,22 @@ export function PreviewModeView({
       .finally(() => setLoadingVersions(false));
   }, [historyOpen, activeNote.path]);
 
-  // Close panel when clicking outside
+  // Close panel when clicking outside. Skip the close when the click is on
+  // the header's History toggle — its own onClick will handle the toggle,
+  // and racing with our setShowNoteHistory(false) here would leave the
+  // panel stuck open (toggle would close-then-reopen on every click).
   useEffect(() => {
     if (!historyOpen) return;
     function handleClick(e: MouseEvent) {
+      const target = e.target as Element | null;
+      if (target && target.closest('[data-header-btn="history-toggle"]')) return;
       if (historyPanelRef.current && !historyPanelRef.current.contains(e.target as Node)) {
         setHistoryOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
-  }, [historyOpen]);
+  }, [historyOpen, setHistoryOpen]);
 
   async function handleRestore(timestamp: number) {
     setRestoring(timestamp);

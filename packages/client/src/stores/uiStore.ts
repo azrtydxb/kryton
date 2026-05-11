@@ -30,6 +30,9 @@ interface UIState {
   shareTarget: { path: string; isFolder: boolean } | null;
   showAccessRequests: boolean;
   showAccountSettings: boolean;
+  /** Per-note version-history dropdown — toggled by the top-bar History
+   *  button when a note is active; consumed by PreviewModeView. */
+  showNoteHistory: boolean;
 
   // Editor
   cursorState: { line: number; col: number; wordCount: number };
@@ -53,6 +56,7 @@ interface UIState {
   setShareTarget: SetState<{ path: string; isFolder: boolean } | null>;
   setShowAccessRequests: SetState<boolean>;
   setShowAccountSettings: SetState<boolean>;
+  setShowNoteHistory: SetState<boolean>;
 
   // Compound actions
   enterEditMode: (content: string) => void;
@@ -87,6 +91,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   shareTarget: null,
   showAccessRequests: false,
   showAccountSettings: false,
+  showNoteHistory: false,
   cursorState: { line: 1, col: 1, wordCount: 0 },
 
   // Setters — all support updater functions
@@ -108,6 +113,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   setShareTarget: (v) => set({ shareTarget: resolve(v, get().shareTarget) }),
   setShowAccessRequests: (v) => set({ showAccessRequests: resolve(v, get().showAccessRequests) }),
   setShowAccountSettings: (v) => set({ showAccountSettings: resolve(v, get().showAccountSettings) }),
+  setShowNoteHistory: (v) => set({ showNoteHistory: resolve(v, get().showNoteHistory) }),
 
   enterEditMode: (content) => set({ editing: true, editContent: content, originalContent: content }),
   cancelEdit: () => set({ editing: false, editContent: null, originalContent: null }),
@@ -128,6 +134,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     shareTarget: null,
     showAccessRequests: false,
     showAccountSettings: false,
+    showNoteHistory: false,
     cursorState: { line: 1, col: 1, wordCount: 0 },
   }),
 }));
