@@ -141,10 +141,9 @@ export function QuickSwitcher({
 
   const flat = useMemo(() => sections.flatMap((s) => s.items), [sections]);
 
-  // Clamp idx when results change
-  useEffect(() => {
-    if (idx > flat.length - 1) setIdx(0);
-  }, [flat.length, idx]);
+  // Clamp idx when results change — derive during render rather than syncing
+  // via an effect (avoids cascading re-renders).
+  const activeIdx = flat.length === 0 ? 0 : Math.min(idx, flat.length - 1);
 
   const activate = (item: ResultItem) => {
     if (item.onActivate) {
@@ -166,13 +165,13 @@ export function QuickSwitcher({
       onClose();
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setIdx((i) => Math.min(flat.length - 1, i + 1));
+      setIdx(Math.min(flat.length - 1, activeIdx + 1));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setIdx((i) => Math.max(0, i - 1));
+      setIdx(Math.max(0, activeIdx - 1));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      const sel = flat[idx];
+      const sel = flat[activeIdx];
       if (sel) activate(sel);
     }
   };
@@ -273,7 +272,7 @@ export function QuickSwitcher({
                 <div style={sectionHeader}>{section.title}</div>
                 {section.items.map((item) => {
                   const i = runningIndex++;
-                  const sel = i === idx;
+                  const sel = i === activeIdx;
                   return (
                     <button
                       key={i}

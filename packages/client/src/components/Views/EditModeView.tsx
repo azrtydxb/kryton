@@ -77,13 +77,15 @@ export function EditModeView({
   }, 2000);
 
   useEffect(() => {
-    if (hasChanges) {
-      setSaveStatus('unsaved');
-      debouncedAutoSave();
-    } else if (saveStatus === 'unsaved') {
-      setSaveStatus('unchanged');
-      debouncedAutoSave.cancel();
-    }
+    void (async () => {
+      if (hasChanges) {
+        setSaveStatus('unsaved');
+        debouncedAutoSave();
+      } else if (saveStatus === 'unsaved') {
+        setSaveStatus('unchanged');
+        debouncedAutoSave.cancel();
+      }
+    })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editContent, originalContent]);
 

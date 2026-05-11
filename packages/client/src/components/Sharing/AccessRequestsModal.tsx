@@ -31,7 +31,9 @@ export function AccessRequestsModal({ onClose }: AccessRequestsModalProps) {
   }, []);
 
   useEffect(() => {
-    fetchRequests();
+    void (async () => {
+      await fetchRequests();
+    })();
   }, [fetchRequests]);
 
   useEffect(() => {

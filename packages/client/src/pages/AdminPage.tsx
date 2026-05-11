@@ -126,7 +126,11 @@ function UsersSection({ currentUserId }: { currentUserId: string }) {
     }
   }, []);
 
-  useEffect(() => { fetchUsers(); }, [fetchUsers]);
+  useEffect(() => {
+    void (async () => {
+      await fetchUsers();
+    })();
+  }, [fetchUsers]);
 
   const toggleDisabled = async (u: AdminUser) => {
     try {
@@ -341,7 +345,11 @@ function InvitesSection() {
     }
   }, []);
 
-  useEffect(() => { fetchInvites(); }, [fetchInvites]);
+  useEffect(() => {
+    void (async () => {
+      await fetchInvites();
+    })();
+  }, [fetchInvites]);
 
   const createInvite = async () => {
     try {
