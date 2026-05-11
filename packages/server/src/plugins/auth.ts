@@ -1,7 +1,7 @@
 import fp from "fastify-plugin";
 import type { FastifyRequest } from "fastify";
 import { fromNodeHeaders } from "better-auth/node";
-import { auth, type Auth } from "../modules/identity/auth-config.js";
+import { createAuth, type Auth } from "../modules/identity/auth-config.js";
 import { AuthError, ForbiddenError } from "../lib/errors.js";
 
 export interface AuthUser {
@@ -60,6 +60,13 @@ declare module "fastify" {
  * Fastify instance with auth helpers.
  */
 export const authPlugin = fp(async (app) => {
+  if (!app.db) {
+    throw new Error(
+      "authPlugin requires app.db (Drizzle). Set POSTGRES_URL so dbPlugin initialises before authPlugin.",
+    );
+  }
+  const auth = createAuth(app.db, app.prisma);
+
   const api: AuthApi = {
     instance: auth,
 
@@ -222,4 +229,4 @@ export const authPlugin = fp(async (app) => {
       reply.send(buf);
     },
   });
-}, { name: "auth", dependencies: ["prisma"] });
+}, { name: "auth", dependencies: ["db", "prisma"] });
