@@ -26,19 +26,6 @@ const cardStyle: CSSProperties = {
   border: '1px solid var(--accent)',
 };
 
-const idleBadge: CSSProperties = {
-  position: 'absolute',
-  top: -8,
-  right: -8,
-  padding: '2px 7px',
-  borderRadius: 10,
-  background: 'var(--bg)',
-  border: '1px solid var(--accent)',
-  color: 'var(--accent)',
-  fontSize: 10,
-  fontFamily: monoFamily,
-};
-
 export function EmptyStateView() {
   const isMac =
     typeof navigator !== 'undefined' && navigator.platform.toLowerCase().includes('mac');
@@ -69,7 +56,6 @@ export function EmptyStateView() {
     >
       <div style={cardStyle}>
         <Icons.Logo size={56} />
-        <span style={idleBadge}>idle</span>
       </div>
 
       <div style={{ textAlign: 'center' }}>
