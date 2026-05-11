@@ -1,4 +1,7 @@
 import type { FastifyInstance } from "fastify";
+import { and, eq, like } from "drizzle-orm";
+import { noteShare } from "../../../db/schema/sharing.js";
+import { searchIndex } from "../../../db/schema/notes.js";
 
 /**
  * Resolve the set of (ownerUserId, notePath) entries the given user can read
@@ -13,8 +16,8 @@ export async function getAccessibleSharedPaths(
   app: FastifyInstance,
   userId: string,
 ): Promise<Array<{ ownerUserId: string; notePath: string; permission: string }>> {
-  const shares = await app.prisma.noteShare.findMany({
-    where: { sharedWithUserId: userId },
+  const shares = await app.db.query.noteShare.findMany({
+    where: eq(noteShare.sharedWithUserId, userId),
   });
 
   const paths: Array<{ ownerUserId: string; notePath: string; permission: string }> = [];
@@ -27,11 +30,11 @@ export async function getAccessibleSharedPaths(
         permission: share.permission,
       });
     } else {
-      const notesInFolder = await app.prisma.searchIndex.findMany({
-        where: {
-          userId: share.ownerUserId,
-          notePath: { startsWith: share.path + "/" },
-        },
+      const notesInFolder = await app.db.query.searchIndex.findMany({
+        where: and(
+          eq(searchIndex.userId, share.ownerUserId),
+          like(searchIndex.notePath, `${share.path}/%`),
+        ),
       });
       for (const note of notesInFolder) {
         paths.push({
