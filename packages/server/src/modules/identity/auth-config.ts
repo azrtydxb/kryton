@@ -2,9 +2,12 @@ import { betterAuth } from "better-auth";
 import { passkey } from "@better-auth/passkey";
 import { twoFactor } from "better-auth/plugins";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import type { PrismaClient } from "../../generated/prisma/client.js";
+import { and, count, eq, isNull } from "drizzle-orm";
 import type { Db } from "../../db/client.js";
 import * as authSchema from "../../db/schema/auth.js";
+import { user as userTable } from "../../db/schema/auth.js";
+import { settings as settingsTable } from "../../db/schema/settings.js";
+import { inviteCode as inviteCodeTable } from "../../db/schema/sharing.js";
 import { createLogger } from "../../lib/logger.js";
 import { GLOBAL_USER_ID } from "../../lib/pathUtils.js";
 
@@ -27,15 +30,13 @@ function cleanupPendingInvites(): void {
 }
 
 /**
- * Construct a Better Auth instance bound to the supplied Drizzle DB (used as
- * the auth adapter) and Prisma client (used by hooks that still touch
- * non-auth tables like `settings` and `inviteCode`).
+ * Construct a Better Auth instance bound to the supplied Drizzle DB.
  *
- * Phase 4 of the Postgres + Drizzle migration: better-auth now reads/writes
- * the auth tables via the Drizzle adapter against Postgres. Prisma is kept
- * for the remaining non-auth modules until Phase 5.
+ * Phase 5.1 of the Postgres + Drizzle migration: the hooks that previously
+ * went through Prisma (`user.count`, `settings.findUnique`, `inviteCode.*`)
+ * now run against the same Drizzle DB used for the auth adapter.
  */
-export function createAuth(db: Db, prisma: PrismaClient) {
+export function createAuth(db: Db) {
   return betterAuth({
     secret: process.env.BETTER_AUTH_SECRET,
     database: drizzleAdapter(db, {
@@ -147,13 +148,19 @@ export function createAuth(db: Db, prisma: PrismaClient) {
         create: {
           before: async (user, context) => {
             // First user auto-becomes admin
-            const userCount = await prisma.user.count();
+            const countRow = await db
+              .select({ c: count() })
+              .from(userTable);
+            const userCount = Number(countRow[0]?.c ?? 0);
             const role = userCount === 0 ? "admin" : "user";
 
             // Invite code validation for invite-only mode
             if (userCount > 0) {
-              const regMode = await prisma.settings.findUnique({
-                where: { key_userId: { key: "registration_mode", userId: GLOBAL_USER_ID } },
+              const regMode = await db.query.settings.findFirst({
+                where: and(
+                  eq(settingsTable.key, "registration_mode"),
+                  eq(settingsTable.userId, GLOBAL_USER_ID),
+                ),
               });
 
               if (regMode?.value === "invite-only") {
@@ -172,8 +179,8 @@ export function createAuth(db: Db, prisma: PrismaClient) {
                   throw new Error("Registration requires an invite code");
                 }
 
-                const invite = await prisma.inviteCode.findUnique({
-                  where: { code: inviteCode },
+                const invite = await db.query.inviteCode.findFirst({
+                  where: eq(inviteCodeTable.code, inviteCode),
                 });
 
                 if (!invite) {
@@ -187,12 +194,20 @@ export function createAuth(db: Db, prisma: PrismaClient) {
                 }
 
                 // Atomically claim the invite code to prevent race conditions
-                // with concurrent registrations using the same code
-                const claimed = await prisma.inviteCode.updateMany({
-                  where: { id: invite.id, usedById: null },
-                  data: { usedById: "pending" },
-                });
-                if (claimed.count === 0) {
+                // with concurrent registrations using the same code. The
+                // `usedById IS NULL` predicate guarantees only one concurrent
+                // claim wins.
+                const claimed = await db
+                  .update(inviteCodeTable)
+                  .set({ usedById: "pending" })
+                  .where(
+                    and(
+                      eq(inviteCodeTable.id, invite.id),
+                      isNull(inviteCodeTable.usedById),
+                    ),
+                  )
+                  .returning({ id: inviteCodeTable.id });
+                if (claimed.length === 0) {
                   throw new Error("Invite code has already been used");
                 }
 
@@ -215,10 +230,10 @@ export function createAuth(db: Db, prisma: PrismaClient) {
             if (pending) {
               pendingInviteCodes.delete(user.email);
               try {
-                await prisma.inviteCode.update({
-                  where: { id: pending.id },
-                  data: { usedById: user.id },
-                });
+                await db
+                  .update(inviteCodeTable)
+                  .set({ usedById: user.id })
+                  .where(eq(inviteCodeTable.id, pending.id));
               } catch (err) {
                 log.error("Failed to finalize invite code", err);
               }

@@ -65,7 +65,7 @@ export const authPlugin = fp(async (app) => {
       "authPlugin requires app.db (Drizzle). Set POSTGRES_URL so dbPlugin initialises before authPlugin.",
     );
   }
-  const auth = createAuth(app.db, app.prisma);
+  const auth = createAuth(app.db);
 
   const api: AuthApi = {
     instance: auth,
