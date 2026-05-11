@@ -1,5 +1,7 @@
 # Kryton UI redesign — implementation plan
 
+**Status**: Implemented
+
 **Goal:** rebuild every client screen against the design system in `design_handoff_kryton_redesign/README.md`. The README + `prototype/` files are the canonical spec.
 
 **Tech stack:** existing — React 19, Vite 8, Tailwind v4, Zustand, TanStack Query, CodeMirror 6, lucide-react. No new state lib, no router change.

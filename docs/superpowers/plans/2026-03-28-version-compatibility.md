@@ -1,5 +1,7 @@
 # Version Display & Mobile Compatibility Implementation Plan
 
+**Status**: Implemented
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Display version + commit in the web status bar, expose version info from the server API, and enforce major-version compatibility on the mobile app before syncing.

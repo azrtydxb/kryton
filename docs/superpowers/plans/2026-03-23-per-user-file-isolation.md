@@ -1,5 +1,7 @@
 # Per-User File Isolation Implementation Plan
 
+**Status**: Implemented
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Restructure note storage so each user has an isolated directory (`notes/{userId}/`) and all DB queries are scoped by userId.

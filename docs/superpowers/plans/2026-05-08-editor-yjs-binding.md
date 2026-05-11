@@ -1,5 +1,7 @@
 # Editor Yjs Binding — Implementation Plan
 
+**Status**: Implemented
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development`. Steps use checkbox (`- [ ]`).
 
 **Goal:** Bidirectional binding between the in-house `EditorState` (from `editor-state-core`) and a `Y.Text` document, including cursor awareness. Replaces `y-codemirror.next` with a renderer-agnostic implementation tested under Node.

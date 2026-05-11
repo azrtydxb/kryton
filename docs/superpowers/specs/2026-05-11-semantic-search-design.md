@@ -1,7 +1,7 @@
 # Semantic Search Design
 
 **Date**: 2026-05-11
-**Status**: **Decisions resolved — ready for plan.**
+**Status**: Implemented (PR #114 — fused lexical + semantic + graph search is the default behavior of `GET /api/search/`, with graceful degradation when the embedder is off or warming up. No UI mode toggle. Per-user fusion weights shipped in PR #115).
 **Prerequisite**: ✅ [Postgres + Drizzle Migration](2026-05-11-postgres-drizzle-migration-design.md) shipped (PR #109).
 
 > ## Spec status

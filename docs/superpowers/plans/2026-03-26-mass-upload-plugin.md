@@ -1,5 +1,7 @@
 # Mass Upload Plugin Implementation Plan
 
+**Status**: Implemented
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build a server+client plugin that lets users bulk-import `.md` files via a modal with validation, duplicate detection, and per-file action choices.

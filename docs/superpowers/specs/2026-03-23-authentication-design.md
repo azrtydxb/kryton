@@ -1,5 +1,7 @@
 # Authentication — Multi-User Sub-Project 1 of 3
 
+**Status**: Implemented
+
 **Date:** 2026-03-23
 **Scope:** Add user authentication to Kryton — email/password + OAuth (Google, GitHub), JWT with refresh tokens, admin role, invite system. No changes to note storage or sharing yet (those are sub-projects 2 and 3).
 

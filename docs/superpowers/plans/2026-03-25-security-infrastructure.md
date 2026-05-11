@@ -1,5 +1,7 @@
 # Security & Infrastructure Fixes
 
+**Status**: Implemented
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Fix all critical and high security vulnerabilities (GH issues #2-#24) and harden infrastructure configuration.

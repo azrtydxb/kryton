@@ -1,5 +1,7 @@
 # App.tsx Refactor — Implementation Plan
 
+**Status**: Implemented
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Decompose the 686-line `AppContent` component into focused, single-responsibility components and hooks, creating clean insertion points for the upcoming plugin slot system.

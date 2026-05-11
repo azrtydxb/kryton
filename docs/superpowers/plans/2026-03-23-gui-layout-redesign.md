@@ -1,5 +1,7 @@
 # GUI Layout Redesign Implementation Plan
 
+**Status**: Implemented
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Redesign the main layout so notes show in preview mode by default with an inline graph panel, and editing is opt-in via an Edit button that opens a split editor+preview.

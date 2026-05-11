@@ -1,5 +1,7 @@
 # Kryton - Vim Keybindings & Keyboard-First Interface
 
+**Status**: Deferred / not implemented. A `vim-mode` plugin briefly existed in the bundled-plugins directory but failed to load (`registerExtension` undefined against the current custom EditorView; previously targeted CodeMirror's vim adapter which was retired during the editor migration). The keybinding ideas captured here remain a useful target if a vim-mode plugin is rebuilt against the new editor.
+
 ## Overview
 Transform Kryton into a keyboard-first note-taking app with Vim-style navigation and editing.
 

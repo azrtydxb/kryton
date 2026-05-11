@@ -1,5 +1,7 @@
 # Per-User File Isolation — Multi-User Sub-Project 2 of 3
 
+**Status**: Implemented
+
 **Date:** 2026-03-23
 **Scope:** Restructure note storage so each user has an isolated directory and all DB queries are scoped by userId. No sharing yet (sub-project 3).
 

@@ -1,5 +1,7 @@
 # Mass Upload Plugin — Design Spec
 
+**Status**: Implemented
+
 ## Overview
 
 A server+client plugin for Kryton that lets users bulk-import `.md` files via a modal dialog. Files are uploaded to the server, validated, and presented for review before being committed as notes.

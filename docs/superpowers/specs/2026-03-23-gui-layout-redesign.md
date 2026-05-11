@@ -1,5 +1,7 @@
 # GUI Layout Redesign
 
+**Status**: Implemented
+
 **Date:** 2026-03-23
 **Scope:** Redesign the main app layout to make preview the default view, embed the graph as a persistent panel, and simplify the view mode system.
 

@@ -1,7 +1,7 @@
 # Graph Layout Redesign
 
 **Date**: 2026-03-28
-**Status**: Approved
+**Status**: Superseded by [2026-05-08-graph-cross-platform-renderer.md](2026-05-08-graph-cross-platform-renderer.md) (2026-05-08)
 
 ## Problem
 

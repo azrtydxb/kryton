@@ -1,5 +1,7 @@
 # Plugin Ecosystem Design
 
+**Status**: Implemented
+
 Comprehensive design for an Obsidian-like plugin ecosystem in Kryton, covering the Plugin API, runtime, distribution, and management UI.
 
 ## Overview

@@ -1,5 +1,7 @@
 # Fastify Migration & Server Re-Architecture — Design
 
+**Status**: Implemented
+
 - **Date:** 2026-05-07
 - **Status:** Approved (design phase)
 - **Scope:** `packages/server` only. `core`, `core-react`, `ui`, `client` not touched beyond keeping them building.

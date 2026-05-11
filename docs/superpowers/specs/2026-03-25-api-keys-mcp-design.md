@@ -1,7 +1,7 @@
 # API Keys, OpenAPI & MCP Server — Design Spec
 
 **Date:** 2026-03-25
-**Status:** Draft
+**Status:** Implemented
 **Scope:** API key management, bearer auth, OpenAPI improvements, built-in MCP server, Account Settings page
 
 ## Overview

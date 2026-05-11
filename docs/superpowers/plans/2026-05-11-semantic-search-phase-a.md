@@ -1,5 +1,7 @@
 # Semantic Search — Phase A Implementation Plan
 
+**Status**: Implemented
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans. Steps use `[ ]` checkbox syntax for tracking.
 
 **Spec**: [`2026-05-11-semantic-search-design.md`](../specs/2026-05-11-semantic-search-design.md)

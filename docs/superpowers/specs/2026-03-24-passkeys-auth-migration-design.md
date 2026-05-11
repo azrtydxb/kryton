@@ -1,5 +1,7 @@
 # Passkeys + Auth & ORM Migration Design
 
+**Status**: Implemented
+
 Unified migration: TypeORM → Prisma, hand-rolled auth → better-auth, and add passkey support.
 
 ## Overview

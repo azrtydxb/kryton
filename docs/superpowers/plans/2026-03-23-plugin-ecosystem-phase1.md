@@ -1,5 +1,7 @@
 # Plugin Ecosystem Phase 1: Plugin API & Runtime — Implementation Plan
 
+**Status**: Implemented
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build the plugin loading runtime, backend PluginAPI, frontend ClientPluginAPI, and defensive guardrails — producing a working system that can load and run a sample plugin.

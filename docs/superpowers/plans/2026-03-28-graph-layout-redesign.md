@@ -1,5 +1,7 @@
 # Graph Layout Redesign Implementation Plan
 
+**Status**: Superseded by [2026-05-08-graph-cross-platform-renderer.md](./2026-05-08-graph-cross-platform-renderer.md) (2026-05-08)
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Improve the graph visualization with tuned force-directed layout for global view, concentric ring layout for local view, full-screen overlay mode, and matching behavior on mobile.

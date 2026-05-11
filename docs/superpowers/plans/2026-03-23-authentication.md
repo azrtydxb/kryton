@@ -1,5 +1,7 @@
 # Authentication Implementation Plan
 
+**Status**: Implemented
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add multi-user authentication to Kryton — email/password + OAuth (Google, GitHub), JWT with refresh tokens, admin role with invite system, and protected API routes.

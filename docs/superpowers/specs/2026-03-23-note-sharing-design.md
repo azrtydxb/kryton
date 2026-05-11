@@ -1,5 +1,7 @@
 # Note Sharing — Multi-User Sub-Project 3 of 3
 
+**Status**: Implemented
+
 **Date:** 2026-03-23
 **Scope:** Allow users to share individual notes or entire folders with other users, with read or read-write permissions. Shared notes appear in sidebar, search, and graph with visual distinction. Access request system for inaccessible links.
 

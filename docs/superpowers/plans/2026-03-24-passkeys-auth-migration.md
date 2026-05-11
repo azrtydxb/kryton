@@ -1,5 +1,7 @@
 # Passkeys + Auth & ORM Migration — Implementation Plan
 
+**Status**: Implemented
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Migrate Kryton from TypeORM to Prisma, replace hand-rolled JWT auth with better-auth (adding passkey support), and convert the server from CommonJS to ESM — all in one unified migration.

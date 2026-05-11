@@ -1,5 +1,7 @@
 # Full Dependency Upgrade Design
 
+**Status**: Implemented
+
 **Date:** 2026-03-23
 **Scope:** Upgrade all dependencies to latest versions, replace incompatible libraries, modernize build tooling and CI.
 

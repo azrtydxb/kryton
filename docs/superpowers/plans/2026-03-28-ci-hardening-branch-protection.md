@@ -1,5 +1,7 @@
 # CI Hardening & Branch Protection Implementation Plan
 
+**Status**: Implemented
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Harden the CI pipeline with strict linting, add git hooks with conventional commits, set up branch protection with automerge, and create an automated release workflow with multi-arch Docker and auto-generated release notes.

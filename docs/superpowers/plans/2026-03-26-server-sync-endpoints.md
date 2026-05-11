@@ -1,5 +1,7 @@
 # Server Sync Endpoints Implementation Plan
 
+**Status**: Superseded — sync v2 was removed in PR #110. See [2026-05-11-remove-sqlite-and-offline-sync-design.md](../specs/2026-05-11-remove-sqlite-and-offline-sync-design.md) for the architecture change that made this obsolete.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add pull/push sync endpoints to the Kryton server so the mobile app can synchronize notes, settings, shares, and trash bidirectionally using WatermelonDB.
