@@ -1,16 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { ApiKeyInfo as UiApiKeyInfo, ApiKeyScope, ApiKeyExpiry, NewApiKeyResult } from '@azrtydxb/ui';
 import { apiKeyApi } from '../../lib/api';
+import { Section, Field, Toolbar } from '../Settings/settings-kit';
 import {
-  Section,
-  Field,
-  Toolbar,
   helpText,
   inputStyle,
   primaryBtn,
   ghostBtn,
   dangerBtn,
-} from '../Settings/settings-kit';
+} from '../Settings/settings-kit-styles';
 
 /**
  * Renders the API-keys management surface inline, matching the visual

@@ -2,16 +2,14 @@ import { useState, useEffect, useCallback, CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { Fingerprint, Trash2, X } from 'lucide-react';
 import { authClient } from '../../lib/auth-client';
+import { Section, Field, Toolbar } from '../Settings/settings-kit';
 import {
-  Section,
-  Field,
-  Toolbar,
   helpText,
   inputStyle,
   primaryBtn,
   ghostBtn,
   dangerBtn,
-} from '../Settings/settings-kit';
+} from '../Settings/settings-kit-styles';
 
 interface PasskeyData {
   id: string;

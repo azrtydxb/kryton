@@ -2,16 +2,14 @@ import { useState, useEffect, useCallback, FormEvent } from 'react';
 import { ShieldCheck, Copy, Check } from 'lucide-react';
 import QRCode from 'qrcode';
 import { authClient } from '../../lib/auth-client';
+import { Section, Field, Toolbar } from '../Settings/settings-kit';
 import {
-  Section,
-  Field,
-  Toolbar,
   helpText,
   inputStyle,
   primaryBtn,
   ghostBtn,
   dangerBtn,
-} from '../Settings/settings-kit';
+} from '../Settings/settings-kit-styles';
 
 type SetupStep = 'idle' | 'confirm-password' | 'scan-qr' | 'verify' | 'backup-codes';
 

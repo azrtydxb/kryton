@@ -137,7 +137,7 @@ export function QuickSwitcher({
       { title: 'Commands', items: commands },
       { title: 'Notes', items: noteHits.slice(0, 8) },
     ];
-  }, [q, allFiles, mod, onNewNote, onNewFolder, onDailyNote, onGraphView, onSettings]);
+  }, [q, allFiles, onNewNote, onNewFolder, onDailyNote, onGraphView, onSettings]);
 
   const flat = useMemo(() => sections.flatMap((s) => s.items), [sections]);
 

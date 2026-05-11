@@ -9,14 +9,12 @@ import { PasskeyManagerContent } from '../components/Security/PasskeyManager';
 import { ApiKeyManager } from '../components/ApiKeys/ApiKeyManager';
 import { TwoFactorManager } from '../components/Security/TwoFactorManager';
 import { AppearanceSection } from '../components/Settings/AppearanceSection';
+import { Section, Field, Toolbar } from '../components/Settings/settings-kit';
 import {
-  Section,
-  Field,
-  Toolbar,
   inputStyle as kitInputStyle,
   primaryBtn,
   helpText,
-} from '../components/Settings/settings-kit';
+} from '../components/Settings/settings-kit-styles';
 
 type Tab = 'profile' | 'appearance' | 'passkeys' | 'api-keys' | '2fa';
 
