@@ -2,6 +2,7 @@ import * as path from "node:path";
 import type { FastifyPluginAsync } from "fastify";
 import { backfillFolders } from "./services/backfill/folders-backfill.js";
 import { backfillTags } from "./services/backfill/tags-backfill.js";
+import { reconcileSearchIndex } from "./services/backfill/search-index-reconcile.js";
 import { NoteService } from "./services/note.service.js";
 import { getUserNotesDir } from "./services/user-notes-dir.service.js";
 import {
@@ -96,6 +97,11 @@ export const notesModule: FastifyPluginAsync = async (app) => {
     try {
       await backfillFolders(app, notesDir, userId);
       await backfillTags(app, userId);
+      // Drop searchIndex/graphEdge rows for notes that no longer exist on
+      // disk — keeps the graph view from rendering phantom nodes when the
+      // notes dir was rebased, the user deleted files out-of-band, or a
+      // dev worktree points at a different notes root.
+      await reconcileSearchIndex(app, notesDir, userId);
     } catch (err) {
       // Non-fatal: log and allow retry on the next request.
       app.log.warn({ err, userId }, "backfill failed for user");
