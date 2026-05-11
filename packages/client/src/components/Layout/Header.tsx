@@ -8,6 +8,7 @@
  */
 import { MutableRefObject, useMemo } from 'react';
 import { UserMenu } from './UserMenu';
+import { IndexingPill } from './IndexingPill';
 import { Icons } from '../Icons';
 import { usePrefs } from '../../stores/prefsStore';
 import { useUIStore } from '../../stores/uiStore';
@@ -190,6 +191,7 @@ export function Header({
       <div style={{ flex: 1 }} />
 
       {/* right cluster */}
+      <IndexingPill />
       {onNewNote && (
         <HeaderBtn onClick={onNewNote} title={`New note (${formatShortcut(['mod', 'shift', 'N'])})`} ariaLabel="New note">
           <Icons.Plus size={14} />
