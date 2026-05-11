@@ -3,6 +3,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { backfillFolders } from "./services/backfill/folders-backfill.js";
 import { backfillTags } from "./services/backfill/tags-backfill.js";
 import { reconcileSearchIndex } from "./services/backfill/search-index-reconcile.js";
+import { ensureNotesWatcher } from "./services/notes-watcher.js";
 import { NoteService } from "./services/note.service.js";
 import { getUserNotesDir } from "./services/user-notes-dir.service.js";
 import {
@@ -98,10 +99,14 @@ export const notesModule: FastifyPluginAsync = async (app) => {
       await backfillFolders(app, notesDir, userId);
       await backfillTags(app, userId);
       // Drop searchIndex/graphEdge rows for notes that no longer exist on
-      // disk — keeps the graph view from rendering phantom nodes when the
-      // notes dir was rebased, the user deleted files out-of-band, or a
-      // dev worktree points at a different notes root.
+      // disk — handles the cold-start case where the notes dir was rebased,
+      // the user deleted files out-of-band, or a dev worktree points at a
+      // different notes root.
       await reconcileSearchIndex(app, notesDir, userId);
+      // Start a live chokidar watcher so subsequent out-of-band changes
+      // (filesystem rm, Finder, git checkout) keep the index in sync
+      // without the user having to restart the server.
+      await ensureNotesWatcher(app, notesDir, userId);
     } catch (err) {
       // Non-fatal: log and allow retry on the next request.
       app.log.warn({ err, userId }, "backfill failed for user");
@@ -110,6 +115,31 @@ export const notesModule: FastifyPluginAsync = async (app) => {
   };
 
   const deps = { notesDir, noteService, ensureBackfilled };
+
+  // Warm-start watchers + reconcile for every existing user dir at boot so
+  // out-of-band changes (filesystem rm, git checkout, manual edit) are
+  // picked up without requiring the user to send a request first. Without
+  // this, a file dropped on disk before the user reloads the UI would sit
+  // unindexed until ensureBackfilled fires on their first authenticated call.
+  app.addHook("onReady", async () => {
+    try {
+      const fs = await import("node:fs/promises");
+      let entries: { name: string; isDirectory: () => boolean }[];
+      try {
+        entries = await fs.readdir(notesDir, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        if (entry.name.startsWith(".")) continue;
+        // Schedule but don't block onReady — backfill+reconcile can be slow.
+        void ensureBackfilled(entry.name);
+      }
+    } catch (err) {
+      app.log.warn({ err }, "warm-start watchers failed");
+    }
+  });
 
   // Mount shared-notes BEFORE /api/notes so the prefix is matched first.
   await app.register(sharedNotesRoutes(deps), { prefix: "/api/notes/shared" });
