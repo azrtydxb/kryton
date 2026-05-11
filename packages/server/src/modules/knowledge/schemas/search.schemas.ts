@@ -34,3 +34,9 @@ export const semanticReindexQuerySchema = z.object({
 export const semanticReindexResponseSchema = z.object({
   enqueued: z.number().int(),
 });
+
+export const fusionWeightsSchema = z.object({
+  lex: z.number().min(0).max(1),
+  sem: z.number().min(0).max(1),
+  graph: z.number().min(0).max(1),
+});

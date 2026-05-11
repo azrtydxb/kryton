@@ -1,5 +1,5 @@
-import { useState, useCallback, FormEvent, CSSProperties } from 'react';
-import { Settings, User, Fingerprint, Key, Shield, X, Palette } from 'lucide-react';
+import { useState, useCallback, useEffect, FormEvent, CSSProperties } from 'react';
+import { Settings, User, Fingerprint, Key, Shield, X, Palette, Sliders } from 'lucide-react';
 
 const dialogStyle: CSSProperties = { background: 'var(--bg-1)' };
 const borderLine: CSSProperties = { borderColor: 'var(--line)' };
@@ -16,7 +16,7 @@ import {
   helpText,
 } from '../components/Settings/settings-kit-styles';
 
-type Tab = 'profile' | 'appearance' | 'passkeys' | 'api-keys' | '2fa';
+type Tab = 'profile' | 'appearance' | 'passkeys' | 'api-keys' | '2fa' | 'search';
 
 const TABS: { key: Tab; label: string; icon: typeof User }[] = [
   { key: 'profile', label: 'Profile', icon: User },
@@ -24,6 +24,7 @@ const TABS: { key: Tab; label: string; icon: typeof User }[] = [
   { key: 'passkeys', label: 'Passkeys', icon: Fingerprint },
   { key: 'api-keys', label: 'API Keys', icon: Key },
   { key: '2fa', label: '2FA', icon: Shield },
+  { key: 'search', label: 'Search', icon: Sliders },
 ];
 
 function ProfileSection() {
@@ -129,6 +130,149 @@ function ProfileSection() {
   );
 }
 
+interface FusionWeights {
+  lex: number;
+  sem: number;
+  graph: number;
+}
+
+const DEFAULT_WEIGHTS: FusionWeights = { lex: 0.4, sem: 0.4, graph: 0.2 };
+
+function SearchSection() {
+  const [weights, setWeights] = useState<FusionWeights>(DEFAULT_WEIGHTS);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [savedAt, setSavedAt] = useState(0);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch('/api/search/weights', { credentials: 'include' });
+        if (!res.ok) throw new Error(`Failed to load weights (${res.status})`);
+        const data = (await res.json()) as FusionWeights;
+        if (!cancelled) setWeights(data);
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleSave = useCallback(async (e: FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      const res = await fetch('/api/search/weights', {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(weights),
+      });
+      if (!res.ok) throw new Error(`Failed to save (${res.status})`);
+      const data = (await res.json()) as FusionWeights;
+      setWeights(data);
+      setSavedAt(Date.now());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  }, [weights]);
+
+  const setField = (k: keyof FusionWeights) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = parseFloat(e.target.value);
+    setWeights((prev) => ({ ...prev, [k]: Number.isFinite(v) ? v : 0 }));
+  };
+
+  const focusRing = (e: React.FocusEvent<HTMLInputElement>): void => {
+    e.currentTarget.style.boxShadow = '0 0 0 2px var(--accent-soft)';
+  };
+  const blurRing = (e: React.FocusEvent<HTMLInputElement>): void => {
+    e.currentTarget.style.boxShadow = 'none';
+  };
+
+  return (
+    <div style={{ color: 'var(--fg-1)', maxWidth: 420 }}>
+      <Section title="fusion weights">
+        <div style={helpText}>
+          Search combines three signal sources: <strong>lexical</strong> (exact word match),{' '}
+          <strong>semantic</strong> (meaning similarity), and <strong>graph</strong> (wikilink
+          proximity). Adjust the weights to bias your search results. Values are normalised so the
+          total is 1.
+        </div>
+        <form onSubmit={handleSave}>
+          <Field label="lexical">
+            <input
+              type="number"
+              min={0}
+              max={1}
+              step={0.05}
+              value={weights.lex}
+              onChange={setField('lex')}
+              disabled={loading || saving}
+              style={kitInputStyle}
+              onFocus={focusRing}
+              onBlur={blurRing}
+            />
+          </Field>
+          <Field label="semantic">
+            <input
+              type="number"
+              min={0}
+              max={1}
+              step={0.05}
+              value={weights.sem}
+              onChange={setField('sem')}
+              disabled={loading || saving}
+              style={kitInputStyle}
+              onFocus={focusRing}
+              onBlur={blurRing}
+            />
+          </Field>
+          <Field label="graph">
+            <input
+              type="number"
+              min={0}
+              max={1}
+              step={0.05}
+              value={weights.graph}
+              onChange={setField('graph')}
+              disabled={loading || saving}
+              style={kitInputStyle}
+              onFocus={focusRing}
+              onBlur={blurRing}
+            />
+          </Field>
+          {error && (
+            <div style={{ ...helpText, color: 'var(--accent-danger)', marginBottom: 8 }}>
+              {error}
+            </div>
+          )}
+          {savedAt > 0 && !error && (
+            <div style={{ ...helpText, color: 'var(--accent-good)', marginBottom: 8 }}>
+              Weights saved and normalised.
+            </div>
+          )}
+          <Toolbar>
+            <button
+              type="submit"
+              disabled={loading || saving}
+              style={{ ...primaryBtn, opacity: loading || saving ? 0.6 : 1, cursor: loading || saving ? 'not-allowed' : 'pointer' }}
+            >
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+          </Toolbar>
+        </form>
+      </Section>
+    </div>
+  );
+}
+
 export default function AccountSettingsPage({ onClose }: { onClose: () => void }) {
   const [tab, setTab] = useState<Tab>('profile');
 
@@ -211,6 +355,7 @@ export default function AccountSettingsPage({ onClose }: { onClose: () => void }
           {tab === 'passkeys' && <PasskeyManagerContent />}
           {tab === 'api-keys' && <ApiKeyManager />}
           {tab === '2fa' && <TwoFactorManager />}
+          {tab === 'search' && <SearchSection />}
         </div>
       </div>
     </div>

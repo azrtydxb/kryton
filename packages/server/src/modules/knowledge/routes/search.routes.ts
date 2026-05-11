@@ -3,6 +3,7 @@ import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { eq, sql } from "drizzle-orm";
 
 import {
+  fusionWeightsSchema,
   searchQuerySchema,
   searchResponseSchema,
   semanticReadyResponseSchema,
@@ -11,6 +12,10 @@ import {
 } from "../schemas/search.schemas.js";
 import type { SearchService } from "../services/search.service.js";
 import { searchFused } from "../services/fused-search.service.js";
+import {
+  getFusionWeights,
+  setFusionWeights,
+} from "../services/fusion-weights.service.js";
 import { searchIndex } from "../../../db/schema/notes.js";
 import { embedJob } from "../../../db/schema/embeddings.js";
 import { ForbiddenError } from "../../../lib/errors.js";
@@ -154,6 +159,43 @@ export const searchRoutes: FastifyPluginAsync<SearchRoutesOptions> = async (
         });
 
       return { enqueued: rows.length };
+    },
+  );
+
+  typed.get(
+    "/weights",
+    {
+      schema: {
+        tags: ["knowledge"],
+        summary: "Get the current user's fusion weights (lex/sem/graph)",
+        response: { 200: fusionWeightsSchema },
+      },
+      preHandler: async (req) => {
+        await app.auth.requireUser(req);
+      },
+    },
+    async (req) => {
+      const user = await app.auth.requireUser(req);
+      return getFusionWeights(app, user.id);
+    },
+  );
+
+  typed.put(
+    "/weights",
+    {
+      schema: {
+        tags: ["knowledge"],
+        summary: "Update the current user's fusion weights (normalised to sum=1)",
+        body: fusionWeightsSchema,
+        response: { 200: fusionWeightsSchema },
+      },
+      preHandler: async (req) => {
+        await app.auth.requireUser(req);
+      },
+    },
+    async (req) => {
+      const user = await app.auth.requireUser(req);
+      return setFusionWeights(app, user.id, req.body);
     },
   );
 };

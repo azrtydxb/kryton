@@ -3,6 +3,7 @@ import { user } from "../../../db/schema/auth.js";
 import { searchIndex, graphEdge } from "../../../db/schema/notes.js";
 import { noteEmbeddingChunk } from "../../../db/schema/embeddings.js";
 import type { TestDbHandle } from "../../../test/db-fixture.js";
+import { setFusionWeights } from "../services/fusion-weights.service.js";
 import {
   buildKnowledgeTestApp,
   createKnowledgeTestDb,
@@ -272,6 +273,91 @@ describe("knowledge / GET /api/search (fused)", () => {
     expect(paths).not.toContain("loner.md");
     // Top should outrank the graph-only neighbour.
     expect(paths.indexOf("top.md")).toBeLessThan(paths.indexOf("neighbour.md"));
+  });
+
+  it("custom fusion weights re-order results: lex-only weight ignores graph neighbour", async () => {
+    const now = new Date("2026-05-11T00:00:00Z");
+    // Same setup as the graph-boost test: top.md has the lexical+semantic
+    // hit; neighbour.md only appears via the graph layer. With default
+    // weights (0.2 graph), neighbour appears. With lex-only weights
+    // (graph=0), neighbour MUST drop out entirely.
+    await dbHandle.db.insert(searchIndex).values([
+      {
+        notePath: "top.md",
+        userId: TEST_USER.id,
+        title: "Top",
+        content: "marker keyword appears here",
+        tags: "[]",
+        modifiedAt: now,
+      },
+      {
+        notePath: "neighbour.md",
+        userId: TEST_USER.id,
+        title: "Neighbour",
+        content: "unrelated prose",
+        tags: "[]",
+        modifiedAt: now,
+      },
+    ]);
+
+    await dbHandle.db.insert(noteEmbeddingChunk).values([
+      {
+        userId: TEST_USER.id,
+        notePath: "top.md",
+        chunkIndex: 0,
+        chunkText: "top chunk text",
+        embedding: Array.from(oneHot(0)),
+        modifiedAt: now,
+      },
+    ]);
+
+    await dbHandle.db.insert(graphEdge).values([
+      {
+        userId: TEST_USER.id,
+        fromPath: "top.md",
+        toPath: "neighbour.md",
+        fromNoteId: "n-top",
+        toNoteId: "n-neigh",
+      },
+    ]);
+
+    const fakeEmbedder = {
+      model: "fake-mini",
+      dimensions: DIM,
+      async embed(texts: string[]): Promise<Float32Array[]> {
+        return texts.map(() => oneHot(0));
+      },
+      async embedQuery(_text: string): Promise<Float32Array> {
+        return oneHot(0);
+      },
+    };
+
+    const app = await buildKnowledgeTestApp({
+      user: TEST_USER,
+      dbHandle,
+      embedderState: {
+        ready: true,
+        provider: "pgvector-local",
+        model: "fake-mini",
+        dimensions: DIM,
+        embedder: fakeEmbedder,
+      },
+    });
+    close = () => app.close();
+
+    // Tilt the weights all the way to lexical — graph contribution = 0.
+    await setFusionWeights(app, TEST_USER.id, { lex: 1, sem: 0, graph: 0 });
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/search?q=marker",
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    const paths = body.map((r: { path: string }) => r.path);
+    expect(paths).toContain("top.md");
+    // Graph-only neighbour must NOT appear under lex-only weights.
+    expect(paths).not.toContain("neighbour.md");
   });
 
   it("every fused result has a numeric score field populated", async () => {

@@ -27,6 +27,7 @@ export async function resetKnowledgeTestDb(handle: TestDbHandle): Promise<void> 
       "EmbedJob",
       "NoteEmbeddingChunk",
       "NoteShare",
+      "Settings",
       "User"
     RESTART IDENTITY CASCADE
   `);
