@@ -2,7 +2,6 @@ import type { FastifyInstance } from "fastify";
 import { eq } from "drizzle-orm";
 import { noteTag, searchIndex } from "../../../../db/schema/notes.js";
 import { TagService } from "../tag.service.js";
-import { incrementCursor } from "../folder.service.js";
 
 /** Parse tags from SearchIndex.tags field (stored as JSON array string). */
 function parseTags(tagsField: string): string[] {
@@ -38,7 +37,6 @@ export async function backfillTags(
   for (const e of entries) {
     for (const name of parseTags(e.tags)) {
       const tagRow = tagRecords.get(name)!;
-      const cursor = await incrementCursor(app, userId);
       // ON CONFLICT DO NOTHING gives us the "skip if exists" semantic from
       // the original Prisma findUnique + create dance.
       const inserted = await app.db
@@ -48,7 +46,6 @@ export async function backfillTags(
           notePath: e.notePath,
           tagId: tagRow.id,
           version: 1,
-          cursor,
         })
         .onConflictDoNothing({
           target: [noteTag.userId, noteTag.notePath, noteTag.tagId],

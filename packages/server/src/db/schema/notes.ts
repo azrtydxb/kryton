@@ -1,6 +1,5 @@
 import { relations, sql } from "drizzle-orm";
 import {
-  bigint,
   index,
   integer,
   pgTable,
@@ -57,7 +56,6 @@ export const graphEdge = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     version: integer("version").notNull().default(0),
-    cursor: bigint("cursor", { mode: "bigint" }).notNull().default(sql`0`),
   },
   (t) => [
     index("GraphEdge_userId_idx").on(t.userId),
@@ -82,7 +80,6 @@ export const folder = pgTable(
     path: text("path").notNull(),
     parentId: text("parentId"),
     version: integer("version").notNull().default(0),
-    cursor: bigint("cursor", { mode: "bigint" }).notNull().default(sql`0`),
     updatedAt: timestamp("updatedAt", { withTimezone: true, mode: "date" })
       .notNull()
       .defaultNow(),
@@ -106,7 +103,6 @@ export const tag = pgTable(
     name: text("name").notNull(),
     color: text("color"),
     version: integer("version").notNull().default(0),
-    cursor: bigint("cursor", { mode: "bigint" }).notNull().default(sql`0`),
     updatedAt: timestamp("updatedAt", { withTimezone: true, mode: "date" })
       .notNull()
       .defaultNow(),
@@ -129,7 +125,6 @@ export const noteTag = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     version: integer("version").notNull().default(0),
-    cursor: bigint("cursor", { mode: "bigint" }).notNull().default(sql`0`),
     updatedAt: timestamp("updatedAt", { withTimezone: true, mode: "date" })
       .notNull()
       .defaultNow(),
@@ -149,7 +144,6 @@ export const noteVersion = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     notePath: text("notePath").notNull(),
     version: integer("version").notNull().default(0),
-    cursor: bigint("cursor", { mode: "bigint" }).notNull().default(sql`0`),
     updatedAt: timestamp("updatedAt", { withTimezone: true, mode: "date" })
       .notNull()
       .defaultNow(),
@@ -224,7 +218,6 @@ export const trashItem = pgTable(
       .notNull()
       .defaultNow(),
     version: integer("version").notNull().default(0),
-    cursor: bigint("cursor", { mode: "bigint" }).notNull().default(sql`0`),
   },
   (t) => [index("TrashItem_userId_trashedAt_idx").on(t.userId, t.trashedAt)],
 );

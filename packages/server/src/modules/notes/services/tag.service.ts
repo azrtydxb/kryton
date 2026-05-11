@@ -1,19 +1,17 @@
 import type { FastifyInstance } from "fastify";
 import { and, eq } from "drizzle-orm";
-import { incrementCursor } from "./folder.service.js";
 import { noteTag, tag } from "../../../db/schema/notes.js";
 
 export class TagService {
   constructor(private readonly app: FastifyInstance) {}
 
   async upsert(userId: string, name: string) {
-    const cursor = await incrementCursor(this.app, userId);
     // Drizzle has no Postgres-compatible "upsert + return existing without
     // updating" — emulate with INSERT ... ON CONFLICT DO UPDATE on a column
     // (set userId to itself to make it a no-op-write that still RETURNING-s).
     const [row] = await this.app.db
       .insert(tag)
-      .values({ userId, name, version: 1, cursor })
+      .values({ userId, name, version: 1 })
       .onConflictDoUpdate({
         target: [tag.userId, tag.name],
         set: { userId: tag.userId },
@@ -39,10 +37,9 @@ export class TagService {
     const union = Array.from(new Set([...existing, ...addTags]));
     for (const name of addTags) {
       const tagRow = await this.upsert(userId, name);
-      const cursor = await incrementCursor(this.app, userId);
       await this.app.db
         .insert(noteTag)
-        .values({ userId, notePath, tagId: tagRow.id, version: 1, cursor })
+        .values({ userId, notePath, tagId: tagRow.id, version: 1 })
         .onConflictDoNothing({ target: [noteTag.userId, noteTag.notePath, noteTag.tagId] });
     }
     return union;

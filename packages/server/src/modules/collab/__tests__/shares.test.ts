@@ -70,32 +70,6 @@ describe("collab shares routes", () => {
     expect(res.statusCode).toBe(401);
   });
 
-  it("rejects unauthenticated sync pull", async () => {
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/sync/v2/pull",
-      payload: { cursor: "0" },
-    });
-    expect(res.statusCode).toBe(401);
-  });
-
-  it("rejects unauthenticated sync push", async () => {
-    const res = await app.inject({
-      method: "POST",
-      url: "/api/sync/v2/push",
-      payload: { changes: {} },
-    });
-    expect(res.statusCode).toBe(401);
-  });
-
-  it("rejects unauthenticated tier2 fetch", async () => {
-    const res = await app.inject({
-      method: "GET",
-      url: "/api/sync/v2/tier2/history/some-path",
-    });
-    expect(res.statusCode).toBe(401);
-  });
-
   it("validates share creation body", async () => {
     const res = await app.inject({
       method: "POST",

@@ -1,7 +1,7 @@
 import * as Y from "yjs";
 import { asc, eq } from "drizzle-orm";
 import type { Db } from "../../../db/client.js";
-import { yjsDocument, yjsUpdate } from "../../../db/schema/sync.js";
+import { yjsDocument, yjsUpdate } from "../../../db/schema/collab.js";
 
 export class YjsPersistence {
   constructor(private readonly db: Db) {}

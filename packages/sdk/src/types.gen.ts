@@ -2538,7 +2538,6 @@ export interface paths {
                         "application/json": {
                             /** Format: date-time */
                             createdAt: string;
-                            cursor: string;
                             id: string;
                             isFolder: boolean;
                             ownerUserId: string;
@@ -2583,7 +2582,6 @@ export interface paths {
                         "application/json": {
                             /** Format: date-time */
                             createdAt: string;
-                            cursor: string;
                             id: string;
                             isFolder: boolean;
                             ownerUserId: string;
@@ -2683,7 +2681,6 @@ export interface paths {
                         "application/json": {
                             /** Format: date-time */
                             createdAt: string;
-                            cursor: string;
                             id: string;
                             isFolder: boolean;
                             ownerUserId: string;
@@ -2724,180 +2721,6 @@ export interface paths {
                 };
             };
         };
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/sync/v2/pull": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Pull changes since cursor */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /** @default 0 */
-                        cursor?: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description Default Response */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            changes: {
-                                [key: string]: {
-                                    created: unknown[];
-                                    deleted: string[];
-                                    updated: unknown[];
-                                };
-                            };
-                            cursor: string;
-                        };
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/sync/v2/push": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Push changes */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        changes: {
-                            [key: string]: ({
-                                fields: {
-                                    [key: string]: unknown;
-                                };
-                                id: string;
-                                /** @enum {string} */
-                                op: "create";
-                            } | {
-                                base_version: number;
-                                fields: {
-                                    [key: string]: unknown;
-                                };
-                                id: string;
-                                /** @enum {string} */
-                                op: "update";
-                            } | {
-                                id: string;
-                                /** @enum {string} */
-                                op: "delete";
-                            })[];
-                        };
-                    };
-                };
-            };
-            responses: {
-                /** @description Default Response */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            accepted: {
-                                [key: string]: {
-                                    id: string;
-                                    merged_value?: {
-                                        [key: string]: unknown;
-                                    };
-                                    version: number;
-                                }[];
-                            };
-                            conflicts: {
-                                current_state: unknown;
-                                current_version: number;
-                                id: string;
-                                table: string;
-                            }[];
-                        };
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/sync/v2/tier2/{entityType}/{parentId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Tier 2 entity fetch */
-        get: {
-            parameters: {
-                query?: {
-                    limit?: number;
-                };
-                header?: never;
-                path: {
-                    entityType: string;
-                    parentId: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Default Response */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            entities: unknown[];
-                        };
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
         options?: never;
         head?: never;
         patch?: never;

@@ -1,6 +1,5 @@
-import { relations, sql } from "drizzle-orm";
+import { relations } from "drizzle-orm";
 import {
-  bigint,
   bigserial,
   index,
   pgTable,
@@ -12,40 +11,7 @@ import { user } from "./auth.js";
 import { bytea } from "../types.js";
 
 // ---------------------------------------------------------------------------
-// SyncDeletion
-// ---------------------------------------------------------------------------
-
-export const syncDeletion = pgTable(
-  "SyncDeletion",
-  {
-    id: text("id")
-      .primaryKey()
-      .default(sql`gen_random_uuid()`),
-    tableName: text("tableName").notNull(),
-    recordId: text("recordId").notNull(),
-    userId: text("userId").notNull(),
-    deletedAt: timestamp("deletedAt", { withTimezone: true, mode: "date" })
-      .notNull()
-      .defaultNow(),
-  },
-  (t) => [index("SyncDeletion_userId_deletedAt_idx").on(t.userId, t.deletedAt)],
-);
-
-// ---------------------------------------------------------------------------
-// SyncCursor  — PK is userId (one row per user)
-// ---------------------------------------------------------------------------
-
-export const syncCursor = pgTable("SyncCursor", {
-  userId: text("userId")
-    .primaryKey()
-    .references(() => user.id, { onDelete: "cascade" }),
-  cursor: bigint("cursor", { mode: "bigint" }).notNull().default(sql`0`),
-});
-
-// ---------------------------------------------------------------------------
 // YjsDocument
-//
-// Prisma: snapshot Bytes, stateVector Bytes, updatedAt @updatedAt
 // ---------------------------------------------------------------------------
 
 export const yjsDocument = pgTable("YjsDocument", {
@@ -81,10 +47,6 @@ export const yjsUpdate = pgTable(
 // ---------------------------------------------------------------------------
 // Relations
 // ---------------------------------------------------------------------------
-
-export const syncCursorRelations = relations(syncCursor, ({ one }) => ({
-  user: one(user, { fields: [syncCursor.userId], references: [user.id] }),
-}));
 
 export const yjsDocumentRelations = relations(yjsDocument, ({ one }) => ({
   user: one(user, { fields: [yjsDocument.userId], references: [user.id] }),

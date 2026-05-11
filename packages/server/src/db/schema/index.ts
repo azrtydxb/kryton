@@ -30,10 +30,10 @@ import {
   accessRequest,
   inviteCode,
 } from "./sharing.js";
-import { syncCursor, yjsDocument } from "./sync.js";
+import { yjsDocument } from "./collab.js";
 import { agent } from "./agents.js";
 
-export const userRelations = relations(user, ({ many, one }) => ({
+export const userRelations = relations(user, ({ many }) => ({
   // Auth
   sessions: many(session),
   accounts: many(account),
@@ -58,9 +58,8 @@ export const userRelations = relations(user, ({ many, one }) => ({
   attachments: many(attachment),
   // Settings / plugins
   pluginStorage: many(pluginStorage),
-  // Sync / collab
+  // Collab
   yjsDocuments: many(yjsDocument),
-  syncCursor: one(syncCursor),
   // Agents
   agents: many(agent),
 }));
@@ -69,5 +68,5 @@ export * from "./auth.js";
 export * from "./settings.js";
 export * from "./notes.js";
 export * from "./sharing.js";
-export * from "./sync.js";
+export * from "./collab.js";
 export * from "./agents.js";

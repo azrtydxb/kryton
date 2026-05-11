@@ -5,7 +5,6 @@ import { and, eq } from "drizzle-orm";
 import { moveToTrash } from "./trash.service.js";
 import { saveHistorySnapshot } from "./history.service.js";
 import { trashItem } from "../../../db/schema/notes.js";
-import { syncDeletion } from "../../../db/schema/sync.js";
 import { noteShare } from "../../../db/schema/sharing.js";
 
 /**
@@ -136,11 +135,6 @@ export class NoteService {
     await moveToTrash(notesDir, notePath);
 
     await this.app.db.insert(trashItem).values({ originalPath: notePath, userId });
-    await this.app.db.insert(syncDeletion).values({
-      tableName: "notes",
-      recordId: notePath,
-      userId,
-    });
 
     const knowledge = this.app.knowledge;
     if (knowledge) {

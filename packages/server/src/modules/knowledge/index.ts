@@ -2,7 +2,6 @@ import type { FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
 import { SearchService, type SearchResult } from "./services/search.service.js";
 import { GraphService, type GraphData } from "./services/graph.service.js";
-import { CursorService } from "./services/cursor.service.js";
 import { extractTitle } from "./services/search-helpers.js";
 import { searchRoutes } from "./routes/search.routes.js";
 import { graphRoutes } from "./routes/graph.routes.js";
@@ -45,11 +44,6 @@ export interface KnowledgeApi {
   ): Promise<{ path: string; title: string }[]>;
   /** Get the full visible graph (own + accessible shared) for a user. */
   getFullGraph(userId: string): Promise<GraphData>;
-
-  /** Increment the per-user sync cursor and return the new value. */
-  incrementCursor(userId: string): Promise<bigint>;
-  /** Read the per-user sync cursor (0 if none). */
-  getCursor(userId: string): Promise<bigint>;
 }
 
 // The `knowledge` decorator is declared `?:` in `modules/notes/services/note.service.ts`
@@ -74,8 +68,6 @@ declare module "fastify" {
       search(query: string, userId: string): Promise<unknown[]>;
       getBacklinks(notePath: string, userId: string): Promise<{ path: string; title: string }[]>;
       getFullGraph(userId: string): Promise<unknown>;
-      incrementCursor(userId: string): Promise<bigint>;
-      getCursor(userId: string): Promise<bigint>;
     };
   }
 }
@@ -93,7 +85,6 @@ export const knowledgeModule: FastifyPluginAsync = fp(
   async (app) => {
     const search = new SearchService(app);
     const graph = new GraphService(app);
-    const cursor = new CursorService(app);
 
     const api: KnowledgeApi = {
       indexNote: (p, c, u) => search.indexNote(p, c, u),
@@ -112,9 +103,6 @@ export const knowledgeModule: FastifyPluginAsync = fp(
       renameInGraph: (o, n, u) => graph.renameInGraph(o, n, u),
       getBacklinks: (p, u) => graph.getBacklinks(p, u),
       getFullGraph: (u) => graph.getFullGraph(u),
-
-      incrementCursor: (u) => cursor.increment(u),
-      getCursor: (u) => cursor.get(u),
     };
 
     app.decorate("knowledge", api);

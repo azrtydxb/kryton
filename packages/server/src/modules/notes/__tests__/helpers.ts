@@ -13,8 +13,8 @@ import { user as userTable } from "../../../db/schema/auth.js";
 /**
  * Shared Drizzle handle for notes tests. Lazily created on first call and
  * reused across the file. The notes test suite touches: SearchIndex, Folder,
- * Tag, NoteTag, TrashItem, SyncDeletion, SyncCursor, Settings, NoteShare,
- * Attachment, GraphEdge, NoteVersion, NoteRevision — all truncated below.
+ * Tag, NoteTag, TrashItem, Settings, NoteShare, Attachment, GraphEdge,
+ * NoteVersion, NoteRevision — all truncated below.
  */
 let sharedHandle: TestDbHandle | null = null;
 function getHandle(): TestDbHandle {
@@ -32,8 +32,6 @@ async function resetNotesTestDb(handle: TestDbHandle): Promise<void> {
       "Tag",
       "Folder",
       "TrashItem",
-      "SyncDeletion",
-      "SyncCursor",
       "Settings",
       "NoteShare",
       "GraphEdge",
@@ -70,8 +68,8 @@ export async function buildNotesTestApp(
 
   const user = opts.user ?? null;
   // Seed the User row when an authenticated user is configured — every
-  // table that references User via FK (Folder, Tag, NoteTag, SyncCursor,
-  // NoteShare, …) is cascade-deleted via the truncate above, so we must
+  // table that references User via FK (Folder, Tag, NoteTag, NoteShare, …)
+  // is cascade-deleted via the truncate above, so we must
   // re-insert the user row for each test that needs one.
   if (user) {
     await handle.db.insert(userTable).values({
