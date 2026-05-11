@@ -16,7 +16,7 @@ export function createKnowledgeTestDb(): TestDbHandle {
 }
 
 /**
- * Truncate tables touched by knowledge graph routes/services. Call from
+ * Truncate tables touched by knowledge graph/search routes. Call from
  * `beforeEach` for test isolation.
  */
 export async function resetKnowledgeTestDb(handle: TestDbHandle): Promise<void> {
@@ -35,22 +35,16 @@ export interface KnowledgeTestAppOptions {
   user?: AuthUser | null;
   apiKey?: { id: string; scope: string } | null;
   /**
-   * Optional prisma stub. Routes that still use Prisma (MiniSearch-backed
-   * search index + query, which die in Phase 6) read from this.
-   */
-  prisma?: unknown;
-  /**
-   * Optional Drizzle DB handle. Routes migrated to Drizzle (graph) read from
-   * this. Provide it when exercising graph routes against a real test DB.
+   * Drizzle DB handle. Knowledge module routes read/write `app.db`. Required
+   * for any test that exercises the routes against a real DB.
    */
   dbHandle?: TestDbHandle;
 }
 
 /**
- * Build a Fastify app for knowledge tests. Stubs `app.prisma` (for MiniSearch-
- * era search code that dies in Phase 6) and/or decorates `app.db` with a real
- * Drizzle handle (for graph routes migrated in Phase 5.5). Also stubs `app.auth`
- * so routes can be exercised without a real Better Auth session.
+ * Build a Fastify app for knowledge tests. Decorates `app.db` with a real
+ * Drizzle handle and stubs `app.auth` so routes can be exercised without a
+ * real Better Auth session.
  */
 export async function buildKnowledgeTestApp(
   opts: KnowledgeTestAppOptions,
@@ -59,9 +53,6 @@ export async function buildKnowledgeTestApp(
 
   await app.register(zodPlugin);
 
-  if (opts.prisma !== undefined) {
-    app.decorate("prisma", opts.prisma as never);
-  }
   if (opts.dbHandle) {
     app.decorate("db", opts.dbHandle.db);
   }

@@ -52,7 +52,6 @@
     "fastify": "^5.2.0",
     "fastify-plugin": "^5.0.1",
     "fastify-type-provider-zod": "^6.1.0",
-    "minisearch": "^7.2.0",
     "multer": "^2.1.1",
     "nodemailer": "^8.0.5",
     "pg": "^8.20.0",

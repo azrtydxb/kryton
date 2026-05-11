@@ -46,14 +46,6 @@ async function resetNotesTestDb(handle: TestDbHandle): Promise<void> {
 export interface NotesTestAppOptions {
   user?: AuthUser | null;
   apiKey?: { id: string; scope: string } | null;
-  /**
-   * Inline prisma stub. Phase 5.7+: the notes module itself no longer uses
-   * prisma, but the knowledge module's MiniSearch-era search code (which is
-   * deleted in Phase 6) still does. Routes that trigger `knowledge.indexNote`
-   * / `removeFromIndex` / `renameInIndex` hit this stub — defaults below
-   * cover the surface those touch.
-   */
-  prisma?: unknown;
   /** Optional NOTES_DIR override; default = a fresh tmp dir. */
   notesDir?: string;
 }
@@ -65,8 +57,7 @@ export interface NotesTestApp {
 }
 
 /** Build a Fastify app with the notes module wired up against the
- * testcontainers Postgres and a stub prisma decorator (for the MiniSearch
- * search-index code that still lives in the knowledge module). */
+ * testcontainers Postgres. */
 export async function buildNotesTestApp(
   opts: NotesTestAppOptions = {},
 ): Promise<NotesTestApp> {
@@ -102,31 +93,6 @@ export async function buildNotesTestApp(
   await app.register(zodPlugin);
 
   app.decorate("db", handle.db);
-
-  // Stub prisma for any code paths still on prisma (knowledge search-index +
-  // search-index-reconcile, both die in Phase 6). The notes module itself
-  // no longer touches prisma after Phase 5.7.
-  const prismaStub = opts.prisma ?? {
-    searchIndex: {
-      findMany: async () => [],
-      upsert: async () => ({}),
-      update: async () => ({}),
-      delete: async () => ({}),
-      deleteMany: async () => ({}),
-    },
-    graphEdge: {
-      deleteMany: async () => ({}),
-    },
-    $transaction: async (ops: unknown) => {
-      // search-index-reconcile uses prisma.$transaction([...]) with prisma
-      // promise objects; with our stubs they're plain values, so returning
-      // a resolved array is enough.
-      if (Array.isArray(ops)) return Promise.all(ops);
-      if (typeof ops === "function") return (ops as (tx: unknown) => unknown)({});
-      return ops;
-    },
-  };
-  app.decorate("prisma", prismaStub as never);
 
   // Stub auth — same shape as identity helpers.
   const apiKey = opts.apiKey ?? null;

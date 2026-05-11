@@ -2,7 +2,6 @@ import * as path from "node:path";
 import type { FastifyPluginAsync } from "fastify";
 import { backfillFolders } from "./services/backfill/folders-backfill.js";
 import { backfillTags } from "./services/backfill/tags-backfill.js";
-import { reconcileSearchIndex } from "./services/backfill/search-index-reconcile.js";
 import { ensureNotesWatcher } from "./services/notes-watcher.js";
 import { NoteService } from "./services/note.service.js";
 import { getUserNotesDir } from "./services/user-notes-dir.service.js";
@@ -98,14 +97,10 @@ export const notesModule: FastifyPluginAsync = async (app) => {
     try {
       await backfillFolders(app, notesDir, userId);
       await backfillTags(app, userId);
-      // Drop searchIndex/graphEdge rows for notes that no longer exist on
-      // disk — handles the cold-start case where the notes dir was rebased,
-      // the user deleted files out-of-band, or a dev worktree points at a
-      // different notes root.
-      await reconcileSearchIndex(app, notesDir, userId);
-      // Start a live chokidar watcher so subsequent out-of-band changes
-      // (filesystem rm, Finder, git checkout) keep the index in sync
-      // without the user having to restart the server.
+      // Start a live chokidar watcher so out-of-band changes (filesystem rm,
+      // Finder, git checkout) keep the index in sync without the user having
+      // to restart the server. The chokidar `ready` event reconciles the
+      // index by emitting add/unlink for any drift on disk.
       await ensureNotesWatcher(app, notesDir, userId);
     } catch (err) {
       // Non-fatal: log and allow retry on the next request.

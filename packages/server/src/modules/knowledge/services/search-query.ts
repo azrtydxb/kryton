@@ -1,15 +1,8 @@
 import type { FastifyInstance } from "fastify";
+import { and, desc, eq, like, or, sql } from "drizzle-orm";
+import { searchIndex } from "../../../db/schema/notes.js";
+import { noteShare } from "../../../db/schema/sharing.js";
 import { parseTags, createSnippet } from "./search-helpers.js";
-import type { SearchIndexManager } from "./search-index.js";
-
-interface SearchIndexRow {
-  notePath: string;
-  userId: string;
-  title: string;
-  content: string;
-  tags: string;
-  modifiedAt: Date;
-}
 
 export interface SearchResult {
   path: string;
@@ -21,107 +14,150 @@ export interface SearchResult {
   ownerUserId?: string;
 }
 
+interface IndexRow {
+  notePath: string;
+  userId: string;
+  title: string;
+  content: string;
+  tags: string;
+  modifiedAt: Date;
+}
+
+function rowToResult(r: IndexRow, query: string): SearchResult {
+  return {
+    path: r.notePath,
+    title: r.title,
+    snippet: query.trim()
+      ? createSnippet(r.content, query)
+      : r.content.substring(0, 150).trim() + (r.content.length > 150 ? "..." : ""),
+    tags: parseTags(r.tags),
+    modifiedAt: r.modifiedAt,
+  };
+}
+
 /**
- * Search notes using MiniSearch for own notes (fuzzy + prefix + relevance scoring),
- * and Prisma `contains` for shared notes (which belong to other users' indices that
- * may not be loaded into memory).
+ * Search notes via Postgres FTS (websearch_to_tsquery against the generated
+ * `tsv` GIN index). Shared notes are matched the same way against the
+ * sharer's index rows. JS snippet generation is preserved so test
+ * expectations for the snippet format stay stable.
  */
 export async function search(
   app: FastifyInstance,
-  index: SearchIndexManager,
   query: string,
   userId: string,
+  limit = 100,
 ): Promise<SearchResult[]> {
-  await index.buildIndex(userId);
+  const trimmed = query.trim();
 
-  const mini = index.getOrCreateIndex(userId);
+  // Own notes
   let ownMapped: SearchResult[];
-
-  if (!query.trim()) {
-    const allOwn = await app.prisma.searchIndex.findMany({
-      where: { userId },
-      orderBy: { modifiedAt: "desc" },
-    });
-    ownMapped = (allOwn as SearchIndexRow[]).map((r) => ({
-      path: r.notePath,
-      title: r.title,
-      snippet:
-        r.content.substring(0, 150).trim() + (r.content.length > 150 ? "..." : ""),
-      tags: parseTags(r.tags),
-      modifiedAt: r.modifiedAt,
-    }));
+  if (!trimmed) {
+    const rows = await app.db
+      .select()
+      .from(searchIndex)
+      .where(eq(searchIndex.userId, userId))
+      .orderBy(desc(searchIndex.modifiedAt))
+      .limit(limit);
+    ownMapped = rows.map((r) => rowToResult(r as IndexRow, ""));
   } else {
-    const miniResults = mini.search(query);
-    const notePaths = miniResults.map((r) => r.id as string);
-    const prismaRows =
-      notePaths.length > 0
-        ? await app.prisma.searchIndex.findMany({
-            where: { userId, notePath: { in: notePaths } },
-          })
-        : [];
-
-    const rowByPath = new Map(
-      (prismaRows as SearchIndexRow[]).map((r) => [r.notePath, r]),
-    );
-
-    ownMapped = miniResults
-      .map((r) => {
-        const row = rowByPath.get(r.id as string);
-        if (!row) return null;
-        return {
-          path: row.notePath,
-          title: row.title,
-          snippet: createSnippet(row.content, query),
-          tags: parseTags(row.tags),
-          modifiedAt: row.modifiedAt,
-        };
-      })
-      .filter((r): r is SearchResult => r !== null);
+    const rows = (await app.db.execute(sql`
+      SELECT
+        "notePath",
+        "userId",
+        title,
+        content,
+        tags,
+        "modifiedAt"
+      FROM "SearchIndex", websearch_to_tsquery('english', ${trimmed}) AS q
+      WHERE "userId" = ${userId} AND tsv @@ q
+      ORDER BY ts_rank(tsv, q) DESC
+      LIMIT ${limit}
+    `)) as unknown as { rows: IndexRow[] };
+    ownMapped = rows.rows.map((r) => rowToResult(r, trimmed));
   }
 
   // Shared notes
-  const shares = await app.prisma.noteShare.findMany({
-    where: { sharedWithUserId: userId },
-  });
+  const shares = await app.db
+    .select()
+    .from(noteShare)
+    .where(eq(noteShare.sharedWithUserId, userId));
 
   let sharedResults: SearchResult[] = [];
 
   if (shares.length > 0) {
     const shareConditions = shares.map((s) =>
       s.isFolder
-        ? { userId: s.ownerUserId, notePath: { startsWith: s.path + "/" } }
-        : { userId: s.ownerUserId, notePath: s.path },
+        ? and(
+            eq(searchIndex.userId, s.ownerUserId),
+            like(searchIndex.notePath, `${s.path}/%`),
+          )
+        : and(
+            eq(searchIndex.userId, s.ownerUserId),
+            eq(searchIndex.notePath, s.path),
+          ),
     );
 
-    const queryFilter = query.trim()
-      ? {
-          OR: [
-            { title: { contains: query } },
-            { content: { contains: query } },
-          ],
-        }
-      : {};
+    const baseWhere = or(...shareConditions);
 
-    const matchingNotes = await app.prisma.searchIndex.findMany({
-      where: {
-        AND: [{ OR: shareConditions }, queryFilter],
-      },
-      select: {
-        notePath: true,
-        title: true,
-        content: true,
-        tags: true,
-        modifiedAt: true,
-        userId: true,
-      },
-    });
+    let rows: IndexRow[];
+    if (trimmed) {
+      // Filter the shared set by FTS too.
+      const candidates = await app.db
+        .select({
+          notePath: searchIndex.notePath,
+          userId: searchIndex.userId,
+          title: searchIndex.title,
+          content: searchIndex.content,
+          tags: searchIndex.tags,
+          modifiedAt: searchIndex.modifiedAt,
+        })
+        .from(searchIndex)
+        .where(baseWhere);
 
-    sharedResults = matchingNotes.map((r) => ({
-      path: r.notePath,
-      title: r.title,
-      snippet: createSnippet(r.content, query),
-      tags: parseTags(r.tags),
-      modifiedAt: r.modifiedAt,
+      if (candidates.length === 0) {
+        rows = [];
+      } else {
+        // Run FTS over the candidate set in one query.
+        const result = (await app.db.execute(sql`
+          SELECT
+            "notePath",
+            "userId",
+            title,
+            content,
+            tags,
+            "modifiedAt"
+          FROM "SearchIndex", websearch_to_tsquery('english', ${trimmed}) AS q
+          WHERE tsv @@ q
+            AND ("notePath", "userId") IN (
+              ${sql.join(
+                candidates.map(
+                  (c) => sql`(${c.notePath}, ${c.userId})`,
+                ),
+                sql`, `,
+              )}
+            )
+          ORDER BY ts_rank(tsv, q) DESC
+          LIMIT ${limit}
+        `)) as unknown as { rows: IndexRow[] };
+        rows = result.rows;
+      }
+    } else {
+      const candidates = await app.db
+        .select({
+          notePath: searchIndex.notePath,
+          userId: searchIndex.userId,
+          title: searchIndex.title,
+          content: searchIndex.content,
+          tags: searchIndex.tags,
+          modifiedAt: searchIndex.modifiedAt,
+        })
+        .from(searchIndex)
+        .where(baseWhere);
+      rows = candidates as IndexRow[];
+    }
+
+    sharedResults = rows.map((r) => ({
+      ...rowToResult(r, trimmed),
       isShared: true,
       ownerUserId: r.userId,
     }));
@@ -144,13 +180,17 @@ export async function getAllTags(
   app: FastifyInstance,
   userId: string,
 ): Promise<{ tag: string; count: number }[]> {
-  const allNotes = await app.prisma.searchIndex.findMany({
-    where: { userId },
-    select: { notePath: true, title: true, tags: true },
-  });
+  const rows = await app.db
+    .select({
+      notePath: searchIndex.notePath,
+      title: searchIndex.title,
+      tags: searchIndex.tags,
+    })
+    .from(searchIndex)
+    .where(eq(searchIndex.userId, userId));
 
   const tagCounts = new Map<string, number>();
-  for (const note of allNotes) {
+  for (const note of rows) {
     for (const tag of parseTags(note.tags)) {
       if (tag) {
         tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
@@ -168,10 +208,16 @@ export async function getNotesByTag(
   tag: string,
   userId: string,
 ): Promise<{ notePath: string; title: string }[]> {
-  const candidates = await app.prisma.searchIndex.findMany({
-    where: { userId, tags: { contains: tag } },
-    select: { notePath: true, title: true, tags: true },
-  });
+  const candidates = await app.db
+    .select({
+      notePath: searchIndex.notePath,
+      title: searchIndex.title,
+      tags: searchIndex.tags,
+    })
+    .from(searchIndex)
+    .where(
+      and(eq(searchIndex.userId, userId), like(searchIndex.tags, `%${tag}%`)),
+    );
 
   return candidates
     .filter((note) => parseTags(note.tags).includes(tag))
