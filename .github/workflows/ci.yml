@@ -40,8 +40,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build shared packages (core, core-react, ui)
-        run: npm run build:core
+      - name: Build shared packages (ui, sdk)
+        run: npm run build:shared
 
       - name: TypeCheck
         run: npm run typecheck

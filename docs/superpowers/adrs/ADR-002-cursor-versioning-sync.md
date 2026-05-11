@@ -1,8 +1,14 @@
 # ADR-002: Server-Monotonic Cursor + Per-Row Version Columns for Delta Sync
 
 **Date:** 2026-04-30
-**Status:** Accepted
+**Status:** Superseded by [2026-05-11-remove-sqlite-and-offline-sync-design](../specs/2026-05-11-remove-sqlite-and-offline-sync-design.md) (2026-05-11)
 **Sub-project:** Server Sync v2 (spec 2 of 5)
+
+> **Superseded.** Mobile and desktop are now online-only API consumers;
+> sync v2, the per-row `cursor: bigint` columns, and the `SyncCursor` +
+> `SyncDeletion` tables described below have all been removed. Retained
+> as historical context for the decisions that shaped the now-deleted
+> infrastructure.
 
 ## Context
 
