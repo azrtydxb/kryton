@@ -6,6 +6,8 @@ import * as syncProtocol from "y-protocols/sync";
 import * as encoding from "lib0/encoding";
 import * as decoding from "lib0/decoding";
 import { buildTestApp } from "../../../__tests__/helpers/build-test-app.js";
+import { user as userTable } from "../../../db/schema/auth.js";
+import { agent as agentTable, agentToken as agentTokenTable } from "../../../db/schema/agents.js";
 
 const MSG_SYNC = 0;
 
@@ -71,14 +73,15 @@ class TestYjsClient {
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 async function makeAgentToken(app: FastifyInstance): Promise<{ userId: string; token: string }> {
-  // Create a user and an agent with a known token.
-  const user = await app.prisma.user.create({
-    data: {
-      id: `u-yjs-${Date.now()}-${Math.random()}`,
-      email: `yjs-${Date.now()}-${Math.random()}@test.local`,
-      name: "Yjs Test User",
-      emailVerified: false,
-    },
+  // Create a user and an agent with a known token. Phase 5.2 migrated the
+  // agents service to Drizzle/Postgres (app.db); seed there so token
+  // validation can find the row.
+  const userId = `u-yjs-${Date.now()}-${Math.random()}`;
+  await app.db.insert(userTable).values({
+    id: userId,
+    email: `yjs-${Date.now()}-${Math.random()}@test.local`,
+    name: "Yjs Test User",
+    emailVerified: false,
   });
 
   const crypto = await import("crypto");
@@ -86,22 +89,22 @@ async function makeAgentToken(app: FastifyInstance): Promise<{ userId: string; t
   const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
 
   const agentName = `yjs-test-${Date.now()}-${Math.random()}`;
-  await app.prisma.agent.create({
-    data: {
-      ownerUserId: user.id,
+  const [agentRow] = await app.db
+    .insert(agentTable)
+    .values({
+      ownerUserId: userId,
       name: agentName,
       label: agentName,
       policyText: "permit(principal, action, resource);",
-      tokens: {
-        create: {
-          tokenHash,
-          expiresAt: new Date(Date.now() + 60 * 60 * 1000),
-        },
-      },
-    },
+    })
+    .returning();
+  await app.db.insert(agentTokenTable).values({
+    agentId: agentRow.id,
+    tokenHash,
+    expiresAt: new Date(Date.now() + 60 * 60 * 1000),
   });
 
-  return { userId: user.id, token: rawToken };
+  return { userId, token: rawToken };
 }
 
 describe("collab Yjs WebSocket", () => {

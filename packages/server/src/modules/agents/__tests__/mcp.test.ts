@@ -8,7 +8,7 @@ import type { AppConfig } from "../../../config/index.js";
 /**
  * MCP smoke test — verifies the transport route is wired up and rejects
  * requests without a valid Personal Access Token. Exercising a full MCP
- * round-trip requires a real Prisma DB and is covered by the integration
+ * round-trip requires a real DB and is covered by the integration
  * suite; here we just confirm the auth gate.
  */
 describe("MCP transport smoke test", () => {
@@ -18,10 +18,12 @@ describe("MCP transport smoke test", () => {
     app = Fastify({ logger: false });
     await app.register(zodPlugin);
 
-    // Minimal stubs — the mcp route only touches app.prisma after auth passes
-    app.decorate("prisma", {
-      user: {
-        findUnique: async () => null,
+    // Minimal stubs — the mcp route only touches app.db after auth passes
+    app.decorate("db", {
+      query: {
+        user: {
+          findFirst: async () => undefined,
+        },
       },
     } as never);
 
