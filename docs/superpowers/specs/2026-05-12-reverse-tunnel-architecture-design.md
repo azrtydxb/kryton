@@ -10,6 +10,19 @@
 > independently-shipped sub-projects, each of which gets its own
 > `YYYY-MM-DD-...-design.md` spec and its own plan. See §4.
 
+> **Amendments (2026-05-12, during 4b brainstorming):**
+> - §2 / §5.3 — Tunnel server is **multi-replica with HA failover via a peer-mesh
+>   registry**. Pod restart or single-pod failure leaves the tunnel functional;
+>   affected tenants reconnect within ~1–3s (graceful drain) or ~15–30s (hard
+>   crash). Routing critical path does not depend on WordPress.
+> - §5.2 — `GET /plan/{jti}` response is extended with
+>   `current_period_start`, `current_period_end`, and `abuse_threshold_bytes`
+>   so the tunnel server can compute per-billing-period totals locally.
+> - §5.3 — Multiplexing inside the persistent h2 CONNECT body is **yamux**
+>   carrying HTTP/1.1 framing on each stream (not "a new h2 stream on the
+>   tenant's connection" — h2 does not allow server-initiated streams).
+>   Functionally identical from the user's perspective.
+
 ## 1. Goal
 
 Let any user who runs a self-hosted Kryton instance on their own hardware reach it from the public internet at a personalised subdomain (`xyz.my.kryton.ai`) without opening inbound ports on their firewall and without us holding a copy of their data. Concretely:
@@ -77,6 +90,7 @@ Let any user who runs a self-hosted Kryton instance on their own hardware reach 
 - Same Go binary serves both public traffic (`*.my.kryton.ai`) and the Kryton control plane (`tunnel.kryton.ai`); they are distinguished by listening port + Ingress rule.
 - Public requests carry `X-Forwarded-For` / `X-Real-IP` injected by the tunnel server before being forwarded; Kryton trusts those headers only when the request entered via tunnel.
 - Tunnel server is stateless w.r.t. WordPress for the common path (connection already open, no plan change): JWT verification is offline using a public Ed25519 key. WordPress is consulted only on new connections and via the revocation/stats polling loops.
+- **The tunnel server runs as a multi-replica StatefulSet (3 pods in v1) with HA failover via a peer-mesh connection registry.** Each pod knows the location of every live tenant via 5-second peer sync over the headless Service. Public requests that land on a pod which does not own a given tenant are forwarded over the cluster network to the owning pod. Pod restart triggers graceful drain (GOAWAY → reconnect within 1–3 s); hard pod loss is recovered in 15–30 s once peers and Kryton clients detect the failure. WordPress is not on the routing critical path.
 
 ## 3. Tenant lifecycle
 
@@ -211,6 +225,9 @@ GET  /wp-json/kryton-tunnels/v1/plan/{jti}
      → { "plan": "active",
          "subdomain": "xyz",
          "throttle_kbps": null,
+         "current_period_start": 1746979200,    // unix; mirrors Stripe
+         "current_period_end":   1749571200,
+         "abuse_threshold_bytes": 10737418240,  // 10 GiB; 0 = disabled
          "as_of": <unix> }
 
 POST /wp-json/kryton-tunnels/v1/stats
@@ -224,7 +241,7 @@ POST /wp-json/kryton-tunnels/v1/stats
 
 ### 5.3 Wire protocol (Kryton ↔ tunnel server)
 
-**Transport:** single TLS+HTTP/2 connection per Kryton instance, hostname `tunnel.kryton.ai`, port 443.
+**Transport:** single TLS+HTTP/2 connection per Kryton instance, hostname `tunnel.kryton.ai`, port 443. Inside the one CONNECT body the tunnel server and Kryton run a **yamux session** which multiplexes per-request streams. Yamux is used because HTTP/2 does not permit server-initiated streams; we need bidirectional multiplexing where either side can open a new stream at any time.
 
 **Handshake:**
 ```
@@ -236,13 +253,15 @@ Tunnel →  HTTP/2 200
           x-tunnel-session-id: <uuid>
 ```
 
+Once the 200 is received, both sides treat the CONNECT body as a bidirectional bytestream and start a yamux session: Kryton runs the yamux *server* role, tunnel server runs the *client* role. No further out-of-band framing — all subsequent traffic is yamux frames.
+
 Tunnel server verifies signature, checks `jti` against in-memory revocation set, calls `/plan/{jti}` (cached 5 min) for current state. Duplicate-instance collision for the same subdomain: existing connection wins, new one receives `409` + `x-reason: duplicate-instance`.
 
-**Forwarding (HTTP):** each inbound public request becomes one h2 stream on the tenant's persistent connection. Headers passed through verbatim, plus `X-Forwarded-For`, `X-Forwarded-Proto: https`, `X-Real-IP` set by tunnel server.
+**Forwarding (HTTP):** each inbound public request becomes one yamux stream initiated by the tunnel server. The wire format inside the stream is plain HTTP/1.1 (request line, headers, body). Kryton reads it with its normal HTTP/1.1 parser and dispatches to Fastify. Headers passed through verbatim from the original public request, plus `X-Forwarded-For`, `X-Forwarded-Proto: https`, `X-Real-IP`, `X-Forwarded-Host`, `X-Kryton-Tunnel-Request-Id` set by tunnel server. Hop-by-hop and inbound `X-Forwarded-*` / `X-Real-IP` / `X-Kryton-Tunnel-*` headers are stripped before injection.
 
-**Forwarding (WebSocket):** Extended CONNECT (RFC 8441) — `:method CONNECT, :protocol websocket`. Kryton's Fastify WS handler treats it as a normal upgrade. Used for `/ws/yjs/:docId` and MCP SSE.
+**Forwarding (WebSocket):** same yamux-stream pattern — the tunnel server writes an HTTP/1.1 request with `Upgrade: websocket` headers into a new yamux stream, reads back the `101 Switching Protocols` response, then bridges raw bytes between the public client connection and the yamux stream. Kryton's Fastify WS handler treats the stream as a normal WS upgrade.
 
-**Heartbeat:** h2 PING frames every 30 s, tunnel server initiates. Three missed → connection torn down.
+**Heartbeat:** two layers. yamux PING frames every 5 s, 15 s timeout (3 missed) to detect a hung control connection. h2 PING frames on the outer h2 connection at the same cadence to detect ingress-side or transport death.
 
 **Reconnect:** Kryton-side exponential backoff with jitter (1 s, 2 s, 4 s, … cap 60 s). If the JWT is rejected (revoked/exp/suspended), client surfaces specific reason in admin UI and stops retrying until user action.
 
