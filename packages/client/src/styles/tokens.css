@@ -153,6 +153,10 @@ body {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.45; }
 }
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
 .scanline {
   background: linear-gradient(180deg, transparent 0%, var(--accent-soft) 50%, transparent 100%);
 }

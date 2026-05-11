@@ -8,9 +8,9 @@
  *   - Graph: 1-hop neighbours (in either direction) of the union of the
  *     top lexical + semantic hits, drawn from `GraphEdge`
  *
- * RRF formula: score = Σ wᵢ / (k + rankᵢ) with k=60 and weights
- * 0.4 / 0.4 / 0.2 (lex / sem / graph). Constants are hardcoded for now;
- * per-user weights are a future Settings entry.
+ * RRF formula: score = Σ wᵢ / (k + rankᵢ) with k=60. Weights default to
+ * 0.4 / 0.4 / 0.2 (lex / sem / graph) but are per-user adjustable via the
+ * `Settings` table (key: "fusion_weights") — see fusion-weights.service.ts.
  *
  * Snippet selection:
  *   - If semantic contributed (sem_rank IS NOT NULL): use the best chunk
@@ -27,6 +27,7 @@ import { sql } from "drizzle-orm";
 
 import { parseTags } from "./search-helpers.js";
 import type { SearchResult } from "./search-query.js";
+import { getFusionWeights } from "./fusion-weights.service.js";
 
 interface FusedRow {
   note_path: string;
@@ -70,6 +71,12 @@ export async function searchFused(
   const qv = await embedderState.embedder.embedQuery(query);
   const qvLiteral = `[${Array.from(qv).join(",")}]`;
   const trimmed = query.trim();
+
+  // Per-user fusion weights (already normalised so lex+sem+graph = 1).
+  const weights = await getFusionWeights(app, userId);
+  const wLex = weights.lex;
+  const wSem = weights.sem;
+  const wGraph = weights.graph;
 
   // Single statement, all CTEs. Column-name caveats:
   //   - "SearchIndex": camelCase quoted ("notePath", "userId", "modifiedAt")
@@ -138,9 +145,9 @@ export async function searchFused(
         sr.best_chunk_text,
         gr.graph_rank,
         (
-          COALESCE(0.4::float / (60 + l.lex_rank), 0) +
-          COALESCE(0.4::float / (60 + sr.sem_rank), 0) +
-          COALESCE(0.2::float / (60 + gr.graph_rank), 0)
+          COALESCE(${wLex}::float / (60 + l.lex_rank), 0) +
+          COALESCE(${wSem}::float / (60 + sr.sem_rank), 0) +
+          COALESCE(${wGraph}::float / (60 + gr.graph_rank), 0)
         ) AS score
       FROM lexical l
       FULL OUTER JOIN semantic_ranked sr USING (note_path)

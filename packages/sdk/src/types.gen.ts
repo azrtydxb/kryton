@@ -2512,6 +2512,78 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/search/weights": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get the current user's fusion weights (lex/sem/graph) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            graph: number;
+                            lex: number;
+                            sem: number;
+                        };
+                    };
+                };
+            };
+        };
+        /** Update the current user's fusion weights (normalised to sum=1) */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        graph: number;
+                        lex: number;
+                        sem: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description Default Response */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            graph: number;
+                            lex: number;
+                            sem: number;
+                        };
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/settings/": {
         parameters: {
             query?: never;
