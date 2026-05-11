@@ -25,16 +25,6 @@ export interface SearchResult {
   score?: number;
 }
 
-export type SearchMode = "lexical" | "semantic" | "hybrid";
-
-export interface SemanticReady {
-  ready: boolean;
-  provider: "pgvector-local" | "novamem" | "off";
-  model?: string;
-  dimensions: number;
-  pendingJobs: number;
-}
-
 export interface GraphData {
   nodes: { id: string; title: string; path: string; shared?: boolean; ownerUserId?: string }[];
   edges: { fromNoteId: string; toNoteId: string }[];
@@ -206,9 +196,8 @@ export const api = {
     request<void>(`/folders-rename/${encodeURIComponent(path)}`, { method: 'POST', body: JSON.stringify({ newPath }) }),
 
   // Search
-  search: (query: string, mode: SearchMode = "lexical") =>
-    request<SearchResult[]>(`/search?q=${encodeURIComponent(query)}&mode=${mode}`),
-  semanticReady: () => request<SemanticReady>('/search/semantic/ready'),
+  search: (query: string) =>
+    request<SearchResult[]>(`/search?q=${encodeURIComponent(query)}`),
 
   // Graph
   getGraph: () => request<GraphData>('/graph'),

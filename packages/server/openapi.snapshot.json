@@ -3753,20 +3753,6 @@
               "maximum": 100,
               "type": "integer"
             }
-          },
-          {
-            "in": "query",
-            "name": "mode",
-            "required": false,
-            "schema": {
-              "default": "lexical",
-              "enum": [
-                "lexical",
-                "semantic",
-                "hybrid"
-              ],
-              "type": "string"
-            }
           }
         ],
         "responses": {
@@ -3825,28 +3811,9 @@
               }
             },
             "description": "Default Response"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": false,
-                  "properties": {
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "message"
-                  ],
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Default Response"
           }
         },
-        "summary": "Search notes (lexical | semantic | hybrid)",
+        "summary": "Search notes (3-layer RRF fusion with lexical fallback)",
         "tags": [
           "knowledge"
         ]

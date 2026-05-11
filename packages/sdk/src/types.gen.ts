@@ -2386,13 +2386,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Search notes (lexical | semantic | hybrid) */
+        /** Search notes (3-layer RRF fusion with lexical fallback) */
         get: {
             parameters: {
                 query: {
                     q: string;
                     limit?: number;
-                    mode?: "lexical" | "semantic" | "hybrid";
                 };
                 header?: never;
                 path?: never;
@@ -2418,17 +2417,6 @@ export interface paths {
                             tags: string[];
                             title: string;
                         }[];
-                    };
-                };
-                /** @description Default Response */
-                501: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            message: string;
-                        };
                     };
                 };
             };

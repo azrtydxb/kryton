@@ -1,7 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { eq, sql } from "drizzle-orm";
-import { z } from "zod";
 
 import {
   searchQuerySchema,
@@ -10,10 +9,8 @@ import {
   semanticReindexQuerySchema,
   semanticReindexResponseSchema,
 } from "../schemas/search.schemas.js";
-
-const notImplementedResponseSchema = z.object({ message: z.string() });
 import type { SearchService } from "../services/search.service.js";
-import { semanticSearch } from "../services/semantic-search.service.js";
+import { searchFused } from "../services/fused-search.service.js";
 import { searchIndex } from "../../../db/schema/notes.js";
 import { embedJob } from "../../../db/schema/embeddings.js";
 import { ForbiddenError } from "../../../lib/errors.js";
@@ -23,12 +20,13 @@ export interface SearchRoutesOptions {
 }
 
 /**
- * Search routes — mounted under `/api/search`. The search service is passed in
- * so the handlers don't depend on the (optional, parallel-migration) decorator
- * shape of `app.knowledge`.
+ * Search routes — mounted under `/api/search`.
  *
- * Phase 5: `mode=semantic` dispatches to pgvector KNN, `mode=hybrid` returns
- * 501 (Phase C), default `mode=lexical` preserves the previous FTS behavior.
+ * `GET /` is a single fused-search endpoint: it combines lexical + semantic +
+ * graph signals NovaMem-style via Reciprocal Rank Fusion. When the embedder
+ * isn't ready (provider=off or warming up), the handler falls back to
+ * lexical-only with the same response shape. There is no `mode` query
+ * parameter — the fusion is the search.
  */
 export const searchRoutes: FastifyPluginAsync<SearchRoutesOptions> = async (
   app,
@@ -41,32 +39,30 @@ export const searchRoutes: FastifyPluginAsync<SearchRoutesOptions> = async (
     {
       schema: {
         tags: ["knowledge"],
-        summary: "Search notes (lexical | semantic | hybrid)",
+        summary: "Search notes (3-layer RRF fusion with lexical fallback)",
         querystring: searchQuerySchema,
-        response: {
-          200: searchResponseSchema,
-          501: notImplementedResponseSchema,
-        },
+        response: { 200: searchResponseSchema },
       },
       preHandler: async (req) => {
         await app.auth.requireUser(req);
       },
     },
-    async (req, reply) => {
+    async (req) => {
       const user = await app.auth.requireUser(req);
-      const { q, mode, limit } = req.query;
+      const { q, limit } = req.query;
+      const trimmed = q.trim();
 
-      if (mode === "hybrid") {
-        return reply
-          .code(501)
-          .send({ message: "Hybrid search is Phase C" });
+      if (!trimmed) {
+        return opts.searchService.search("", user.id);
       }
 
-      if (mode === "semantic") {
-        return semanticSearch(app, q.trim(), user.id, limit);
+      const state = app.embedderState;
+      if (state?.ready && state.provider !== "off" && state.embedder) {
+        return searchFused(app, trimmed, user.id, limit);
       }
 
-      return opts.searchService.search(q.trim(), user.id);
+      // Lexical-only fallback when the embedder is off or still warming up.
+      return opts.searchService.search(trimmed, user.id);
     },
   );
 
@@ -161,4 +157,3 @@ export const searchRoutes: FastifyPluginAsync<SearchRoutesOptions> = async (
     },
   );
 };
-

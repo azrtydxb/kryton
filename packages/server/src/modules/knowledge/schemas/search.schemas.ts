@@ -3,7 +3,6 @@ import { z } from "zod";
 export const searchQuerySchema = z.object({
   q: z.string().min(1, "Query parameter 'q' is required"),
   limit: z.coerce.number().int().positive().max(100).optional().default(20),
-  mode: z.enum(["lexical", "semantic", "hybrid"]).optional().default("lexical"),
 });
 
 export const searchResultSchema = z.object({
