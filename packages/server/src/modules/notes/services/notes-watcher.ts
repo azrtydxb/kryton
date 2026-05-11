@@ -135,12 +135,6 @@ export async function ensureNotesWatcher(
   watcher.on("error", (err) => {
     app.log.warn({ err, userId }, "notes-watcher: error");
   });
-
-  // Close cleanly on app shutdown so the test harness and graceful restarts
-  // don't leak FDs.
-  app.addHook("onClose", async () => {
-    await stopNotesWatcher(userId);
-  });
 }
 
 export async function stopNotesWatcher(userId: string): Promise<void> {
@@ -154,4 +148,10 @@ export async function stopNotesWatcher(userId: string): Promise<void> {
   } catch {
     // best-effort
   }
+}
+
+/** Stop every active watcher. Called once at app shutdown. */
+export async function stopAllNotesWatchers(): Promise<void> {
+  const ids = Array.from(watchers.keys());
+  await Promise.all(ids.map((id) => stopNotesWatcher(id)));
 }

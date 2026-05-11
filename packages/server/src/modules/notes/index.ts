@@ -1,8 +1,9 @@
 import * as path from "node:path";
 import type { FastifyPluginAsync } from "fastify";
 import { backfillFolders } from "./services/backfill/folders-backfill.js";
+import { backfillSearchIndex } from "./services/backfill/search-index-backfill.js";
 import { backfillTags } from "./services/backfill/tags-backfill.js";
-import { ensureNotesWatcher } from "./services/notes-watcher.js";
+import { ensureNotesWatcher, stopAllNotesWatchers } from "./services/notes-watcher.js";
 import { NoteService } from "./services/note.service.js";
 import { getUserNotesDir } from "./services/user-notes-dir.service.js";
 import {
@@ -96,6 +97,12 @@ export const notesModule: FastifyPluginAsync = async (app) => {
     backfilledUsers.add(userId);
     try {
       await backfillFolders(app, notesDir, userId);
+      // Reconcile SearchIndex + GraphEdge against disk. This replaces the
+      // initial-scan side of the MiniSearch reconcile module that was
+      // deleted in the Postgres migration (Phase 6 / PR #109). Without this,
+      // any .md file present on disk before chokidar starts watching never
+      // gets indexed because the watcher runs with `ignoreInitial: true`.
+      await backfillSearchIndex(app, notesDir, userId);
       await backfillTags(app, userId);
       // Start a live chokidar watcher so out-of-band changes (filesystem rm,
       // Finder, git checkout) keep the index in sync without the user having
@@ -134,6 +141,14 @@ export const notesModule: FastifyPluginAsync = async (app) => {
     } catch (err) {
       app.log.warn({ err }, "warm-start watchers failed");
     }
+  });
+
+  // Register the shutdown hook once at module init. ensureNotesWatcher used
+  // to call addHook per-user inside its body, which fails with
+  // FST_ERR_INSTANCE_ALREADY_LISTENING the moment a request triggers the
+  // lazy-init path after `app.ready()` has resolved.
+  app.addHook("onClose", async () => {
+    await stopAllNotesWatchers();
   });
 
   // Mount shared-notes BEFORE /api/notes so the prefix is matched first.
