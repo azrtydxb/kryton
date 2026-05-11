@@ -1,22 +1,18 @@
 FROM node:24-alpine AS builder
-# git for commit hash capture. python3 + build tools are still required:
-# @azrtydxb/core ships a better-sqlite3 adapter as a devDependency (for
-# downstream consumers like the mobile app) and npm's workspace install
-# attempts to native-compile it. The server itself does not use it.
-RUN apk add --no-cache git python3 make g++
+# git for commit-hash capture.
+RUN apk add --no-cache git
 WORKDIR /app
 COPY package*.json ./
 COPY packages/client/package*.json packages/client/
 COPY packages/server/package*.json packages/server/
-COPY packages/core/package*.json packages/core/
-COPY packages/core-react/package*.json packages/core-react/
 COPY packages/ui/package*.json packages/ui/
+COPY packages/sdk/package*.json packages/sdk/
 RUN npm install
 COPY . .
 RUN git rev-parse --short HEAD > /tmp/COMMIT_SHA || echo "unknown" > /tmp/COMMIT_SHA
-# Shared workspace packages must be built before client typecheck since
+# Shared workspace packages must be built before the client typecheck since
 # the client imports from `@azrtydxb/ui` which resolves via dist/.
-RUN npm run build:core
+RUN npm run build:shared
 RUN npm run build
 # tsc with moduleResolution:"bundler" emits extensionless relative imports,
 # but Node ESM requires .js extensions. Patch all compiled .js files.
