@@ -1,7 +1,7 @@
 # Graph Cross-Platform Renderer
 
 **Date**: 2026-05-08
-**Status**: Draft
+**Status**: Implemented (`packages/ui/src/graph/` ships the layout/painter/gestures architecture; web build uses `CanvasPainter.web` + `useViewport.web`; React Native build uses `SkiaPainter.native` + `useViewport.native`; shared `drawScene.ts` + `hitTest.ts`).
 **Supersedes**: [2026-03-28-graph-layout-redesign.md](./2026-03-28-graph-layout-redesign.md)
 
 ## Problem

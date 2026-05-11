@@ -1,5 +1,7 @@
 # Graph Cross-Platform Renderer — Implementation Plan
 
+**Status**: Implemented. The `layout/`, `view/`, and `gestures/` layers all ship in `packages/ui/src/graph/`. Web build resolves `CanvasPainter.web` + `useViewport.web`; React Native build resolves `SkiaPainter.native` + `useViewport.native`. Shared `drawScene.ts` + `hitTest.ts` drive both. React-Native deps (`@shopify/react-native-skia`, `react-native-gesture-handler`, `react-native-reanimated`) declared as optional peer deps so web installs stay lean.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace the d3+canvas graph renderer with a layout/painter/gestures architecture that runs natively on web (canvas2d), Tauri (web build), and React Native (Skia native), with zero d3 and zero WebView shims.
