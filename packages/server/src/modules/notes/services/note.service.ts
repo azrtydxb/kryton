@@ -1,8 +1,12 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { FastifyInstance } from "fastify";
+import { and, eq } from "drizzle-orm";
 import { moveToTrash } from "./trash.service.js";
 import { saveHistorySnapshot } from "./history.service.js";
+import { trashItem } from "../../../db/schema/notes.js";
+import { syncDeletion } from "../../../db/schema/sync.js";
+import { noteShare } from "../../../db/schema/sharing.js";
 
 /**
  * Cross-module decorator surfaces that the notes module relies on:
@@ -131,9 +135,11 @@ export class NoteService {
 
     await moveToTrash(notesDir, notePath);
 
-    await this.app.prisma.trashItem.create({ data: { originalPath: notePath, userId } });
-    await this.app.prisma.syncDeletion.create({
-      data: { tableName: "notes", recordId: notePath, userId },
+    await this.app.db.insert(trashItem).values({ originalPath: notePath, userId });
+    await this.app.db.insert(syncDeletion).values({
+      tableName: "notes",
+      recordId: notePath,
+      userId,
     });
 
     const knowledge = this.app.knowledge;
@@ -144,9 +150,15 @@ export class NoteService {
       ]);
     }
 
-    await this.app.prisma.noteShare.deleteMany({
-      where: { ownerUserId: userId, path: notePath, isFolder: false },
-    });
+    await this.app.db
+      .delete(noteShare)
+      .where(
+        and(
+          eq(noteShare.ownerUserId, userId),
+          eq(noteShare.path, notePath),
+          eq(noteShare.isFolder, false),
+        ),
+      );
   }
 
   /** Rename/move a note on disk and update all references. */
@@ -174,10 +186,16 @@ export class NoteService {
       ]);
     }
 
-    await this.app.prisma.noteShare.updateMany({
-      where: { ownerUserId: userId, path: oldPath, isFolder: false },
-      data: { path: newPath },
-    });
+    await this.app.db
+      .update(noteShare)
+      .set({ path: newPath })
+      .where(
+        and(
+          eq(noteShare.ownerUserId, userId),
+          eq(noteShare.path, oldPath),
+          eq(noteShare.isFolder, false),
+        ),
+      );
   }
 
   /** Index all existing notes in a user's notes directory. */

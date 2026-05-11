@@ -1,4 +1,6 @@
 import type { FastifyInstance } from "fastify";
+import { eq } from "drizzle-orm";
+import { noteTag, searchIndex } from "../../../../db/schema/notes.js";
 import { TagService } from "../tag.service.js";
 import { incrementCursor } from "../folder.service.js";
 
@@ -18,7 +20,9 @@ export async function backfillTags(
 ): Promise<{ tags: number; links: number }> {
   const tagService = new TagService(app);
 
-  const entries = await app.prisma.searchIndex.findMany({ where: { userId } });
+  const entries = await app.db.query.searchIndex.findMany({
+    where: eq(searchIndex.userId, userId),
+  });
   const allTagNames = new Set<string>();
   for (const e of entries) {
     for (const t of parseTags(e.tags)) allTagNames.add(t);
@@ -33,15 +37,24 @@ export async function backfillTags(
   let linkCount = 0;
   for (const e of entries) {
     for (const name of parseTags(e.tags)) {
-      const tag = tagRecords.get(name)!;
-      const existing = await app.prisma.noteTag.findUnique({
-        where: { userId_notePath_tagId: { userId, notePath: e.notePath, tagId: tag.id } },
-      });
-      if (!existing) {
-        const cursor = await incrementCursor(app, userId);
-        await app.prisma.noteTag.create({
-          data: { userId, notePath: e.notePath, tagId: tag.id, version: 1, cursor },
-        });
+      const tagRow = tagRecords.get(name)!;
+      const cursor = await incrementCursor(app, userId);
+      // ON CONFLICT DO NOTHING gives us the "skip if exists" semantic from
+      // the original Prisma findUnique + create dance.
+      const inserted = await app.db
+        .insert(noteTag)
+        .values({
+          userId,
+          notePath: e.notePath,
+          tagId: tagRow.id,
+          version: 1,
+          cursor,
+        })
+        .onConflictDoNothing({
+          target: [noteTag.userId, noteTag.notePath, noteTag.tagId],
+        })
+        .returning({ tagId: noteTag.tagId });
+      if (inserted.length > 0) {
         linkCount++;
       }
     }

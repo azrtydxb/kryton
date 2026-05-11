@@ -6,7 +6,7 @@
  * helper registers the full app graph including DB-backed plugins which is
  * heavy for route-level smoke tests.
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from "vitest";
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import {
   validatorCompiler,
@@ -16,20 +16,27 @@ import {
 import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
+import { sql } from "drizzle-orm";
 
 import { canvasRoutes } from "../routes/canvas.routes.js";
 import { backlinksRoutes } from "../routes/backlinks.routes.js";
 import { historyRoutes } from "../routes/history.routes.js";
 import { attachmentsRoutes } from "../routes/attachments.routes.js";
+import { createTestDb, type TestDbHandle } from "../../../test/db-fixture.js";
+import { user as userTable } from "../../../db/schema/auth.js";
 
 const TEST_USER = { id: "u-aux-test", email: "aux@test", name: "Aux", role: "user" };
 
-async function buildAuxTestApp(notesDir: string): Promise<FastifyInstance> {
+async function buildAuxTestApp(
+  notesDir: string,
+  handle: TestDbHandle,
+): Promise<FastifyInstance> {
   const app = Fastify({ logger: false });
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
 
   app.decorate("config", { NOTES_DIR: notesDir } as never);
+  app.decorate("db", handle.db);
 
   const authStub = {
     instance: null,
@@ -60,21 +67,8 @@ async function buildAuxTestApp(notesDir: string): Promise<FastifyInstance> {
   };
   app.decorate("auth", authStub as never);
 
-  // Minimal prisma stub — only the attachment surface that routes touch.
-  const attachments: Record<string, Record<string, unknown>> = {};
-  let nextId = 1;
-  app.decorate("prisma", {
-    attachment: {
-      create: async ({ data }: { data: Record<string, unknown> }) => {
-        const id = `att-${nextId++}`;
-        const row = { id, createdAt: new Date(), ...data };
-        attachments[id] = row;
-        return row;
-      },
-      findUnique: async ({ where }: { where: { id: string } }) =>
-        attachments[where.id] ?? null,
-    },
-  } as never);
+  // Attachments now go through app.db / Drizzle directly. No prisma stub
+  // needed for these routes.
 
   // Stub the cross-module decorators the routes consume.
   const userDirOf = async (userId: string): Promise<string> => {
@@ -139,10 +133,32 @@ async function buildAuxTestApp(notesDir: string): Promise<FastifyInstance> {
 describe("notes-aux routes", () => {
   let notesDir: string;
   let app: FastifyInstance;
+  let handle: TestDbHandle;
+
+  beforeAll(() => {
+    handle = createTestDb();
+  });
+
+  afterAll(async () => {
+    await handle.close();
+  });
 
   beforeEach(async () => {
     notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "kaux-"));
-    app = await buildAuxTestApp(notesDir);
+    // Reset attachment-related tables and reseed the test user.
+    await handle.db.execute(sql`
+      TRUNCATE TABLE "Attachment", "User" RESTART IDENTITY CASCADE
+    `);
+    await handle.db.insert(userTable).values({
+      id: TEST_USER.id,
+      email: TEST_USER.email,
+      name: TEST_USER.name,
+      emailVerified: false,
+      role: TEST_USER.role,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    app = await buildAuxTestApp(notesDir, handle);
   });
 
   afterEach(async () => {

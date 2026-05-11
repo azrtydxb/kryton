@@ -1,16 +1,58 @@
 import os from "node:os";
 import path from "node:path";
 import fs from "node:fs/promises";
+import { sql } from "drizzle-orm";
 import Fastify, { type FastifyInstance } from "fastify";
 import { zodPlugin } from "../../../plugins/zod.js";
 import { errorsPlugin } from "../../../plugins/errors.js";
 import { notesModule } from "../index.js";
 import type { AuthApi, AuthContext, AuthUser } from "../../../plugins/auth.js";
+import { createTestDb, type TestDbHandle } from "../../../test/db-fixture.js";
+import { user as userTable } from "../../../db/schema/auth.js";
+
+/**
+ * Shared Drizzle handle for notes tests. Lazily created on first call and
+ * reused across the file. The notes test suite touches: SearchIndex, Folder,
+ * Tag, NoteTag, TrashItem, SyncDeletion, SyncCursor, Settings, NoteShare,
+ * Attachment, GraphEdge, NoteVersion, NoteRevision — all truncated below.
+ */
+let sharedHandle: TestDbHandle | null = null;
+function getHandle(): TestDbHandle {
+  if (!sharedHandle) sharedHandle = createTestDb();
+  return sharedHandle;
+}
+
+async function resetNotesTestDb(handle: TestDbHandle): Promise<void> {
+  await handle.db.execute(sql`
+    TRUNCATE TABLE
+      "Attachment",
+      "NoteRevision",
+      "NoteVersion",
+      "NoteTag",
+      "Tag",
+      "Folder",
+      "TrashItem",
+      "SyncDeletion",
+      "SyncCursor",
+      "Settings",
+      "NoteShare",
+      "GraphEdge",
+      "SearchIndex",
+      "User"
+    RESTART IDENTITY CASCADE
+  `);
+}
 
 export interface NotesTestAppOptions {
   user?: AuthUser | null;
   apiKey?: { id: string; scope: string } | null;
-  /** Inline prisma stub — provide just the methods used by routes under test. */
+  /**
+   * Inline prisma stub. Phase 5.7+: the notes module itself no longer uses
+   * prisma, but the knowledge module's MiniSearch-era search code (which is
+   * deleted in Phase 6) still does. Routes that trigger `knowledge.indexNote`
+   * / `removeFromIndex` / `renameInIndex` hit this stub — defaults below
+   * cover the surface those touch.
+   */
   prisma?: unknown;
   /** Optional NOTES_DIR override; default = a fresh tmp dir. */
   notesDir?: string;
@@ -22,13 +64,35 @@ export interface NotesTestApp {
   cleanup: () => Promise<void>;
 }
 
-/** Build a Fastify app with the notes module wired up against stubs. */
+/** Build a Fastify app with the notes module wired up against the
+ * testcontainers Postgres and a stub prisma decorator (for the MiniSearch
+ * search-index code that still lives in the knowledge module). */
 export async function buildNotesTestApp(
   opts: NotesTestAppOptions = {},
 ): Promise<NotesTestApp> {
   const notesDir =
     opts.notesDir ??
     (await fs.mkdtemp(path.join(os.tmpdir(), "kryton-notes-test-")));
+
+  const handle = getHandle();
+  await resetNotesTestDb(handle);
+
+  const user = opts.user ?? null;
+  // Seed the User row when an authenticated user is configured — every
+  // table that references User via FK (Folder, Tag, NoteTag, SyncCursor,
+  // NoteShare, …) is cascade-deleted via the truncate above, so we must
+  // re-insert the user row for each test that needs one.
+  if (user) {
+    await handle.db.insert(userTable).values({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      emailVerified: false,
+      role: user.role,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }
 
   const app = Fastify({ logger: false });
 
@@ -37,28 +101,34 @@ export async function buildNotesTestApp(
 
   await app.register(zodPlugin);
 
-  // Stub prisma — default to a no-op stub good enough for unauth tests.
+  app.decorate("db", handle.db);
+
+  // Stub prisma for any code paths still on prisma (knowledge search-index +
+  // search-index-reconcile, both die in Phase 6). The notes module itself
+  // no longer touches prisma after Phase 5.7.
   const prismaStub = opts.prisma ?? {
-    folder: { findUnique: async () => null, findMany: async () => [], create: async () => ({}) },
-    tag: { upsert: async () => ({ id: "t-1" }) },
-    noteTag: { findUnique: async () => null, create: async () => ({}), findMany: async () => [] },
-    searchIndex: { findMany: async () => [] },
-    syncCursor: { upsert: async () => ({ cursor: 1n }) },
-    settings: { findUnique: async () => null },
-    trashItem: {
-      findFirst: async () => null,
+    searchIndex: {
       findMany: async () => [],
-      create: async () => ({}),
+      upsert: async () => ({}),
+      update: async () => ({}),
       delete: async () => ({}),
       deleteMany: async () => ({}),
     },
-    syncDeletion: { create: async () => ({}), createMany: async () => ({}) },
-    noteShare: { deleteMany: async () => ({}), updateMany: async () => ({}) },
+    graphEdge: {
+      deleteMany: async () => ({}),
+    },
+    $transaction: async (ops: unknown) => {
+      // search-index-reconcile uses prisma.$transaction([...]) with prisma
+      // promise objects; with our stubs they're plain values, so returning
+      // a resolved array is enough.
+      if (Array.isArray(ops)) return Promise.all(ops);
+      if (typeof ops === "function") return (ops as (tx: unknown) => unknown)({});
+      return ops;
+    },
   };
   app.decorate("prisma", prismaStub as never);
 
   // Stub auth — same shape as identity helpers.
-  const user = opts.user ?? null;
   const apiKey = opts.apiKey ?? null;
   const ctx: AuthContext | null = user ? { user, apiKey, agentId: null } : null;
 
