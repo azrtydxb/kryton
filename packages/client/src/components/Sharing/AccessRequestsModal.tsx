@@ -88,7 +88,8 @@ export function AccessRequestsModal({ onClose }: AccessRequestsModalProps) {
 
   const modal = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'oklch(0 0 0 / 0.6)' }}
       onClick={handleOverlayClick}
     >
       <div

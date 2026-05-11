@@ -114,7 +114,10 @@ export function PasskeyManagerContent() {
 
       {/* Error */}
       {error && (
-        <div className="mb-4 rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 text-xs text-red-400">
+        <div
+          className="mb-4 rounded-lg border px-3 py-2 text-xs"
+          style={{ background: 'color-mix(in oklch, var(--accent-danger) 10%, transparent)', borderColor: 'color-mix(in oklch, var(--accent-danger) 30%, transparent)', color: 'var(--accent-danger)' }}
+        >
           {error}
         </div>
       )}
@@ -145,7 +148,8 @@ export function PasskeyManagerContent() {
                   <button
                     onClick={() => handleDeletePasskey(pk.id)}
                     disabled={deletingId === pk.id}
-                    className="text-xs text-red-400 hover:text-red-300 px-2 py-1 rounded bg-red-500/10 disabled:opacity-50"
+                    className="text-xs px-2 py-1 rounded disabled:opacity-50"
+                    style={{ color: 'var(--accent-danger)', background: 'color-mix(in oklch, var(--accent-danger) 10%, transparent)' }}
                   >
                     {deletingId === pk.id ? '...' : 'Confirm'}
                   </button>
@@ -160,7 +164,7 @@ export function PasskeyManagerContent() {
               ) : (
                 <button
                   onClick={() => setConfirmDeleteId(pk.id)}
-                  className="ml-2 p-1.5 hover:text-red-400 transition-colors"
+                  className="ml-2 p-1.5 transition-colors"
                   style={{ color: 'var(--fg-3)' }}
                   aria-label="Delete passkey"
                 >
@@ -220,7 +224,7 @@ export function PasskeyManagerContent() {
 export function PasskeyManager({ open, onClose }: PasskeyManagerProps) {
   if (!open) return null;
   return createPortal(
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'oklch(0 0 0 / 0.6)' }} onClick={onClose}>
       <div
         className="rounded-xl shadow-2xl w-full max-w-md p-6 border"
         style={{ background: 'var(--bg-1)', borderColor: 'var(--line)' }}

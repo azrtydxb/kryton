@@ -137,7 +137,7 @@ export function TwoFactorManager() {
       <div>
         <h3 className="text-sm font-medium mb-1 flex items-center gap-2" style={{ color: 'var(--fg)' }}>
           {twoFactorEnabled
-            ? <><ShieldCheck size={16} className="text-green-400" /> Two-Factor Authentication</>
+            ? <><ShieldCheck size={16} style={{ color: 'var(--accent-good)' }} /> Two-Factor Authentication</>
             : <><Shield size={16} style={{ color: 'var(--fg-3)' }} /> Two-Factor Authentication</>
           }
         </h3>
@@ -148,7 +148,7 @@ export function TwoFactorManager() {
         </p>
       </div>
 
-      {error && <div className="text-red-400 text-xs">{error}</div>}
+      {error && <div className="text-xs" style={{ color: 'var(--accent-danger)' }}>{error}</div>}
 
       {/* Idle state */}
       {step === 'idle' && !twoFactorEnabled && (
@@ -160,7 +160,8 @@ export function TwoFactorManager() {
       {step === 'idle' && twoFactorEnabled && !showDisableConfirm && (
         <button
           onClick={() => { setShowDisableConfirm(true); setError(''); setDisablePassword(''); }}
-          className="border border-red-500/50 text-red-400 rounded-lg px-4 py-2 text-sm font-medium hover:bg-red-500/10 transition-colors"
+          className="border rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+          style={{ borderColor: 'color-mix(in oklch, var(--accent-danger) 50%, transparent)', color: 'var(--accent-danger)' }}
         >
           Disable 2FA
         </button>
@@ -169,7 +170,7 @@ export function TwoFactorManager() {
       {/* Disable confirm */}
       {showDisableConfirm && (
         <form onSubmit={handleDisable} className="space-y-3">
-          <p className="text-xs text-yellow-400">Enter your password to confirm disabling 2FA.</p>
+          <p className="text-xs" style={{ color: 'var(--accent-warn)' }}>Enter your password to confirm disabling 2FA.</p>
           <div>
             <label htmlFor="2fa-disable-password" className="block text-xs mb-1" style={{ color: 'var(--fg-3)' }}>Password</label>
             <input
@@ -229,7 +230,7 @@ export function TwoFactorManager() {
             Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.).
           </p>
           {qrDataUrl ? (
-            <div className="bg-white p-3 rounded-lg inline-block">
+            <div className="p-3 rounded-lg inline-block" style={{ background: 'var(--fg)' }}>
               <img src={qrDataUrl} alt="TOTP QR Code" width={200} height={200} />
             </div>
           ) : (
@@ -290,9 +291,12 @@ export function TwoFactorManager() {
       {/* Step 4: Backup codes */}
       {step === 'backup-codes' && (
         <div className="space-y-3">
-          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
-            <p className="text-xs text-yellow-300 font-medium mb-1">Save your backup codes</p>
-            <p className="text-xs text-yellow-400/80">
+          <div
+            className="border rounded-lg p-3"
+            style={{ background: 'color-mix(in oklch, var(--accent-warn) 10%, transparent)', borderColor: 'color-mix(in oklch, var(--accent-warn) 30%, transparent)' }}
+          >
+            <p className="text-xs font-medium mb-1" style={{ color: 'var(--accent-warn)' }}>Save your backup codes</p>
+            <p className="text-xs" style={{ color: 'var(--accent-warn)' }}>
               Store these in a safe place. Each code can only be used once to recover access if you lose your authenticator.
             </p>
           </div>

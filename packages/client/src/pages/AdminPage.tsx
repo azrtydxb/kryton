@@ -43,7 +43,8 @@ export default function AdminPage({ onClose }: { onClose: () => void }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center"
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'oklch(0 0 0 / 0.6)' }}
       onClick={onClose}
     >
       <div
@@ -169,7 +170,10 @@ function UsersSection({ currentUserId }: { currentUserId: string }) {
   return (
     <div>
       {error && (
-        <div className="mb-4 px-3 py-2 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+        <div
+          className="mb-4 px-3 py-2 border rounded-lg text-sm"
+          style={{ background: 'color-mix(in oklch, var(--accent-danger) 10%, transparent)', borderColor: 'color-mix(in oklch, var(--accent-danger) 30%, transparent)', color: 'var(--accent-danger)' }}
+        >
           {error}
         </div>
       )}
@@ -204,11 +208,12 @@ function UsersSection({ currentUserId }: { currentUserId: string }) {
                     </span>
                   </td>
                   <td className="py-3">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                      u.disabled
-                        ? 'bg-red-500/20 text-red-300'
-                        : 'bg-green-500/20 text-green-300'
-                    }`}>
+                    <span
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                      style={u.disabled
+                        ? { background: 'color-mix(in oklch, var(--accent-danger) 20%, transparent)', color: 'var(--accent-danger)' }
+                        : { background: 'color-mix(in oklch, var(--accent-good) 20%, transparent)', color: 'var(--accent-good)' }}
+                    >
                       {u.disabled ? 'Disabled' : 'Active'}
                     </span>
                   </td>
@@ -222,11 +227,12 @@ function UsersSection({ currentUserId }: { currentUserId: string }) {
                       <div className="flex items-center justify-end gap-1">
                         <button
                           onClick={() => toggleDisabled(u)}
-                          className={`p-1.5 rounded-lg transition-colors ${
-                            u.disabled
-                              ? 'text-green-400 hover:bg-green-500/10'
-                              : 'text-yellow-400 hover:bg-yellow-500/10'
-                          }`}
+                          className="p-1.5 rounded-lg transition-colors"
+                          style={{ color: u.disabled ? 'var(--accent-good)' : 'var(--accent-warn)' }}
+                          onMouseEnter={e => { e.currentTarget.style.background = u.disabled
+                            ? 'color-mix(in oklch, var(--accent-good) 10%, transparent)'
+                            : 'color-mix(in oklch, var(--accent-warn) 10%, transparent)'; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
                           title={u.disabled ? 'Enable user' : 'Disable user'}
                         >
                           {u.disabled ? <UserCheck size={15} /> : <UserX size={15} />}
@@ -243,7 +249,8 @@ function UsersSection({ currentUserId }: { currentUserId: string }) {
                           <div className="flex items-center gap-1">
                             <button
                               onClick={() => deleteUser(u.id)}
-                              className="px-2 py-1 rounded text-xs bg-red-500 text-white hover:bg-red-600 transition-colors"
+                              className="px-2 py-1 rounded text-xs transition-colors"
+                              style={{ background: 'var(--accent-danger)', color: 'var(--fg)' }}
                             >
                               Confirm
                             </button>
@@ -269,13 +276,16 @@ function UsersSection({ currentUserId }: { currentUserId: string }) {
                                   placeholder="New password" minLength={8} required
                                   className="w-24 border rounded px-1.5 py-0.5 text-xs"
                                   style={inputSmallStyle} />
-                                <button type="submit" className="text-xs text-green-400 hover:text-green-300">Set</button>
+                                <button type="submit" className="text-xs" style={{ color: 'var(--accent-good)' }}>Set</button>
                                 <button type="button" onClick={() => setResetPwUser(null)} className="text-xs" style={mutedStyle}>✕</button>
                               </form>
                             ) : (
                               <button
                                 onClick={() => { setResetPwUser(u.id); setResetPwValue(''); }}
-                                className="p-1.5 rounded-lg text-yellow-400 hover:bg-yellow-500/10 transition-colors"
+                                className="p-1.5 rounded-lg transition-colors"
+                                style={{ color: 'var(--accent-warn)' }}
+                                onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in oklch, var(--accent-warn) 10%, transparent)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
                                 title="Reset password"
                               >
                                 <Key size={15} />
@@ -283,7 +293,10 @@ function UsersSection({ currentUserId }: { currentUserId: string }) {
                             )}
                             <button
                               onClick={() => setConfirmDelete(u.id)}
-                              className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors"
+                              className="p-1.5 rounded-lg transition-colors"
+                              style={{ color: 'var(--accent-danger)' }}
+                              onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in oklch, var(--accent-danger) 10%, transparent)'; }}
+                              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
                               title="Delete user"
                             >
                               <Trash2 size={15} />
@@ -361,12 +374,12 @@ function InvitesSection() {
     });
   };
 
-  const getStatus = (invite: InviteCode): { label: string; className: string; style?: CSSProperties } => {
-    if (invite.usedBy) return { label: 'Used', className: '', style: { background: 'var(--bg-2)', color: 'var(--fg-3)' } };
+  const getStatus = (invite: InviteCode): { label: string; style: CSSProperties } => {
+    if (invite.usedBy) return { label: 'Used', style: { background: 'var(--bg-2)', color: 'var(--fg-3)' } };
     if (invite.expiresAt && new Date(invite.expiresAt) < new Date()) {
-      return { label: 'Expired', className: 'bg-red-500/20 text-red-300' };
+      return { label: 'Expired', style: { background: 'color-mix(in oklch, var(--accent-danger) 20%, transparent)', color: 'var(--accent-danger)' } };
     }
-    return { label: 'Unused', className: 'bg-green-500/20 text-green-300' };
+    return { label: 'Unused', style: { background: 'color-mix(in oklch, var(--accent-good) 20%, transparent)', color: 'var(--accent-good)' } };
   };
 
   if (loading) {
@@ -376,7 +389,10 @@ function InvitesSection() {
   return (
     <div>
       {error && (
-        <div className="mb-4 px-3 py-2 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+        <div
+          className="mb-4 px-3 py-2 border rounded-lg text-sm"
+          style={{ background: 'color-mix(in oklch, var(--accent-danger) 10%, transparent)', borderColor: 'color-mix(in oklch, var(--accent-danger) 30%, transparent)', color: 'var(--accent-danger)' }}
+        >
           {error}
         </div>
       )}
@@ -410,9 +426,9 @@ function InvitesSection() {
                   style={ghostBtnStyle}
                   title="Copy code"
                 >
-                  {copiedId === invite.id ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
+                  {copiedId === invite.id ? <Check size={14} style={{ color: 'var(--accent-good)' }} /> : <Copy size={14} />}
                 </button>
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${status.className}`} style={status.style}>
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={status.style}>
                   {status.label}
                 </span>
                 <span className="text-xs" style={mutedStyle}>
@@ -421,7 +437,10 @@ function InvitesSection() {
               </div>
               <button
                 onClick={() => deleteInvite(invite.id)}
-                className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors"
+                className="p-1.5 rounded-lg transition-colors"
+                style={{ color: 'var(--accent-danger)' }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in oklch, var(--accent-danger) 10%, transparent)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
                 title="Delete invite"
               >
                 <Trash2 size={15} />
@@ -480,7 +499,10 @@ function SettingsSection() {
   return (
     <div>
       {error && (
-        <div className="mb-4 px-3 py-2 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+        <div
+          className="mb-4 px-3 py-2 border rounded-lg text-sm"
+          style={{ background: 'color-mix(in oklch, var(--accent-danger) 10%, transparent)', borderColor: 'color-mix(in oklch, var(--accent-danger) 30%, transparent)', color: 'var(--accent-danger)' }}
+        >
           {error}
         </div>
       )}

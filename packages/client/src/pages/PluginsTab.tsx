@@ -227,9 +227,12 @@ function RegistryBrowse({
 
   if (error) {
     return (
-      <div className="px-4 py-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm flex items-center justify-between">
+      <div
+        className="px-4 py-3 border rounded-lg text-sm flex items-center justify-between"
+        style={{ background: 'color-mix(in oklch, var(--accent-danger) 10%, transparent)', borderColor: 'color-mix(in oklch, var(--accent-danger) 30%, transparent)', color: 'var(--accent-danger)' }}
+      >
         <span>{error}</span>
-        <button onClick={fetchRegistry} className="ml-3 text-red-300 hover:text-red-200 underline text-xs">
+        <button onClick={fetchRegistry} className="ml-3 underline text-xs" style={{ color: 'var(--accent-danger)' }}>
           Retry
         </button>
       </div>
@@ -391,13 +394,19 @@ function PluginCard({
             <span className="text-xs" style={{ color: 'var(--fg-4)' }}>v{plugin.version}</span>
             <span className="text-xs" style={{ color: 'var(--fg-4)' }}>by {plugin.author}</span>
             {isInstalled && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-300">
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                style={{ background: 'color-mix(in oklch, var(--accent-good) 20%, transparent)', color: 'var(--accent-good)' }}
+              >
                 <CheckCircle size={10} />
                 Installed
               </span>
             )}
             {incompatible && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/20 text-amber-300">
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                style={{ background: 'color-mix(in oklch, var(--accent-warn) 20%, transparent)', color: 'var(--accent-warn)' }}
+              >
                 <AlertCircle size={10} />
                 Requires v{plugin.minKrytonVersion}
               </span>
@@ -418,7 +427,7 @@ function PluginCard({
             </div>
           )}
           {err && (
-            <p className="text-xs text-red-400 mt-1">{err}</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--accent-danger)' }}>{err}</p>
           )}
         </div>
       </div>
@@ -532,9 +541,12 @@ function InstalledPlugins({ onUninstalled }: { onUninstalled: () => void }) {
 
   if (error) {
     return (
-      <div className="px-4 py-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm flex items-center justify-between">
+      <div
+        className="px-4 py-3 border rounded-lg text-sm flex items-center justify-between"
+        style={{ background: 'color-mix(in oklch, var(--accent-danger) 10%, transparent)', borderColor: 'color-mix(in oklch, var(--accent-danger) 30%, transparent)', color: 'var(--accent-danger)' }}
+      >
         <span>{error}</span>
-        <button onClick={fetchAll} className="ml-3 text-red-300 hover:text-red-200 underline text-xs">
+        <button onClick={fetchAll} className="ml-3 underline text-xs" style={{ color: 'var(--accent-danger)' }}>
           Retry
         </button>
       </div>
@@ -586,7 +598,10 @@ function InstalledPlugins({ onUninstalled }: { onUninstalled: () => void }) {
                       <span className="text-xs" style={{ color: 'var(--fg-4)' }}>by {plugin.author}</span>
                       <StateLabel state={plugin.state} />
                       {update && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-500/20 text-amber-300">
+                        <span
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                          style={{ background: 'color-mix(in oklch, var(--accent-warn) 20%, transparent)', color: 'var(--accent-warn)' }}
+                        >
                           <AlertCircle size={10} />
                           v{update.latestVersion} available
                         </span>
@@ -594,10 +609,10 @@ function InstalledPlugins({ onUninstalled }: { onUninstalled: () => void }) {
                     </div>
                     <p className="text-xs mt-0.5 leading-relaxed" style={{ color: 'var(--fg-3)' }}>{plugin.description}</p>
                     {isError && plugin.error && (
-                      <p className="text-xs text-red-400 mt-1 font-mono">{plugin.error}</p>
+                      <p className="text-xs mt-1 font-mono" style={{ color: 'var(--accent-danger)' }}>{plugin.error}</p>
                     )}
                     {err && (
-                      <p className="text-xs text-red-400 mt-1">{err}</p>
+                      <p className="text-xs mt-1" style={{ color: 'var(--accent-danger)' }}>{err}</p>
                     )}
                     {busy && (
                       <p className="text-xs mt-1" style={{ color: 'var(--fg-4)' }}>{busy}...</p>
@@ -621,7 +636,10 @@ function InstalledPlugins({ onUninstalled }: { onUninstalled: () => void }) {
                     <button
                       onClick={() => doAction(plugin.id, 'Enabling', () => api.enablePlugin(plugin.id))}
                       disabled={!!busy}
-                      className="p-1.5 rounded-lg text-green-400 hover:bg-green-500/10 transition-colors disabled:opacity-50"
+                      className="p-1.5 rounded-lg transition-colors disabled:opacity-50"
+                      style={{ color: 'var(--accent-good)' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in oklch, var(--accent-good) 10%, transparent)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
                       title="Enable plugin"
                     >
                       <ToggleLeft size={15} />
@@ -646,7 +664,10 @@ function InstalledPlugins({ onUninstalled }: { onUninstalled: () => void }) {
                     <button
                       onClick={() => doAction(plugin.id, 'Updating', () => api.updatePlugin(plugin.id))}
                       disabled={!!busy}
-                      className="p-1.5 rounded-lg text-amber-400 hover:bg-amber-500/10 transition-colors disabled:opacity-50"
+                      className="p-1.5 rounded-lg transition-colors disabled:opacity-50"
+                      style={{ color: 'var(--accent-warn)' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in oklch, var(--accent-warn) 10%, transparent)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
                       title={`Update to v${update.latestVersion}`}
                     >
                       <RefreshCw size={15} />
@@ -658,7 +679,8 @@ function InstalledPlugins({ onUninstalled }: { onUninstalled: () => void }) {
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => uninstall(plugin.id)}
-                        className="px-2 py-1 rounded text-xs bg-red-500 text-white hover:bg-red-600 transition-colors"
+                        className="px-2 py-1 rounded text-xs transition-colors"
+                        style={{ background: 'var(--accent-danger)', color: 'var(--fg)' }}
                       >
                         Confirm
                       </button>
@@ -668,7 +690,10 @@ function InstalledPlugins({ onUninstalled }: { onUninstalled: () => void }) {
                     <button
                       onClick={() => setConfirmUninstall(plugin.id)}
                       disabled={!!busy}
-                      className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                      className="p-1.5 rounded-lg transition-colors disabled:opacity-50"
+                      style={{ color: 'var(--accent-danger)' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'color-mix(in oklch, var(--accent-danger) 10%, transparent)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
                       title="Uninstall plugin"
                     >
                       <Trash2 size={15} />
@@ -725,9 +750,12 @@ function DisableButton({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       disabled={disabled}
-      className="p-1.5 rounded-lg hover:text-yellow-400 hover:bg-yellow-500/10 transition-colors disabled:opacity-50"
+      className="p-1.5 rounded-lg transition-colors disabled:opacity-50"
       title="Disable plugin"
-      style={{ color: hovered ? undefined : 'var(--fg-3)' }}
+      style={{
+        color: hovered ? 'var(--accent-warn)' : 'var(--fg-3)',
+        background: hovered ? 'color-mix(in oklch, var(--accent-warn) 10%, transparent)' : 'transparent',
+      }}
     >
       <ToggleRight size={15} />
     </button>
@@ -779,10 +807,10 @@ function CancelButton({ onClick }: { onClick: () => void }) {
 
 function StatusDot({ state }: { state: InstalledPlugin['state'] }) {
   if (state === 'active') {
-    return <span className="inline-block w-2 h-2 rounded-full bg-green-400 mt-1" />;
+    return <span className="inline-block w-2 h-2 rounded-full mt-1" style={{ background: 'var(--accent-good)' }} />;
   }
   if (state === 'error') {
-    return <span className="inline-block w-2 h-2 rounded-full bg-red-400 mt-1" />;
+    return <span className="inline-block w-2 h-2 rounded-full mt-1" style={{ background: 'var(--accent-danger)' }} />;
   }
   return (
     <span
@@ -795,7 +823,10 @@ function StatusDot({ state }: { state: InstalledPlugin['state'] }) {
 function StateLabel({ state }: { state: InstalledPlugin['state'] }) {
   if (state === 'active') {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-300">
+      <span
+        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+        style={{ background: 'color-mix(in oklch, var(--accent-good) 20%, transparent)', color: 'var(--accent-good)' }}
+      >
         <CheckCircle size={10} />
         Active
       </span>
@@ -803,7 +834,10 @@ function StateLabel({ state }: { state: InstalledPlugin['state'] }) {
   }
   if (state === 'error') {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/20 text-red-300">
+      <span
+        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+        style={{ background: 'color-mix(in oklch, var(--accent-danger) 20%, transparent)', color: 'var(--accent-danger)' }}
+      >
         <XCircle size={10} />
         Error
       </span>
@@ -924,7 +958,10 @@ function PluginSettingsPanel({
       {expanded && (
         <div className="px-4 pb-4">
           {error && (
-            <div className="mb-3 px-3 py-2 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-xs">
+            <div
+              className="mb-3 px-3 py-2 border rounded-lg text-xs"
+              style={{ background: 'color-mix(in oklch, var(--accent-danger) 10%, transparent)', borderColor: 'color-mix(in oklch, var(--accent-danger) 30%, transparent)', color: 'var(--accent-danger)' }}
+            >
               {error}
             </div>
           )}
@@ -963,7 +1000,7 @@ function PluginSettingsPanel({
                   {saving ? 'Saving...' : 'Save'}
                 </button>
                 {saved && (
-                  <span className="text-xs text-green-400 flex items-center gap-1">
+                  <span className="text-xs flex items-center gap-1" style={{ color: 'var(--accent-good)' }}>
                     <CheckCircle size={12} /> Saved
                   </span>
                 )}
@@ -1031,9 +1068,10 @@ function SettingField({
           style={{ background: checked ? 'var(--accent)' : 'var(--fg-4)' }}
         >
           <span
-            className={`inline-block h-3.5 w-3.5 rounded-full bg-white transform transition-transform ${
+            className={`inline-block h-3.5 w-3.5 rounded-full transform transition-transform ${
               checked ? 'translate-x-4' : 'translate-x-0.5'
             }`}
+            style={{ background: 'var(--fg)' }}
           />
         </button>
       </label>

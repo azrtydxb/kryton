@@ -111,8 +111,8 @@ function ProfileSection() {
             onBlur={e => { e.currentTarget.style.boxShadow = 'none'; }}
           />
         </div>
-        {pwError && <div className="text-red-400 text-xs">{pwError}</div>}
-        {pwSuccess && <div className="text-green-400 text-xs">Password changed successfully!</div>}
+        {pwError && <div className="text-xs" style={{ color: 'var(--accent-danger)' }}>{pwError}</div>}
+        {pwSuccess && <div className="text-xs" style={{ color: 'var(--accent-good)' }}>Password changed successfully!</div>}
         <div className="flex gap-2 pt-1">
           <button
             type="submit"
@@ -133,7 +133,8 @@ export default function AccountSettingsPage({ onClose }: { onClose: () => void }
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center"
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'oklch(0 0 0 / 0.6)' }}
       onClick={onClose}
     >
       <div
@@ -148,7 +149,7 @@ export default function AccountSettingsPage({ onClose }: { onClose: () => void }
         <div className="flex items-center justify-between px-6 py-4 border-b" style={borderLine}>
           <div className="flex items-center gap-2">
             <Settings size={18} style={{ color: 'var(--accent)' }} />
-            <h2 id="account-settings-title" className="text-lg font-semibold text-white">Account Settings</h2>
+            <h2 id="account-settings-title" className="text-lg font-semibold" style={{ color: 'var(--fg)' }}>Account Settings</h2>
           </div>
           <button
             onClick={onClose}
