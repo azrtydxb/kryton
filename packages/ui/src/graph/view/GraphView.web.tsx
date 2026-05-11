@@ -244,12 +244,17 @@ export function GraphView({
     // cancelled and restarted every frame.
   }, [graphData, layoutMode, activeNotePath, starredPaths, setViewport, showAllLabels]);
 
-  // Hover + click + drag from pointer events on the wrapper.
+  // Hover + click + drag from pointer events on the wrapper. We read the
+  // viewport via viewportRef (kept in sync with React state) so the click
+  // hit-test always sees the latest camera transform — even if the React
+  // closure on this handler captured a stale viewport from before the most
+  // recent camera-follow snap.
   const onPointerMove = (e: React.PointerEvent) => {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const v = viewportRef.current;
     const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
-    const wx = (sx - viewport.x) / viewport.k;
-    const wy = (sy - viewport.y) / viewport.k;
+    const wx = (sx - v.x) / v.k;
+    const wy = (sy - v.y) / v.k;
     if (dragRef.current) {
       applyDragMove(layoutRef.current!, dragRef.current.id, wx, wy);
       return;
@@ -265,8 +270,9 @@ export function GraphView({
   };
   const onPointerDown = (e: React.PointerEvent) => {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const wx = (e.clientX - rect.left - viewport.x) / viewport.k;
-    const wy = (e.clientY - rect.top - viewport.y) / viewport.k;
+    const v = viewportRef.current;
+    const wx = (e.clientX - rect.left - v.x) / v.k;
+    const wy = (e.clientY - rect.top - v.y) / v.k;
     const id = hitRef.current?.test(wx, wy);
     if (id) {
       dragRef.current = { id, startX: e.clientX, startY: e.clientY };
