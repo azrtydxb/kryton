@@ -14,6 +14,7 @@ import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { buildMcpServer } from "./build-server.js";
 import { authenticateMcpRequest } from "./auth.js";
+import * as activeSessions from "./active-sessions.js";
 import { createLogger } from "../../../lib/logger.js";
 
 const log = createLogger("mcp-streamable");
@@ -40,6 +41,31 @@ function isInitializeRequest(body: unknown): boolean {
   return m === "initialize";
 }
 
+/**
+ * The MCP `initialize` JSON-RPC payload looks like:
+ *   { method: "initialize", params: { clientInfo: { name, version }, ... } }
+ * Extract name/version so we can surface "Claude Desktop", "Cursor", etc. in
+ * the sidebar — falling back to `undefined` for anonymous/older clients.
+ */
+function extractClientInfo(body: unknown): { name?: string; version?: string } {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return {};
+  const params = (body as { params?: unknown }).params;
+  if (!params || typeof params !== "object" || Array.isArray(params)) return {};
+  const info = (params as { clientInfo?: unknown }).clientInfo;
+  if (!info || typeof info !== "object" || Array.isArray(info)) return {};
+  const { name, version } = info as { name?: unknown; version?: unknown };
+  return {
+    name: typeof name === "string" ? name : undefined,
+    version: typeof version === "string" ? version : undefined,
+  };
+}
+function extractClientName(body: unknown): string | undefined {
+  return extractClientInfo(body).name;
+}
+function extractClientVersion(body: unknown): string | undefined {
+  return extractClientInfo(body).version;
+}
+
 export const streamableMcpRoutes: FastifyPluginAsync = async (app) => {
   const sessions = new Map<string, SessionEntry>();
 
@@ -53,6 +79,7 @@ export const streamableMcpRoutes: FastifyPluginAsync = async (app) => {
     const s = sessions.get(sid);
     if (!s) return;
     sessions.delete(sid);
+    activeSessions.unregister(sid);
     try {
       await s.transport.close();
     } catch {
@@ -104,6 +131,7 @@ export const streamableMcpRoutes: FastifyPluginAsync = async (app) => {
           return;
         }
         entry.lastActivity = Date.now();
+        activeSessions.touch(sid);
         reply.hijack();
         try {
           await entry.transport.handleRequest(request.raw, reply.raw, request.body);
@@ -149,9 +177,19 @@ export const streamableMcpRoutes: FastifyPluginAsync = async (app) => {
         lastActivity: Date.now(),
       };
       sessions.set(newId, entry);
+      activeSessions.register({
+        sessionId: newId,
+        userId: auth.userId,
+        transport: "streamable",
+        clientName: extractClientName(request.body),
+        clientVersion: extractClientVersion(request.body),
+        startedAt: Date.now(),
+        lastActivity: Date.now(),
+      });
 
       transport.onclose = (): void => {
         sessions.delete(newId);
+        activeSessions.unregister(newId);
       };
 
       reply.hijack();

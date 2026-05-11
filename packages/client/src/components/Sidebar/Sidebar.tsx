@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { api, FileNode, TagData } from '../../lib/api';
 import { FileTree, FavoritesSection } from '@azrtydxb/ui';
 import { useUIStore } from '../../stores/uiStore';
@@ -170,24 +171,37 @@ function NavRow({
   );
 }
 
-function AgentAvatar({ label, title }: { label: string; title: string }) {
-  return (
-    <span
-      title={title}
-      className="mono"
-      style={{
-        width: 16, height: 16, borderRadius: '50%',
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        background: 'var(--bg-2)', border: '1px solid var(--line)',
-        fontSize: 9.5, color: 'var(--fg-2)',
-      }}
-    >
-      {label}
-    </span>
-  );
-}
+/**
+ * Sidebar footer — live MCP status driven by /api/agents:
+ *   - mcp-health probe decides whether the chip is "MCP" (green-pulsing,
+ *     transport reachable) or "MCP offline" (gray, transport down).
+ *   - agents/online drives the "N agents online" count. The pluralisation
+ *     and the count are real, not the hard-coded "2" mock.
+ *
+ * Both queries refetch every 10s. Failure modes:
+ *   - mcp-health rejecting → chip turns gray "MCP offline".
+ *   - online returning 0 → "0 agents online". (No avatar list — the prior
+ *     "C / ↗" pills were decorative placeholders not tied to any client.)
+ */
+function AgentsFooter() {
+  const healthQuery = useQuery({
+    queryKey: ['mcp-health'],
+    queryFn: () => api.getMcpHealth(),
+    refetchInterval: 10_000,
+    retry: 1,
+  });
+  const onlineQuery = useQuery({
+    queryKey: ['agents-online'],
+    queryFn: () => api.getAgentsOnline(),
+    refetchInterval: 10_000,
+    retry: 1,
+  });
+  const healthy = healthQuery.data?.status === 'ok';
+  const count = onlineQuery.data?.count ?? 0;
+  const titles = (onlineQuery.data?.clients ?? [])
+    .map((c) => c.name || `${c.transport} session`)
+    .join(', ');
 
-function AgentsFooter({ agents = 2 }: { agents?: number }) {
   return (
     <div
       className="mono"
@@ -201,27 +215,32 @@ function AgentsFooter({ agents = 2 }: { agents?: number }) {
       }}
     >
       <span
+        title={healthy ? 'MCP transport reachable' : 'MCP transport unreachable'}
         style={{
           display: 'inline-flex', alignItems: 'center', gap: 5,
           padding: '2px 6px', borderRadius: 3,
-          background: 'var(--accent-soft)', color: 'var(--accent)',
+          background: healthy ? 'var(--accent-soft)' : 'var(--bg-2)',
+          color: healthy ? 'var(--accent)' : 'var(--fg-3)',
+          border: healthy ? 'none' : '1px solid var(--line)',
         }}
       >
         <span
-          className="dot pulse"
+          className={healthy ? 'dot pulse' : 'dot'}
           style={{
             display: 'inline-block',
             width: 5, height: 5, borderRadius: '50%',
-            background: 'var(--accent)',
+            background: healthy ? 'var(--accent)' : 'var(--fg-4)',
             boxShadow: 'none',
           }}
         />
-        MCP
+        {healthy ? 'MCP' : 'MCP offline'}
       </span>
-      <span style={{ color: 'var(--fg-3)' }}>{agents} agents online</span>
-      <div style={{ flex: 1 }} />
-      <AgentAvatar label="C" title="Claude" />
-      <AgentAvatar label="↗" title="Cursor" />
+      <span
+        style={{ color: 'var(--fg-3)' }}
+        title={titles || undefined}
+      >
+        {count} {count === 1 ? 'agent' : 'agents'} online
+      </span>
     </div>
   );
 }

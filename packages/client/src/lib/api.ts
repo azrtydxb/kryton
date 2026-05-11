@@ -28,6 +28,20 @@ export interface GraphData {
   edges: { fromNoteId: string; toNoteId: string }[];
 }
 
+export interface AgentsOnlineClient {
+  sessionId: string;
+  name: string | null;
+  version: string | null;
+  transport: 'sse' | 'streamable';
+  startedAt: number;
+  lastActivity: number;
+}
+
+export interface AgentsOnlineData {
+  count: number;
+  clients: AgentsOnlineClient[];
+}
+
 export interface BacklinkData {
   path: string;
   title: string;
@@ -192,6 +206,10 @@ export const api = {
 
   // Backlinks
   getBacklinks: (path: string) => request<BacklinkData[]>(`/backlinks/${encodeURIComponent(path)}`),
+
+  // MCP-session indicators consumed by the sidebar agents-online footer.
+  getAgentsOnline: () => request<AgentsOnlineData>('/agents/online'),
+  getMcpHealth: () => request<{ status: 'ok' }>('/agents/mcp-health'),
 
   // Tags
   getTags: () => request<TagData[]>('/tags'),
