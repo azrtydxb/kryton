@@ -39,15 +39,16 @@
 - Stats block with 24h / 7d / 30d pill selector + pure-CSS sparkline
 - Setup help block deep-linking to `https://kryton.ai/tunnels/dashboard`
 
-**Status of the wire layer:** `TunnelClient` exposes the full state
-machine but the actual h2 + yamux handshake is intentionally stubbed
-out (transitions to `fatal:unknown` with a clear "wire implementation
-pending" message). This is documented in
-`services/tunnel-client.service.ts` and the message surfaces honestly
-in the admin UI, so a fresh install shows "Disconnected" with an
-actionable message rather than appearing to work. Replacing the body
-of `connectLoop` is the only change needed once the yamux library
-spike (plan §3 task 7) lands.
+**Status of the wire layer:** real h2 + yamux end-to-end, no stub.
+`packages/server/src/modules/tunnel/wire/yamux.ts` is a from-scratch
+hashicorp/yamux-compatible client (~500 LOC), `wire/h2-connect.ts`
+handles the h2 CONNECT handshake, `services/loopback-injector.service.ts`
+splices each inbound yamux stream to a fresh `127.0.0.1:<fastify-port>`
+TCP socket so Fastify treats forwarded requests as local. The Go
+server uses `github.com/hashicorp/yamux`. Wire interop is verified
+by an e2e test that spawns the real Go binary as a subprocess, dials
+it with the real TS client, mints an Ed25519 JWT, and forwards a
+public HTTP request all the way through to a faux-Fastify and back.
 
 **Verification:**
 - `npm run typecheck` — clean
@@ -66,19 +67,17 @@ Both created on GitHub via `gh repo create --private --source=. --push`:
 
 ### What I deliberately didn't do
 
-- **Did not write the yamux + h2 wire implementation** for 4c. The
-  spec defers this to a one-day spike to validate library interop
-  (libp2p-yamux against hashicorp/yamux Go server). Doing it without
-  the spike risks a wire-protocol mismatch that's painful to debug
-  later. The admin UI honestly reports "wire implementation pending"
-  so this state is visible, not hidden.
-- **Did not build the WP plugin's signup / Stripe / dashboard /
-  admin pages**. Phase 1–2 of that plan are done; phases 3–12 are
-  itemised but require PHP locally to TDD properly.
-- **Did not implement the Go tunnel server's registry / peer-sync /
-  forwarder / public listener**. Phase 1–3 of that plan are done with
-  passing tests + binary boots. The remaining 9 phases need to be
-  built incrementally per the plan.
+- **WP plugin's signup / Stripe / dashboard / admin pages**. Phase 1–2
+  of that plan are done; phases 3–12 are itemised but require PHP
+  locally to TDD properly. For now the tunnel server treats JWTs as
+  authoritative without a WP plan-resolver attached (the plan
+  resolver interface is wired in tunnel.ListenerConfig.Plans but
+  defaults to nil, in which case the JWT's plan claim is used).
+- **Peer-sync mesh for multi-replica HA**. The Go server's
+  registry has the peer map and the public listener has a peer-hit
+  code path (currently logs and falls through to offline). Filling
+  in `internal/registry/syncer.go` is straightforward and itemised
+  in the plan. Single-replica is fully functional today.
 - **Did not deploy anything to the DO k8s cluster.** That requires
   user authorization (Cloudflare API token, OpenBao seal, ArgoCD
   Application creation).
