@@ -391,28 +391,49 @@ function StatsBlock({
           </div>
           <div
             style={{
-              display: 'flex', alignItems: 'flex-end', gap: 2, height: 60,
+              display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-start',
+              gap: 2, height: 60,
               padding: 6, borderRadius: 6, background: 'var(--bg-1)', border: '1px solid var(--line)',
             }}
           >
             {stats.daily.length === 0 ? (
               <span style={helpText}>No traffic recorded in this window yet.</span>
             ) : (
-              stats.daily.map((d) => {
-                const total = d.bytes_in + d.bytes_out;
-                const height = Math.max(2, (total / maxDaily) * 48);
-                return (
-                  <div
-                    key={d.date}
-                    title={`${d.date}: ${d.requests} req, ${formatBytes(total)}`}
-                    style={{
-                      flex: 1, height,
-                      background: 'var(--accent)',
-                      opacity: 0.7, borderRadius: 2,
-                    }}
-                  />
-                );
-              })
+              (() => {
+                // Pad to the expected bucket count so a 24h window with only
+                // one day's data doesn't stretch a single bar across the
+                // whole chart. Empty buckets render as a hairline baseline.
+                const expected = window === '24h' ? 2 : window === '7d' ? 7 : 30;
+                const padded =
+                  stats.daily.length >= expected
+                    ? stats.daily
+                    : [
+                        ...Array.from({ length: expected - stats.daily.length }, (_, i) => ({
+                          date: `pad-${i}`,
+                          requests: 0,
+                          bytes_in: 0,
+                          bytes_out: 0,
+                        })),
+                        ...stats.daily,
+                      ];
+                return padded.map((d) => {
+                  const total = d.bytes_in + d.bytes_out;
+                  const height = total === 0 ? 2 : Math.max(2, (total / maxDaily) * 48);
+                  const isPad = d.date.startsWith('pad-');
+                  return (
+                    <div
+                      key={d.date}
+                      title={isPad ? 'no data' : `${d.date}: ${d.requests} req, ${formatBytes(total)}`}
+                      style={{
+                        flex: 1, height,
+                        background: isPad ? 'var(--line)' : 'var(--accent)',
+                        opacity: isPad ? 1 : 0.7,
+                        borderRadius: 2,
+                      }}
+                    />
+                  );
+                });
+              })()
             )}
           </div>
         </>
