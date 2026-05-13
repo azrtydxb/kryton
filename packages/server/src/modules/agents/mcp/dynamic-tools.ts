@@ -14,7 +14,7 @@ export interface DynamicToolDef {
 //   2. routes already covered by hand-written core tools
 const EXCLUDED_PREFIXES = [
   "/api/admin", "/api/auth", "/api/api-keys", "/api/mcp", "/api/docs",
-  "/healthz", "/readyz", "/version",
+  "/healthz",
   // Core note API routes handled by built-in tools
   "/api/notes", "/api/search", "/api/tags", "/api/backlinks",
   "/api/graph", "/api/folders", "/api/daily", "/api/templates",
