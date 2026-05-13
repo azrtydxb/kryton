@@ -187,6 +187,5 @@ const notesModuleImpl: FastifyPluginAsync = async (app) => {
 };
 
 export const notesModule: FastifyPluginAsync = fp(notesModuleImpl, {
-  name: "notes",
-  dependencies: ["knowledge"],
+  name: "notes-module",
 });
