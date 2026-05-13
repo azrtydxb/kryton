@@ -15,6 +15,7 @@ import { errorsPlugin } from "./plugins/errors.js";
 import { multipartPlugin } from "./plugins/multipart.js";
 import { websocketPlugin } from "./plugins/websocket.js";
 import { openapiPlugin } from "./plugins/openapi.js";
+import { spaPlugin } from "./plugins/spa.js";
 
 import { platformModule } from "./modules/platform/index.js";
 import { identityModule } from "./modules/identity/index.js";
@@ -92,6 +93,12 @@ export async function buildApp({
   // no cross-module dependencies. Registered last so other decorators
   // are available if a future iteration needs them.
   await app.register(tunnelModule);
+
+  // SPA must register after all module routes so its setNotFoundHandler
+  // is the final fallback. Falls through API/plugin/ws/docs prefixes
+  // back to 404 JSON; everything else gets index.html for client-side
+  // routing.
+  await app.register(spaPlugin);
 
   return app;
 }
