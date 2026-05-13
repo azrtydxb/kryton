@@ -143,7 +143,20 @@ export const streamableMcpRoutes: FastifyPluginAsync = async (app) => {
         return;
       }
 
-      // New session: only allowed on POST initialize.
+      // No live session for the supplied id. Two cases worth distinguishing:
+      //   1. Client sent an Mcp-Session-Id we don't know (expired, or
+      //      the server was restarted and the in-memory map was wiped).
+      //      Per the MCP streamable-HTTP transport spec we MUST return
+      //      404 here — that's the signal compliant clients use to
+      //      transparently re-issue an `initialize` and reconnect.
+      //   2. Client sent no Mcp-Session-Id at all and isn't sending
+      //      `initialize`. That's a genuine protocol violation → 400.
+      if (sid) {
+        void reply.status(404).send({
+          error: "MCP session not found or expired; re-initialize to obtain a new session id",
+        });
+        return;
+      }
       if (request.method !== "POST" || !isInitializeRequest(request.body)) {
         void reply.status(400).send({
           error: "Missing or invalid Mcp-Session-Id header (initialize required to create a session)",
