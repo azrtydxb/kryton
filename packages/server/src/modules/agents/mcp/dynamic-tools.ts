@@ -13,6 +13,19 @@ const EXCLUDED_PREFIXES = [
   "/notes", "/search", "/tags", "/backlinks", "/graph", "/folders", "/daily", "/templates",
 ];
 
+/**
+ * Coerce an OpenAPI parameter name to something Anthropic's tool-use
+ * API will accept as a JSON-Schema property key: ^[a-zA-Z0-9_.-]{1,64}$.
+ * Fastify wildcard params come through as the literal '*'; we map those
+ * to 'path' (the closest descriptive name). Anything else illegal gets
+ * underscores.
+ */
+function sanitizePropertyKey(name: string): string {
+  if (name === "*") return "path";
+  const cleaned = name.replace(/[^a-zA-Z0-9_.-]/g, "_").slice(0, 64);
+  return cleaned || "param";
+}
+
 export function generateDynamicTools(
   spec: Record<string, unknown>,
   coreToolNames: string[],
@@ -55,11 +68,16 @@ export function generateDynamicTools(
         const props: Record<string, unknown> = {};
         const required: string[] = [];
         for (const param of op.parameters) {
-          props[param.name] = {
+          // Anthropic's tool-use API restricts property keys to
+          // ^[a-zA-Z0-9_.-]{1,64}$. Fastify wildcard params surface as
+          // the literal '*', which violates that pattern. Sanitize +
+          // record the alias so the executor can map it back.
+          const safeKey = sanitizePropertyKey(param.name);
+          props[safeKey] = {
             type: param.schema?.type || "string",
             description: param.description || `${param.in} parameter: ${param.name}`,
           };
-          if (param.required) required.push(param.name);
+          if (param.required) required.push(safeKey);
         }
         if (!bodySchema) {
           inputSchema = { type: "object", properties: props, required };

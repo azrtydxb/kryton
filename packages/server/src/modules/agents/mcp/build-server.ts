@@ -134,13 +134,31 @@ export function buildMcpServer({ app, userId, keyScope, rawKey }: BuildMcpServer
               delete (remaining as Record<string, unknown>)[name];
             }
           }
+          // Fastify wildcard params come through as a literal '*' in
+          // the OpenAPI path. Sanitize step renamed the property to
+          // 'path' — splice that value in for the trailing wildcard.
+          // Don't URI-encode slashes; wildcard params are commonly
+          // multi-segment paths like 'folder/note.md'.
+          if (url.includes("/*") && typeof remaining.path === "string") {
+            url = url.replace(/\*(?=$|\?)/, encodeURI(remaining.path));
+            delete remaining.path;
+          }
           const queryEntries = Object.entries(remaining).filter(([, v]) => v !== undefined && v !== null);
           if (queryEntries.length > 0) {
             const qs = new URLSearchParams(queryEntries.map(([k, v]) => [k, String(v)]));
             url = `${url}?${qs.toString()}`;
           }
         } else {
-          fetchInit.body = JSON.stringify(args);
+          // For POST/PUT/PATCH, the wildcard may live in the URL too
+          // (e.g. POST /api/trash/restore/*). The body stays as-is.
+          if (dynTool.apiPath.includes("/*") && typeof (args as { path?: unknown }).path === "string") {
+            const bodyArgs = { ...args };
+            url = url.replace(/\*(?=$|\?)/, encodeURI((bodyArgs as { path: string }).path));
+            delete (bodyArgs as { path?: string }).path;
+            fetchInit.body = JSON.stringify(bodyArgs);
+          } else {
+            fetchInit.body = JSON.stringify(args);
+          }
         }
 
         const u = new URL(url);
