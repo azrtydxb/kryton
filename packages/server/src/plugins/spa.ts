@@ -30,6 +30,7 @@ export async function spaPlugin(app: FastifyInstance): Promise<void> {
   });
   app.setNotFoundHandler((req, reply) => {
     const url = req.raw.url ?? "/";
+    const method = req.raw.method ?? "GET";
     if (
       url.startsWith("/api/") ||
       url.startsWith("/plugins/") ||
@@ -41,6 +42,15 @@ export async function spaPlugin(app: FastifyInstance): Promise<void> {
     ) {
       reply.code(404).type("application/json").send({
         error: { code: "NOT_FOUND", message: "Route not found" },
+      });
+      return;
+    }
+    // Only navigations (GET/HEAD) get the SPA fallback. Non-idempotent
+    // methods to an unknown URL are protocol errors, not SPA routes —
+    // return 405 so callers don't get a misleading HTML body.
+    if (method !== "GET" && method !== "HEAD") {
+      reply.code(405).type("application/json").send({
+        error: { code: "METHOD_NOT_ALLOWED", message: `${method} not allowed on ${url}` },
       });
       return;
     }

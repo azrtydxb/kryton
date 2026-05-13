@@ -7,10 +7,18 @@ export interface DynamicToolDef {
   apiPath: string;
 }
 
+// Paths the dynamic-tool generator skips. OpenAPI emits full mounted
+// paths (e.g. /api/notes, /api/admin/users), so each entry below is
+// matched against the actual prefix. Categories:
+//   1. routes that shouldn't be MCP tools at all (admin, auth, mcp itself)
+//   2. routes already covered by hand-written core tools
 const EXCLUDED_PREFIXES = [
-  "/admin", "/auth", "/api-keys", "/mcp", "/docs", "/health",
+  "/api/admin", "/api/auth", "/api/api-keys", "/api/mcp", "/api/docs",
+  "/healthz", "/readyz", "/version",
   // Core note API routes handled by built-in tools
-  "/notes", "/search", "/tags", "/backlinks", "/graph", "/folders", "/daily", "/templates",
+  "/api/notes", "/api/search", "/api/tags", "/api/backlinks",
+  "/api/graph", "/api/folders", "/api/daily", "/api/templates",
+  "/api/trash",
 ];
 
 /**

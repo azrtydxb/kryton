@@ -213,7 +213,11 @@ export async function executeTool(
       try {
         const noteSvc = await import("../../notes/services/note.service.js");
         const svc = new noteSvc.NoteService(app);
-        return svc.scanDirectory(path.join(userDir, "templates"));
+        // Must `await` so the ENOENT rejection from a missing
+        // templates/ folder lands in this catch — `return svc.…`
+        // hands an unresolved promise back to the caller and the
+        // rejection escapes the try/catch.
+        return await svc.scanDirectory(path.join(userDir, "templates"));
       } catch {
         return [];
       }

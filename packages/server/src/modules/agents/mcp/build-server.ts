@@ -114,7 +114,10 @@ export function buildMcpServer({ app, userId, keyScope, rawKey }: BuildMcpServer
         };
       }
       try {
-        let url = `http://localhost:${port}/api${dynTool.apiPath}`;
+        // apiPath is the OpenAPI path key, which is the full mounted
+        // route (e.g. "/api/admin/users", "/version"). Do not prepend
+        // any prefix — that doubled to "/api/api/..." before.
+        let url = `http://localhost:${port}${dynTool.apiPath}`;
         const fetchInit: RequestInit = {
           method: dynTool.method,
           headers: {
