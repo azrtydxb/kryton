@@ -135,9 +135,7 @@ export const errorsPlugin = fp(async (app) => {
     });
   });
 
-  app.setNotFoundHandler((_req, reply) => {
-    reply.status(404).send({
-      error: { code: "NOT_FOUND", message: "Route not found" },
-    });
-  });
+  // 404 handler lives in the SPA plugin so it can fall back to
+  // index.html for client-side routing while still returning JSON 404s
+  // on API prefixes.
 }, { name: "errors" });
