@@ -15,6 +15,20 @@ const log = createLogger("auth");
 
 const APP_URL = process.env.APP_URL || "http://localhost:5173";
 
+/**
+ * Extra origins (beyond APP_URL) that better-auth will accept. Modules
+ * that learn additional public origins at runtime — most notably the
+ * tunnel module, once a JWT is configured — push them in via
+ * setExtraTrustedOriginsProvider. The provider runs on every auth
+ * request, so changing the JWT (e.g. after a subdomain rename) takes
+ * effect on the next sign-in without a server restart.
+ */
+type TrustedOriginsProvider = () => string[];
+let extraTrustedOriginsProvider: TrustedOriginsProvider = () => [];
+export function setExtraTrustedOriginsProvider(fn: TrustedOriginsProvider): void {
+  extraTrustedOriginsProvider = fn;
+}
+
 // Temporary store to pass invite code ID from before to after hook.
 // Uses a TTL Map to prevent memory leaks on registration failure.
 const pendingInviteCodes = new Map<string, { id: string; timestamp: number }>();
@@ -45,7 +59,7 @@ export function createAuth(db: Db) {
     }),
     basePath: "/api/auth",
     baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3001",
-    trustedOrigins: [APP_URL, "kryton://"],
+    trustedOrigins: () => [APP_URL, "kryton://", ...extraTrustedOriginsProvider()],
 
     emailAndPassword: {
       enabled: true,

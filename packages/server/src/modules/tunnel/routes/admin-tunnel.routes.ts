@@ -65,6 +65,7 @@ export const adminTunnelRoutes: FastifyPluginAsync = async (app) => {
       await app.tunnel.state.setJwt(token);
       await app.tunnel.state.setCachedClaims(check.claims);
       await app.tunnel.state.clearLastError();
+      await app.tunnel.refreshTrustedOrigin();
       await app.tunnel.client.restart(token);
       app.log.info(
         {
@@ -93,6 +94,7 @@ export const adminTunnelRoutes: FastifyPluginAsync = async (app) => {
     async (_req, reply) => {
       await app.tunnel.client.stop({ timeoutMs: 5_000 });
       await app.tunnel.state.clearJwt();
+      await app.tunnel.refreshTrustedOrigin();
       app.log.info("tunnel token cleared by admin");
       reply.status(204);
       return null;

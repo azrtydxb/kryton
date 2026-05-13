@@ -18,6 +18,7 @@ import { TunnelStatsService } from "./services/tunnel-stats.service.js";
 import { TunnelClient } from "./services/tunnel-client.service.js";
 import { LoopbackInjector } from "./services/loopback-injector.service.js";
 import { adminTunnelRoutes } from "./routes/admin-tunnel.routes.js";
+import { setExtraTrustedOriginsProvider } from "../identity/auth-config.js";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -26,6 +27,7 @@ declare module "fastify" {
       stats: TunnelStatsService;
       client: TunnelClient;
       loopback: LoopbackInjector;
+      refreshTrustedOrigin: () => Promise<void>;
     };
   }
 }
@@ -64,7 +66,33 @@ export const tunnelModule: FastifyPluginAsync = async (app) => {
     krytonVersion: process.env.npm_package_version ?? "0.0.0",
   });
 
-  app.decorate("tunnel", { state, stats, client, loopback });
+  // Auto-inject the tunnel's public origin into better-auth's trusted
+  // origins. Reads cached claims (set whenever a JWT is configured) +
+  // KRYTON_TUNNEL_PUBLIC_HOST. Picks up subdomain renames automatically
+  // because setJwt refreshes cached claims.
+  const tunnelPublicHost =
+    process.env.KRYTON_TUNNEL_PUBLIC_HOST ?? "my.kryton.ai";
+  let cachedOrigin: string | null = null;
+  const refreshOrigin = async (): Promise<void> => {
+    try {
+      const claims = await state.getCachedClaims();
+      cachedOrigin = claims
+        ? `https://${claims.subdomain}.${tunnelPublicHost}`
+        : null;
+    } catch {
+      cachedOrigin = null;
+    }
+  };
+  await refreshOrigin();
+  setExtraTrustedOriginsProvider(() => (cachedOrigin ? [cachedOrigin] : []));
+
+  app.decorate("tunnel", {
+    state,
+    stats,
+    client,
+    loopback,
+    refreshTrustedOrigin: refreshOrigin,
+  });
 
   stats.start();
 
