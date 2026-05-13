@@ -1,5 +1,6 @@
 import * as path from "node:path";
 import type { FastifyPluginAsync } from "fastify";
+import fp from "fastify-plugin";
 import { backfillFolders } from "./services/backfill/folders-backfill.js";
 import { backfillSearchIndex } from "./services/backfill/search-index-backfill.js";
 import { backfillTags } from "./services/backfill/tags-backfill.js";
@@ -55,7 +56,11 @@ declare module "fastify" {
  * Express server's `ensureBackfilled` middleware. Triggered via per-route
  * `preHandler` after authentication so we know the user id.
  */
-export const notesModule: FastifyPluginAsync = async (app) => {
+// Wrapped with `fastify-plugin` so `app.notes` is visible to sibling
+// modules (knowledge, collab, agents/MCP). Without this, the decorator
+// stays encapsulated in the notes scope and downstream callers see
+// `Cannot read properties of undefined (reading 'scanDirectory')`.
+const notesModuleImpl: FastifyPluginAsync = async (app) => {
   const notesDir = path.resolve(
     app.config.NOTES_DIR.startsWith("/")
       ? app.config.NOTES_DIR
@@ -180,3 +185,8 @@ export const notesModule: FastifyPluginAsync = async (app) => {
   // Aux routes (attachments, canvas, history, backlinks) — owned by notes-aux
   await registerAuxRoutes(app);
 };
+
+export const notesModule: FastifyPluginAsync = fp(notesModuleImpl, {
+  name: "notes",
+  dependencies: ["knowledge"],
+});
