@@ -67,6 +67,16 @@ export function registerYjsRoutes(
 ): YjsRegistry {
   const { persistence } = opts;
   const docs = new Map<string, DocEntry>();
+  /**
+   * In-flight ensureDoc calls. Without this, two clients connecting to
+   * the same docId at roughly the same moment both miss the `docs.get`
+   * check, both await `persistence.loadYjsDoc()`, and both construct
+   * their own Y.Doc. The second's `docs.set` wins the registry, but the
+   * first connection's update handler is bound to the orphaned doc —
+   * its edits never reach peers. Coalescing the lookup so the second
+   * caller awaits the first's promise serialises the cache fill.
+   */
+  const ensureDocInFlight = new Map<string, Promise<DocEntry>>();
 
   const scheduleFlush = (entry: DocEntry): void => {
     entry.dirty = true;
@@ -111,68 +121,81 @@ export function registerYjsRoutes(
   };
 
   const ensureDoc = async (docId: string, auth: AuthInfo): Promise<DocEntry> => {
-    let entry = docs.get(docId);
-    if (entry) {
+    const cached = docs.get(docId);
+    if (cached) {
       // Cancel any pending eviction since a new client is connecting.
-      if (entry.evictTimer) {
-        clearTimeout(entry.evictTimer);
-        entry.evictTimer = null;
+      if (cached.evictTimer) {
+        clearTimeout(cached.evictTimer);
+        cached.evictTimer = null;
       }
-      return entry;
+      return cached;
     }
+    // Coalesce concurrent first-time-fills so two clients connecting in
+    // the same tick don't construct rival Y.Doc instances.
+    const inflight = ensureDocInFlight.get(docId);
+    if (inflight) return inflight;
 
-    const doc = (await persistence.loadYjsDoc(docId, auth.userId)) ?? new Y.Doc();
-    const awareness = new awarenessProtocol.Awareness(doc);
-    entry = {
-      docId,
-      doc,
-      awareness,
-      clients: new Set(),
-      userId: auth.userId,
-      dirty: false,
-      idleTimer: null,
-      maxTimer: null,
-      flushing: null,
-      evictTimer: null,
-    };
-    docs.set(docId, entry);
+    const buildPromise = (async (): Promise<DocEntry> => {
+      const doc = (await persistence.loadYjsDoc(docId, auth.userId)) ?? new Y.Doc();
+      const awareness = new awarenessProtocol.Awareness(doc);
+      const entry: DocEntry = {
+        docId,
+        doc,
+        awareness,
+        clients: new Set(),
+        userId: auth.userId,
+        dirty: false,
+        idleTimer: null,
+        maxTimer: null,
+        flushing: null,
+        evictTimer: null,
+      };
+      docs.set(docId, entry);
 
-    doc.on("update", (update: Uint8Array, origin: unknown) => {
-      // Append to update log out-of-band.
-      void persistence
-        .appendYjsUpdate(docId, update, auth.agentId)
-        .catch((e) => app.log.warn({ err: e, docId }, "appendYjsUpdate failed"));
+      doc.on("update", (update: Uint8Array, origin: unknown) => {
+        // Append to update log out-of-band.
+        void persistence
+          .appendYjsUpdate(docId, update, auth.agentId)
+          .catch((e) => app.log.warn({ err: e, docId }, "appendYjsUpdate failed"));
 
-      // Broadcast to all other clients.
-      const msg = makeSyncUpdateMsg(update);
-      for (const c of entry!.clients) {
-        if (c !== origin && c.readyState === c.OPEN) {
-          c.send(msg);
+        // Broadcast to all other clients.
+        const msg = makeSyncUpdateMsg(update);
+        for (const c of entry.clients) {
+          if (c !== origin && c.readyState === c.OPEN) {
+            c.send(msg);
+          }
         }
-      }
 
-      // Schedule debounced snapshot writeback.
-      scheduleFlush(entry!);
-    });
+        // Schedule debounced snapshot writeback.
+        scheduleFlush(entry);
+      });
 
-    awareness.on(
-      "update",
-      ({ added, updated, removed }: { added: number[]; updated: number[]; removed: number[] }) => {
-        const changedClients = [...added, ...updated, ...removed];
-        const enc = encoding.createEncoder();
-        encoding.writeVarUint(enc, MSG_AWARENESS);
-        encoding.writeVarUint8Array(
-          enc,
-          awarenessProtocol.encodeAwarenessUpdate(awareness, changedClients),
-        );
-        const msg = encoding.toUint8Array(enc);
-        for (const c of entry!.clients) {
-          if (c.readyState === c.OPEN) c.send(msg);
-        }
-      },
-    );
+      awareness.on(
+        "update",
+        ({ added, updated, removed }: { added: number[]; updated: number[]; removed: number[] }) => {
+          const changedClients = [...added, ...updated, ...removed];
+          const enc = encoding.createEncoder();
+          encoding.writeVarUint(enc, MSG_AWARENESS);
+          encoding.writeVarUint8Array(
+            enc,
+            awarenessProtocol.encodeAwarenessUpdate(awareness, changedClients),
+          );
+          const msg = encoding.toUint8Array(enc);
+          for (const c of entry.clients) {
+            if (c.readyState === c.OPEN) c.send(msg);
+          }
+        },
+      );
 
-    return entry;
+      return entry;
+    })();
+
+    ensureDocInFlight.set(docId, buildPromise);
+    try {
+      return await buildPromise;
+    } finally {
+      ensureDocInFlight.delete(docId);
+    }
   };
 
   const onConnection = async (
