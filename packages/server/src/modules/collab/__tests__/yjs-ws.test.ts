@@ -19,6 +19,13 @@ class TestYjsClient {
   readonly doc = new Y.Doc();
   private ws: NodeWebSocket;
   private opened: Promise<void>;
+  /** Resolves after the first message arrives from the server, which
+   *  is the response to our sync step 1. Used by `ready()` so callers
+   *  block until the handshake has completed both ways — otherwise the
+   *  test races and the first edit can ship before the server is
+   *  prepared to relay it to peers. */
+  private serverReplied: Promise<void>;
+  private resolveServerReplied!: () => void;
 
   constructor(url: string) {
     this.ws = new NodeWebSocket(url);
@@ -26,6 +33,9 @@ class TestYjsClient {
     this.opened = new Promise<void>((resolve, reject) => {
       this.ws.once("open", () => resolve());
       this.ws.once("error", reject);
+    });
+    this.serverReplied = new Promise<void>((resolve) => {
+      this.resolveServerReplied = resolve;
     });
 
     this.doc.on("update", (update: Uint8Array, origin: unknown) => {
@@ -52,6 +62,9 @@ class TestYjsClient {
         if (encoding.length(replyEnc) > 1 && this.ws.readyState === NodeWebSocket.OPEN) {
           this.ws.send(encoding.toUint8Array(replyEnc));
         }
+        // First server sync message means the bidirectional handshake
+        // is live — unblock ready() so callers can start editing safely.
+        this.resolveServerReplied();
       }
     });
   }
@@ -63,6 +76,11 @@ class TestYjsClient {
     encoding.writeVarUint(enc, MSG_SYNC);
     syncProtocol.writeSyncStep1(enc, this.doc);
     this.ws.send(encoding.toUint8Array(enc));
+    // Block until the server has replied at least once. Without this
+    // the test's first edit could be sent into a half-open handshake
+    // (especially on slow CI runners), and the server's broadcast to
+    // peers would race the still-pending sync exchange.
+    await this.serverReplied;
   }
 
   close(): void {
@@ -173,10 +191,10 @@ describe("collab Yjs WebSocket", () => {
 
     const a = new TestYjsClient(url);
     const b = new TestYjsClient(url);
+    // `ready()` blocks until the bidirectional sync handshake is live
+    // for both clients, so the first edit below is sent into a fully-
+    // primed connection. No hopeful sleep needed.
     await Promise.all([a.ready(), b.ready()]);
-
-    // Give the server a moment to send sync step 1 and flush state.
-    await sleep(150);
 
     a.doc.getText("t").insert(0, "hello");
 

@@ -43,6 +43,7 @@ export async function resetIdentityTestDb(handle: TestDbHandle): Promise<void> {
       "TwoFactor",
       "InviteCode",
       "Settings",
+      "McpSession",
       "User"
     RESTART IDENTITY CASCADE
   `);
