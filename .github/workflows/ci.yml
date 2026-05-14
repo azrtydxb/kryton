@@ -13,7 +13,7 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, kryton-248]
     services:
       postgres:
         image: pgvector/pgvector:pg16
@@ -100,7 +100,7 @@ jobs:
   # mask an E2E regression (and vice versa). Reuses the same Postgres
   # service-container shape as the unit job.
   e2e:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, kryton-248]
     services:
       postgres:
         image: pgvector/pgvector:pg16
@@ -154,7 +154,7 @@ jobs:
 
   docker:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, kryton-248]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     permissions:
       contents: read
