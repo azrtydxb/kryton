@@ -83,6 +83,17 @@ jobs:
           APP_URL: http://localhost:5173
           OPENAPI_ENABLED: "true"
 
+      - name: E2E (full Kryton boot + HTTP API + MCP + restart persistence)
+        run: npm run test:e2e --workspace=packages/server
+        env:
+          NODE_ENV: test
+          POSTGRES_URL: postgres://kryton:kryton@localhost:5432/kryton_test
+          TEST_DATABASE_URL: postgres://kryton:kryton@localhost:5432/kryton_test
+          BETTER_AUTH_SECRET: ci-test-secret-must-be-at-least-32-characters-long
+          BETTER_AUTH_URL: http://localhost:3001
+          APP_URL: http://localhost:5173
+          SEMANTIC_PROVIDER: "off"
+
       - name: Upload client dist
         uses: actions/upload-artifact@v4
         with:
