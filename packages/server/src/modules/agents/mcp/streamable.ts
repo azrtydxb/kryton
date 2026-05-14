@@ -150,6 +150,8 @@ export const streamableMcpRoutes: FastifyPluginAsync = async (app) => {
       lastActivity: Date.now(),
     });
     transport.onclose = (): void => {
+      // Same rule as the init path — DB row only removed by explicit
+      // DELETE or by the reaper. SDK-driven closes are transient.
       sessions.delete(args.sid);
       activeSessions.unregister(args.sid);
     };
@@ -304,10 +306,13 @@ export const streamableMcpRoutes: FastifyPluginAsync = async (app) => {
         })
         .catch((err) => log.warn("mcp session persist failed", err));
 
+      // SDK-driven closes (graceful shutdown, SSE timeouts) drop the
+      // in-memory entry only; the DB row stays so a future request can
+      // rehydrate. Idle reaper + explicit DELETE are the only paths
+      // that remove the row.
       transport.onclose = (): void => {
         sessions.delete(newId);
         activeSessions.unregister(newId);
-        void store.delete(newId).catch(() => undefined);
       };
 
       reply.hijack();
