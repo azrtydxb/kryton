@@ -22,7 +22,11 @@ jobs:
           POSTGRES_PASSWORD: kryton
           POSTGRES_DB: kryton_test
         ports:
-          - 5432:5432
+          # Host port 5432 is taken on the self-hosted runner by an
+          # unrelated Postgres; map the service container's 5432 to
+          # 5433 on the host so this job's psql/drizzle steps don't
+          # collide. Connection strings below use :5433 accordingly.
+          - 5433:5432
         options: >-
           --health-cmd "pg_isready -U kryton -d kryton_test"
           --health-interval 5s
@@ -53,19 +57,19 @@ jobs:
         env:
           PGPASSWORD: kryton
         run: |
-          psql -h localhost -U kryton -d kryton_test -c "CREATE EXTENSION IF NOT EXISTS vector"
+          psql -h localhost -p 5433 -U kryton -d kryton_test -c "CREATE EXTENSION IF NOT EXISTS vector"
 
       - name: Run drizzle migrations
         env:
-          POSTGRES_URL: postgres://kryton:kryton@localhost:5432/kryton_test
+          POSTGRES_URL: postgres://kryton:kryton@localhost:5433/kryton_test
         run: npm run db:migrate --workspace=packages/server
 
       - name: Test
         run: npm run test
         env:
           NODE_ENV: test
-          POSTGRES_URL: postgres://kryton:kryton@localhost:5432/kryton_test
-          TEST_DATABASE_URL: postgres://kryton:kryton@localhost:5432/kryton_test
+          POSTGRES_URL: postgres://kryton:kryton@localhost:5433/kryton_test
+          TEST_DATABASE_URL: postgres://kryton:kryton@localhost:5433/kryton_test
           BETTER_AUTH_SECRET: ci-test-secret-must-be-at-least-32-characters-long
           BETTER_AUTH_URL: http://localhost:3001
           APP_URL: http://localhost:5173
@@ -77,7 +81,7 @@ jobs:
         run: npm run openapi:check --workspace=packages/server
         env:
           NODE_ENV: test
-          POSTGRES_URL: postgres://kryton:kryton@localhost:5432/kryton_test
+          POSTGRES_URL: postgres://kryton:kryton@localhost:5433/kryton_test
           BETTER_AUTH_SECRET: ci-test-secret-must-be-at-least-32-characters-long
           BETTER_AUTH_URL: http://localhost:3001
           APP_URL: http://localhost:5173
@@ -109,7 +113,11 @@ jobs:
           POSTGRES_PASSWORD: kryton
           POSTGRES_DB: kryton_test
         ports:
-          - 5432:5432
+          # Host port 5432 is taken on the self-hosted runner by an
+          # unrelated Postgres; map the service container's 5432 to
+          # 5433 on the host so this job's psql/drizzle steps don't
+          # collide. Connection strings below use :5433 accordingly.
+          - 5433:5432
         options: >-
           --health-cmd "pg_isready -U kryton -d kryton_test"
           --health-interval 5s
@@ -134,19 +142,19 @@ jobs:
         env:
           PGPASSWORD: kryton
         run: |
-          psql -h localhost -U kryton -d kryton_test -c "CREATE EXTENSION IF NOT EXISTS vector"
+          psql -h localhost -p 5433 -U kryton -d kryton_test -c "CREATE EXTENSION IF NOT EXISTS vector"
 
       - name: Run drizzle migrations
         env:
-          POSTGRES_URL: postgres://kryton:kryton@localhost:5432/kryton_test
+          POSTGRES_URL: postgres://kryton:kryton@localhost:5433/kryton_test
         run: npm run db:migrate --workspace=packages/server
 
       - name: E2E suite
         run: npm run test:e2e --workspace=packages/server
         env:
           NODE_ENV: test
-          POSTGRES_URL: postgres://kryton:kryton@localhost:5432/kryton_test
-          TEST_DATABASE_URL: postgres://kryton:kryton@localhost:5432/kryton_test
+          POSTGRES_URL: postgres://kryton:kryton@localhost:5433/kryton_test
+          TEST_DATABASE_URL: postgres://kryton:kryton@localhost:5433/kryton_test
           BETTER_AUTH_SECRET: ci-test-secret-must-be-at-least-32-characters-long
           BETTER_AUTH_URL: http://localhost:3001
           APP_URL: http://localhost:5173
