@@ -72,6 +72,27 @@ class TestYjsClient {
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
+/**
+ * Poll a predicate every 50ms until it's true or `timeoutMs` elapses.
+ * Throws with the predicate source so failures are debuggable. Use
+ * this instead of fixed sleeps when a test depends on async state
+ * propagation (WS sync, DB writes, etc.) — fixed sleeps are flake bait
+ * on loaded CI runners.
+ */
+async function waitFor(
+  predicate: () => boolean,
+  timeoutMs: number,
+): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (predicate()) return;
+    await sleep(50);
+  }
+  throw new Error(
+    `waitFor: predicate did not become true within ${timeoutMs}ms — ${predicate.toString()}`,
+  );
+}
+
 async function makeAgentToken(app: FastifyInstance): Promise<{ userId: string; token: string }> {
   // Create a user and an agent with a known token. Phase 5.2 migrated the
   // agents service to Drizzle/Postgres (app.db); seed there so token
@@ -158,20 +179,24 @@ describe("collab Yjs WebSocket", () => {
     await sleep(150);
 
     a.doc.getText("t").insert(0, "hello");
-    await sleep(200);
+
+    // Wait for B to observe A's "hello" before appending. Without
+    // this, on a slow runner B inserts at offset 0 (still empty) and
+    // the two concurrent edits merge to either order — yjs is
+    // deterministic but the result isn't guaranteed to be the literal
+    // string the test asserts. The fix is real synchronisation, not
+    // a longer sleep.
+    await waitFor(() => b.doc.getText("t").toString() === "hello", 5_000);
+
     b.doc.getText("t").insert(b.doc.getText("t").length, " world");
 
-    // Poll for convergence instead of a fixed sleep — CI runners
-    // sometimes take >300 ms to settle. Up to 10s; test-level timeout
-    // is 15s so failure mode is a real assertion, not a vitest timeout.
-    const expected = "hello world";
-    for (let i = 0; i < 100; i++) {
-      if (
-        a.doc.getText("t").toString() === expected &&
-        b.doc.getText("t").toString() === expected
-      ) break;
-      await sleep(100);
-    }
+    // Wait for the second edit to propagate back to A.
+    await waitFor(
+      () =>
+        a.doc.getText("t").toString() === "hello world" &&
+        b.doc.getText("t").toString() === "hello world",
+      5_000,
+    );
 
     expect(a.doc.getText("t").toString()).toBe("hello world");
     expect(b.doc.getText("t").toString()).toBe("hello world");
