@@ -152,8 +152,20 @@ Once connected, the AI agent has access to these tools:
 | `list_favorites` | List the user's starred note paths |
 | `add_favorite` | Star a note (add to favorites) |
 | `remove_favorite` | Unstar a note |
+| `list_recent_notes` | Notes sorted by most-recently-modified first |
+| `list_daily_notes` | All daily notes, newest first |
+| `get_note_metadata` | Title + modifiedAt + size without pulling content |
+| `list_trash` | Notes currently in trash |
+| `restore_from_trash` | Restore a trashed note |
+| `empty_trash` | Permanently delete every note in trash |
+| `rename_folder` | Rename or move a folder |
+| `delete_folder` | Delete an empty folder |
+| `list_shares` | List shares the current user owns |
+| `list_shares_with_me` | List notes others have shared with the current user |
+| `share_note` | Share a note (or folder) with another user |
+| `unshare_note` | Revoke a share by id |
 
-Write tools (`create_note`, `update_note`, `append_to_note`, `rename_note`, `delete_note`, `create_folder`, `create_note_from_template`, `write_daily_note`, `add_favorite`, `remove_favorite`) require a `read-write` scoped API key.
+Write tools (`create_note`, `update_note`, `append_to_note`, `rename_note`, `delete_note`, `create_folder`, `create_note_from_template`, `write_daily_note`, `add_favorite`, `remove_favorite`, `restore_from_trash`, `empty_trash`, `rename_folder`, `delete_folder`, `share_note`, `unshare_note`) require a `read-write` scoped API key.
 
 ### MCP Resources
 

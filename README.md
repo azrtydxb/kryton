@@ -61,6 +61,10 @@ Kryton ships with a production-ready MCP server at `/api/mcp`. No sidecar, no pr
 | `get_daily_note` / `write_daily_note` | Access or write today's daily note |
 | `list_templates` / `create_note_from_template` | Use templates |
 | `list_favorites` / `add_favorite` / `remove_favorite` | Manage starred notes |
+| `list_recent_notes` / `list_daily_notes` / `get_note_metadata` | Discovery helpers |
+| `list_trash` / `restore_from_trash` / `empty_trash` | Recover or purge deleted notes |
+| `rename_folder` / `delete_folder` | Folder organisation |
+| `list_shares` / `list_shares_with_me` / `share_note` / `unshare_note` | Share notes with other users |
 | + **Plugin tools** | Plugins that register API routes are automatically exposed as MCP tools |
 
 ### Connect Your AI Agent

@@ -258,6 +258,130 @@ export function getToolDefinitions(): ToolDefinition[] {
       },
       scope: "read-write",
     },
+    {
+      name: "list_recent_notes",
+      description: "List notes sorted by most-recently-modified first. Useful for 'what was I working on' queries.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          limit: { type: "number", description: "Max notes to return (default 20)" },
+        },
+        required: [],
+      },
+      scope: "read-only",
+    },
+    {
+      name: "get_note_metadata",
+      description: "Get a note's title + modifiedAt + size without pulling the full content. Cheap discovery.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Note path" },
+        },
+        required: ["path"],
+      },
+      scope: "read-only",
+    },
+    {
+      name: "list_daily_notes",
+      description: "List all daily notes (daily/YYYY-MM-DD.md), newest first.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          limit: { type: "number", description: "Max daily notes to return (default 30)" },
+        },
+        required: [],
+      },
+      scope: "read-only",
+    },
+    {
+      name: "list_trash",
+      description: "List notes currently in trash.",
+      inputSchema: { type: "object", properties: {}, required: [] },
+      scope: "read-only",
+    },
+    {
+      name: "restore_from_trash",
+      description: "Restore a previously-deleted note from trash back to its original location.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Note path as it appears in list_trash" },
+        },
+        required: ["path"],
+      },
+      scope: "read-write",
+    },
+    {
+      name: "empty_trash",
+      description: "Permanently delete every note currently in trash. NOT REVERSIBLE.",
+      inputSchema: { type: "object", properties: {}, required: [] },
+      scope: "read-write",
+    },
+    {
+      name: "rename_folder",
+      description: "Rename or move a folder. All notes inside move with it; wiki-links update.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          oldPath: { type: "string", description: "Current folder path (e.g. 'projects/old-name')" },
+          newPath: { type: "string", description: "New folder path" },
+        },
+        required: ["oldPath", "newPath"],
+      },
+      scope: "read-write",
+    },
+    {
+      name: "delete_folder",
+      description: "Delete an empty folder. Use trash for notes; deleting a non-empty folder fails.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Folder path to delete" },
+        },
+        required: ["path"],
+      },
+      scope: "read-write",
+    },
+    {
+      name: "list_shares",
+      description: "List shares the current user owns (notes they've shared with others).",
+      inputSchema: { type: "object", properties: {}, required: [] },
+      scope: "read-only",
+    },
+    {
+      name: "list_shares_with_me",
+      description: "List notes other users have shared with the current user.",
+      inputSchema: { type: "object", properties: {}, required: [] },
+      scope: "read-only",
+    },
+    {
+      name: "share_note",
+      description: "Share a note (or folder) with another user by their user id. Permission is 'read' or 'readwrite'.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Note or folder path to share" },
+          sharedWithUserId: { type: "string", description: "Recipient's user id" },
+          permission: { type: "string", description: "'read' or 'readwrite'" },
+          isFolder: { type: "boolean", description: "True if sharing a folder (default false)" },
+        },
+        required: ["path", "sharedWithUserId", "permission"],
+      },
+      scope: "read-write",
+    },
+    {
+      name: "unshare_note",
+      description: "Revoke an existing share by its id (get the id from list_shares).",
+      inputSchema: {
+        type: "object",
+        properties: {
+          shareId: { type: "string", description: "Share id returned by list_shares" },
+        },
+        required: ["shareId"],
+      },
+      scope: "read-write",
+    },
   ];
 }
 
@@ -267,11 +391,53 @@ interface FolderNode {
   children?: FolderNode[];
 }
 
+/**
+ * Call a REST route in-process using fastify.inject. Skips the network
+ * stack but still goes through preHandlers (auth, requireBackfill, …),
+ * which is what we want — the caller's API key authorizes the request.
+ * Throws on non-2xx so the MCP tool surfaces a structured error.
+ */
+async function injectCall(
+  app: FastifyInstance,
+  rawKey: string,
+  opts: {
+    method: "GET" | "POST" | "PUT" | "DELETE";
+    url: string;
+    body?: unknown;
+  },
+): Promise<unknown> {
+  const res = await app.inject({
+    method: opts.method,
+    url: opts.url,
+    headers: {
+      authorization: `Bearer ${rawKey}`,
+      "content-type": "application/json",
+    },
+    payload: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+  });
+  if (res.statusCode >= 200 && res.statusCode < 300) {
+    if (res.statusCode === 204 || res.body === "") return { success: true };
+    try {
+      return JSON.parse(res.body);
+    } catch {
+      return res.body;
+    }
+  }
+  let detail: unknown = res.body;
+  try {
+    detail = JSON.parse(res.body);
+  } catch {
+    /* keep raw body */
+  }
+  throw new Error(`HTTP ${res.statusCode}: ${typeof detail === "string" ? detail : JSON.stringify(detail)}`);
+}
+
 export async function executeTool(
   app: FastifyInstance,
   toolName: string,
   args: Record<string, unknown>,
   userId: string,
+  rawKey?: string,
 ): Promise<unknown> {
   switch (toolName) {
     case "list_notes":
@@ -412,6 +578,146 @@ export async function executeTool(
       }
       await writeStarred(app, userId, next);
       return { success: true, path: p };
+    }
+    case "list_recent_notes": {
+      const limit = typeof args.limit === "number" ? args.limit : 20;
+      const userDir = await app.notes.getUserNotesDir(userId);
+      const noteSvc = await import("../../notes/services/note.service.js");
+      const svc = new noteSvc.NoteService(app);
+      const tree = await svc.scanDirectory(userDir);
+      // Flatten the tree, collect files with modifiedAt, sort desc, slice.
+      const files: { path: string; title: string; modifiedAt: string }[] = [];
+      const walk = (nodes: unknown[]): void => {
+        for (const raw of nodes) {
+          const node = raw as { type?: string; name?: string; path?: string; title?: string; modifiedAt?: string; children?: unknown[] };
+          if (node.type === "file" && node.path) {
+            files.push({
+              path: node.path,
+              title: node.title ?? node.name ?? node.path,
+              modifiedAt: node.modifiedAt ?? "",
+            });
+          }
+          if (node.children) walk(node.children);
+        }
+      };
+      walk(tree as unknown[]);
+      files.sort((a, b) => (b.modifiedAt > a.modifiedAt ? 1 : -1));
+      return files.slice(0, limit);
+    }
+    case "get_note_metadata": {
+      const p = args.path as string;
+      if (!p) throw new Error("path is required");
+      const note = (await app.notes.readNote(p, userId)) as { content: string; modifiedAt: Date | string | null };
+      // extractTitle may not be decorated on every deploy; fall back to
+      // the first markdown H1 or the filename.
+      const title =
+        app.knowledge?.extractTitle?.(note.content, p) ??
+        (note.content.match(/^#\s+(.+)$/m)?.[1] ?? p.replace(/\.md$/, ""));
+      return {
+        path: p,
+        title,
+        modifiedAt: note.modifiedAt,
+        size: note.content.length,
+        firstChars: note.content.slice(0, 200),
+      };
+    }
+    case "list_daily_notes": {
+      const limit = typeof args.limit === "number" ? args.limit : 30;
+      const userDir = await app.notes.getUserNotesDir(userId);
+      const noteSvc = await import("../../notes/services/note.service.js");
+      const svc = new noteSvc.NoteService(app);
+      let tree: unknown[];
+      try {
+        tree = (await svc.scanDirectory(path.join(userDir, "daily"))) as unknown[];
+      } catch {
+        return [];
+      }
+      const files: { path: string; modifiedAt: string }[] = [];
+      const walk = (nodes: unknown[]): void => {
+        for (const raw of nodes) {
+          const node = raw as { type?: string; path?: string; modifiedAt?: string; children?: unknown[] };
+          if (node.type === "file" && node.path) {
+            files.push({ path: node.path, modifiedAt: node.modifiedAt ?? "" });
+          }
+          if (node.children) walk(node.children);
+        }
+      };
+      walk(tree);
+      // Daily filenames sort naturally (YYYY-MM-DD), but also break ties by mtime.
+      files.sort((a, b) => (b.path > a.path ? 1 : -1));
+      return files.slice(0, limit);
+    }
+    case "list_trash":
+      if (!rawKey) throw new Error("rawKey unavailable");
+      return injectCall(app, rawKey, { method: "GET", url: "/api/trash" });
+    case "restore_from_trash": {
+      if (!rawKey) throw new Error("rawKey unavailable");
+      const p = args.path as string;
+      if (!p) throw new Error("path is required");
+      return injectCall(app, rawKey, {
+        method: "POST",
+        url: `/api/trash/restore/${encodeURI(p)}`,
+      });
+    }
+    case "empty_trash":
+      if (!rawKey) throw new Error("rawKey unavailable");
+      return injectCall(app, rawKey, { method: "DELETE", url: "/api/trash-empty" });
+    case "rename_folder": {
+      if (!rawKey) throw new Error("rawKey unavailable");
+      const oldPath = args.oldPath as string;
+      const newPath = args.newPath as string;
+      if (!oldPath || !newPath) throw new Error("oldPath and newPath are required");
+      return injectCall(app, rawKey, {
+        method: "POST",
+        url: `/api/folders-rename/${encodeURI(oldPath)}`,
+        body: { newPath },
+      });
+    }
+    case "delete_folder": {
+      if (!rawKey) throw new Error("rawKey unavailable");
+      const p = args.path as string;
+      if (!p) throw new Error("path is required");
+      return injectCall(app, rawKey, {
+        method: "DELETE",
+        url: `/api/folders/${encodeURI(p)}`,
+      });
+    }
+    case "list_shares":
+      if (!rawKey) throw new Error("rawKey unavailable");
+      return injectCall(app, rawKey, { method: "GET", url: "/api/shares" });
+    case "list_shares_with_me":
+      if (!rawKey) throw new Error("rawKey unavailable");
+      return injectCall(app, rawKey, { method: "GET", url: "/api/shares/with-me" });
+    case "share_note": {
+      if (!rawKey) throw new Error("rawKey unavailable");
+      const p = args.path as string;
+      const sharedWithUserId = args.sharedWithUserId as string;
+      const permission = args.permission as string;
+      if (!p || !sharedWithUserId || !permission) {
+        throw new Error("path, sharedWithUserId and permission are required");
+      }
+      if (permission !== "read" && permission !== "readwrite") {
+        throw new Error("permission must be 'read' or 'readwrite'");
+      }
+      return injectCall(app, rawKey, {
+        method: "POST",
+        url: "/api/shares",
+        body: {
+          path: p,
+          sharedWithUserId,
+          permission,
+          isFolder: args.isFolder === true,
+        },
+      });
+    }
+    case "unshare_note": {
+      if (!rawKey) throw new Error("rawKey unavailable");
+      const shareId = args.shareId as string;
+      if (!shareId) throw new Error("shareId is required");
+      return injectCall(app, rawKey, {
+        method: "DELETE",
+        url: `/api/shares/${encodeURIComponent(shareId)}`,
+      });
     }
     default:
       throw new Error(`Unknown tool: ${toolName}`);
