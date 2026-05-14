@@ -10,8 +10,26 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  # Gate before publishing: typecheck, lint, unit tests, AND the full
+  # E2E suite (API + MCP + session-restart-persistence). Same shape as
+  # ci.yml's build job, plus the e2e step. A red here blocks the docker
+  # build/push and the GitHub release.
   ci:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, kryton-248]
+    container:
+      image: node:24
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: kryton
+          POSTGRES_PASSWORD: kryton
+          POSTGRES_DB: kryton_test
+        options: >-
+          --health-cmd "pg_isready -U kryton -d kryton_test"
+          --health-interval 5s
+          --health-retries 10
+          --health-timeout 3s
     steps:
       - uses: actions/checkout@v4
 
@@ -24,8 +42,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Generate Prisma client
-        run: npx prisma generate --schema=packages/server/prisma/schema.prisma
+      - name: Build shared packages (ui, sdk)
+        run: npm run build:shared
 
       - name: TypeCheck
         run: npm run typecheck
@@ -33,11 +51,46 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Test
+      - name: Install pgvector extension + psql client
+        env:
+          PGPASSWORD: kryton
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends postgresql-client
+          psql -h postgres -U kryton -d kryton_test -c "CREATE EXTENSION IF NOT EXISTS vector"
+
+      - name: Run drizzle migrations
+        env:
+          POSTGRES_URL: postgres://kryton:kryton@postgres:5432/kryton_test
+        run: npm run db:migrate --workspace=packages/server
+
+      - name: Unit tests
         run: npm run test
+        env:
+          NODE_ENV: test
+          POSTGRES_URL: postgres://kryton:kryton@postgres:5432/kryton_test
+          TEST_DATABASE_URL: postgres://kryton:kryton@postgres:5432/kryton_test
+          BETTER_AUTH_SECRET: ci-test-secret-must-be-at-least-32-characters-long
+          BETTER_AUTH_URL: http://localhost:3001
+          APP_URL: http://localhost:5173
+
+      - name: E2E suite (API + MCP + restart-persistence)
+        run: npm run test:e2e --workspace=packages/server
+        env:
+          NODE_ENV: test
+          POSTGRES_URL: postgres://kryton:kryton@postgres:5432/kryton_test
+          TEST_DATABASE_URL: postgres://kryton:kryton@postgres:5432/kryton_test
+          BETTER_AUTH_SECRET: ci-test-secret-must-be-at-least-32-characters-long
+          BETTER_AUTH_URL: http://localhost:3001
+          APP_URL: http://localhost:5173
+          SEMANTIC_PROVIDER: "off"
 
       - name: Build
         run: npm run build
+
+      - name: Restore workspace ownership to host user
+        if: always()
+        run: chown -R 1000:1000 . || true
 
       - name: Upload client dist
         uses: actions/upload-artifact@v4
