@@ -69,3 +69,36 @@ export const agentRelations = relations(agent, ({ one, many }) => ({
 export const agentTokenRelations = relations(agentToken, ({ one }) => ({
   agent: one(agent, { fields: [agentToken.agentId], references: [agent.id] }),
 }));
+
+// ---------------------------------------------------------------------------
+// McpSession — persists MCP streamable-HTTP sessions across server
+// restarts. The in-memory map in agents/mcp/streamable.ts is the hot
+// path; this table is consulted on cold misses to rehydrate the
+// transport + per-session McpServer so clients don't have to
+// re-initialize after a deploy or pod restart.
+// ---------------------------------------------------------------------------
+
+export const mcpSession = pgTable(
+  "McpSession",
+  {
+    id: text("id").primaryKey(), // session id (uuid)
+    userId: text("userId")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    // SHA-256(rawKey) — used to verify the same API key on rehydrate
+    // without storing the key in plaintext.
+    keyHash: text("keyHash").notNull(),
+    // 'read-only' | 'read-write'
+    keyScope: text("keyScope").notNull(),
+    createdAt: timestamp("createdAt", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+    lastActivityAt: timestamp("lastActivityAt", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("McpSession_userId_idx").on(t.userId),
+    index("McpSession_lastActivityAt_idx").on(t.lastActivityAt),
+  ],
+);

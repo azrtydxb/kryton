@@ -29,6 +29,13 @@
       "when": 1778537021551,
       "tag": "0003_talented_maverick",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1778749088424,
+      "tag": "0004_mcp_session",
+      "breakpoints": true
     }
   ]
 }
