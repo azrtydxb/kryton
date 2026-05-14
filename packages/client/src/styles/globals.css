@@ -15,6 +15,22 @@
 @theme {
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* Surface scale — used by Tailwind utilities like bg-surface-900,
+     border-surface-700 etc. that ship from @azrtydxb/ui. Mapped onto
+     the project's token system (see tokens.css) so dark/light theming
+     stays centralized. Without these, `dark:bg-surface-900` resolved
+     to an undefined CSS var and modals fell through to `bg-white`. */
+  --color-surface-50:  var(--bg);
+  --color-surface-100: var(--bg-1);
+  --color-surface-200: var(--bg-2);
+  --color-surface-300: var(--bg-3);
+  --color-surface-400: var(--bg-hover);
+  --color-surface-500: var(--line);
+  --color-surface-600: var(--line);
+  --color-surface-700: var(--bg-3);
+  --color-surface-800: var(--bg-2);
+  --color-surface-900: var(--bg-1);
 }
 
 @layer base {

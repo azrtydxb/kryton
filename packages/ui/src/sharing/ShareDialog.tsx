@@ -60,17 +60,35 @@ export function ShareDialog({
 
   const modal = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: "oklch(0 0 0 / 0.6)" }}
       onClick={handleOverlayClick}
     >
+      {/*
+        Inline styles using the project's token system (var(--bg-1),
+        var(--line), …). Tailwind's `dark:bg-surface-900` previously
+        used a colour that isn't declared in the theme — in dark mode
+        the dialog fell through to the `bg-white` base, producing the
+        bright white modal on a black UI.
+      */}
       <div
         ref={dialogRef}
-        className="bg-white dark:bg-surface-900 rounded-xl shadow-2xl border dark:border-surface-700 w-full max-w-md mx-4 overflow-hidden"
+        className="w-full max-w-md mx-4 overflow-hidden"
+        style={{
+          background: "var(--bg-1)",
+          color: "var(--fg)",
+          borderRadius: 12,
+          boxShadow: "var(--shadow-lg)",
+          border: "1px solid var(--line)",
+        }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b dark:border-surface-700">
+        <div
+          className="flex items-center justify-between px-5 py-4"
+          style={{ borderBottom: "1px solid var(--line)" }}
+        >
           <div className="flex items-center gap-2">
-            <Share2 size={18} className="text-violet-500" />
+            <Share2 size={18} style={{ color: "var(--accent)" }} />
             <h2 className="text-sm font-semibold truncate">
               Share {notePath}
             </h2>
@@ -78,8 +96,13 @@ export function ShareDialog({
           <button
             type="button"
             onClick={onClose}
-            className="btn-ghost p-1"
             aria-label="Close"
+            style={{
+              padding: 4,
+              borderRadius: 4,
+              color: "var(--fg-3)",
+              background: "transparent",
+            }}
           >
             <X size={16} />
           </button>
