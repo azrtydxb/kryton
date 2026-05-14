@@ -49,15 +49,18 @@ Kryton ships with a production-ready MCP server at `/api/mcp`. No sidecar, no pr
 | `list_notes` | Browse all notes with paths and titles |
 | `read_note` | Read any note's markdown content |
 | `create_note` | Create new notes |
-| `update_note` | Edit existing notes |
+| `update_note` | Edit existing notes (full replace) |
+| `append_to_note` | Append markdown to the end of an existing note |
+| `rename_note` | Rename or move a note (keeps wiki-links intact) |
 | `delete_note` | Remove notes |
 | `search` | Full-text search across the entire knowledge base |
 | `get_backlinks` | Find all notes linking to a given note |
 | `get_graph` | Traverse the full wiki-link graph (nodes + edges) |
-| `list_tags` | Browse tags with counts |
-| `list_folders` | Navigate folder structure |
-| `get_daily_note` | Access today's daily note |
+| `list_tags` / `list_notes_by_tag` | Browse tags and filter notes by tag |
+| `list_folders` / `create_folder` | Navigate and create folders |
+| `get_daily_note` / `write_daily_note` | Access or write today's daily note |
 | `list_templates` / `create_note_from_template` | Use templates |
+| `list_favorites` / `add_favorite` / `remove_favorite` | Manage starred notes |
 | + **Plugin tools** | Plugins that register API routes are automatically exposed as MCP tools |
 
 ### Connect Your AI Agent

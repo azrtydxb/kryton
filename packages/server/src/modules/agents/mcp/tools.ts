@@ -1,6 +1,38 @@
 import * as path from "path";
 import type { FastifyInstance } from "fastify";
+import { eq, and } from "drizzle-orm";
 import { validatePathWithinBase } from "../../../lib/pathUtils.js";
+import { settings } from "../../../db/schema/settings.js";
+
+const STARRED_KEY = "starred";
+
+async function readStarred(app: FastifyInstance, userId: string): Promise<string[]> {
+  const row = await app.db.query.settings.findFirst({
+    where: and(eq(settings.userId, userId), eq(settings.key, STARRED_KEY)),
+  });
+  if (!row?.value) return [];
+  try {
+    const parsed = JSON.parse(row.value);
+    return Array.isArray(parsed) ? parsed.filter((p) => typeof p === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+async function writeStarred(
+  app: FastifyInstance,
+  userId: string,
+  paths: string[],
+): Promise<void> {
+  const value = JSON.stringify(paths);
+  await app.db
+    .insert(settings)
+    .values({ key: STARRED_KEY, userId, value })
+    .onConflictDoUpdate({
+      target: [settings.key, settings.userId],
+      set: { value, updatedAt: new Date() },
+    });
+}
 
 interface ToolDefinition {
   name: string;
@@ -146,6 +178,86 @@ export function getToolDefinitions(): ToolDefinition[] {
       },
       scope: "read-write",
     },
+    {
+      name: "rename_note",
+      description: "Rename or move a note. Updates wiki-links + tag/search indexes atomically.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          oldPath: { type: "string", description: "Current note path (e.g. 'folder/old-name.md')" },
+          newPath: { type: "string", description: "New note path (e.g. 'folder/new-name.md' or 'other/folder/old-name.md')" },
+        },
+        required: ["oldPath", "newPath"],
+      },
+      scope: "read-write",
+    },
+    {
+      name: "append_to_note",
+      description: "Append markdown content to the end of an existing note. Adds a leading blank line if the note doesn't end in one.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Note path to append to" },
+          content: { type: "string", description: "Markdown content to append" },
+        },
+        required: ["path", "content"],
+      },
+      scope: "read-write",
+    },
+    {
+      name: "list_notes_by_tag",
+      description: "List notes that contain a given tag. Returns paths + titles.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          tag: { type: "string", description: "Tag name without the leading '#' (e.g. 'project', 'idea')" },
+        },
+        required: ["tag"],
+      },
+      scope: "read-only",
+    },
+    {
+      name: "write_daily_note",
+      description: "Create or replace today's daily note (at daily/YYYY-MM-DD.md). Use append_to_note instead if you want to add to existing content without overwriting.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          content: { type: "string", description: "Full markdown content for today's daily note" },
+        },
+        required: ["content"],
+      },
+      scope: "read-write",
+    },
+    {
+      name: "list_favorites",
+      description: "List the paths of notes the user has starred / favorited.",
+      inputSchema: { type: "object", properties: {}, required: [] },
+      scope: "read-only",
+    },
+    {
+      name: "add_favorite",
+      description: "Star a note (add it to favorites). No-op if already favorited.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Note path to favorite (e.g. 'folder/my-note.md')" },
+        },
+        required: ["path"],
+      },
+      scope: "read-write",
+    },
+    {
+      name: "remove_favorite",
+      description: "Unstar a note. No-op if not currently favorited.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Note path to unfavorite" },
+        },
+        required: ["path"],
+      },
+      scope: "read-write",
+    },
   ];
 }
 
@@ -230,6 +342,76 @@ export async function executeTool(
       const templateContent = (await app.notes.readNote(`templates/${templateName}.md`, userId)) as { content: string };
       await app.notes.writeNote(args.notePath as string, templateContent.content, userId);
       return { success: true, path: args.notePath };
+    }
+    case "rename_note": {
+      const oldPath = args.oldPath as string;
+      const newPath = args.newPath as string;
+      if (!oldPath || !newPath) throw new Error("oldPath and newPath are required");
+      const userDir = await app.notes.getUserNotesDir(userId);
+      // Use the rename service from the notes module if exposed; fall
+      // back to a copy+delete pair if not. NoteService.renameNote is
+      // the canonical entry point.
+      const noteSvc = await import("../../notes/services/note.service.js");
+      const svc = new noteSvc.NoteService(app);
+      const oldFull = oldPath.endsWith(".md") ? oldPath : oldPath + ".md";
+      const newFull = newPath.endsWith(".md") ? newPath : newPath + ".md";
+      await svc.renameNote(userDir, oldFull, newFull, userId);
+      return { success: true, oldPath: oldFull, newPath: newFull };
+    }
+    case "append_to_note": {
+      const p = args.path as string;
+      const appended = args.content as string;
+      if (!p || appended === undefined) throw new Error("path and content are required");
+      const existing = (await app.notes.readNote(p, userId)) as { content: string };
+      const sep = existing.content.endsWith("\n\n")
+        ? ""
+        : existing.content.endsWith("\n")
+          ? "\n"
+          : "\n\n";
+      await app.notes.writeNote(p, existing.content + sep + appended, userId);
+      return { success: true, path: p };
+    }
+    case "list_notes_by_tag": {
+      const tag = args.tag as string;
+      if (!tag) throw new Error("tag is required");
+      const rows = await app.knowledge.getNotesByTag(tag, userId);
+      return rows;
+    }
+    case "write_daily_note": {
+      const content = args.content as string;
+      if (content === undefined) throw new Error("content is required");
+      const today = new Date();
+      const yyyy = today.getUTCFullYear();
+      const mm = String(today.getUTCMonth() + 1).padStart(2, "0");
+      const dd = String(today.getUTCDate()).padStart(2, "0");
+      const dailyPath = `daily/${yyyy}-${mm}-${dd}.md`;
+      await app.notes.writeNote(dailyPath, content, userId);
+      return { success: true, path: dailyPath };
+    }
+    case "list_favorites": {
+      const paths = await readStarred(app, userId);
+      return { paths };
+    }
+    case "add_favorite": {
+      const p = args.path as string;
+      if (!p) throw new Error("path is required");
+      const current = await readStarred(app, userId);
+      if (current.includes(p)) {
+        return { success: true, path: p, alreadyFavorited: true };
+      }
+      await writeStarred(app, userId, [...current, p]);
+      return { success: true, path: p };
+    }
+    case "remove_favorite": {
+      const p = args.path as string;
+      if (!p) throw new Error("path is required");
+      const current = await readStarred(app, userId);
+      const next = current.filter((x) => x !== p);
+      if (next.length === current.length) {
+        return { success: true, path: p, wasFavorited: false };
+      }
+      await writeStarred(app, userId, next);
+      return { success: true, path: p };
     }
     default:
       throw new Error(`Unknown tool: ${toolName}`);

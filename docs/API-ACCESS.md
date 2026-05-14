@@ -135,18 +135,25 @@ Once connected, the AI agent has access to these tools:
 | `read_note` | Read a note's markdown content |
 | `create_note` | Create a new note |
 | `update_note` | Update a note (full content replacement) |
+| `append_to_note` | Append markdown to the end of an existing note |
+| `rename_note` | Rename or move a note (updates wiki-links + indexes) |
 | `delete_note` | Delete a note |
 | `search` | Full-text search across notes |
 | `list_tags` | List all tags with counts |
+| `list_notes_by_tag` | List notes that carry a given tag |
 | `get_backlinks` | Get notes linking to a given path |
 | `get_graph` | Get the full link graph |
 | `list_folders` | List folder structure |
 | `create_folder` | Create a folder |
 | `get_daily_note` | Get today's daily note |
+| `write_daily_note` | Create or replace today's daily note |
 | `list_templates` | List available templates |
 | `create_note_from_template` | Create a note from a template |
+| `list_favorites` | List the user's starred note paths |
+| `add_favorite` | Star a note (add to favorites) |
+| `remove_favorite` | Unstar a note |
 
-Write tools (`create_note`, `update_note`, `delete_note`, `create_folder`, `create_note_from_template`) require a `read-write` scoped API key.
+Write tools (`create_note`, `update_note`, `append_to_note`, `rename_note`, `delete_note`, `create_folder`, `create_note_from_template`, `write_daily_note`, `add_favorite`, `remove_favorite`) require a `read-write` scoped API key.
 
 ### MCP Resources
 
