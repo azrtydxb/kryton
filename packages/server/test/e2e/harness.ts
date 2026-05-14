@@ -50,6 +50,13 @@ export class KrytonHarness {
   /** Stop + restart the app. DB + notes dir survive; in-memory state doesn't. */
   async restart(): Promise<void> {
     if (this.app) await this.app.close();
+    // undici's default fetch agent keeps connections alive to the host.
+    // After the previous server closes those sockets point at a corpse;
+    // reusing one for the next call surfaces as ECONNRESET. Replace the
+    // global dispatcher with a fresh one so post-restart fetches dial a
+    // new connection.
+    const undici = await import("undici");
+    undici.setGlobalDispatcher(new undici.Agent());
     await this.boot();
   }
 
