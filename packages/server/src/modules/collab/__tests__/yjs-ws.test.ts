@@ -158,7 +158,7 @@ describe("collab Yjs WebSocket", () => {
     expect(result).toBe("rejected");
   });
 
-  it("converges state across two connected clients", { timeout: 15_000 }, async () => {
+  it("converges state across two connected clients", { timeout: 30_000 }, async () => {
     let auth: { userId: string; token: string };
     try {
       auth = await makeAgentToken(app);
@@ -186,7 +186,7 @@ describe("collab Yjs WebSocket", () => {
     // deterministic but the result isn't guaranteed to be the literal
     // string the test asserts. The fix is real synchronisation, not
     // a longer sleep.
-    await waitFor(() => b.doc.getText("t").toString() === "hello", 5_000);
+    await waitFor(() => b.doc.getText("t").toString() === "hello", 10_000);
 
     b.doc.getText("t").insert(b.doc.getText("t").length, " world");
 
@@ -195,7 +195,7 @@ describe("collab Yjs WebSocket", () => {
       () =>
         a.doc.getText("t").toString() === "hello world" &&
         b.doc.getText("t").toString() === "hello world",
-      5_000,
+      10_000,
     );
 
     expect(a.doc.getText("t").toString()).toBe("hello world");

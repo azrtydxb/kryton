@@ -23,6 +23,9 @@ function getHandle(): TestDbHandle {
 }
 
 async function resetNotesTestDb(handle: TestDbHandle): Promise<void> {
+  // Listing every table explicitly (including the newer McpSession that
+  // FKs to User) keeps the planner from chasing the CASCADE chain on
+  // each test reset — a small but measurable win on a slow runner.
   await handle.db.execute(sql`
     TRUNCATE TABLE
       "Attachment",
@@ -36,6 +39,7 @@ async function resetNotesTestDb(handle: TestDbHandle): Promise<void> {
       "NoteShare",
       "GraphEdge",
       "SearchIndex",
+      "McpSession",
       "User"
     RESTART IDENTITY CASCADE
   `);
