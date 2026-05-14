@@ -160,7 +160,18 @@ describe("collab Yjs WebSocket", () => {
     a.doc.getText("t").insert(0, "hello");
     await sleep(200);
     b.doc.getText("t").insert(b.doc.getText("t").length, " world");
-    await sleep(300);
+
+    // Poll for convergence instead of a fixed sleep — CI runners
+    // sometimes take >300 ms to settle and produced flakes like
+    // "expected 'hello' to be 'hello world'".
+    const expected = "hello world";
+    for (let i = 0; i < 50; i++) {
+      if (
+        a.doc.getText("t").toString() === expected &&
+        b.doc.getText("t").toString() === expected
+      ) break;
+      await sleep(100);
+    }
 
     expect(a.doc.getText("t").toString()).toBe("hello world");
     expect(b.doc.getText("t").toString()).toBe("hello world");
