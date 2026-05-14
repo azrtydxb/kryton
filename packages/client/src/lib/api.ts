@@ -216,7 +216,17 @@ export const api = {
 
   // Tags
   getTags: () => request<TagData[]>('/tags'),
-  getNotesByTag: (tag: string) => request<TagNoteData[]>(`/tags/${encodeURIComponent(tag)}/notes`),
+  // Server returns `{ path, title }`; the UI components expect
+  // `{ notePath, title }`. Map at the boundary so callers don't have
+  // to keep both shapes in mind. (Without this, clicks in TagsView's
+  // notes list fired with notePath=undefined → openNote(undefined) →
+  // nothing happened.)
+  getNotesByTag: async (tag: string): Promise<TagNoteData[]> => {
+    const rows = await request<{ path: string; title: string }[]>(
+      `/tags/${encodeURIComponent(tag)}/notes`,
+    );
+    return rows.map((r) => ({ notePath: r.path, title: r.title }));
+  },
 
   // Templates
   getTemplates: () => request<TemplateData[]>('/templates'),
