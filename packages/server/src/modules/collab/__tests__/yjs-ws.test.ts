@@ -137,7 +137,7 @@ describe("collab Yjs WebSocket", () => {
     expect(result).toBe("rejected");
   });
 
-  it("converges state across two connected clients", async () => {
+  it("converges state across two connected clients", { timeout: 15_000 }, async () => {
     let auth: { userId: string; token: string };
     try {
       auth = await makeAgentToken(app);
@@ -162,10 +162,10 @@ describe("collab Yjs WebSocket", () => {
     b.doc.getText("t").insert(b.doc.getText("t").length, " world");
 
     // Poll for convergence instead of a fixed sleep — CI runners
-    // sometimes take >300 ms to settle and produced flakes like
-    // "expected 'hello' to be 'hello world'".
+    // sometimes take >300 ms to settle. Up to 10s; test-level timeout
+    // is 15s so failure mode is a real assertion, not a vitest timeout.
     const expected = "hello world";
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 100; i++) {
       if (
         a.doc.getText("t").toString() === expected &&
         b.doc.getText("t").toString() === expected
