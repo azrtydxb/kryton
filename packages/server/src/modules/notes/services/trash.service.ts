@@ -1,5 +1,10 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { and, eq } from "drizzle-orm";
+import type { FastifyInstance } from "fastify";
+import { NotFoundError, ValidationError } from "../../../lib/errors.js";
+import { trashItem } from "../../../db/schema/notes.js";
+import { getUserNotesDir } from "./user-notes-dir.service.js";
 
 const TRASH_DIR = ".trash";
 
@@ -76,6 +81,111 @@ export async function scanTrash(dir: string, basePath = ""): Promise<TrashItem[]
 }
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * In-process trash API consumed by:
+ *   - `/api/trash*` route handlers (delegate so the validation + DB
+ *     cleanup live in one place);
+ *   - MCP tool executors (list_trash / restore_from_trash / empty_trash).
+ *
+ * Per-request preHandlers in the routes still enforce auth + backfill;
+ * this service trusts that whoever calls it has already authorised the
+ * userId. It owns the filesystem moves, path-safety checks, and the
+ * trash_item DB row cleanup.
+ */
+export class TrashApi {
+  constructor(
+    private readonly app: FastifyInstance,
+    private readonly notesDir: string,
+  ) {}
+
+  /** List trashed notes for a user. */
+  async list(userId: string): Promise<TrashItem[]> {
+    const userDir = await getUserNotesDir(this.notesDir, userId);
+    return scanTrash(getTrashDir(userDir));
+  }
+
+  /** Restore a note from trash back to its original location. */
+  async restore(userId: string, notePath: string): Promise<{ path: string }> {
+    if (!notePath) throw new ValidationError("Path is required");
+    const userDir = await getUserNotesDir(this.notesDir, userId);
+    const trashDir = getTrashDir(userDir);
+    const fullNotePath = notePath.endsWith(".md") ? notePath : `${notePath}.md`;
+
+    const trashFilePath = path.join(trashDir, fullNotePath);
+    const restorePath = path.join(userDir, fullNotePath);
+    this.assertWithin(trashFilePath, trashDir);
+    this.assertWithin(restorePath, userDir);
+
+    try {
+      await fs.stat(trashFilePath);
+    } catch {
+      throw new NotFoundError("Note not found in trash");
+    }
+
+    await fs.mkdir(path.dirname(restorePath), { recursive: true });
+    await fs.rename(trashFilePath, restorePath);
+    await removeEmptyDirs(path.dirname(trashFilePath), trashDir);
+
+    const record = await this.app.db.query.trashItem.findFirst({
+      where: and(eq(trashItem.originalPath, fullNotePath), eq(trashItem.userId, userId)),
+    });
+    if (record) {
+      await this.app.db.delete(trashItem).where(eq(trashItem.id, record.id));
+    }
+    return { path: fullNotePath };
+  }
+
+  /** Permanently delete a single note from trash. */
+  async permanentlyDelete(userId: string, notePath: string): Promise<void> {
+    if (!notePath) throw new ValidationError("Path is required");
+    const userDir = await getUserNotesDir(this.notesDir, userId);
+    const trashDir = getTrashDir(userDir);
+    const fullNotePath = notePath.endsWith(".md") ? notePath : `${notePath}.md`;
+    const trashFilePath = path.join(trashDir, fullNotePath);
+    this.assertWithin(trashFilePath, trashDir);
+
+    try {
+      await fs.unlink(trashFilePath);
+    } catch {
+      throw new NotFoundError("Note not found in trash");
+    }
+    await removeEmptyDirs(path.dirname(trashFilePath), trashDir);
+
+    const record = await this.app.db.query.trashItem.findFirst({
+      where: and(eq(trashItem.originalPath, fullNotePath), eq(trashItem.userId, userId)),
+    });
+    if (record) {
+      await this.app.db.delete(trashItem).where(eq(trashItem.id, record.id));
+    }
+  }
+
+  /** Empty the entire trash for a user. */
+  async emptyAll(userId: string): Promise<void> {
+    const userDir = await getUserNotesDir(this.notesDir, userId);
+    const trashDir = getTrashDir(userDir);
+    try {
+      await fs.rm(trashDir, { recursive: true, force: true });
+    } catch {
+      // best-effort
+    }
+    const records = await this.app.db.query.trashItem.findMany({
+      where: eq(trashItem.userId, userId),
+    });
+    if (records.length > 0) {
+      await this.app.db.delete(trashItem).where(eq(trashItem.userId, userId));
+    }
+  }
+
+  /** Refuse symlink / `..` escapes out of the trash or user dirs. */
+  private assertWithin(target: string, base: string): void {
+    const resolvedTarget = path.resolve(target);
+    const resolvedBase = path.resolve(base);
+    if (!resolvedTarget.startsWith(resolvedBase + path.sep)) {
+      throw new ValidationError("Invalid path");
+    }
+  }
+}
 
 /**
  * Auto-purge trash items older than 30 days for a user.

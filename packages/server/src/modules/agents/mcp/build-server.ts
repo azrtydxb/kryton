@@ -71,7 +71,7 @@ export function buildMcpServer({ app, userId, keyScope, rawKey }: BuildMcpServer
         };
       }
       try {
-        const result = await executeTool(app, toolDef.name, args, userId, rawKey);
+        const result = await executeTool(app, toolDef.name, args, userId);
         return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
       } catch (err) {
         log.error(`MCP tool ${toolDef.name} error:`, err);

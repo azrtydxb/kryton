@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
+import fp from "fastify-plugin";
 import * as Y from "yjs";
 import { ShareService } from "./services/share.service.js";
 import { YjsPersistence } from "./ws/persistence.js";
@@ -18,6 +19,7 @@ export interface CollabApi {
 declare module "fastify" {
   interface FastifyInstance {
     collab?: CollabApi;
+    shares: ShareService;
   }
 }
 
@@ -34,8 +36,11 @@ declare module "fastify" {
  *
  * Graceful shutdown: an `onClose` hook flushes all dirty Y.Docs to Postgres.
  */
-export const collabModule: FastifyPluginAsync = async (app) => {
+const collabModuleImpl: FastifyPluginAsync = async (app) => {
   const shareService = new ShareService(app.db);
+  if (!app.hasDecorator("shares")) {
+    app.decorate("shares", shareService);
+  }
   const persistence = new YjsPersistence(app.db);
 
   let registry: YjsRegistry | null = null;
@@ -71,3 +76,9 @@ export const collabModule: FastifyPluginAsync = async (app) => {
     await yjs.flushAll();
   });
 };
+
+// Wrapped with `fastify-plugin` so `app.collab` and `app.shares`
+// propagate to sibling modules (agents/MCP needs both).
+export const collabModule: FastifyPluginAsync = fp(collabModuleImpl, {
+  name: "collab-module",
+});

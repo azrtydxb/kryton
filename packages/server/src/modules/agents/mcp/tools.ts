@@ -391,53 +391,11 @@ interface FolderNode {
   children?: FolderNode[];
 }
 
-/**
- * Call a REST route in-process using fastify.inject. Skips the network
- * stack but still goes through preHandlers (auth, requireBackfill, …),
- * which is what we want — the caller's API key authorizes the request.
- * Throws on non-2xx so the MCP tool surfaces a structured error.
- */
-async function injectCall(
-  app: FastifyInstance,
-  rawKey: string,
-  opts: {
-    method: "GET" | "POST" | "PUT" | "DELETE";
-    url: string;
-    body?: unknown;
-  },
-): Promise<unknown> {
-  const res = await app.inject({
-    method: opts.method,
-    url: opts.url,
-    headers: {
-      authorization: `Bearer ${rawKey}`,
-      "content-type": "application/json",
-    },
-    payload: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
-  });
-  if (res.statusCode >= 200 && res.statusCode < 300) {
-    if (res.statusCode === 204 || res.body === "") return { success: true };
-    try {
-      return JSON.parse(res.body);
-    } catch {
-      return res.body;
-    }
-  }
-  let detail: unknown = res.body;
-  try {
-    detail = JSON.parse(res.body);
-  } catch {
-    /* keep raw body */
-  }
-  throw new Error(`HTTP ${res.statusCode}: ${typeof detail === "string" ? detail : JSON.stringify(detail)}`);
-}
-
 export async function executeTool(
   app: FastifyInstance,
   toolName: string,
   args: Record<string, unknown>,
   userId: string,
-  rawKey?: string,
 ): Promise<unknown> {
   switch (toolName) {
     case "list_notes":
@@ -648,77 +606,40 @@ export async function executeTool(
       return files.slice(0, limit);
     }
     case "list_trash":
-      if (!rawKey) throw new Error("rawKey unavailable");
-      return injectCall(app, rawKey, { method: "GET", url: "/api/trash" });
-    case "restore_from_trash": {
-      if (!rawKey) throw new Error("rawKey unavailable");
-      const p = args.path as string;
-      if (!p) throw new Error("path is required");
-      return injectCall(app, rawKey, {
-        method: "POST",
-        url: `/api/trash/restore/${encodeURI(p)}`,
-      });
-    }
+      return app.trash.list(userId);
+    case "restore_from_trash":
+      return app.trash.restore(userId, args.path as string);
     case "empty_trash":
-      if (!rawKey) throw new Error("rawKey unavailable");
-      return injectCall(app, rawKey, { method: "DELETE", url: "/api/trash-empty" });
-    case "rename_folder": {
-      if (!rawKey) throw new Error("rawKey unavailable");
-      const oldPath = args.oldPath as string;
-      const newPath = args.newPath as string;
-      if (!oldPath || !newPath) throw new Error("oldPath and newPath are required");
-      return injectCall(app, rawKey, {
-        method: "POST",
-        url: `/api/folders-rename/${encodeURI(oldPath)}`,
-        body: { newPath },
-      });
-    }
-    case "delete_folder": {
-      if (!rawKey) throw new Error("rawKey unavailable");
-      const p = args.path as string;
-      if (!p) throw new Error("path is required");
-      return injectCall(app, rawKey, {
-        method: "DELETE",
-        url: `/api/folders/${encodeURI(p)}`,
-      });
-    }
+      await app.trash.emptyAll(userId);
+      return { success: true };
+    case "rename_folder":
+      return app.folders.rename(
+        userId,
+        args.oldPath as string,
+        args.newPath as string,
+      );
+    case "delete_folder":
+      await app.folders.delete(userId, args.path as string);
+      return { success: true };
     case "list_shares":
-      if (!rawKey) throw new Error("rawKey unavailable");
-      return injectCall(app, rawKey, { method: "GET", url: "/api/shares" });
+      return app.shares.listOwned(userId);
     case "list_shares_with_me":
-      if (!rawKey) throw new Error("rawKey unavailable");
-      return injectCall(app, rawKey, { method: "GET", url: "/api/shares/with-me" });
+      return app.shares.getSharedNotesForUser(userId);
     case "share_note": {
-      if (!rawKey) throw new Error("rawKey unavailable");
-      const p = args.path as string;
-      const sharedWithUserId = args.sharedWithUserId as string;
       const permission = args.permission as string;
-      if (!p || !sharedWithUserId || !permission) {
-        throw new Error("path, sharedWithUserId and permission are required");
-      }
       if (permission !== "read" && permission !== "readwrite") {
         throw new Error("permission must be 'read' or 'readwrite'");
       }
-      return injectCall(app, rawKey, {
-        method: "POST",
-        url: "/api/shares",
-        body: {
-          path: p,
-          sharedWithUserId,
-          permission,
-          isFolder: args.isFolder === true,
-        },
+      return app.shares.create(userId, {
+        path: args.path as string,
+        sharedWithUserId: args.sharedWithUserId as string,
+        permission,
+        isFolder: args.isFolder === true,
       });
     }
-    case "unshare_note": {
-      if (!rawKey) throw new Error("rawKey unavailable");
-      const shareId = args.shareId as string;
-      if (!shareId) throw new Error("shareId is required");
-      return injectCall(app, rawKey, {
-        method: "DELETE",
-        url: `/api/shares/${encodeURIComponent(shareId)}`,
-      });
-    }
+    case "unshare_note":
+      await app.shares.revoke(userId, args.shareId as string);
+      return { success: true };
     default:
       throw new Error(`Unknown tool: ${toolName}`);
   }

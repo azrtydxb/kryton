@@ -1,13 +1,8 @@
 import type { FastifyPluginAsync } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { and, eq } from "drizzle-orm";
-import {
-  ConflictError,
-  ForbiddenError,
-  NotFoundError,
-  ValidationError,
-} from "../../../lib/errors.js";
-import { noteShare, accessRequest } from "../../../db/schema/sharing.js";
+import { ForbiddenError, NotFoundError, ValidationError } from "../../../lib/errors.js";
+import { accessRequest, noteShare } from "../../../db/schema/sharing.js";
 import { user as userTable } from "../../../db/schema/auth.js";
 import {
   createShareBodySchema,
@@ -30,25 +25,11 @@ interface SharesRoutesDeps {
   shareService: ShareService;
 }
 
-const serializeShare = (s: {
-  id: string;
-  ownerUserId: string;
-  path: string;
-  isFolder: boolean;
-  sharedWithUserId: string;
-  permission: string;
-  createdAt: Date;
-  updatedAt: Date;
-  version: number;
-}) => ({ ...s });
-
-// Postgres unique_violation
-const isUniqueViolation = (err: unknown): boolean =>
-  typeof err === "object" &&
-  err !== null &&
-  "code" in err &&
-  (err as { code?: string }).code === "23505";
-
+/**
+ * Share routes — mounted at `/api/shares`. All CRUD logic lives in
+ * `ShareService` (also exposed as `app.shares`) so the MCP tool
+ * executors call the same code path.
+ */
 export const sharesRoutes = (deps: SharesRoutesDeps): FastifyPluginAsync =>
   async (app) => {
     const typed = app.withTypeProvider<ZodTypeProvider>();
@@ -71,31 +52,9 @@ export const sharesRoutes = (deps: SharesRoutesDeps): FastifyPluginAsync =>
       },
       async (req, reply) => {
         const ctx = await app.auth.requireAuth(req);
-        const { path, isFolder, sharedWithUserId, permission } = req.body;
-
-        if (sharedWithUserId === ctx.user.id) {
-          throw new ValidationError("Cannot share with yourself");
-        }
-
-        try {
-          const [saved] = await app.db
-            .insert(noteShare)
-            .values({
-              ownerUserId: ctx.user.id,
-              path,
-              isFolder: isFolder ?? false,
-              sharedWithUserId,
-              permission,
-            })
-            .returning();
-          reply.status(201);
-          return serializeShare(saved);
-        } catch (err) {
-          if (isUniqueViolation(err)) {
-            throw new ConflictError("Share already exists");
-          }
-          throw err;
-        }
+        const saved = await shareService.create(ctx.user.id, req.body);
+        reply.status(201);
+        return saved;
       },
     );
 
@@ -114,10 +73,7 @@ export const sharesRoutes = (deps: SharesRoutesDeps): FastifyPluginAsync =>
       },
       async (req) => {
         const user = await app.auth.requireUser(req);
-        const shares = await app.db.query.noteShare.findMany({
-          where: eq(noteShare.ownerUserId, user.id),
-        });
-        return shares.map(serializeShare);
+        return shareService.listOwned(user.id);
       },
     );
 
@@ -158,19 +114,11 @@ export const sharesRoutes = (deps: SharesRoutesDeps): FastifyPluginAsync =>
       },
       async (req) => {
         const ctx = await app.auth.requireAuth(req);
-        const share = await app.db.query.noteShare.findFirst({
-          where: eq(noteShare.id, req.params.id),
-        });
-        if (!share) throw new NotFoundError("Share not found");
-        if (share.ownerUserId !== ctx.user.id) {
-          throw new ForbiddenError("Not the owner of this share");
-        }
-        const [updated] = await app.db
-          .update(noteShare)
-          .set({ permission: req.body.permission, updatedAt: new Date() })
-          .where(eq(noteShare.id, req.params.id))
-          .returning();
-        return serializeShare(updated);
+        return shareService.updatePermission(
+          ctx.user.id,
+          req.params.id,
+          req.body.permission,
+        );
       },
     );
 
@@ -191,14 +139,7 @@ export const sharesRoutes = (deps: SharesRoutesDeps): FastifyPluginAsync =>
       },
       async (req) => {
         const ctx = await app.auth.requireAuth(req);
-        const share = await app.db.query.noteShare.findFirst({
-          where: eq(noteShare.id, req.params.id),
-        });
-        if (!share) throw new NotFoundError("Share not found");
-        if (share.ownerUserId !== ctx.user.id) {
-          throw new ForbiddenError("Not the owner of this share");
-        }
-        await app.db.delete(noteShare).where(eq(noteShare.id, req.params.id));
+        await shareService.revoke(ctx.user.id, req.params.id);
         return { message: "Share revoked" };
       },
     );

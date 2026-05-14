@@ -6,6 +6,8 @@ import { backfillSearchIndex } from "./services/backfill/search-index-backfill.j
 import { backfillTags } from "./services/backfill/tags-backfill.js";
 import { ensureNotesWatcher, stopAllNotesWatchers } from "./services/notes-watcher.js";
 import { NoteService } from "./services/note.service.js";
+import { TrashApi } from "./services/trash.service.js";
+import { FoldersApi } from "./services/folders.service.js";
 import { getUserNotesDir } from "./services/user-notes-dir.service.js";
 import {
   notesRenameRoutes,
@@ -42,6 +44,8 @@ export interface NotesApi {
 declare module "fastify" {
   interface FastifyInstance {
     notes: NotesApi;
+    trash: TrashApi;
+    folders: FoldersApi;
   }
 }
 
@@ -92,6 +96,13 @@ const notesModuleImpl: FastifyPluginAsync = async (app) => {
       },
     };
     app.decorate("notes", api);
+  }
+
+  if (!app.hasDecorator("trash")) {
+    app.decorate("trash", new TrashApi(app, notesDir));
+  }
+  if (!app.hasDecorator("folders")) {
+    app.decorate("folders", new FoldersApi(notesDir, noteService));
   }
 
   // Per-process backfill tracking. Mirrors the Express server's
@@ -161,10 +172,10 @@ const notesModuleImpl: FastifyPluginAsync = async (app) => {
   await app.register(notesRoutes(deps), { prefix: "/api/notes" });
   await app.register(notesRenameRoutes(deps), { prefix: "/api/notes-rename" });
 
-  await app.register(foldersRoutes({ notesDir, ensureBackfilled, noteService }), {
+  await app.register(foldersRoutes({ ensureBackfilled }), {
     prefix: "/api/folders",
   });
-  await app.register(foldersRenameRoutes({ notesDir, ensureBackfilled }), {
+  await app.register(foldersRenameRoutes({ ensureBackfilled }), {
     prefix: "/api/folders-rename",
   });
 
@@ -175,10 +186,10 @@ const notesModuleImpl: FastifyPluginAsync = async (app) => {
   await app.register(tagsRoutes({ ensureBackfilled }), { prefix: "/api/tags" });
 
   // Trash-empty must register before trash to avoid wildcard conflicts.
-  await app.register(trashEmptyRoutes({ notesDir, ensureBackfilled }), {
+  await app.register(trashEmptyRoutes({ ensureBackfilled }), {
     prefix: "/api/trash-empty",
   });
-  await app.register(trashRoutes({ notesDir, ensureBackfilled }), {
+  await app.register(trashRoutes({ ensureBackfilled }), {
     prefix: "/api/trash",
   });
 
