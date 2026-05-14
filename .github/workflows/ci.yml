@@ -89,6 +89,16 @@ jobs:
           APP_URL: http://localhost:5173
           OPENAPI_ENABLED: "true"
 
+      - name: Restore workspace ownership to host user
+        # Container runs as root by default — files written here end up
+        # owned by root on the host runner's bind-mounted workspace.
+        # That blocks the next job's actions/checkout cleanup. Hand
+        # ownership back to piwi (1000:1000) before exiting so any
+        # subsequent host-based job (e.g. docker) can clean cleanly.
+        # `if: always()` ensures this runs on failure too.
+        if: always()
+        run: chown -R 1000:1000 . || true
+
       - name: Upload client dist
         uses: actions/upload-artifact@v4
         with:
@@ -159,6 +169,13 @@ jobs:
           BETTER_AUTH_URL: http://localhost:3001
           APP_URL: http://localhost:5173
           SEMANTIC_PROVIDER: "off"
+
+      - name: Restore workspace ownership to host user
+        # See note on the build job. Hands files back to piwi:piwi so
+        # the next job's checkout cleanup doesn't trip on root-owned
+        # files left behind by this container.
+        if: always()
+        run: chown -R 1000:1000 . || true
 
   docker:
     needs: build
