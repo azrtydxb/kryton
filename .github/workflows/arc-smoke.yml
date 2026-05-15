@@ -86,16 +86,22 @@ jobs:
           docker image inspect pgvector/pgvector:pg16 \
             --format 'arch={{.Architecture}} os={{.Os}}'
 
-      - name: Set up Docker Buildx (local arm64 + remote amd64)
+      - name: Set up Docker Buildx (two builders — local arm64 + remote amd64)
+        # buildx does not support mixed drivers within a single builder
+        # ("ERROR: existing instance for ... but has mismatched driver").
+        # The cookbook snippet that uses `--name multi --append` is stale.
+        # Create two builders, build each platform on the appropriate
+        # one, then assemble a manifest list with `buildx imagetools
+        # create`. release.yml's existing matrix does the same thing on
+        # GH-hosted runners; this pattern keeps that shape on ARC.
         run: |
           docker buildx create \
-            --name multi \
+            --name local-arm64 \
             --driver docker-container \
-            --platform linux/arm64 \
-            --use
+            --platform linux/arm64
 
           docker buildx create \
-            --name multi --append \
+            --name remote-amd64 \
             --driver remote \
             --platform linux/amd64 \
             --driver-opt cacert="$BUILDKIT_CLIENT_CA" \
@@ -103,7 +109,8 @@ jobs:
             --driver-opt key="$BUILDKIT_CLIENT_KEY" \
             "$BUILDKIT_AMD64_ENDPOINT"
 
-          docker buildx inspect --bootstrap
+          docker buildx inspect --bootstrap local-arm64
+          docker buildx inspect --bootstrap remote-amd64
 
       - name: Write trivial Dockerfile
         run: |
@@ -124,22 +131,57 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Multi-arch build (no push)
-        if: ${{ inputs.push_image != 'true' }}
+      - name: Build arm64 (local dind, native)
         run: |
           docker buildx build \
-            --platform linux/amd64,linux/arm64 \
-            --tag "$TEST_IMAGE:smoke" \
+            --builder local-arm64 \
+            --platform linux/arm64 \
+            --tag "$TEST_IMAGE:smoke-arm64" \
+            --load \
+            ./smoke
+          docker run --rm "$TEST_IMAGE:smoke-arm64"
+
+      - name: Build amd64 (remote BuildKit on 192.168.10.253, native)
+        # --load won't work against a remote builder (image stays in the
+        # remote daemon). For a smoke test it's enough to confirm the
+        # build succeeds; the push step below exercises the full path
+        # to ghcr.io when push_image=true.
+        run: |
+          docker buildx build \
+            --builder remote-amd64 \
+            --platform linux/amd64 \
+            --tag "$TEST_IMAGE:smoke-amd64" \
+            --output type=cacheonly \
             ./smoke
 
-      - name: Multi-arch build + push
+      - name: Multi-arch build + push (manifest list)
         if: ${{ inputs.push_image == 'true' }}
+        # Builds + pushes both arches in parallel: arm64 from local
+        # dind, amd64 from the remote builder. buildx coordinates the
+        # manifest-list assembly and push by tag — same single-tag
+        # output release.yml's manifest job today does in two stages.
         run: |
-          docker buildx build \
-            --platform linux/amd64,linux/arm64 \
-            --tag "$TEST_IMAGE:smoke-${{ github.run_id }}" \
+          ARM_DIGEST=$(docker buildx build \
+            --builder local-arm64 \
+            --platform linux/arm64 \
+            --tag "$TEST_IMAGE:smoke-${{ github.run_id }}-arm64" \
             --push \
-            ./smoke
+            --metadata-file arm64.json \
+            ./smoke && jq -r '."containerimage.digest"' arm64.json)
+
+          AMD_DIGEST=$(docker buildx build \
+            --builder remote-amd64 \
+            --platform linux/amd64 \
+            --tag "$TEST_IMAGE:smoke-${{ github.run_id }}-amd64" \
+            --push \
+            --metadata-file amd64.json \
+            ./smoke && jq -r '."containerimage.digest"' amd64.json)
+
+          docker buildx imagetools create \
+            --tag "$TEST_IMAGE:smoke-${{ github.run_id }}" \
+            "$TEST_IMAGE@$ARM_DIGEST" \
+            "$TEST_IMAGE@$AMD_DIGEST"
+
           docker buildx imagetools inspect "$TEST_IMAGE:smoke-${{ github.run_id }}"
 
       - name: Summary
