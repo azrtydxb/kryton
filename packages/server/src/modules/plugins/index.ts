@@ -194,10 +194,10 @@ const pluginsModuleImpl = (options: PluginsModuleOptions = {}): FastifyPluginAsy
     // directory; this hand-rolled handler enforces the "<id>/client/..."
     // path shape and resolves through realpath to defeat any symlink-based
     // escape out of the client subtree.
-    const fsModule = await import("node:fs/promises");
     // `pluginsDir` is created above with mkdir({recursive:true}) so this
-    // always resolves under normal operation.
-    const pluginsDirReal = await fsModule.realpath(pluginsDir);
+    // always resolves under normal operation. Re-use the top-level
+    // `fs` import; no dynamic re-import is needed.
+    const pluginsDirReal = await fs.realpath(pluginsDir);
 
     app.route({
       method: "GET",
@@ -223,7 +223,7 @@ const pluginsModuleImpl = (options: PluginsModuleOptions = {}): FastifyPluginAsy
         // points back out (e.g. ../../../../etc/passwd) doesn't escape.
         let real: string;
         try {
-          real = await fsModule.realpath(target);
+          real = await fs.realpath(target);
         } catch {
           return reply.code(404).send();
         }
