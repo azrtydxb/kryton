@@ -40,46 +40,36 @@ const LISTBOX_ID = "command-palette-listbox";
  * Escape to close.
  *
  * Consumers control open state and supply the action registry via `actions`.
+ *
+ * The outer wrapper renders nothing when closed and keys the inner
+ * component on `open` so state (search query, selection) is naturally
+ * fresh on each open without setState-during-render or setState-in-
+ * effect patterns.
  */
-export function CommandPalette({
-  open,
+export function CommandPalette(props: CommandPaletteProps) {
+  if (!props.open) return null;
+  return <CommandPaletteOpen {...props} />;
+}
+
+function CommandPaletteOpen({
   onClose,
   actions,
   placeholder = "Search actions…",
 }: CommandPaletteProps) {
   const [query, setQuery] = React.useState("");
   const [selectedIndex, setSelectedIndex] = React.useState(0);
-  const [prevOpen, setPrevOpen] = React.useState(open);
-  const [prevQuery, setPrevQuery] = React.useState(query);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
-  // Reset state whenever palette is opened (derived-from-input pattern)
-  if (prevOpen !== open) {
-    setPrevOpen(open);
-    if (open) {
-      setQuery("");
-      setSelectedIndex(0);
-      setPrevQuery("");
-    }
-  }
-
-  // Focus input when palette opens
+  // Focus input when palette opens. The component is freshly mounted
+  // on each open (parent gates rendering), so no `open` dep is needed.
   React.useEffect(() => {
-    if (open) {
-      requestAnimationFrame(() => inputRef.current?.focus());
-    }
-  }, [open]);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }, []);
 
   const filtered = React.useMemo(() => {
     if (!query.trim()) return actions;
     return actions.filter((a) => fuzzyMatch(query, a.label) || fuzzyMatch(query, a.group ?? ""));
   }, [actions, query]);
-
-  // Reset selection when query changes (derived-from-input pattern)
-  if (prevQuery !== query) {
-    setPrevQuery(query);
-    setSelectedIndex(0);
-  }
 
   const handleKeyDown = React.useCallback(
     (e: React.KeyboardEvent) => {
@@ -110,8 +100,6 @@ export function CommandPalette({
     }
     return Array.from(map.entries());
   }, [filtered]);
-
-  if (!open) return null;
 
   const activeOptionId =
     filtered.length > 0 ? `cp-option-${selectedIndex}` : undefined;
@@ -146,7 +134,12 @@ export function CommandPalette({
             aria-activedescendant={activeOptionId}
             aria-autocomplete="list"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              // Reset selection on every keystroke so the filtered
+              // list starts at the top.
+              setSelectedIndex(0);
+            }}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             className="w-full bg-transparent py-3 text-sm outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500"

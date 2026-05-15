@@ -18,11 +18,14 @@ function makeListHook<T>(entityType: string, getList: (a: KrytonDataAdapter) => 
 export function useUiNotes(filter?: NoteFilter): NoteData[] {
   const adapter = useKrytonData();
   const [, forceUpdate] = useReducer((n: number) => n + 1, 0);
-  const filterKey = JSON.stringify(filter ?? null);
+  // The subscription listens to "notes" / "*" and doesn't depend on
+  // `filter`, so changing the filter shouldn't re-subscribe — the
+  // render below already re-derives the list. Re-subscribing on every
+  // filter change caused unnecessary subscribe/unsubscribe churn.
   useEffect(() => {
     const off = adapter.subscribe("notes", "*", () => forceUpdate());
     return off;
-  }, [adapter, filterKey]);
+  }, [adapter]);
   return adapter.notes.list(filter);
 }
 export const useUiFolders = makeListHook<FolderData>("folders", a => a.folders.list());

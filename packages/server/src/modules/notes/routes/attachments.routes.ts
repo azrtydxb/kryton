@@ -7,21 +7,43 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { pipeline } from "stream/promises";
 import { eq } from "drizzle-orm";
-import { NotFoundError, ValidationError } from "../../../lib/errors.js";
+import {
+  NotFoundError,
+  PayloadTooLargeError,
+  ValidationError,
+} from "../../../lib/errors.js";
 import { attachment } from "../../../db/schema/notes.js";
 
 // Attachments are user-uploaded content rendered inside notes. The list
-// below is conservative: media for embeds, PDFs for inline render, and
-// text/JSON for plain code references. Anything else (executables,
-// scripts) is rejected up front so a stray click can't serve them with
-// the wrong content-type.
-const ALLOWED_MIME_PREFIXES = ["image/", "audio/", "video/", "text/"];
+// below is conservative: raster images, A/V media, PDFs for inline
+// render, and a couple of structured text types for code/data
+// references.
+//
+// Explicitly excluded — these can execute in the app origin if served
+// back with their declared content-type, which would be a stored XSS:
+//   - text/html, application/xhtml+xml — scripts + arbitrary DOM
+//   - image/svg+xml — can embed <script>, <foreignObject>, javascript: URLs
+//   - text/xml, application/xml — same XSS surface as HTML via XSLT
+const ALLOWED_IMAGE_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+  "image/avif",
+  "image/heic",
+  "image/heif",
+]);
+const ALLOWED_MIME_PREFIXES = ["audio/", "video/"];
 const ALLOWED_MIME_EXACT = new Set([
   "application/pdf",
   "application/json",
   "application/zip",
+  "text/plain",
+  "text/markdown",
+  "text/csv",
 ]);
 const isAllowedMime = (mime: string): boolean =>
+  ALLOWED_IMAGE_TYPES.has(mime) ||
   ALLOWED_MIME_EXACT.has(mime) ||
   ALLOWED_MIME_PREFIXES.some((p) => mime.startsWith(p));
 
@@ -126,7 +148,7 @@ export const attachmentsRoutes: FastifyPluginAsync = async (app) => {
       // a partial copy.
       if (data.file.truncated) {
         await fs.unlink(tmpPath).catch(() => {});
-        throw new ValidationError("file exceeds maximum upload size");
+        throw new PayloadTooLargeError("file exceeds maximum upload size");
       }
 
       const hash = hasher.digest("hex");

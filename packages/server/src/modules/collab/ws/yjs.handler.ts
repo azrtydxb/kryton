@@ -146,6 +146,11 @@ export function registerYjsRoutes(
   };
 
   const ensureDoc = async (docId: string, auth: AuthInfo): Promise<DocEntry> => {
+    // Authorize on every connection (not just cache miss). The doc may
+    // have been deleted on disk or had its permissions changed since
+    // the entry was last loaded; relying on the cache would silently
+    // grant access until the eviction grace period elapsed.
+    await authorizeDoc(docId, auth);
     const cached = docs.get(docId);
     if (cached) {
       if (cached.userId !== auth.userId) {
@@ -312,15 +317,18 @@ export function registerYjsRoutes(
 
   // Extract bearer token from Sec-WebSocket-Protocol. Query-string tokens
   // are no longer accepted because they leak via access logs, browser
-  // history, and proxies. Convention: "kryton-token, <token>".
+  // history, and proxies. Convention: a "kryton-token" marker followed
+  // by the token entry. Anything else (bare subprotocols, missing
+  // marker, marker without a following entry) returns null so the
+  // request falls through to cookie/session auth.
   const extractToken = (req: FastifyRequest): string | null => {
     const proto = req.headers["sec-websocket-protocol"];
-    if (typeof proto === "string" && proto.length > 0) {
-      const parts = proto.split(",").map((s) => s.trim());
-      if (parts.length >= 2 && parts[0] === "kryton-token") return parts[1];
-      return parts[0];
-    }
-    return null;
+    if (typeof proto !== "string" || proto.length === 0) return null;
+    const parts = proto.split(",").map((s) => s.trim());
+    const marker = parts.indexOf("kryton-token");
+    if (marker === -1) return null;
+    const candidate = parts[marker + 1];
+    return candidate && candidate.length > 0 ? candidate : null;
   };
 
   app.route({

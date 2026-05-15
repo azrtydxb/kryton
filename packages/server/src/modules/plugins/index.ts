@@ -75,8 +75,11 @@ const pluginsModuleImpl = (options: PluginsModuleOptions = {}): FastifyPluginAsy
     const notesDir =
       options.notesDir ?? path.resolve(process.cwd(), "notes");
     // Default notesOps to the notes module's NoteService decorator
-    // (signatures match exactly). Tests can pass `options.notesOps`
-    // to inject a mock without registering the full notes module.
+    // (signatures match exactly). Tests can pass `options.notesOps` to
+    // inject a mock implementation, but the `dependencies: ["notes-module"]`
+    // declaration on this fastify-plugin wrapper means the notes module
+    // still has to register first — the override replaces the routed
+    // operations, not the registration order.
     const notesOps: NotesOps = options.notesOps ?? app.noteService;
     if (!notesOps) {
       // Should not be reachable under normal boot because the

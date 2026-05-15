@@ -367,36 +367,36 @@ export const NotePreviewReact = React.forwardRef<
     [onLinkClick, onCreateNote],
   );
 
-  const headingComponents = useMemo(() => {
-    // Counter is scoped per `content` revision; including content in the
-    // dependency array below ensures a fresh counter on every change so
-    // heading ids remain stable across renders for the same content.
-    const contentVersion = content.length;
-    const counter = { value: 0 };
-    const makeHeading = (
-      Tag: "h1" | "h2" | "h3" | "h4" | "h5" | "h6",
-    ) => {
-      return ({
-        children,
-        ...props
-      }: React.HTMLAttributes<HTMLHeadingElement>) => {
-        counter.value++;
-        return (
-          <Tag id={`heading-${contentVersion}-${counter.value}`} {...props}>
-            {children}
-          </Tag>
-        );
-      };
+  // Heading IDs are positional: `heading-1`, `heading-2`, … in
+  // document order. The counter is reset to zero at the top of every
+  // render so the numbering is stable for a given markdown structure;
+  // typing somewhere that doesn't add or remove a heading leaves all
+  // existing in-note anchor links pointing at the right element. We
+  // intentionally do NOT include any content-derived value (length,
+  // hash) in the id — that would invalidate every anchor on every
+  // keystroke. Components must be re-created per render (no useMemo)
+  // because the counter is closed over by the heading factories.
+  const headingCounter = { value: 0 };
+  const makeHeading = (Tag: "h1" | "h2" | "h3" | "h4" | "h5" | "h6") =>
+    function HeadingComponent({
+      children,
+      ...props
+    }: React.HTMLAttributes<HTMLHeadingElement>) {
+      headingCounter.value++;
+      return (
+        <Tag id={`heading-${headingCounter.value}`} {...props}>
+          {children}
+        </Tag>
+      );
     };
-    return {
-      h1: makeHeading("h1"),
-      h2: makeHeading("h2"),
-      h3: makeHeading("h3"),
-      h4: makeHeading("h4"),
-      h5: makeHeading("h5"),
-      h6: makeHeading("h6"),
-    };
-  }, [content]);
+  const headingComponents = {
+    h1: makeHeading("h1"),
+    h2: makeHeading("h2"),
+    h3: makeHeading("h3"),
+    h4: makeHeading("h4"),
+    h5: makeHeading("h5"),
+    h6: makeHeading("h6"),
+  };
 
   const codeComponent = useMemo(() => {
     return function CodeBlock({

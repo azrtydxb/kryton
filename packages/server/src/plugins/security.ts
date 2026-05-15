@@ -20,11 +20,12 @@ export const securityPlugin = fp<SecurityOptions>(async (app, { config }) => {
     config.CORS_ORIGINS.length === 1 && config.CORS_ORIGINS[0] === "*";
 
   if (isWildcard && config.NODE_ENV === "production") {
-    // origin:'*' + credentials:true reflects arbitrary origins back as
-    // Access-Control-Allow-Origin and would allow credentialed
-    // cross-origin requests. Browsers actually block this combination,
-    // but configuring it is still a misconfiguration that hides intent.
-    // Refuse to boot in production — operators must supply an explicit
+    // With `origin: true` and `credentials: true`, @fastify/cors reflects
+    // the request Origin header back as Access-Control-Allow-Origin —
+    // not the literal "*" — so browsers DO honor it and credentialed
+    // requests succeed from any origin. That's effectively an open
+    // CORS surface, which is almost always a misconfiguration in
+    // production. Refuse to boot — operators must supply an explicit
     // CORS_ORIGINS allow-list.
     throw new Error(
       "CORS_ORIGINS='*' is not allowed with credentials in production; " +

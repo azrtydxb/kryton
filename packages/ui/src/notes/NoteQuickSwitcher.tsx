@@ -43,14 +43,7 @@ export function NoteQuickSwitcher({
 }: NoteQuickSwitcherProps) {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [prevQuery, setPrevQuery] = useState(query);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  // Reset selection when query changes (derived-from-input pattern)
-  if (prevQuery !== query) {
-    setPrevQuery(query);
-    setSelectedIndex(0);
-  }
 
   const filtered = useMemo(
     () =>
@@ -120,7 +113,12 @@ export function NoteQuickSwitcher({
             aria-activedescendant={activeOptionId}
             aria-autocomplete="list"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              // Reset selection on every keystroke so the filtered
+              // list starts at the top.
+              setSelectedIndex(0);
+            }}
             onKeyDown={handleKeyDown}
             placeholder="Type to search notes…"
             className="w-full py-3 bg-transparent text-sm outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500"
