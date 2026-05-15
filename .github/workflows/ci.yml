@@ -14,6 +14,16 @@ on:
   pull_request:
     branches: [master]
 
+# Cancel any in-progress run on the same branch when a new push lands.
+# The self-hosted runner pool is small (single 248 box, three runners),
+# and stacking two CI runs from the same PR — the second push and the
+# leftover first push — was hitting vitest worker-spawn timeouts and
+# fastify boot timeouts because the runner was CPU-starved. Cancelling
+# the older run frees the runner for the newest commit.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
