@@ -177,9 +177,15 @@ export function GraphPanel({
   }, [expanded]);
 
   const handleRecenter = useCallback(() => {
+    // Recenter changes viewport.k via fitToCanvas; GraphView's
+    // onZoomChange surfaces the new scale through setZoom. We don't
+    // force-set 1 here — the recenter may resolve to a non-1 scale
+    // (small graphs zoom in, large graphs zoom out), and if the user
+    // had only panned without changing zoom, viewport.k could even
+    // stay constant — overwriting to 1 would lie about the actual
+    // transform.
     if (expanded) expandedRecenterRef.current?.();
     else recenterRef.current?.();
-    setZoom(1);
   }, [expanded]);
 
   const nodeCount = graphData?.nodes.length ?? 0;
