@@ -15,7 +15,12 @@ jobs:
   # ci.yml's build job, plus the e2e step. A red here blocks the docker
   # build/push and the GitHub release.
   ci:
-    runs-on: [self-hosted, kryton-248]
+    # ARC v2 scale-set on the kw cluster (k3s ARM64). Ephemeral runner
+    # pods with a dind sidecar. The release gate doesn't push images —
+    # the `docker` matrix below still runs on GH-hosted runners until
+    # the cluster's ghcr.io push path lands (see novamem entry
+    # 01KRPPQT3RRD0XHXM2V61ZV1C8 for the workaround options).
+    runs-on: arc-azrtydxb
     container:
       image: node:24
     services:
@@ -88,9 +93,12 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Restore workspace ownership to host user
+      - name: Restore workspace ownership to runner user
+        # ARC runner UID is 1001; the job container runs as root and
+        # would otherwise leave root-owned files in the bind-mounted
+        # workspace, blocking post-job cleanup.
         if: always()
-        run: chown -R 1000:1000 . || true
+        run: chown -R 1001:1001 . || true
 
       - name: Upload client dist
         uses: actions/upload-artifact@v4
