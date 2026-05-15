@@ -27,8 +27,10 @@ class TestYjsClient {
   private serverReplied: Promise<void>;
   private resolveServerReplied!: () => void;
 
-  constructor(url: string) {
-    this.ws = new NodeWebSocket(url);
+  constructor(url: string, token?: string) {
+    this.ws = token
+      ? new NodeWebSocket(url, ["kryton-token", token])
+      : new NodeWebSocket(url);
     this.ws.binaryType = "arraybuffer";
     this.opened = new Promise<void>((resolve, reject) => {
       this.ws.once("open", () => resolve());
@@ -115,7 +117,10 @@ async function makeAgentToken(app: FastifyInstance): Promise<{ userId: string; t
   // Create a user and an agent with a known token. Phase 5.2 migrated the
   // agents service to Drizzle/Postgres (app.db); seed there so token
   // validation can find the row.
-  const userId = `u-yjs-${Date.now()}-${Math.random()}`;
+  // userId must satisfy the SAFE_USER_ID_REGEX (alnum/_/-, 8..64 chars)
+  // since the yjs handler now calls app.notes.readNote which resolves
+  // a per-user directory.
+  const userId = `u-yjs-${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
   await app.db.insert(userTable).values({
     id: userId,
     email: `yjs-${Date.now()}-${Math.random()}@test.local`,
@@ -186,11 +191,16 @@ describe("collab Yjs WebSocket", () => {
       return;
     }
 
-    const docId = `convtest-${Date.now()}`;
-    const url = `${baseUrl}/ws/yjs/${docId}?token=${encodeURIComponent(auth.token)}`;
+    // The yjs WS handler now authorizes the docId against the user's
+    // notes (`app.notes.readNote(docId, userId)`), so seed a real note
+    // first and use its path as the docId.
+    const docId = `convtest-${Date.now()}.md`;
+    await app.notes.writeNote(docId, "", auth.userId);
 
-    const a = new TestYjsClient(url);
-    const b = new TestYjsClient(url);
+    const url = `${baseUrl}/ws/yjs/${encodeURIComponent(docId)}`;
+
+    const a = new TestYjsClient(url, auth.token);
+    const b = new TestYjsClient(url, auth.token);
     // `ready()` blocks until the bidirectional sync handshake is live
     // for both clients, so the first edit below is sent into a fully-
     // primed connection. No hopeful sleep needed.

@@ -88,7 +88,9 @@ export function GraphView({
   // react to graphData / mode changes (not selection). Selection is handled
   // by a separate effect that calls layout.setActive.
   const activePathRef = React.useRef(activeNotePath);
-  activePathRef.current = activeNotePath;
+  React.useEffect(() => {
+    activePathRef.current = activeNotePath;
+  }, [activeNotePath]);
 
   // Build the layout once per graphData / mode. Selection is handled below.
   React.useEffect(() => {

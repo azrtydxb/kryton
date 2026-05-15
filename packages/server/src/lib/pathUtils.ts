@@ -8,7 +8,8 @@ export function validatePathWithinBase(fullPath: string, baseDir: string): void 
   }
 }
 
-export function decodePathParam(param: string | string[]): string {
+export function decodePathParam(param: string | string[] | undefined): string {
+  if (param === undefined) return "";
   const raw = Array.isArray(param) ? param.join("/") : param;
   return decodeURIComponent(raw);
 }

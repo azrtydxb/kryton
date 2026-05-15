@@ -55,27 +55,11 @@ export interface PluginsModuleOptions {
   autoDiscover?: boolean;
 }
 
-/**
- * Last-resort fallback. The real notesOps is the notes module's
- * NoteService instance, exposed as `app.noteService`. The host wires
- * it automatically below — these throwing stubs only fire if the
- * plugins module is somehow registered before the notes module, which
- * a misconfigured custom host could do.
- */
-const noopNotesOps: NotesOps = {
-  async readNote() {
-    throw new Error("notesOps not configured (notes module must register before plugins)");
-  },
-  async writeNote() {
-    throw new Error("notesOps not configured (notes module must register before plugins)");
-  },
-  async deleteNote() {
-    throw new Error("notesOps not configured (notes module must register before plugins)");
-  },
-  async scanDirectory() {
-    return [];
-  },
-};
+// notesOps was previously sourced via a stringly-typed cast off of
+// `app.noteService` with a throwing noop fallback. The fastify-plugin
+// `dependencies: ["notes-module"]` declaration below now enforces
+// registration order at boot, so when this module loads the notes
+// module's NoteService decorator is guaranteed to exist.
 
 /**
  * Plugins module — Kryton plugin runtime.
@@ -91,11 +75,20 @@ const pluginsModuleImpl = (options: PluginsModuleOptions = {}): FastifyPluginAsy
     const notesDir =
       options.notesDir ?? path.resolve(process.cwd(), "notes");
     // Default notesOps to the notes module's NoteService decorator
-    // (signatures match exactly). Callers can still override for tests.
-    const notesOps: NotesOps =
-      options.notesOps ??
-      ((app as unknown as { noteService?: NotesOps }).noteService) ??
-      noopNotesOps;
+    // (signatures match exactly). Tests can pass `options.notesOps` to
+    // inject a mock implementation, but the `dependencies: ["notes-module"]`
+    // declaration on this fastify-plugin wrapper means the notes module
+    // still has to register first — the override replaces the routed
+    // operations, not the registration order.
+    const notesOps: NotesOps = options.notesOps ?? app.noteService;
+    if (!notesOps) {
+      // Should not be reachable under normal boot because the
+      // fastify-plugin `dependencies` declaration on this module
+      // requires `notes-module` to register first.
+      throw new Error(
+        "plugins module: app.noteService missing — notes module must register first",
+      );
+    }
 
     await fs.mkdir(pluginsDir, { recursive: true });
 
@@ -225,4 +218,11 @@ const pluginsModuleImpl = (options: PluginsModuleOptions = {}): FastifyPluginAsy
  * visible to siblings + tests that call `app.plugins.manager` directly.
  */
 export const pluginsModule = (options: PluginsModuleOptions = {}): FastifyPluginAsync =>
-  fp(pluginsModuleImpl(options), { name: "plugins-module" });
+  fp(pluginsModuleImpl(options), {
+    name: "plugins-module",
+    // `notes-module` decorates `app.noteService`, which we depend on for
+    // the default NotesOps. Declaring the dependency here lets fastify-
+    // plugin enforce registration order at boot rather than relying on
+    // app.ts ordering by convention.
+    dependencies: ["notes-module"],
+  });

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api, FileNode, TagData } from '../../lib/api';
-import { FileTree, FavoritesSection } from '@azrtydxb/ui';
+import { FileTree, FavoritesSection, KRYTON_UI_VERSION } from '@azrtydxb/ui';
 import { useUIStore } from '../../stores/uiStore';
 import { Icons } from '../Icons';
 import { formatShortcut } from '../../lib/platform';
@@ -44,7 +44,10 @@ interface SidebarProps {
   onTagSelect?: (tag: string) => void;
 }
 
-const DEFAULT_VERSION = 'v4.4.0-pre.9';
+// Surfaced in the sidebar footer. Sourced from the @azrtydxb/ui package
+// (which generates its version from its own package.json at build time)
+// so client + ui can't drift apart silently.
+const DEFAULT_VERSION = `v${KRYTON_UI_VERSION}`;
 
 /* helpers ------------------------------------------------------------------ */
 

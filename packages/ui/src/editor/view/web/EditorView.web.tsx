@@ -49,14 +49,18 @@ export function EditorView({
 }: EditorViewProps) {
   const rootRef = React.useRef<HTMLDivElement | null>(null);
   const composingRef = React.useRef(false);
-  const stateRef = React.useRef<EditorState>(createEditorState(initialDoc));
+  const [state, setStateInternal] = React.useState<EditorState>(() => createEditorState(initialDoc));
+  const stateRef = React.useRef<EditorState>(state);
   const historyRef = React.useRef(createHistory());
-  const [, forceRender] = React.useReducer((n: number) => n + 1, 0);
+
+  React.useLayoutEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   const setState = React.useCallback((next: EditorState) => {
     stateRef.current = next;
     onChange?.(next);
-    forceRender();
+    setStateInternal(next);
   }, [onChange]);
 
   const dispatch = React.useCallback((tr: { ops: Operation[]; selection: Selection | null }) => {
@@ -68,7 +72,7 @@ export function EditorView({
   React.useLayoutEffect(() => {
     const root = rootRef.current;
     if (!root || composingRef.current) return;
-    selectionToDomRange(root, stateRef.current.selection);
+    selectionToDomRange(root, state.selection);
   });
 
   // React's synthetic `onBeforeInput` is mapped to the legacy `textInput` event,
@@ -136,8 +140,10 @@ export function EditorView({
     const root = rootRef.current!;
     const next = domRangeToSelection(root);
     if (next.anchor !== stateRef.current.selection.anchor || next.head !== stateRef.current.selection.head) {
-      stateRef.current = { ...stateRef.current, selection: next };
-      onChange?.(stateRef.current);
+      const updated = { ...stateRef.current, selection: next };
+      stateRef.current = updated;
+      onChange?.(updated);
+      setStateInternal(updated);
     }
   };
 
@@ -150,11 +156,11 @@ export function EditorView({
   };
 
   const decos = [
-    ...emitDecorations(stateRef.current.doc, stateRef.current.tree),
-    ...collectDecorations(plugins, stateRef.current),
+    ...emitDecorations(state.doc, state.tree),
+    ...collectDecorations(plugins, state),
   ];
-  const runs = projectDom(stateRef.current.doc, decos);
-  const lineCount = stateRef.current.doc.split("\n").length;
+  const runs = projectDom(state.doc, decos);
+  const lineCount = state.doc.split("\n").length;
 
   return (
     <div className={className ?? "ed-shell"} data-editor-shell="">

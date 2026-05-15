@@ -8,10 +8,7 @@ import {
   trashRestoreResponseSchema,
   trashWildcardParamsSchema,
 } from "../schemas/trash.schemas.js";
-
-function decodePathParam(raw: string): string {
-  return decodeURIComponent(raw);
-}
+import { decodePathParam } from "../../../lib/pathUtils.js";
 
 export interface TrashRoutesDeps {
   ensureBackfilled: (userId: string) => Promise<void>;

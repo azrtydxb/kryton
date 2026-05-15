@@ -17,7 +17,7 @@ import { Toaster as SonnerToasterPrimitive, type ToasterProps as SonnerToasterPr
 
 export type { SonnerToasterProps };
 
-export interface ToasterProps extends SonnerToasterProps {}
+export type ToasterProps = SonnerToasterProps;
 
 /**
  * Pre-styled Toaster that matches the Kryton design system.

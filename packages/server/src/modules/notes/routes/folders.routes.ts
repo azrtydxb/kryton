@@ -9,10 +9,7 @@ import {
   renameFolderBodySchema,
 } from "../schemas/folders.schemas.js";
 import { wildcardPathParamsSchema } from "../schemas/notes.schemas.js";
-
-function decodePathParam(raw: string): string {
-  return decodeURIComponent(raw);
-}
+import { decodePathParam } from "../../../lib/pathUtils.js";
 
 export interface FoldersRoutesDeps {
   ensureBackfilled: (userId: string) => Promise<void>;

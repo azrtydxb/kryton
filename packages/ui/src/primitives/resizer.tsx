@@ -34,9 +34,7 @@ const Resizer = React.forwardRef<HTMLDivElement, ResizerProps>(
       className,
       orientation = "horizontal",
       onResize,
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       minSize: _minSize,
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       maxSize: _maxSize,
       ...props
     },

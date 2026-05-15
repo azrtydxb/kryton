@@ -1,9 +1,9 @@
 // packages/ui/src/data/hooks.ts
 import { useEffect, useReducer, useState } from "react";
 import { useKrytonData } from "./KrytonDataProvider";
-import type { NoteFilter, NoteData, FolderData, TagData, SettingData, NoteShareData, TrashItemData, SyncStatus } from "./types";
+import type { NoteFilter, NoteData, FolderData, TagData, SettingData, NoteShareData, TrashItemData, SyncStatus, KrytonDataAdapter } from "./types";
 
-function makeListHook<T>(entityType: string, getList: (a: any) => T[]) {
+function makeListHook<T>(entityType: string, getList: (a: KrytonDataAdapter) => T[]) {
   return function useList(): T[] {
     const adapter = useKrytonData();
     const [, forceUpdate] = useReducer((n: number) => n + 1, 0);
@@ -18,12 +18,14 @@ function makeListHook<T>(entityType: string, getList: (a: any) => T[]) {
 export function useUiNotes(filter?: NoteFilter): NoteData[] {
   const adapter = useKrytonData();
   const [, forceUpdate] = useReducer((n: number) => n + 1, 0);
-  const filterKey = JSON.stringify(filter ?? null);
+  // The subscription listens to "notes" / "*" and doesn't depend on
+  // `filter`, so changing the filter shouldn't re-subscribe — the
+  // render below already re-derives the list. Re-subscribing on every
+  // filter change caused unnecessary subscribe/unsubscribe churn.
   useEffect(() => {
     const off = adapter.subscribe("notes", "*", () => forceUpdate());
     return off;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adapter, filterKey]);
+  }, [adapter]);
   return adapter.notes.list(filter);
 }
 export const useUiFolders = makeListHook<FolderData>("folders", a => a.folders.list());

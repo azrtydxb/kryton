@@ -59,10 +59,6 @@ export function NoteQuickSwitcher({
     inputRef.current?.focus();
   }, []);
 
-  useEffect(() => {
-    setSelectedIndex(0);
-  }, [query]);
-
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "ArrowDown") {
@@ -117,7 +113,12 @@ export function NoteQuickSwitcher({
             aria-activedescendant={activeOptionId}
             aria-autocomplete="list"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              // Reset selection on every keystroke so the filtered
+              // list starts at the top.
+              setSelectedIndex(0);
+            }}
             onKeyDown={handleKeyDown}
             placeholder="Type to search notes…"
             className="w-full py-3 bg-transparent text-sm outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500"

@@ -4,6 +4,7 @@ export const yjsParamsSchema = z.object({
   docId: z.string().min(1).max(500),
 });
 
-export const yjsQuerySchema = z.object({
-  token: z.string().optional(),
-});
+// strict() rejects unknown keys so a client that's still passing
+// ?token=… (now unsupported) fails validation loudly instead of being
+// silently accepted-but-ignored.
+export const yjsQuerySchema = z.object({}).strict();
