@@ -47,7 +47,7 @@ A plugin's `client/index.js` is modified on disk (compromised host, malicious si
 **We want**: browser refuses to execute unless the bundle hash matches a known-good value.
 
 ### T4 — Plugin abusing API surface beyond declared intent
-A "markdown table beautifier" plugin silently calls `api.notes.list("*")` to enumerate every note in every user account, or `api.storage` to mine global state, or registers a route that exposes admin data.
+A "markdown table beautifier" plugin silently calls `api.notes.list(otherUserId)` for any user ID it can guess or harvest from other API calls, or `api.notes.readNote(otherUserId, "secrets.md")` for a specific known target, or `api.storage` to mine global state, or registers a route that exposes admin data. `NoteService.list` takes a concrete `userId` and joins it into a filesystem path, so the abuse isn't a wildcard scan — it's that *any* authenticated plugin context can read *any* user's notes given the userId, with no scope check.
 **Today**: every plugin gets the *complete* `PluginAPI` from `api-factory.ts:50` — full notes read/write, full storage, full search index, arbitrary route registration. No declaration, no enforcement.
 **We want**: plugins declare needed scopes; the API factory only wires the surface they asked for and the admin consented to.
 
@@ -79,7 +79,7 @@ What we already do, with file:line citations, followed by what's missing.
 | Path-traversal guard on `manifest.server` | `manager.ts:138-143` | `serverEntry` must resolve under `pluginDir`. |
 | Path-traversal guard on `pluginId` | `pluginsRoutes` via `validatePluginId` (`plugins.routes.ts:150, 181, 207, 294, 336, 379`) | Rejects `..`, slashes, control chars in URL params. |
 | Admin-only install / enable / disable / uninstall / update | `plugins.routes.ts` preHandlers using `app.auth.requireAdmin` | Only admins can introduce new plugin code. |
-| Activation timeout | `manager.ts:43, 172-180` | A misbehaving `activate()` is bounded. |
+| Activation timeout | `manager.ts:43, 172-180` | Bounds *async / non-resolving* `activate()` calls only. The plugin's `mod.activate(api)` is invoked synchronously before the timeout promise is even created, so a synchronous infinite loop or CPU-bound work inside `activate()` blocks the event loop and the timeout never fires. Real containment of CPU-bound abuse requires `worker_threads` or a separate process — see §5.4 and §6. |
 | Sticky `enabled` flag | `manager.ts:74, 287` | Disabled plugins stay disabled across boots. |
 | Module-cache invalidation on unload | `manager.ts:217-227` | `require.cache` is cleared so reload picks up new code. |
 | `validatePathWithinBase` on notes API | `api-factory.ts:99` | Prevents plugin from escaping a user's notes directory. |
@@ -118,12 +118,13 @@ Six candidate mechanisms. Each is evaluated on what it defeats, what it costs, a
 
 **Mechanism.** The registry index (`registry.json` in `azrtydxb/kryton-plugins`) is extended so each plugin/version entry carries a `sha256` of the canonical artifact (e.g. a tarball or a manifest of per-file hashes). On install, the server computes the hash of what it downloaded and compares to the pinned value. Mismatch → fail closed, do not write to `pluginsDir`. The installed-plugin DB row stores the pinned hash, and `loadPlugin` re-verifies on every boot before `require()`.
 
-**Defeats**: T2 (MITM corrupts bytes → hash mismatch → fail), T6 partially (we keep the historical hash on uninstall for audit). Defeats T1 *only* if the registry index itself is updated independently of the plugin artifact (i.e. registry index commits are protected even if a plugin author's branch isn't).
+**Defeats**: T6 partially (we keep the historical hash on uninstall for audit), plus on-disk / post-install tamper detection (catches T3-adjacent local modification and the "another process rewrote the file after install" case). **Does not defeat T2 on its own** when the hash is served inline in the same `registry.json` fetched from the same GitHub channel as the artifact — an attacker who can rewrite the bytes in flight can also rewrite the matching hash in flight. Defeats T1 *only* if the registry index itself is updated independently of the plugin artifact (i.e. registry index commits are protected even if a plugin author's branch isn't). Genuine T2 defense requires the hash to come from an **independent trust anchor**: a signed registry index, a lockfile bundled and pinned with the Kryton release, or a separate authenticated channel. This is flagged as an open question in §12.
 
 **Costs.**
 - Need a source of truth for the hashes. Two options:
-  - **Inline in registry.json**, maintained by the registry curator on each release. Simple, but the curator becomes a trust anchor.
-  - **Per-release `checksums.txt`** committed alongside the plugin sources. Avoids centralization but harder to verify "did the curator approve this?"
+  - **Inline in registry.json**, maintained by the registry curator on each release. Simple, but the curator becomes a trust anchor *and* the hash shares its trust channel with the artifact — so this option does nothing against T2.
+  - **Per-release `checksums.txt`** committed alongside the plugin sources. Avoids centralization but harder to verify "did the curator approve this?" — and still shares the GitHub trust channel.
+- Real T2 defense needs an independent anchor (see above). Pairs naturally with 5.1 (signed registry index) or with a Kryton-shipped lockfile.
 - First-install is still trust-on-first-use: if the registry repo is compromised at the moment of first publication, the wrong hash gets pinned. Pairs naturally with 5.1 (signed registry index) to close this.
 - Need a backfill story for plugins installed before this lands (see §10).
 
@@ -155,7 +156,7 @@ Six candidate mechanisms. Each is evaluated on what it defeats, what it costs, a
 - Engineering cost is substantial — every method on `PluginAPI` needs an RPC counterpart.
 - Doesn't help the client at all.
 
-**Stops at.** A plugin worker is still a Node process with `fs` and `net` unless we further sandbox it (run with `--no-experimental-permission` enforcement, AppArmor/seccomp, etc.). Those are real options on Linux but tied to deployment topology.
+**Stops at.** A plugin worker is still a Node process with `fs` and `net` unless we further sandbox it. The Node-native option is the experimental permission model: launch the worker (or the host) with `--experimental-permission` and grant only the scopes the plugin manifest declares via `--allow-fs-read=<paths>`, `--allow-fs-write=<paths>`, `--allow-child-process`, `--allow-worker`, `--allow-addons`, etc. (Note: `--no-experimental-permission` is the *disable* flag and would defeat the model.) OS-level sandboxes — AppArmor, seccomp, SELinux — are complementary and tied to deployment topology.
 
 ### 5.5 Permission manifest enforced at the API layer
 
@@ -172,18 +173,21 @@ Six candidate mechanisms. Each is evaluated on what it defeats, what it costs, a
 
 ### 5.6 Subresource Integrity for client bundles
 
-**Mechanism.** At install time, the server hashes `client/index.js` (and any other client bundle file). The hash is stored in the `installedPlugin` row and exposed in `/api/plugins/active` alongside the URL. The client either:
-- (a) loads the bundle via a `<script integrity="sha384-…">` tag instead of dynamic `import()`, letting the browser enforce SRI; or
-- (b) fetches the bundle as text, hashes it in JS, and only `import()`s a `blob:` URL if the hash matches.
+**Mechanism.** At install time, the server hashes *every* file the client bundle can request — not just `client/index.js` — and persists a manifest of `{ path, sha256 }` entries (`client-manifest.json`). This is necessary because ESM bundles routinely load additional chunks at runtime (code splitting, dynamic `import()` of feature modules, CSS-in-JS asset URLs, JSON imports). Hashing only the entry file leaves every secondary chunk unverified, and rewriting the entry's URL to a `blob:` URL changes the base URL so the relative imports break entirely.
 
-(a) is simpler and standards-compliant but doesn't compose well with ESM `import()`. (b) is more flexible but loses the browser's built-in cache and complicates source maps.
+Two enforcement options:
+- (a) **Single-file constraint.** Require plugin client bundles to be a single file with no code splitting and no runtime asset loading. Plugin authors must bundle to one self-contained module. Simple, but a real constraint on the plugin authoring model and easy to violate accidentally.
+- (b) **Per-asset integrity manifest (recommended).** Server stores `client-manifest.json` mapping every shipped client asset to its `sha256`. The server enforces the manifest on every request under `/plugins/<id>/client/...` — any path not in the manifest 404s, any byte mismatch 409s. The client verifies the entry file against the advertised hash (as today) but trusts subsequent same-origin fetches because the server gate-keeps them.
+
+Recommend (b): it composes naturally with code-split bundles, doesn't constrain plugin authoring, and keeps the original URL as the cache key (so HTTP caching works). It's also the right answer for tampered secondary chunks — without the manifest, a modified non-entry chunk would execute with no hash check whatsoever. Tracked as an open question in §12.
 
 **Defeats**: T3.
 
 **Costs.**
-- Adds a per-install hashing step.
+- Adds a per-install hashing step over the full `client/` tree.
 - Hashes need to update on every plugin update; client must invalidate on hash change.
-- (b) breaks browser HTTP caching unless we keep the original URL as the cache key and use the blob URL only for the actual `import()`. Manageable but fiddly.
+- Server has to consult the manifest on every static-file request under `/plugins/<id>/client/...`. Cheap (in-memory map lookup) but a new hot path.
+- Source maps either ship with their own manifest entries or are stripped at install time.
 
 **Stops at.** Doesn't help server side.
 
@@ -191,10 +195,12 @@ Six candidate mechanisms. Each is evaluated on what it defeats, what it costs, a
 
 No single mechanism above is sufficient on its own. Defense in depth requires layering. The recommendation is a phased rollout with three composed boundaries, each addressing a distinct class of threat:
 
-### Phase A — Integrity at install + load (defeats T2, parts of T1, T6)
+### Phase A — Integrity at install + load (defeats parts of T1, T6, plus on-disk / post-install tamper detection)
 
 - **Checksum pinning** (5.2) as the base layer. Registry index carries per-version `sha256`. Server verifies on download, persists the hash to the `installedPlugin` row, and re-verifies on every `loadPlugin` before `require()`. Mismatch → state goes to `error`, plugin does not load.
 - **Pinned version commit**. Install records the *registry commit SHA* alongside the artifact hash so reproducing an install is trivial.
+
+Important scope note: as long as the `sha256` lives inline in `registry.json` served from the same GitHub channel as the artifact, this phase **does not defeat T2 (MITM)** — an attacker rewriting the bytes can rewrite the matching hash. What it *does* buy is post-install / on-disk tamper detection (every `loadPlugin` re-verifies against the stored hash, so anything that mutated files after install fails closed) and a forensic anchor for T6. Full T2 defense requires the hash source to come from an independent trust anchor (signed registry index, a lockfile bundled and pinned with the Kryton release, or a separate authenticated channel) — see §12 open questions.
 
 This is the lowest-effort, highest-value layer. It can ship without changing the plugin authoring model.
 
@@ -207,8 +213,9 @@ This is the most user-visible piece and the hardest to design well, because the 
 
 ### Phase C — Client integrity (defeats T3)
 
-- **Bundle hashing on install** (5.6). Server hashes `client/index.js` at install time and exposes the hash via `/api/plugins/active`.
-- **Client-side verification**. `PluginManager.ts` fetches the bundle as text, computes SHA-256 via `crypto.subtle.digest`, compares to the advertised hash, and `import()`s a `blob:` URL only on match.
+- **Per-asset integrity manifest** (5.6 option b). Server walks the full `client/` tree at install time and writes a `client-manifest.json` of `{ path, sha256 }` entries. The entry-file hash is exposed via `/api/plugins/active`; the rest of the manifest is server-internal.
+- **Server-side enforcement at the static layer.** Every request under `/plugins/<id>/client/...` is gated by the manifest: paths not present 404, hash-mismatched bytes 409. This catches tampered secondary chunks (code-split bundles, CSS, JSON imports) that an entry-file-only hash would miss.
+- **Client-side entry verification.** `PluginManager.ts` fetches the entry bundle, computes SHA-256 via `crypto.subtle.digest`, compares to the advertised hash. On match, the original same-origin URL is used for `import()` (the server has already gate-kept every subsequent fetch, so a `blob:` URL — which would break relative chunk imports — is not needed).
 
 Phase A and Phase C are largely independent and could ship in either order. Phase B depends on the install flow knowing about scopes, so Phase A's install-time admin-consent UI is a natural home for it.
 
@@ -225,29 +232,29 @@ File-level outline of where changes land. No code in this doc.
 ### Phase A — checksum pinning
 
 1. **Registry schema (`azrtydxb/kryton-plugins` repo, not this codebase).** Each entry in `registry.json` gains `sha256` (hex string) and `releasedAt` (ISO date). Curator computes these at release time. Out of scope for this PR but mentioned because the server change depends on it.
-2. **`registry.service.ts`**: extend `RegistryPlugin` with `sha256` and `releasedAt`. `downloadPlugin` becomes `downloadPlugin(pluginId, version, expectedHash, targetDir)` and returns the actually-observed hash. Internally:
-   - Download into a temp directory.
+2. **`registry.service.ts`**: extend `RegistryPlugin` with `sha256` and `releasedAt`. `downloadPlugin` becomes `downloadPlugin(pluginId, version, expectedHash, registryCommit, targetDir)` and returns the actually-observed hash. The `registryCommit` is the SHA of the `azrtydxb/kryton-plugins` commit the admin reviewed at `/registry` time — every GitHub contents API URL the function builds is suffixed with `?ref=<registryCommit>` so the download is pinned to that exact tree, not the default branch. Without this, the recorded `registryCommit` would be a passive observation rather than a reproduction anchor, and a registry mutation between `/registry` and `/install` could only fail via hash mismatch instead of fetching the artifact the admin actually saw. Internally:
+   - Download into a temp directory, every fetch pinned to `?ref=<registryCommit>`.
    - Hash the canonicalized output (file-tree hash: sorted list of relative-path + per-file sha256, then hash that manifest).
    - Compare to `expectedHash`. On mismatch, delete temp dir, throw.
    - On match, atomically move temp dir to `<pluginsDir>/<id>`.
 3. **DB schema (`installedPlugin` table)**: add `sha256` (text, nullable for back-compat) and `registryCommit` (text, nullable). Migration is a non-destructive `ALTER TABLE`.
 4. **`manager.ts loadPlugin`**: before the `require(serverEntry)` call, recompute the file-tree hash, compare to the stored `sha256`. Mismatch → `state = "error"`, persist with a distinct `error` string like `integrity_mismatch`, do not load. (This catches T6 leftovers and post-install tampering.)
-5. **`plugins.routes.ts install/:id`**: pass through to the new `downloadPlugin` signature; write the observed hash + registry commit into the DB row.
+5. **`plugins.routes.ts install/:id`**: the request body now carries the `registryCommit` the UI displayed; the handler passes it through to `downloadPlugin` (together with `version` and `expectedHash`) and writes the observed hash + registry commit into the DB row.
 6. **Feature flag**: a new server config option `pluginIntegrity: "off" | "warn" | "enforce"` so dev environments can warn-only while production enforces.
 
 ### Phase B — permission manifest
 
 7. **`types.ts PluginManifest`**: add `permissions: PluginPermission[]` (schema in §8). Validate at install with a zod schema before writing anything to disk.
-8. **`api-factory.ts createApi`**: rewrite to take both manifest and granted scopes. Each sub-API (`notes`, `events`, `routes`, `storage`, `settings`, `search`) is built conditionally. Methods outside granted scopes are simply absent from the returned object (not no-op stubs — absence is a stronger signal to plugin authors during development).
+8. **`api-factory.ts createApi`**: rewrite to take both manifest and granted scopes. Each sub-API (`notes`, `events`, `routes`, `storage`, `settings`, `search`) is **always present on the returned object**, but methods outside granted scopes throw a typed `ScopeError("plugin lacks '<scope>' scope")` at call time. The reason for "present but throwing" over "absent": absence produces a generic `TypeError: Cannot read properties of undefined` at the call site, which is opaque to admins reading logs and indistinguishable from a real bug. Throwing `ScopeError` gives admins a clean error message, surfaces the scope failure at the exact callsite, and lets the manager catch and report it as a scope violation rather than a crash. This contract is consistent with §8 ("Scope semantics" → "throwing stub over silent undefined") — both sections now agree.
 9. **`plugins.routes.ts install/:id`**: response includes the requested permissions. UI shows them; install requires an explicit `acceptPermissions: true` flag in the request body to proceed. Updates that *broaden* scopes set a `requiresReconsent: true` flag on the DB row; the plugin loads in `state: "needs_consent"` and remains inert until the admin re-confirms.
-10. **`plugin-router.ts`**: route registration goes through a scope check before it's accepted. A plugin without `network` scope calling `api.routes.register` gets a clean error during `activate()`.
+10. **`plugin-router.ts`**: route registration goes through a scope check before it's accepted. `api.routes` is present on every plugin's API object regardless of scopes — `register()` itself checks the `network` scope and throws `ScopeError("plugin lacks 'network' scope")` if absent. A plugin without `network` scope therefore gets a clean, named error at the `api.routes.register(...)` callsite during `activate()`, not a generic `TypeError` from accessing a property of `undefined`.
 
 ### Phase C — client integrity
 
-11. **`registry.service.ts downloadPlugin`**: after the file-tree extraction, also compute SHA-256 of `client/index.js` if present. Store separately in DB column `clientSha256`.
-12. **`plugins.routes.ts /active`**: include `clientSha256` in the response.
-13. **`client/src/plugins/PluginManager.ts loadPlugin`**: fetch the bundle as `Response`, read as `ArrayBuffer`, `crypto.subtle.digest("SHA-256", buf)`, hex-compare to the advertised hash. On match, construct a `Blob` and `import(URL.createObjectURL(blob))`. On mismatch, log + skip + report back via the existing WebSocket channel.
-14. **Static serving (`packages/server/src/modules/plugins/index.ts`)**: narrow the `@fastify/static` root from `pluginsDir` to a per-plugin `client/` subpath. Add a `setHeaders` hook that emits `Cache-Control: no-cache` for plugin bundles so a stale browser cache cannot survive a hash-mismatch event.
+11. **`registry.service.ts downloadPlugin`**: after the file-tree extraction, walk the entire `client/` subtree and emit a `client-manifest.json` of `{ path, sha256 }` entries (path relative to the plugin's `client/` directory). Also store the entry-file (`client/index.js`) hash separately in DB column `clientSha256` for the advertised-hash flow.
+12. **`plugins.routes.ts /active`**: include `clientSha256` (entry-file hash) in the response. The full per-asset manifest stays server-internal.
+13. **`client/src/plugins/PluginManager.ts loadPlugin`**: fetch the entry bundle as `Response`, read as `ArrayBuffer`, `crypto.subtle.digest("SHA-256", buf)`, hex-compare to the advertised hash. On match, `import()` the original same-origin URL — subsequent relative chunk imports are gate-kept by the server (step 14), so a `blob:` URL is unnecessary and would break relative imports. On mismatch, log + skip + report back via the existing WebSocket channel.
+14. **Static serving (`packages/server/src/modules/plugins/index.ts`)**: narrow the `@fastify/static` root from `pluginsDir` to a per-plugin `client/` subpath, then wrap it in a preHandler that consults the in-memory `client-manifest.json` for the requested plugin. Paths not in the manifest → 404. Path present but on-disk bytes hash to something other than the recorded `sha256` → 409 `integrity_mismatch`. Add a `setHeaders` hook that emits `Cache-Control: no-cache` for plugin bundles so a stale browser cache cannot survive a hash-mismatch event.
 
 ### Cross-cutting
 
@@ -297,7 +304,7 @@ Concrete shape. JSON in `manifest.json`, mirrored as a zod schema server-side.
 
 ### Scope semantics
 
-- **Absence over no-op.** If a plugin doesn't request `storage`, `api.storage` is `undefined`, not a throwing stub. Authors discover the missing scope at first call during development.
+- **Throwing stub over silent undefined.** Every sub-API (`notes`, `events`, `routes`, `storage`, `settings`, `search`) is present on the API object passed to `activate()` regardless of granted scopes. Methods outside the granted scopes throw a typed `ScopeError("plugin lacks '<scope>' scope")` at call time. Rationale: making the sub-API absent (i.e. `api.storage === undefined`) produces a generic `TypeError: Cannot read properties of undefined` at the callsite, which is opaque to admins reading logs and indistinguishable from a coding bug. A `ScopeError` thrown by the stub gives admins a clean named error, points at the exact missing scope, and is something the manager can catch and report as a scope violation. Authors still discover the missing scope at first call during development — they just get a better error message.
 - **`reason` is mandatory** and is shown to the admin verbatim during install consent. Keeps authors honest.
 - **Wildcard scopes are not provided.** No `notes.*`. Plugins enumerate what they need.
 - **Forward-compat unknown scopes**: if the manifest declares a scope the server doesn't recognize, install fails. This is intentional — silently dropping unknown scopes would let a future malicious manifest claim authority by typoing.
