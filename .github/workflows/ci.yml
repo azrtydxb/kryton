@@ -11,8 +11,25 @@ name: CI
 on:
   push:
     branches: [master]
+    # Don't burn ~8 minutes of CI on doc-only pushes to master. The
+    # release.yml workflow has its own gates so this is just the
+    # fast-tier feedback loop.
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - 'LICENSE'
+      - '.gitignore'
   pull_request:
     branches: [master]
+    # PRs that touch only Markdown / docs don't change shipped behaviour
+    # and don't need to run the full test suite. The design-doc PRs
+    # under docs/superpowers/specs/** were sitting blocked on flaky CI
+    # for changes that couldn't possibly break tests.
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - 'LICENSE'
+      - '.gitignore'
 
 # Cancel any in-progress run on the same branch when a new push lands.
 # The self-hosted runner pool is small (single 248 box, three runners),
