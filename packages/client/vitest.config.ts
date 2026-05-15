@@ -19,9 +19,11 @@ export default defineConfig({
         minForks: 1,
       },
     },
-    // Same justification as packages/server/vitest.config.ts — fastify
-    // boot inside jsdom tests can take several seconds under load. 30s
-    // is the honest envelope.
+    // jsdom + react-testing-library setup, plus the heavier
+    // integration-shaped tests (HttpAdapter, Yjs adapter wiring) take
+    // several seconds under CI contention. The default 5s timeout
+    // tripped on slower runner conditions; 30s matches the server
+    // envelope and is well past anything a healthy test should take.
     testTimeout: 30_000,
     hookTimeout: 30_000,
     coverage: {

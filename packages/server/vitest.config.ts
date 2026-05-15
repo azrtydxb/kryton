@@ -14,8 +14,10 @@ export default defineConfig({
     // 30s envelope was tripping during contended CI runs (an 11-test
     // file finishing in 91s wall-time, one test hitting 30s). 60s is
     // generous but anything beyond that is genuinely stuck and worth
-    // failing on. CI runs are also now serialised via concurrency:
-    // group in .github/workflows/ci.yml so contention should ease too.
+    // failing on. The per-branch concurrency block in
+    // .github/workflows/ci.yml also cancels older runs for the same
+    // ref so a single PR's stacked pushes can't double-load the
+    // runner — different PRs can still run concurrently though.
     testTimeout: 60_000,
     hookTimeout: 60_000,
     coverage: {
