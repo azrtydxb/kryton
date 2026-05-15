@@ -6,7 +6,7 @@ import { Icons } from '../Icons';
 import { usePrefs, type EditorLayout } from '../../stores/prefsStore';
 
 interface PreviewModeViewProps {
-  activeNote: { path: string; title: string; content: string; modifiedAt?: string };
+  activeNote: { path: string; title: string; content: string; modifiedAt?: string; tabId?: string };
   isStarred: boolean;
   allNotes: FileNode[];
   previewRef: MutableRefObject<HTMLDivElement | null>;
@@ -72,7 +72,7 @@ export function PreviewModeView({
       <div style={{ display: 'flex', alignItems: 'stretch', borderBottom: '1px solid var(--line)', background: 'var(--bg)' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <EditorTabStrip
-            activePath={activeNote.path}
+            activePath={activeNote.tabId ?? activeNote.path}
             activeTitle={activeNote.title}
             dirty={false}
             onSelect={(p) => onNoteSelect?.(p)}

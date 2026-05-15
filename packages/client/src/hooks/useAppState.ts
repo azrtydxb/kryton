@@ -88,7 +88,11 @@ export function useAppState(pluginManager?: import('../plugins/PluginManager').C
   const sharedQuery = useSharedNotes(user?.id);
   const sharedNotes = sharedQuery.data ?? [];
 
-  const isActiveNoteStarred = notes.activeNote ? starredPaths.has(notes.activeNote.path) : false;
+  // Starred set is keyed by tab id so shared notes and own notes that
+  // happen to share the same on-disk path don't collide.
+  const isActiveNoteStarred = notes.activeNote
+    ? starredPaths.has(notes.activeNote.tabId ?? notes.activeNote.path)
+    : false;
 
   // Refs
   const editorViewRef = useRef<EditorHandle | null>(null);

@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useDebouncedCallback } from 'use-debounce';
-import { api, FileNode, NoteData } from '../lib/api';
+import { api, FileNode, NoteData, sharedNoteApi } from '../lib/api';
 
 export function useNotes(userId?: string) {
   const [tree, setTree] = useState<FileNode[]>([]);
@@ -38,9 +38,17 @@ export function useNotes(userId?: string) {
     async (ownerUserId: string, notePath: string) => {
       try {
         setError(null);
-        const { sharedNoteApi } = await import('../lib/api');
         const note = await sharedNoteApi.read(ownerUserId, notePath);
-        setActiveNote({ ...note, modifiedAt: new Date().toISOString() });
+        // The on-disk path returned by the API stays in `path` so any
+        // saves route to the right endpoint. Surface the prefixed
+        // `shared:<ownerUserId>:<notePath>` as `tabId` so the editor
+        // tab strip and starred lookups can compare against it
+        // without conflating two notes that share the same `path`.
+        setActiveNote({
+          ...note,
+          tabId: `shared:${ownerUserId}:${notePath}`,
+          modifiedAt: new Date().toISOString(),
+        });
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Failed to open shared note');
       }

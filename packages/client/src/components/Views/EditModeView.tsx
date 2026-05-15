@@ -13,7 +13,7 @@ import { usePrefs } from '../../stores/prefsStore';
 type SaveStatus = 'unchanged' | 'unsaved' | 'saving' | 'saved' | 'error';
 
 interface EditModeViewProps {
-  activeNote: { path: string; title: string; content: string };
+  activeNote: { path: string; title: string; content: string; tabId?: string };
   editContent: string | null;
   originalContent: string | null;
   isStarred: boolean;
@@ -136,7 +136,7 @@ export function EditModeView({
       <div style={{ display: 'flex', alignItems: 'stretch', background: 'var(--bg)', borderBottom: '1px solid var(--line)' }}>
         <div style={{ flex: 1, minWidth: 0, display: 'flex' }}>
           <EditorTabStrip
-            activePath={activeNote.path}
+            activePath={activeNote.tabId ?? activeNote.path}
             activeTitle={activeNote.title}
             dirty={dirty}
             onSelect={(p) => onNoteSelect?.(p)}

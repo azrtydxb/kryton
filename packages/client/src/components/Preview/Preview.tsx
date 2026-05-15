@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useEffect, useRef, useState } from 'react';
+import React, { useMemo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { NotePreviewReact } from '@azrtydxb/ui';
 import { api, BacklinkData, FileNode } from '../../lib/api';
@@ -219,7 +219,14 @@ export function Preview({
     // them and stack the renders at the bottom).
     const raw = content ?? '';
     const blocks: { id: string; query: string }[] = [];
-    const re = /```dataview\n([\s\S]*?)```/g;
+    // Anchor the opening fence at the start of a line (or document) so
+    // ```dataview written inside a quadruple-backtick block, an
+    // indented code sample, or a markdown tutorial that documents the
+    // syntax verbatim isn't mistaken for an executable block. Both
+    // anchors are zero-width (lookbehind / lookahead) so the
+    // surrounding newlines remain in `parts` and the placeholder
+    // doesn't get glued to the previous line.
+    const re = /(?<=^|\n)```dataview\n([\s\S]*?)\n```(?=\n|$)/g;
     const parts: string[] = [];
     let last = 0;
     let m: RegExpExecArray | null;
@@ -238,7 +245,12 @@ export function Preview({
   // so we can portal the React DataviewBlock components into them.
   const mdRef = useRef<HTMLDivElement | null>(null);
   const [dataviewSlots, setDataviewSlots] = useState<Record<string, HTMLElement>>({});
-  useEffect(() => {
+  // useLayoutEffect (not useEffect) so the placeholder lookup and
+  // portal mount happen in the same commit as the markdown render.
+  // Otherwise the first paint shows empty <div data-dataview-id>
+  // placeholders and the block content flashes in on the next frame,
+  // which is perceptible for pages with many or expensive blocks.
+  useLayoutEffect(() => {
     if (!mdRef.current) return;
     const slots: Record<string, HTMLElement> = {};
     for (const block of dataviewBlocks) {
