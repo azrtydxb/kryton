@@ -46,11 +46,14 @@ env:
 
 jobs:
   build:
-    runs-on: [self-hosted, kryton-248]
+    # ARC v2 scale-set on the kw cluster (k3s ARM64). Ephemeral runner
+    # pods with a dind sidecar; minRunners=0, maxRunners=20. The single
+    # label `arc-azrtydxb` is the only valid form — scale-set runners
+    # don't accept multi-label arrays like the old kryton-248 box did.
+    runs-on: arc-azrtydxb
     # Run inside a node container so the service-container postgres is
     # reachable via its docker-network hostname (`postgres:5432`) instead
-    # of via a host-published port. Lets multiple jobs run on the same
-    # self-hosted box in parallel without colliding on a host port.
+    # of via a host-published port.
     container:
       image: node:24
     services:
@@ -122,12 +125,12 @@ jobs:
           APP_URL: http://localhost:5173
           OPENAPI_ENABLED: "true"
 
-      - name: Restore workspace ownership to host user
-        # Container runs as root by default — files written here end up
-        # owned by root on the host runner's bind-mounted workspace.
-        # That blocks the next job's actions/checkout cleanup. Hand
-        # ownership back to piwi (1000:1000) before exiting so any
-        # subsequent host-based job can clean cleanly.
+      - name: Restore workspace ownership to runner user
+        # The job container runs as root by default but the ARC runner
+        # process is UID 1001. Files written by the job would be owned
+        # by root on the bind-mounted workspace, blocking
+        # actions/checkout's post-job cleanup. Hand ownership back so
+        # any subsequent host-based step (and post-job cleanup) works.
         # `if: always()` ensures this runs on failure too.
         if: always()
-        run: chown -R 1000:1000 . || true
+        run: chown -R 1001:1001 . || true
