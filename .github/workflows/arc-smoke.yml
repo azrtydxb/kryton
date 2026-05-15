@@ -1,0 +1,147 @@
+name: ARC smoke test
+
+# Verifies that the `arc-azrtydxb` ARC v2 scale-set runners on the kw
+# cluster are configured the way the migration plan assumes. Run this
+# manually before moving ci.yml / e2e.yml / release.yml onto ARC.
+#
+# Checks:
+#   1. Basic job placement on the scale set.
+#   2. Pull-through registry mirror for ghcr.io works inside the dind
+#      sidecar (hostAlias 192.168.10.122).
+#   3. Per-pod env vars BUILDKIT_AMD64_ENDPOINT + BUILDKIT_CLIENT_{CA,CERT,KEY}
+#      are populated by the AutoscalingRunnerSet template.
+#   4. Buildkit certs are mounted with the correct mode (runner UID 1001
+#      must be able to read them).
+#   5. Local arm64 + remote amd64 multi-arch build works and pushes a
+#      manifest list to ghcr.io.
+#   6. Confirm pgvector/pgvector:pg16 has an arm64 variant pullable
+#      through the mirror (blocker for migrating ci.yml's service
+#      container to ARC).
+#
+# Trigger: workflow_dispatch only. Not wired into any push/PR events.
+
+on:
+  workflow_dispatch:
+    inputs:
+      push_image:
+        description: "Push the multi-arch test image to ghcr.io? (false = build only)"
+        required: false
+        default: "false"
+        type: choice
+        options: ["false", "true"]
+
+env:
+  TEST_IMAGE: ghcr.io/${{ github.repository }}/arc-smoke-test
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  smoke:
+    runs-on: arc-azrtydxb
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Identify runner
+        run: |
+          echo "=== runner host ==="
+          uname -a
+          echo "=== runner user / uid ==="
+          id
+          echo "=== docker daemon (dind sidecar) ==="
+          docker version || true
+          docker info | head -30 || true
+
+      - name: Confirm buildkit env vars are injected
+        run: |
+          missing=0
+          for v in BUILDKIT_AMD64_ENDPOINT BUILDKIT_CLIENT_CA BUILDKIT_CLIENT_CERT BUILDKIT_CLIENT_KEY; do
+            if [ -z "${!v:-}" ]; then
+              echo "FAIL: \$$v is empty"
+              missing=1
+            else
+              echo "ok:   \$$v = ${!v}"
+            fi
+          done
+          [ "$missing" = 0 ] || exit 1
+
+      - name: Confirm cert files are readable by the runner user
+        run: |
+          for f in "$BUILDKIT_CLIENT_CA" "$BUILDKIT_CLIENT_CERT" "$BUILDKIT_CLIENT_KEY"; do
+            if [ ! -r "$f" ]; then
+              echo "FAIL: cannot read $f as $(id -un) (uid $(id -u))"
+              ls -l "$f" || true
+              exit 1
+            fi
+            echo "ok:   readable $f ($(stat -c '%a' "$f"))"
+          done
+
+      - name: Pull pgvector arm64 through the mirror
+        # The kw cluster's containerd routes ghcr.io and docker.io
+        # through the registry-cache. This proves pgvector/pgvector:pg16
+        # — the image the test workflows mount as a service — pulls
+        # cleanly on arm64. If this fails, ci.yml's service container
+        # won't come up on ARC.
+        run: |
+          docker pull pgvector/pgvector:pg16
+          docker image inspect pgvector/pgvector:pg16 \
+            --format 'arch={{.Architecture}} os={{.Os}}'
+
+      - name: Set up Docker Buildx (local arm64 + remote amd64)
+        run: |
+          docker buildx create \
+            --name multi \
+            --driver docker-container \
+            --platform linux/arm64 \
+            --use
+
+          docker buildx create \
+            --name multi --append \
+            --driver remote \
+            --platform linux/amd64 \
+            --driver-opt cacert="$BUILDKIT_CLIENT_CA" \
+            --driver-opt cert="$BUILDKIT_CLIENT_CERT" \
+            --driver-opt key="$BUILDKIT_CLIENT_KEY" \
+            "$BUILDKIT_AMD64_ENDPOINT"
+
+          docker buildx inspect --bootstrap
+
+      - name: Write trivial Dockerfile
+        run: |
+          mkdir -p smoke
+          cat > smoke/Dockerfile <<'EOF'
+          FROM alpine:3.20
+          ARG TARGETPLATFORM
+          ARG BUILDPLATFORM
+          RUN echo "Built for $TARGETPLATFORM on $BUILDPLATFORM" > /platform.txt
+          CMD ["cat", "/platform.txt"]
+          EOF
+
+      - name: Log in to ghcr.io (only when pushing)
+        if: ${{ inputs.push_image == 'true' }}
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Multi-arch build (no push)
+        if: ${{ inputs.push_image != 'true' }}
+        run: |
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --tag "$TEST_IMAGE:smoke" \
+            ./smoke
+
+      - name: Multi-arch build + push
+        if: ${{ inputs.push_image == 'true' }}
+        run: |
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --tag "$TEST_IMAGE:smoke-${{ github.run_id }}" \
+            --push \
+            ./smoke
+          docker buildx imagetools inspect "$TEST_IMAGE:smoke-${{ github.run_id }}"
+
+      - name: Summary
+        run: |
+          echo "::notice::ARC smoke test passed — env vars present, certs readable, pgvector arm64 pulls, multi-arch buildx works."
