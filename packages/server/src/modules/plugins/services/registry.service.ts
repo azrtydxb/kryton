@@ -1,16 +1,30 @@
 import path from "node:path";
 import fs from "node:fs/promises";
 
-const ALLOWED_DOWNLOAD_HOSTS = ["github.com", "raw.githubusercontent.com", "api.github.com"];
+// Hosts that actually serve raw plugin assets — the GitHub REST API and
+// the raw content CDN. `github.com` itself was on the previous list, but
+// that host serves HTML pages (and redirects to `codeload.github.com`
+// for archives), neither of which we want to ingest. HTTPS is also
+// required so a man-in-the-middle can't substitute a different payload.
+const ALLOWED_DOWNLOAD_HOSTS = ["raw.githubusercontent.com", "api.github.com"];
 
 function validateDownloadUrl(url: string): void {
   try {
     const parsed = new URL(url);
+    if (parsed.protocol !== "https:") {
+      throw new Error(`Download URL must use https: ${parsed.protocol}`);
+    }
     if (!ALLOWED_DOWNLOAD_HOSTS.includes(parsed.hostname)) {
       throw new Error(`Download URL hostname not allowed: ${parsed.hostname}`);
     }
   } catch (err) {
-    if (err instanceof Error && err.message.includes("not allowed")) throw err;
+    if (
+      err instanceof Error &&
+      (err.message.includes("not allowed") ||
+        err.message.includes("must use https"))
+    ) {
+      throw err;
+    }
     throw new Error(`Invalid download URL: ${url}`, { cause: err });
   }
 }

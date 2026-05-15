@@ -187,15 +187,65 @@ const pluginsModuleImpl = (options: PluginsModuleOptions = {}): FastifyPluginAsy
     // ── Static plugin assets ───────────────────────────────────────────
     // Plugin client bundles live on disk under <pluginsDir>/<id>/client/...
     // The active-plugins API advertises them as /plugins/<id>/client/index.js
-    // (see /api/plugins/active response). Serve those files here so the
-    // browser's dynamic `await import()` succeeds.
+    // (see /api/plugins/active response). Only that subtree is web-reachable
+    // — everything else in a plugin directory (server.js, manifest.json,
+    // lockfile, .env, etc.) is intentionally NOT served. Using @fastify/static
+    // rooted at `pluginsDir` would expose every file in every plugin
+    // directory; this hand-rolled handler enforces the "<id>/client/..."
+    // path shape and resolves through realpath to defeat any symlink-based
+    // escape out of the client subtree.
+    const fsModule = await import("node:fs/promises");
+    // `pluginsDir` is created above with mkdir({recursive:true}) so this
+    // always resolves under normal operation.
+    const pluginsDirReal = await fsModule.realpath(pluginsDir);
+
+    app.route({
+      method: "GET",
+      url: "/plugins/*",
+      schema: { hide: true },
+      handler: async (req, reply) => {
+        const wildcard = (req.params as { "*"?: string })["*"] ?? "";
+        // Path shape: <id>/client/<rest>. Reject anything else.
+        const segments = wildcard.split("/").filter((s) => s.length > 0);
+        if (segments.length < 3 || segments[1] !== "client") {
+          return reply.code(404).send();
+        }
+        const [pluginId, , ...rest] = segments;
+        // Plugin IDs must match the same allowlist used at install
+        // (alnum / dash / underscore) so we can't be tricked into
+        // resolving to a sibling directory.
+        if (!/^[a-zA-Z0-9_-]+$/.test(pluginId)) {
+          return reply.code(404).send();
+        }
+        const clientRoot = path.join(pluginsDirReal, pluginId, "client");
+        const target = path.join(clientRoot, ...rest);
+        // Resolve through realpath so a symlink inside client/ that
+        // points back out (e.g. ../../../../etc/passwd) doesn't escape.
+        let real: string;
+        try {
+          real = await fsModule.realpath(target);
+        } catch {
+          return reply.code(404).send();
+        }
+        if (real !== clientRoot && !real.startsWith(clientRoot + path.sep)) {
+          return reply.code(404).send();
+        }
+        return reply.sendFile(
+          path.relative(pluginsDirReal, real),
+          pluginsDirReal,
+        );
+      },
+    });
+
+    // @fastify/static still has to register so `reply.sendFile` exists,
+    // but with `serve: false` it doesn't auto-serve anything. The
+    // hand-rolled handler above is the only entry point into the
+    // plugin asset tree.
     const fastifyStatic = await import("@fastify/static");
     await app.register(fastifyStatic.default, {
-      root: pluginsDir,
-      prefix: "/plugins/",
-      decorateReply: false,
-      // Allow serving deeply nested plugin subpaths.
-      list: false,
+      root: pluginsDirReal,
+      serve: false,
+      decorateReply: true,
     });
 
     // ── Discover plugins on disk ───────────────────────────────────────
