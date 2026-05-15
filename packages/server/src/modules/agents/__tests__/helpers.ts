@@ -1,5 +1,5 @@
 import Fastify, { type FastifyInstance } from "fastify";
-import { sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { zodPlugin } from "../../../plugins/zod.js";
 import { errorsPlugin } from "../../../plugins/errors.js";
 import { AuthError, ForbiddenError } from "../../../lib/errors.js";
@@ -7,6 +7,7 @@ import { agentsRoutes } from "../routes/agents.routes.js";
 import { AgentService } from "../services/agent.service.js";
 import type { AuthApi, AuthContext, AuthUser } from "../../../plugins/auth.js";
 import { createTestDb, type TestDbHandle } from "../../../test/db-fixture.js";
+import { user as userTable } from "../../../db/schema/auth.js";
 
 export interface AgentsTestAppOptions {
   /** The user returned by auth helpers. Set to null to simulate anonymous. */
@@ -17,28 +18,55 @@ export interface AgentsTestAppOptions {
 
 /**
  * Shared Drizzle test DB handle. Agents tests share a single connection to
- * the testcontainers Postgres started by the vitest global setup; rows are
- * cleared between tests via `resetAgentsTestDb()` instead of opening a new
- * pool per app.
+ * the testcontainers Postgres started by the vitest global setup; under
+ * fileParallelism: true rows are scoped via per-suite unique userIds (see
+ * `createAgentsTestUser`) rather than truncated between tests.
  */
 export function createAgentsTestDb(): TestDbHandle {
   return createTestDb();
 }
 
 /**
- * Truncate all tables touched by the agents tests. Call from `beforeEach`
- * (or `afterEach`) to keep tests isolated.
+ * Build a per-suite unique test user. The id satisfies SAFE_USER_ID_REGEX in
+ * services/user-notes-dir.service.ts (`/^[a-zA-Z0-9_-]{8,64}$/`), and the
+ * random suffix + pid keeps two parallel suites from colliding on a single
+ * shared Postgres database under fileParallelism: true.
  */
-export async function resetAgentsTestDb(handle: TestDbHandle): Promise<void> {
-  // RESTART IDENTITY + CASCADE so dependent FKs (AgentToken -> Agent -> User)
-  // clear in one shot.
-  await handle.db.execute(sql`
-    TRUNCATE TABLE
-      "AgentToken",
-      "Agent",
-      "User"
-    RESTART IDENTITY CASCADE
-  `);
+export function createAgentsTestUser(tag: string = "ag"): AuthUser {
+  const rand = Math.floor(Math.random() * 1e9);
+  return {
+    id: `u-${tag}-${rand}-${process.pid}`,
+    email: `${tag}-${rand}-${process.pid}@test.local`,
+    name: tag,
+    role: "user",
+  };
+}
+
+/**
+ * Seed a User row. With per-suite unique ids there's no expected conflict —
+ * we deliberately don't use ON CONFLICT DO NOTHING so any collision surfaces
+ * as a failure.
+ */
+export async function seedAgentsTestUser(
+  handle: TestDbHandle,
+  user: AuthUser,
+): Promise<void> {
+  await handle.db.insert(userTable).values({
+    id: user.id,
+    name: user.name,
+    email: user.email,
+  });
+}
+
+/**
+ * Delete a suite's user. FK cascade handles Agent + AgentToken rows owned by
+ * the user. Call from `afterAll`.
+ */
+export async function cleanupAgentsTestUser(
+  handle: TestDbHandle,
+  userId: string,
+): Promise<void> {
+  await handle.db.delete(userTable).where(eq(userTable.id, userId));
 }
 
 /**

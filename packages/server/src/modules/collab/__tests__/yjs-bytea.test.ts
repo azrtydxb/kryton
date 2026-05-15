@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
-import { sql, eq } from "drizzle-orm";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { eq } from "drizzle-orm";
 import * as Y from "yjs";
 import { createTestDb, type TestDbHandle } from "../../../test/db-fixture.js";
 import { user as userTable } from "../../../db/schema/auth.js";
@@ -11,36 +11,32 @@ import { YjsPersistence } from "../ws/persistence.js";
  * Drizzle's `bytea` custom type (pg Buffer) byte-for-byte, including non-
  * trivial payloads (>100 KB). This guards against any future change to the
  * bytea encoder/decoder that would silently corrupt collaborative state.
+ *
+ * Per-suite unique userId + docId so this file is safe under
+ * fileParallelism: true. Cleanup uses scoped DELETE (FK cascade through
+ * User) — no TRUNCATE.
  */
 describe("yjs bytea round-trip (Drizzle)", () => {
   let handle: TestDbHandle;
   let persistence: YjsPersistence;
-  let userId: string;
+  // Satisfies SAFE_USER_ID_REGEX in services/user-notes-dir.service.ts.
+  const userId = `u-bytea-${Math.floor(Math.random() * 1e9)}-${process.pid}`;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     handle = createTestDb();
     persistence = new YjsPersistence(handle.db);
-  });
-
-  afterAll(async () => {
-    // Leave the DB clean so other test files relying on empty tables pass.
-    await handle.db.execute(sql`
-      TRUNCATE TABLE "YjsUpdate", "YjsDocument", "User" RESTART IDENTITY CASCADE
-    `);
-    await handle.close();
-  });
-
-  beforeEach(async () => {
-    await handle.db.execute(sql`
-      TRUNCATE TABLE "YjsUpdate", "YjsDocument", "User" RESTART IDENTITY CASCADE
-    `);
-    userId = `u-bytea-${Date.now()}-${Math.random()}`;
     await handle.db.insert(userTable).values({
       id: userId,
       email: `${userId}@test.local`,
       name: "Bytea Test",
       emailVerified: false,
     });
+  });
+
+  afterAll(async () => {
+    // FK cascade removes YjsDocument / YjsUpdate rows owned by this user.
+    await handle.db.delete(userTable).where(eq(userTable.id, userId));
+    await handle.close();
   });
 
   it("round-trips a >100 KB Yjs snapshot byte-for-byte", async () => {
@@ -55,7 +51,7 @@ describe("yjs bytea round-trip (Drizzle)", () => {
     const encoded = Y.encodeStateAsUpdate(doc);
     expect(encoded.byteLength).toBeGreaterThan(100 * 1024);
 
-    const docId = `bytea-doc-${Date.now()}`;
+    const docId = `bytea-doc-${Math.floor(Math.random() * 1e9)}-${process.pid}`;
     await persistence.saveYjsSnapshot(docId, userId, doc);
 
     // Verify raw bytes in storage match exactly.
@@ -78,7 +74,7 @@ describe("yjs bytea round-trip (Drizzle)", () => {
     doc.getText("t").insert(0, "hello world");
     const update = Y.encodeStateAsUpdate(doc);
 
-    const docId = `bytea-upd-${Date.now()}`;
+    const docId = `bytea-upd-${Math.floor(Math.random() * 1e9)}-${process.pid}`;
     await persistence.appendYjsUpdate(docId, update, null);
 
     const rows = await handle.db.query.yjsUpdate.findMany({

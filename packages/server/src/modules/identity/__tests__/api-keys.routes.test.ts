@@ -1,35 +1,40 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest";
 import { eq } from "drizzle-orm";
-import { apiKey, user } from "../../../db/schema/auth.js";
+import { apiKey } from "../../../db/schema/auth.js";
 import type { TestDbHandle } from "../../../test/db-fixture.js";
 import {
   buildIdentityTestApp,
+  cleanupIdentityTestUser,
   createIdentityTestDb,
-  resetIdentityTestDb,
+  createIdentityTestUser,
+  seedIdentityTestUser,
 } from "./helpers.js";
 
-const TEST_USER = { id: "u-1", email: "alice@example.com", name: "Alice", role: "user" };
-
-async function seedUser(dbHandle: TestDbHandle): Promise<void> {
-  await dbHandle.db.insert(user).values({
-    id: TEST_USER.id,
-    name: TEST_USER.name,
-    email: TEST_USER.email,
-  });
-}
+const TEST_USER = createIdentityTestUser("apikeys");
 
 describe("identity / api-keys routes", () => {
   let dbHandle: TestDbHandle;
   let close: (() => Promise<void>) | null = null;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     dbHandle = createIdentityTestDb();
+    await seedIdentityTestUser(dbHandle, TEST_USER);
   });
   afterAll(async () => {
+    await cleanupIdentityTestUser(dbHandle, TEST_USER.id);
     await dbHandle.close();
   });
   beforeEach(async () => {
-    await resetIdentityTestDb(dbHandle);
+    // Per-test scoped cleanup: only this suite's user's keys.
+    await dbHandle.db.delete(apiKey).where(eq(apiKey.userId, TEST_USER.id));
   });
   afterEach(async () => {
     if (close) await close();
@@ -37,7 +42,6 @@ describe("identity / api-keys routes", () => {
   });
 
   it("POST /api/api-keys creates a key and returns the raw value once", async () => {
-    await seedUser(dbHandle);
     const app = await buildIdentityTestApp({ user: TEST_USER, dbHandle });
     close = () => app.close();
 
@@ -57,7 +61,6 @@ describe("identity / api-keys routes", () => {
   // BLOCKED: see users.routes.test.ts — validation-failure path crashes
   // inside fastify-type-provider-zod 4.0.2 against Zod 4.
   it.skip("POST /api/api-keys validates body", async () => {
-    await seedUser(dbHandle);
     const app = await buildIdentityTestApp({ user: TEST_USER, dbHandle });
     close = () => app.close();
 
@@ -70,7 +73,6 @@ describe("identity / api-keys routes", () => {
   });
 
   it("POST /api/api-keys rejects API-key-based callers (session-only)", async () => {
-    await seedUser(dbHandle);
     const app = await buildIdentityTestApp({
       user: TEST_USER,
       apiKey: { id: "k-existing", scope: "read-write" },
@@ -87,9 +89,9 @@ describe("identity / api-keys routes", () => {
   });
 
   it("GET /api/api-keys lists user's keys", async () => {
-    await seedUser(dbHandle);
+    const keyId = `k-list-${Math.floor(Math.random() * 1e9)}`;
     await dbHandle.db.insert(apiKey).values({
-      id: "k-1",
+      id: keyId,
       userId: TEST_USER.id,
       name: "key-a",
       keyHash: "hash-a",
@@ -106,14 +108,14 @@ describe("identity / api-keys routes", () => {
     expect(res.statusCode).toBe(200);
     const list = res.json();
     expect(list).toHaveLength(1);
-    expect(list[0].id).toBe("k-1");
+    expect(list[0].id).toBe(keyId);
     expect(list[0].name).toBe("key-a");
   });
 
   it("DELETE /api/api-keys/:id revokes the key", async () => {
-    await seedUser(dbHandle);
+    const keyId = `k-del-${Math.floor(Math.random() * 1e9)}`;
     await dbHandle.db.insert(apiKey).values({
-      id: "k-1",
+      id: keyId,
       userId: TEST_USER.id,
       name: "key-a",
       keyHash: "hash-a",
@@ -123,21 +125,20 @@ describe("identity / api-keys routes", () => {
     const app = await buildIdentityTestApp({ user: TEST_USER, dbHandle });
     close = () => app.close();
 
-    const res = await app.inject({ method: "DELETE", url: "/api/api-keys/k-1" });
+    const res = await app.inject({ method: "DELETE", url: `/api/api-keys/${keyId}` });
     expect(res.statusCode).toBe(204);
     const remaining = await dbHandle.db
       .select()
       .from(apiKey)
-      .where(eq(apiKey.id, "k-1"));
+      .where(eq(apiKey.id, keyId));
     expect(remaining).toHaveLength(0);
   });
 
   it("DELETE /api/api-keys/:id returns 404 for unknown key", async () => {
-    await seedUser(dbHandle);
     const app = await buildIdentityTestApp({ user: TEST_USER, dbHandle });
     close = () => app.close();
 
-    const res = await app.inject({ method: "DELETE", url: "/api/api-keys/missing" });
+    const res = await app.inject({ method: "DELETE", url: "/api/api-keys/missing-xyz" });
     expect(res.statusCode).toBe(404);
   });
 });

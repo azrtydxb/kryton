@@ -1,21 +1,26 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { user } from "../../../db/schema/auth.js";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest";
+import { eq } from "drizzle-orm";
 import { graphEdge, searchIndex } from "../../../db/schema/notes.js";
 import type { TestDbHandle } from "../../../test/db-fixture.js";
 import {
   buildKnowledgeTestApp,
+  cleanupKnowledgeTestUser,
   createKnowledgeTestDb,
-  resetKnowledgeTestDb,
+  createKnowledgeTestUser,
+  seedKnowledgeTestUser,
 } from "./helpers.js";
 
-const TEST_USER = { id: "u-1", email: "alice@example.com", name: "Alice", role: "user" };
+const TEST_USER = createKnowledgeTestUser("graph");
 
 async function seedGraph(dbHandle: TestDbHandle): Promise<void> {
-  await dbHandle.db.insert(user).values({
-    id: TEST_USER.id,
-    name: TEST_USER.name,
-    email: TEST_USER.email,
-  });
   await dbHandle.db.insert(searchIndex).values([
     {
       notePath: "A.md",
@@ -47,14 +52,21 @@ describe("knowledge / graph routes", () => {
   let dbHandle: TestDbHandle;
   let close: (() => Promise<void>) | null = null;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     dbHandle = createKnowledgeTestDb();
+    await seedKnowledgeTestUser(dbHandle, TEST_USER);
   });
   afterAll(async () => {
+    await cleanupKnowledgeTestUser(dbHandle, TEST_USER.id);
     await dbHandle.close();
   });
   beforeEach(async () => {
-    await resetKnowledgeTestDb(dbHandle);
+    await dbHandle.db
+      .delete(graphEdge)
+      .where(eq(graphEdge.userId, TEST_USER.id));
+    await dbHandle.db
+      .delete(searchIndex)
+      .where(eq(searchIndex.userId, TEST_USER.id));
   });
   afterEach(async () => {
     if (close) await close();

@@ -7,7 +7,7 @@
  */
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -36,8 +36,6 @@ function makeFakeEmbedder(): Embedder {
 }
 
 const silentLog = {
-  // Cast through unknown to satisfy the structural FastifyBaseLogger type
-  // without dragging in pino. The worker only uses .info/.warn/.error.
   info: () => {},
   warn: () => {},
   error: () => {},
@@ -48,7 +46,9 @@ const silentLog = {
   level: "silent",
 } as unknown as FastifyBaseLogger;
 
-const TEST_USER_ID = "u-embed-worker-smoke";
+// Per-suite unique userId so this file is safe under fileParallelism: true.
+// Satisfies SAFE_USER_ID_REGEX in services/user-notes-dir.service.ts.
+const TEST_USER_ID = `u-emb-${Math.floor(Math.random() * 1e9)}-${process.pid}`;
 
 describe("EmbedWorker (smoke)", () => {
   let handle: TestDbHandle;
@@ -58,29 +58,30 @@ describe("EmbedWorker (smoke)", () => {
     handle = createTestDb();
     notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "embed-worker-smoke-"));
     await fs.mkdir(path.join(notesDir, TEST_USER_ID), { recursive: true });
+    await handle.db.insert(user).values({
+      id: TEST_USER_ID,
+      email: `embed-worker-${process.pid}@test.local`,
+      name: "Embed Worker Test",
+    });
   });
 
   afterAll(async () => {
+    // FK cascade removes SearchIndex / EmbedJob / NoteEmbeddingChunk rows
+    // owned by this user.
+    await handle.db.delete(user).where(eq(user.id, TEST_USER_ID));
     await handle.close();
     await fs.rm(notesDir, { recursive: true, force: true });
   });
 
   beforeEach(async () => {
-    // Reset just the tables this test touches. Cascade from User clears
-    // SearchIndex / EmbedJob / NoteEmbeddingChunk by FK.
-    await handle.db.execute(sql`
-      TRUNCATE TABLE
-        "NoteEmbeddingChunk",
-        "EmbedJob",
-        "SearchIndex",
-        "User"
-      RESTART IDENTITY CASCADE
-    `);
-    await handle.db.insert(user).values({
-      id: TEST_USER_ID,
-      email: "embed-worker@test.local",
-      name: "Embed Worker Test",
-    });
+    // Per-test scoped reset: only this suite's user's rows.
+    await handle.db
+      .delete(noteEmbeddingChunk)
+      .where(eq(noteEmbeddingChunk.userId, TEST_USER_ID));
+    await handle.db.delete(embedJob).where(eq(embedJob.userId, TEST_USER_ID));
+    await handle.db
+      .delete(searchIndex)
+      .where(eq(searchIndex.userId, TEST_USER_ID));
   });
 
   it("processes an upsert job: writes chunks and removes the job row", async () => {
