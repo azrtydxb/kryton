@@ -85,9 +85,10 @@ export async function buildApp({
   await app.register(notesModule);
   await app.register(collabModule);
   await app.register(agentsModule);
-  // pluginsModule accepts an optional notesOps; we leave it at default for
-  // now and wire it up in a follow-up once the notes module exposes
-  // readNote/writeNote/deleteNote/scanDirectory on its decorator.
+  // pluginsModule reads `app.noteService` (decorated by notesModule
+  // above) as its notesOps bridge — same shape, no custom adapter
+  // needed. The fallback inside pluginsModule throws if it's somehow
+  // unset.
   await app.register(pluginsModule({ autoDiscover: discoverPlugins }));
   // Tunnel module: reverse-tunnel client + admin REST. Standalone — has
   // no cross-module dependencies. Registered last so other decorators

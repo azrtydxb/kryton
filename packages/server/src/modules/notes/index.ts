@@ -46,6 +46,12 @@ declare module "fastify" {
     notes: NotesApi;
     trash: TrashApi;
     folders: FoldersApi;
+    // The NoteService instance the notes module uses internally. Other
+    // modules that need the lower-level (notesDir, path, userId) shape
+    // — most notably the plugins runtime's notesOps bridge — pull this
+    // directly instead of going through `app.notes`, which takes
+    // (userPath, userId) and resolves the dir itself.
+    noteService: NoteService;
   }
 }
 
@@ -103,6 +109,9 @@ const notesModuleImpl: FastifyPluginAsync = async (app) => {
   }
   if (!app.hasDecorator("folders")) {
     app.decorate("folders", new FoldersApi(notesDir, noteService));
+  }
+  if (!app.hasDecorator("noteService")) {
+    app.decorate("noteService", noteService);
   }
 
   // Per-process backfill tracking. Mirrors the Express server's

@@ -31,12 +31,26 @@ export function useAppCallbacks(state: AppState) {
   }, [setStarredPaths]);
 
   const toggleActiveNoteStar = useCallback(() => {
-    if (notes.activeNote) toggleStar(notes.activeNote.path);
+    if (notes.activeNote) {
+      toggleStar(notes.activeNote.tabId ?? notes.activeNote.path);
+    }
   }, [notes.activeNote, toggleStar]);
 
   const handleNoteSelect = useCallback((path: string) => {
-    if (!path.startsWith('shared:')) {
-      notes.openNote(path);
+    // Shared notes are emitted by the FileTree as
+    // "shared:<ownerUserId>:<notePath>"; route those through the
+    // shared-note read endpoint so click → open works for collab.
+    if (path.startsWith('shared:')) {
+      const rest = path.slice('shared:'.length);
+      const sep = rest.indexOf(':');
+      if (sep > 0) {
+        const ownerUserId = rest.slice(0, sep);
+        const notePath = rest.slice(sep + 1);
+        void notes.openSharedNote(ownerUserId, notePath);
+        useUIStore.getState().openTab(path);
+      }
+    } else {
+      void notes.openNote(path);
       // Keep the tab strip in sync — opening a note adds it (idempotent)
       // and selecting an already-open one just leaves the tab where it is.
       useUIStore.getState().openTab(path);
@@ -53,12 +67,24 @@ export function useAppCallbacks(state: AppState) {
    */
   const handleTabClose = useCallback((path: string) => {
     const next = useUIStore.getState().closeTab(path);
-    if (path !== notes.activeNote?.path) return;
+    const activeId = notes.activeNote?.tabId ?? notes.activeNote?.path;
+    if (path !== activeId) return;
     // We just closed the active tab. If there's a neighbour, focus it;
     // otherwise clear the active note so the empty state renders and the
     // tab strip collapses to zero.
     if (next) {
-      notes.openNote(next);
+      // `next` may be a prefixed shared tab id; route through the
+      // same dispatch that handles fresh selections so the right
+      // endpoint gets called.
+      if (next.startsWith('shared:')) {
+        const rest = next.slice('shared:'.length);
+        const sep = rest.indexOf(':');
+        if (sep > 0) {
+          void notes.openSharedNote(rest.slice(0, sep), rest.slice(sep + 1));
+        }
+      } else {
+        notes.openNote(next);
+      }
     } else {
       notes.closeActiveNote();
       setEditing(false);

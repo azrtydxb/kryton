@@ -1,4 +1,5 @@
-import React, { useMemo, useCallback, useEffect, useState } from 'react';
+import React, { useMemo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { NotePreviewReact } from '@azrtydxb/ui';
 import { api, BacklinkData, FileNode } from '../../lib/api';
 import { collectNoteNames } from '../../lib/noteTreeUtils';
@@ -210,19 +211,56 @@ export function Preview({
   // Default to empty string so a brief activeNote.content === undefined
   // window (e.g. immediately after createNote returns its bare metadata)
   // doesn't crash NotePreviewReact's matchAll() calls.
-  const dataviewBlocks: { id: string; query: string }[] = [];
-  let processedContent = content ?? '';
+  const { processedContent, dataviewBlocks } = useMemo(() => {
+    // Walk each ```dataview fence in source order and replace with a
+    // <div data-dataview-id> placeholder. Doing it in one pass keeps
+    // the placeholders aligned with their original positions even when
+    // two blocks contain identical text (the naive replace would alias
+    // them and stack the renders at the bottom).
+    const raw = content ?? '';
+    const blocks: { id: string; query: string }[] = [];
+    // Anchor the opening fence at the start of a line (or document) so
+    // ```dataview written inside a quadruple-backtick block, an
+    // indented code sample, or a markdown tutorial that documents the
+    // syntax verbatim isn't mistaken for an executable block. Both
+    // anchors are zero-width (lookbehind / lookahead) so the
+    // surrounding newlines remain in `parts` and the placeholder
+    // doesn't get glued to the previous line.
+    const re = /(?<=^|\n)```dataview\n([\s\S]*?)\n```(?=\n|$)/g;
+    const parts: string[] = [];
+    let last = 0;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(raw)) !== null) {
+      const id = `dataview-${blocks.length}`;
+      blocks.push({ id, query: m[1].trim() });
+      parts.push(raw.slice(last, m.index));
+      parts.push(`<div data-dataview-id="${id}"></div>`);
+      last = m.index + m[0].length;
+    }
+    parts.push(raw.slice(last));
+    return { processedContent: parts.join(''), dataviewBlocks: blocks };
+  }, [content]);
 
-  const dataviewRegex = /```dataview\n([\s\S]*?)```/g;
-  let dvMatch;
-  while ((dvMatch = dataviewRegex.exec(processedContent)) !== null) {
-    const id = `dataview-${dataviewBlocks.length}`;
-    dataviewBlocks.push({ id, query: dvMatch[1].trim() });
-    processedContent = processedContent.replace(
-      dvMatch[0],
-      `<div data-dataview-id="${id}"></div>`
-    );
-  }
+  // After the markdown renders, locate each <div data-dataview-id> slot
+  // so we can portal the React DataviewBlock components into them.
+  const mdRef = useRef<HTMLDivElement | null>(null);
+  const [dataviewSlots, setDataviewSlots] = useState<Record<string, HTMLElement>>({});
+  // useLayoutEffect (not useEffect) so the placeholder lookup and
+  // portal mount happen in the same commit as the markdown render.
+  // Otherwise the first paint shows empty <div data-dataview-id>
+  // placeholders and the block content flashes in on the next frame,
+  // which is perceptible for pages with many or expensive blocks.
+  useLayoutEffect(() => {
+    if (!mdRef.current) return;
+    const slots: Record<string, HTMLElement> = {};
+    for (const block of dataviewBlocks) {
+      const el = mdRef.current.querySelector<HTMLElement>(
+        `[data-dataview-id="${block.id}"]`,
+      );
+      if (el) slots[block.id] = el;
+    }
+    setDataviewSlots(slots);
+  }, [processedContent, dataviewBlocks]);
 
   return (
     <div className="kryton-md">
@@ -271,18 +309,29 @@ export function Preview({
           )}
         </div>
       )}
-      <NotePreviewReact
-        content={processedContent}
-        onLinkClick={onLinkClick}
-        existingNotes={existingNotes}
-        onCreateNote={onCreateNote}
-        notePath={notePath}
-        getCodeFenceRenderer={getCodeFenceRenderer}
-        onFetchNoteContent={handleFetchNoteContent}
-      />
-      {dataviewBlocks.map(block => (
-        <DataviewBlock key={block.id} query={block.query} onLinkClick={onLinkClick} />
-      ))}
+      <div ref={mdRef}>
+        <NotePreviewReact
+          content={processedContent}
+          onLinkClick={onLinkClick}
+          existingNotes={existingNotes}
+          onCreateNote={onCreateNote}
+          notePath={notePath}
+          getCodeFenceRenderer={getCodeFenceRenderer}
+          onFetchNoteContent={handleFetchNoteContent}
+        />
+      </div>
+      {/* Portal each DataviewBlock into its placeholder <div data-dataview-id>
+          inside the rendered markdown, so blocks appear *in place* of the
+          original ```dataview fence — not concatenated at the bottom. */}
+      {dataviewBlocks.map(block => {
+        const slot = dataviewSlots[block.id];
+        if (!slot) return null;
+        return createPortal(
+          <DataviewBlock query={block.query} onLinkClick={onLinkClick} />,
+          slot,
+          block.id,
+        );
+      })}
 
       {notePath && backlinks.length > 0 && (
         <div

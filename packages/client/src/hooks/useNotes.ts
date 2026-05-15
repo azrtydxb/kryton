@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useDebouncedCallback } from 'use-debounce';
-import { api, FileNode, NoteData } from '../lib/api';
+import { api, FileNode, NoteData, sharedNoteApi } from '../lib/api';
 
 export function useNotes(userId?: string) {
   const [tree, setTree] = useState<FileNode[]>([]);
@@ -27,6 +27,34 @@ export function useNotes(userId?: string) {
       setError(e instanceof Error ? e.message : 'Failed to open note');
     }
   }, []);
+
+  /**
+   * Open a note that someone else owns and has shared with the current
+   * user. The FileTree emits ids of the shape "shared:<ownerUserId>:<path>"
+   * for these; useAppCallbacks parses and forwards to this method.
+   * Without this, clicks on shared-note rows were silent no-ops.
+   */
+  const openSharedNote = useCallback(
+    async (ownerUserId: string, notePath: string) => {
+      try {
+        setError(null);
+        const note = await sharedNoteApi.read(ownerUserId, notePath);
+        // The on-disk path returned by the API stays in `path` so any
+        // saves route to the right endpoint. Surface the prefixed
+        // `shared:<ownerUserId>:<notePath>` as `tabId` so the editor
+        // tab strip and starred lookups can compare against it
+        // without conflating two notes that share the same `path`.
+        setActiveNote({
+          ...note,
+          tabId: `shared:${ownerUserId}:${notePath}`,
+          modifiedAt: new Date().toISOString(),
+        });
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Failed to open shared note');
+      }
+    },
+    [],
+  );
 
   const debouncedSave = useDebouncedCallback(async (path: string, content: string) => {
     setSaving(true);
@@ -155,6 +183,7 @@ export function useNotes(userId?: string) {
     saving,
     error,
     openNote,
+    openSharedNote,
     closeActiveNote,
     updateContent,
     setActiveNoteContent,

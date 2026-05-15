@@ -13,7 +13,7 @@ import { usePrefs } from '../../stores/prefsStore';
 type SaveStatus = 'unchanged' | 'unsaved' | 'saving' | 'saved' | 'error';
 
 interface EditModeViewProps {
-  activeNote: { path: string; title: string; content: string };
+  activeNote: { path: string; title: string; content: string; tabId?: string };
   editContent: string | null;
   originalContent: string | null;
   isStarred: boolean;
@@ -136,7 +136,7 @@ export function EditModeView({
       <div style={{ display: 'flex', alignItems: 'stretch', background: 'var(--bg)', borderBottom: '1px solid var(--line)' }}>
         <div style={{ flex: 1, minWidth: 0, display: 'flex' }}>
           <EditorTabStrip
-            activePath={activeNote.path}
+            activePath={activeNote.tabId ?? activeNote.path}
             activeTitle={activeNote.title}
             dirty={dirty}
             onSelect={(p) => onNoteSelect?.(p)}
@@ -160,21 +160,21 @@ export function EditModeView({
             title: 'Share / Export',
             children: <Icons.Share size={13} />,
           })}
+          {/* "Discard changes" — cancel the current edit and return to
+              preview without saving. Previously labelled "More" with a
+              ⋯ icon which gave no hint that the click would lose work. */}
           {headerBtn({
             onClick: onCancel,
-            title: 'More',
-            children: <Icons.More size={13} />,
+            title: 'Discard changes',
+            children: <Icons.X size={13} />,
           })}
         </div>
       </div>
 
-      {/* Formatting toolbar removed per design guide — the prototype's editor
-          pane has only the tab strip + mode pills above the body, no separate
-          toolbar row. In-editor formatting goes through keyboard shortcuts;
-          plugin-supplied buttons live in the status bar via PluginSlot. */}
-
       {/* Formatting toolbar — shown only when the editor surface is active
-          (edit or split). Pure-preview mode hides it. */}
+          (edit or split). Pure-preview mode hides it. In-editor formatting
+          also goes through keyboard shortcuts; plugin-supplied buttons live
+          in the status bar via PluginSlot. */}
       {showEditor && <EditorToolbar editorRef={editorRef} />}
 
       {/* Body */}

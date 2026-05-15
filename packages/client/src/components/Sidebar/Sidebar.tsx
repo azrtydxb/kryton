@@ -44,7 +44,7 @@ interface SidebarProps {
   onTagSelect?: (tag: string) => void;
 }
 
-const DEFAULT_VERSION = 'v4.3.2';
+const DEFAULT_VERSION = 'v4.4.0-pre.9';
 
 /* helpers ------------------------------------------------------------------ */
 

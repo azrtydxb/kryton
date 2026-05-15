@@ -12,6 +12,16 @@ export interface NoteData {
   content: string;
   title: string;
   modifiedAt: string;
+  /**
+   * Optional UI-only identifier. For an owned note this is undefined and
+   * consumers fall back to `path`. For a shared note opened via
+   * `sharedNoteApi.read`, this is `shared:<ownerUserId>:<path>` so the
+   * tab strip and starred lookups can disambiguate it from an own note
+   * that happens to live at the same `path`. The on-disk filesystem
+   * path stays in `path` so save/update calls still target the correct
+   * endpoint.
+   */
+  tabId?: string;
 }
 
 export interface SearchResult {
