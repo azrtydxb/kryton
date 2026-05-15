@@ -24,12 +24,19 @@ export interface GraphViewProps {
   className?: string;
   /** When true, render every node's label (fullscreen graph view). Defaults to false (rail mode shows labels only on active/hover). */
   showAllLabels?: boolean;
+  /**
+   * Notified whenever the viewport scale changes — wheel zoom, pinch,
+   * programmatic recenter, etc. Lets parents that render a zoom-level
+   * indicator stay in sync with the actual transform instead of
+   * shadowing it.
+   */
+  onZoomChange?: (scale: number) => void;
 }
 
 export function GraphView({
   graphData, loading = false, activeNotePath = null, mode = "full",
   onNoteSelect, onNodeHover, recenterRef, starredPaths, className,
-  showAllLabels = false,
+  showAllLabels = false, onZoomChange,
 }: GraphViewProps) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const layoutRef = React.useRef<LayoutHandle | null>(null);
@@ -49,6 +56,13 @@ export function GraphView({
   // "spider web vibration" the user reported.
   const viewportRef = React.useRef(viewport);
   React.useEffect(() => { viewportRef.current = viewport; }, [viewport]);
+
+  // Surface every scale change to the parent so a zoom-percentage
+  // indicator stays consistent across wheel zoom, pinch, and the +/−
+  // buttons (which all flow through the same viewport state).
+  React.useEffect(() => {
+    onZoomChange?.(viewport.k);
+  }, [viewport.k, onZoomChange]);
   const layoutMode: LayoutMode = mode === "full" ? "global" : "local";
 
   /**
