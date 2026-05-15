@@ -28,6 +28,26 @@ export function useNotes(userId?: string) {
     }
   }, []);
 
+  /**
+   * Open a note that someone else owns and has shared with the current
+   * user. The FileTree emits ids of the shape "shared:<ownerUserId>:<path>"
+   * for these; useAppCallbacks parses and forwards to this method.
+   * Without this, clicks on shared-note rows were silent no-ops.
+   */
+  const openSharedNote = useCallback(
+    async (ownerUserId: string, notePath: string) => {
+      try {
+        setError(null);
+        const { sharedNoteApi } = await import('../lib/api');
+        const note = await sharedNoteApi.read(ownerUserId, notePath);
+        setActiveNote({ ...note, modifiedAt: new Date().toISOString() });
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Failed to open shared note');
+      }
+    },
+    [],
+  );
+
   const debouncedSave = useDebouncedCallback(async (path: string, content: string) => {
     setSaving(true);
     try {
@@ -155,6 +175,7 @@ export function useNotes(userId?: string) {
     saving,
     error,
     openNote,
+    openSharedNote,
     closeActiveNote,
     updateContent,
     setActiveNoteContent,

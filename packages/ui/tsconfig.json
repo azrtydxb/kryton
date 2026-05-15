@@ -10,8 +10,6 @@
   },
   "include": ["src/**/*"],
   "exclude": [
-    "src/editor/codemirror-bundle/**/*",
-    "src/**/*.native.ts",
-    "src/**/*.native.tsx"
+    "src/editor/codemirror-bundle/**/*"
   ]
 }

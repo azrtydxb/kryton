@@ -55,15 +55,22 @@ export interface PluginsModuleOptions {
   autoDiscover?: boolean;
 }
 
+/**
+ * Last-resort fallback. The real notesOps is the notes module's
+ * NoteService instance, exposed as `app.noteService`. The host wires
+ * it automatically below — these throwing stubs only fire if the
+ * plugins module is somehow registered before the notes module, which
+ * a misconfigured custom host could do.
+ */
 const noopNotesOps: NotesOps = {
   async readNote() {
-    throw new Error("notesOps not configured");
+    throw new Error("notesOps not configured (notes module must register before plugins)");
   },
   async writeNote() {
-    throw new Error("notesOps not configured");
+    throw new Error("notesOps not configured (notes module must register before plugins)");
   },
   async deleteNote() {
-    throw new Error("notesOps not configured");
+    throw new Error("notesOps not configured (notes module must register before plugins)");
   },
   async scanDirectory() {
     return [];
@@ -83,7 +90,12 @@ const pluginsModuleImpl = (options: PluginsModuleOptions = {}): FastifyPluginAsy
       options.pluginsDir ?? path.resolve(process.cwd(), "plugins");
     const notesDir =
       options.notesDir ?? path.resolve(process.cwd(), "notes");
-    const notesOps = options.notesOps ?? noopNotesOps;
+    // Default notesOps to the notes module's NoteService decorator
+    // (signatures match exactly). Callers can still override for tests.
+    const notesOps: NotesOps =
+      options.notesOps ??
+      ((app as unknown as { noteService?: NotesOps }).noteService) ??
+      noopNotesOps;
 
     await fs.mkdir(pluginsDir, { recursive: true });
 

@@ -427,7 +427,6 @@ function AppContent() {
                   onTabClose={handleTabClose}
                   onLinkClick={handleLinkClick}
                   onCreateNote={handleCreateNoteFromLink}
-                  onRestored={() => notes.openNote(notes.activeNote!.path)}
                   getCodeFenceRenderer={getCodeFenceRenderer}
                 />
               )

@@ -35,8 +35,20 @@ export function useAppCallbacks(state: AppState) {
   }, [notes.activeNote, toggleStar]);
 
   const handleNoteSelect = useCallback((path: string) => {
-    if (!path.startsWith('shared:')) {
-      notes.openNote(path);
+    // Shared notes are emitted by the FileTree as
+    // "shared:<ownerUserId>:<notePath>"; route those through the
+    // shared-note read endpoint so click → open works for collab.
+    if (path.startsWith('shared:')) {
+      const rest = path.slice('shared:'.length);
+      const sep = rest.indexOf(':');
+      if (sep > 0) {
+        const ownerUserId = rest.slice(0, sep);
+        const notePath = rest.slice(sep + 1);
+        void notes.openSharedNote(ownerUserId, notePath);
+        useUIStore.getState().openTab(path);
+      }
+    } else {
+      void notes.openNote(path);
       // Keep the tab strip in sync — opening a note adds it (idempotent)
       // and selecting an already-open one just leaves the tab where it is.
       useUIStore.getState().openTab(path);
