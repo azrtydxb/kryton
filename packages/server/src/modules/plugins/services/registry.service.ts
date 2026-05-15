@@ -1,16 +1,30 @@
 import path from "node:path";
 import fs from "node:fs/promises";
 
-const ALLOWED_DOWNLOAD_HOSTS = ["github.com", "raw.githubusercontent.com", "api.github.com"];
+// Hosts that actually serve raw plugin assets — the GitHub REST API and
+// the raw content CDN. `github.com` itself was on the previous list, but
+// that host serves HTML pages (and redirects to `codeload.github.com`
+// for archives), neither of which we want to ingest. HTTPS is also
+// required so a man-in-the-middle can't substitute a different payload.
+const ALLOWED_DOWNLOAD_HOSTS = ["raw.githubusercontent.com", "api.github.com"];
 
 function validateDownloadUrl(url: string): void {
   try {
     const parsed = new URL(url);
+    if (parsed.protocol !== "https:") {
+      throw new Error(`Download URL must use https: ${parsed.protocol}`);
+    }
     if (!ALLOWED_DOWNLOAD_HOSTS.includes(parsed.hostname)) {
       throw new Error(`Download URL hostname not allowed: ${parsed.hostname}`);
     }
   } catch (err) {
-    if (err instanceof Error && err.message.includes("not allowed")) throw err;
+    if (
+      err instanceof Error &&
+      (err.message.includes("not allowed") ||
+        err.message.includes("must use https"))
+    ) {
+      throw err;
+    }
     throw new Error(`Invalid download URL: ${url}`, { cause: err });
   }
 }
@@ -75,6 +89,7 @@ export class PluginRegistryService {
           "User-Agent": USER_AGENT,
           Accept: "application/vnd.github.v3+json",
         },
+        redirect: "error",
       });
     } catch (err) {
       this.log.warn(`Failed to reach GitHub API: ${(err as Error).message}`);
@@ -148,11 +163,19 @@ export class PluginRegistryService {
   }
 
   private async fetchDirectoryContents(apiUrl: string): Promise<GitHubFileEntry[]> {
+    validateDownloadUrl(apiUrl);
+    // `redirect: "error"` defeats the redirect-bypass: a malicious
+    // download URL that initially points at an allowlisted host but
+    // 302s to a non-allowed host would otherwise satisfy
+    // validateDownloadUrl yet fetch from the unsafe target. If GitHub
+    // ever starts returning redirects for these endpoints we want a
+    // loud failure here, not silent escalation.
     const response = await fetch(apiUrl, {
       headers: {
         "User-Agent": USER_AGENT,
         Accept: "application/vnd.github.v3+json",
       },
+      redirect: "error",
     });
     if (!response.ok) {
       throw new Error(`GitHub API error ${response.status} fetching ${apiUrl}`);
@@ -162,7 +185,10 @@ export class PluginRegistryService {
 
   private async downloadFileBytes(downloadUrl: string): Promise<Buffer> {
     validateDownloadUrl(downloadUrl);
-    const response = await fetch(downloadUrl, { headers: { "User-Agent": USER_AGENT } });
+    const response = await fetch(downloadUrl, {
+      headers: { "User-Agent": USER_AGENT },
+      redirect: "error",
+    });
     if (!response.ok) {
       throw new Error(`Failed to download file from ${downloadUrl}: ${response.status}`);
     }
