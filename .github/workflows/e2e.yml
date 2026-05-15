@@ -24,7 +24,9 @@ env:
 
 jobs:
   e2e:
-    runs-on: [self-hosted, kryton-248]
+    # ARC v2 scale-set on the kw cluster — see ci.yml for the same
+    # migration. Single label only; chown UID is 1001 (not 1000).
+    runs-on: arc-azrtydxb
     container:
       image: node:24
     services:
@@ -80,6 +82,9 @@ jobs:
           APP_URL: http://localhost:5173
           SEMANTIC_PROVIDER: "off"
 
-      - name: Restore workspace ownership to host user
+      - name: Restore workspace ownership to runner user
+        # ARC runner UID is 1001 (not 1000 as on the old kryton-248
+        # box). Without this the post-job actions/checkout cleanup
+        # fails on the bind-mounted workspace.
         if: always()
-        run: chown -R 1000:1000 . || true
+        run: chown -R 1001:1001 . || true
