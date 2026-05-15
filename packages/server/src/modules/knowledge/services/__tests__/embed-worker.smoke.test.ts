@@ -6,8 +6,8 @@
  * → write → delete-job round trip works against actual SQL.
  */
 
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { and, eq, sql } from "drizzle-orm";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { and, eq } from "drizzle-orm";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -48,7 +48,10 @@ const silentLog = {
   level: "silent",
 } as unknown as FastifyBaseLogger;
 
-const TEST_USER_ID = "u-embed-worker-smoke";
+// Per-suite unique userId so this file is safe under fileParallelism:
+// true. Satisfies SAFE_USER_ID_REGEX in
+// services/user-notes-dir.service.ts (/^[a-zA-Z0-9_-]{8,64}$/).
+const TEST_USER_ID = `u-embed-${Math.floor(Math.random() * 1e9)}-${process.pid}`;
 
 describe("EmbedWorker (smoke)", () => {
   let handle: TestDbHandle;
@@ -58,29 +61,35 @@ describe("EmbedWorker (smoke)", () => {
     handle = createTestDb();
     notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "embed-worker-smoke-"));
     await fs.mkdir(path.join(notesDir, TEST_USER_ID), { recursive: true });
+    // Seed the suite-scoped user once. Per-test cleanup wipes only
+    // this user's rows; the user itself lives for the whole suite.
+    await handle.db
+      .insert(user)
+      .values({
+        id: TEST_USER_ID,
+        email: `embed-worker-${process.pid}@test.local`,
+        name: "Embed Worker Test",
+      })
+      .onConflictDoNothing();
   });
 
   afterAll(async () => {
+    // Scoped cleanup: only delete rows owned by this suite's user.
+    // Cascade from User clears SearchIndex / EmbedJob /
+    // NoteEmbeddingChunk by FK.
+    await handle.db.delete(user).where(eq(user.id, TEST_USER_ID));
     await handle.close();
     await fs.rm(notesDir, { recursive: true, force: true });
   });
 
   beforeEach(async () => {
-    // Reset just the tables this test touches. Cascade from User clears
-    // SearchIndex / EmbedJob / NoteEmbeddingChunk by FK.
-    await handle.db.execute(sql`
-      TRUNCATE TABLE
-        "NoteEmbeddingChunk",
-        "EmbedJob",
-        "SearchIndex",
-        "User"
-      RESTART IDENTITY CASCADE
-    `);
-    await handle.db.insert(user).values({
-      id: TEST_USER_ID,
-      email: "embed-worker@test.local",
-      name: "Embed Worker Test",
-    });
+    // Targeted reset of this user's child rows between tests. We
+    // avoid TRUNCATE because parallel suites share the same DB.
+    await handle.db
+      .delete(noteEmbeddingChunk)
+      .where(eq(noteEmbeddingChunk.userId, TEST_USER_ID));
+    await handle.db.delete(embedJob).where(eq(embedJob.userId, TEST_USER_ID));
+    await handle.db.delete(searchIndex).where(eq(searchIndex.userId, TEST_USER_ID));
   });
 
   it("processes an upsert job: writes chunks and removes the job row", async () => {

@@ -16,7 +16,7 @@ import {
 import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
-import { sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 import { canvasRoutes } from "../routes/canvas.routes.js";
 import { backlinksRoutes } from "../routes/backlinks.routes.js";
@@ -24,8 +24,17 @@ import { historyRoutes } from "../routes/history.routes.js";
 import { attachmentsRoutes } from "../routes/attachments.routes.js";
 import { createTestDb, type TestDbHandle } from "../../../test/db-fixture.js";
 import { user as userTable } from "../../../db/schema/auth.js";
+import { attachment as attachmentTable } from "../../../db/schema/notes.js";
 
-const TEST_USER = { id: "u-aux-test", email: "aux@test", name: "Aux", role: "user" };
+// Per-suite unique userId so this file is safe under fileParallelism:
+// true. Satisfies SAFE_USER_ID_REGEX in
+// services/user-notes-dir.service.ts (/^[a-zA-Z0-9_-]{8,64}$/).
+const TEST_USER = {
+  id: `u-aux-${Math.floor(Math.random() * 1e9)}-${process.pid}`,
+  email: `aux-${process.pid}@test.local`,
+  name: "Aux",
+  role: "user",
+};
 
 async function buildAuxTestApp(
   notesDir: string,
@@ -134,33 +143,45 @@ describe("notes-aux routes", () => {
   let app: FastifyInstance;
   let handle: TestDbHandle;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     handle = createTestDb();
+    // Seed the per-suite user once. ON CONFLICT DO NOTHING guards
+    // against ID collisions on the off-chance two suites picked the
+    // same random suffix.
+    await handle.db
+      .insert(userTable)
+      .values({
+        id: TEST_USER.id,
+        email: TEST_USER.email,
+        name: TEST_USER.name,
+        emailVerified: false,
+        role: TEST_USER.role,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .onConflictDoNothing();
   });
 
   afterAll(async () => {
+    // Scoped cleanup: only delete rows owned by this suite's user.
+    await handle.db
+      .delete(attachmentTable)
+      .where(eq(attachmentTable.userId, TEST_USER.id));
+    await handle.db.delete(userTable).where(eq(userTable.id, TEST_USER.id));
     await handle.close();
   });
 
   beforeEach(async () => {
     notesDir = await fs.mkdtemp(path.join(os.tmpdir(), "kaux-"));
-    // Reset attachment-related tables and reseed the test user.
-    await handle.db.execute(sql`
-      TRUNCATE TABLE "Attachment", "User" RESTART IDENTITY CASCADE
-    `);
-    await handle.db.insert(userTable).values({
-      id: TEST_USER.id,
-      email: TEST_USER.email,
-      name: TEST_USER.name,
-      emailVerified: false,
-      role: TEST_USER.role,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
     app = await buildAuxTestApp(notesDir, handle);
   });
 
   afterEach(async () => {
+    // Targeted cleanup so the next test starts with no attachments
+    // for our user, without nuking other suites' rows.
+    await handle.db
+      .delete(attachmentTable)
+      .where(eq(attachmentTable.userId, TEST_USER.id));
     await app.close();
     await fs.rm(notesDir, { recursive: true, force: true });
   });

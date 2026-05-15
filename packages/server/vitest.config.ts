@@ -6,6 +6,13 @@ export default defineConfig({
     environment: "node",
     // Disable file-level parallelism so the shared Postgres test database
     // (booted in global-setup) isn't hammered by concurrent test suites.
+    // NOTE: yjs-bytea, aux-routes, and embed-worker.smoke have already been
+    // refactored to drop TRUNCATE CASCADE in favour of per-suite unique
+    // userIds + scoped DELETE cleanup. The blocker for fileParallelism:
+    // true is the shared helpers (notes/identity/agents/knowledge
+    // __tests__/helpers.ts) which still TRUNCATE shared tables; flipping
+    // the flag before those are refactored produces deadlocks and
+    // cross-file row collisions.
     fileParallelism: false,
     include: ["src/**/__tests__/**/*.test.ts"],
     globalSetup: ["./src/test/global-setup.ts"],
