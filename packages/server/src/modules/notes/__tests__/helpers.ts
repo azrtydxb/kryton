@@ -1,7 +1,7 @@
 import os from "node:os";
 import path from "node:path";
 import fs from "node:fs/promises";
-import { sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import Fastify, { type FastifyInstance } from "fastify";
 import { zodPlugin } from "../../../plugins/zod.js";
 import { errorsPlugin } from "../../../plugins/errors.js";
@@ -12,9 +12,9 @@ import { user as userTable } from "../../../db/schema/auth.js";
 
 /**
  * Shared Drizzle handle for notes tests. Lazily created on first call and
- * reused across the file. The notes test suite touches: SearchIndex, Folder,
- * Tag, NoteTag, TrashItem, Settings, NoteShare, Attachment, GraphEdge,
- * NoteVersion, NoteRevision — all truncated below.
+ * reused across the file. Under fileParallelism: true the suite no longer
+ * TRUNCATEs shared tables — each suite picks a per-suite unique userId
+ * (see `createNotesTestUser` below) and only touches its own rows.
  */
 let sharedHandle: TestDbHandle | null = null;
 function getHandle(): TestDbHandle {
@@ -22,27 +22,50 @@ function getHandle(): TestDbHandle {
   return sharedHandle;
 }
 
-async function resetNotesTestDb(handle: TestDbHandle): Promise<void> {
-  // Listing every table explicitly (including the newer McpSession that
-  // FKs to User) keeps the planner from chasing the CASCADE chain on
-  // each test reset — a small but measurable win on a slow runner.
-  await handle.db.execute(sql`
-    TRUNCATE TABLE
-      "Attachment",
-      "NoteRevision",
-      "NoteVersion",
-      "NoteTag",
-      "Tag",
-      "Folder",
-      "TrashItem",
-      "Settings",
-      "NoteShare",
-      "GraphEdge",
-      "SearchIndex",
-      "McpSession",
-      "User"
-    RESTART IDENTITY CASCADE
-  `);
+/**
+ * Build a per-suite unique test user. The id satisfies SAFE_USER_ID_REGEX in
+ * services/user-notes-dir.service.ts (`/^[a-zA-Z0-9_-]{8,64}$/`), and the
+ * random suffix + pid keeps two parallel suites from colliding on a single
+ * shared Postgres database under fileParallelism: true.
+ */
+export function createNotesTestUser(tag: string = "notes"): AuthUser {
+  const rand = Math.floor(Math.random() * 1e9);
+  return {
+    id: `u-${tag}-${rand}-${process.pid}`,
+    email: `${tag}-${rand}-${process.pid}@test.local`,
+    name: tag,
+    role: "user",
+  };
+}
+
+/**
+ * Seed the User row for a suite. Call once from `beforeAll`. With per-suite
+ * unique ids there's no expected conflict — we deliberately don't use
+ * ON CONFLICT DO NOTHING so any genuine ID collision surfaces as a failure
+ * instead of silently overlapping with another suite's data.
+ */
+export async function seedNotesTestUser(user: AuthUser): Promise<void> {
+  const handle = getHandle();
+  await handle.db.insert(userTable).values({
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    emailVerified: false,
+    role: user.role,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+}
+
+/**
+ * Delete a suite's user. FK cascade handles every dependent row this suite
+ * touched (Folder, Tag, NoteTag, NoteShare, Settings, GraphEdge,
+ * SearchIndex, Attachment, NoteVersion, NoteRevision, TrashItem, McpSession).
+ * Call from `afterAll`.
+ */
+export async function cleanupNotesTestUser(userId: string): Promise<void> {
+  const handle = getHandle();
+  await handle.db.delete(userTable).where(eq(userTable.id, userId));
 }
 
 export interface NotesTestAppOptions {
@@ -59,7 +82,8 @@ export interface NotesTestApp {
 }
 
 /** Build a Fastify app with the notes module wired up against the
- * testcontainers Postgres. */
+ * testcontainers Postgres. The User row is NOT seeded by this helper —
+ * call `seedNotesTestUser` once from `beforeAll` instead. */
 export async function buildNotesTestApp(
   opts: NotesTestAppOptions = {},
 ): Promise<NotesTestApp> {
@@ -68,24 +92,8 @@ export async function buildNotesTestApp(
     (await fs.mkdtemp(path.join(os.tmpdir(), "kryton-notes-test-")));
 
   const handle = getHandle();
-  await resetNotesTestDb(handle);
 
   const user = opts.user ?? null;
-  // Seed the User row when an authenticated user is configured — every
-  // table that references User via FK (Folder, Tag, NoteTag, NoteShare, …)
-  // is cascade-deleted via the truncate above, so we must
-  // re-insert the user row for each test that needs one.
-  if (user) {
-    await handle.db.insert(userTable).values({
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      emailVerified: false,
-      role: user.role,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-  }
 
   const app = Fastify({ logger: false });
 

@@ -1,36 +1,67 @@
 import Fastify, { type FastifyInstance } from "fastify";
+import { eq } from "drizzle-orm";
 import { zodPlugin } from "../../../plugins/zod.js";
 import { errorsPlugin } from "../../../plugins/errors.js";
 import { AuthError, ForbiddenError } from "../../../lib/errors.js";
 import { knowledgeModule } from "../index.js";
 import type { AuthApi, AuthContext, AuthUser } from "../../../plugins/auth.js";
-import { sql } from "drizzle-orm";
 import { createTestDb, type TestDbHandle } from "../../../test/db-fixture.js";
+import { user as userTable } from "../../../db/schema/auth.js";
 
 /**
- * Shared Drizzle test DB handle for knowledge tests. Mirrors the identity
- * helpers pattern.
+ * Shared Drizzle test DB handle for knowledge tests. Under fileParallelism:
+ * true rows are scoped via per-suite unique userIds (see
+ * `createKnowledgeTestUser`) rather than truncated between tests.
  */
 export function createKnowledgeTestDb(): TestDbHandle {
   return createTestDb();
 }
 
 /**
- * Truncate tables touched by knowledge graph/search routes. Call from
- * `beforeEach` for test isolation.
+ * Build a per-suite unique test user. The id satisfies SAFE_USER_ID_REGEX in
+ * services/user-notes-dir.service.ts (`/^[a-zA-Z0-9_-]{8,64}$/`), and the
+ * random suffix + pid keeps two parallel suites from colliding on a single
+ * shared Postgres database under fileParallelism: true.
  */
-export async function resetKnowledgeTestDb(handle: TestDbHandle): Promise<void> {
-  await handle.db.execute(sql`
-    TRUNCATE TABLE
-      "GraphEdge",
-      "SearchIndex",
-      "EmbedJob",
-      "NoteEmbeddingChunk",
-      "NoteShare",
-      "Settings",
-      "User"
-    RESTART IDENTITY CASCADE
-  `);
+export function createKnowledgeTestUser(
+  tag: string = "k",
+  role: AuthUser["role"] = "user",
+): AuthUser {
+  const rand = Math.floor(Math.random() * 1e9);
+  return {
+    id: `u-${tag}-${rand}-${process.pid}`,
+    email: `${tag}-${rand}-${process.pid}@test.local`,
+    name: tag,
+    role,
+  };
+}
+
+/**
+ * Seed a User row. With per-suite unique ids there's no expected conflict —
+ * we deliberately don't use ON CONFLICT DO NOTHING so any collision surfaces
+ * as a failure.
+ */
+export async function seedKnowledgeTestUser(
+  handle: TestDbHandle,
+  user: AuthUser,
+): Promise<void> {
+  await handle.db.insert(userTable).values({
+    id: user.id,
+    name: user.name,
+    email: user.email,
+  });
+}
+
+/**
+ * Delete a suite's user. FK cascade handles dependent rows owned by the
+ * user (SearchIndex, GraphEdge, NoteEmbeddingChunk, EmbedJob, NoteShare,
+ * Settings). Call from `afterAll`.
+ */
+export async function cleanupKnowledgeTestUser(
+  handle: TestDbHandle,
+  userId: string,
+): Promise<void> {
+  await handle.db.delete(userTable).where(eq(userTable.id, userId));
 }
 
 export interface KnowledgeTestAppOptions {

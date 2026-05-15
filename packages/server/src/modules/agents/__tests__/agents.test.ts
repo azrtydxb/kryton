@@ -1,41 +1,52 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest";
 import { eq } from "drizzle-orm";
-import { user } from "../../../db/schema/auth.js";
 import { agent, agentToken } from "../../../db/schema/agents.js";
 import type { TestDbHandle } from "../../../test/db-fixture.js";
 import {
   buildAgentsTestApp,
+  cleanupAgentsTestUser,
   createAgentsTestDb,
-  resetAgentsTestDb,
+  createAgentsTestUser,
+  seedAgentsTestUser,
 } from "./helpers.js";
 
-const TEST_USER = {
-  id: "u-test",
-  email: "test@example.com",
-  name: "Test",
-  role: "user",
-};
+const TEST_USER = createAgentsTestUser("owner");
+const OTHER_USER = createAgentsTestUser("other");
 
-async function seedUser(dbHandle: TestDbHandle, id = TEST_USER.id): Promise<void> {
-  await dbHandle.db.insert(user).values({
-    id,
-    name: id === TEST_USER.id ? TEST_USER.name : id,
-    email: id === TEST_USER.id ? TEST_USER.email : `${id}@example.com`,
-  });
-}
+// Per-suite unique resource ids. With fileParallelism: true the agents
+// table is shared across parallel suites, so the previous "ag1" / "tid1"
+// constants would collide.
+const SUITE_SUFFIX = `${Math.floor(Math.random() * 1e9)}-${process.pid}`;
+const AGENT_ID = `ag1-${SUITE_SUFFIX}`;
+const TOKEN_ID = `tid1-${SUITE_SUFFIX}`;
 
 describe("agents routes", () => {
   let dbHandle: TestDbHandle;
   let close: (() => Promise<void>) | null = null;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     dbHandle = createAgentsTestDb();
+    await seedAgentsTestUser(dbHandle, TEST_USER);
+    await seedAgentsTestUser(dbHandle, OTHER_USER);
   });
   afterAll(async () => {
+    await cleanupAgentsTestUser(dbHandle, TEST_USER.id);
+    await cleanupAgentsTestUser(dbHandle, OTHER_USER.id);
     await dbHandle.close();
   });
   beforeEach(async () => {
-    await resetAgentsTestDb(dbHandle);
+    // Per-test cleanup: delete only this suite's user's agents (cascade
+    // removes their tokens). Don't touch other suites' rows.
+    await dbHandle.db.delete(agent).where(eq(agent.ownerUserId, TEST_USER.id));
+    await dbHandle.db.delete(agent).where(eq(agent.ownerUserId, OTHER_USER.id));
   });
   afterEach(async () => {
     if (close) await close();
@@ -44,7 +55,6 @@ describe("agents routes", () => {
 
   describe("POST /api/agents", () => {
     it("creates an agent and returns 201", async () => {
-      await seedUser(dbHandle);
       const app = await buildAgentsTestApp({ user: TEST_USER, dbHandle });
       close = () => app.close();
 
@@ -59,7 +69,7 @@ describe("agents routes", () => {
       expect(body.id).toBeTruthy();
       expect(body.name).toBe("claude");
       expect(body.label).toBe("Claude");
-      expect(body.ownerUserId).toBe("u-test");
+      expect(body.ownerUserId).toBe(TEST_USER.id);
       expect(body.policyText).toBeNull();
 
       const rows = await dbHandle.db
@@ -67,11 +77,10 @@ describe("agents routes", () => {
         .from(agent)
         .where(eq(agent.id, body.id));
       expect(rows).toHaveLength(1);
-      expect(rows[0].ownerUserId).toBe("u-test");
+      expect(rows[0].ownerUserId).toBe(TEST_USER.id);
     });
 
     it("returns 400 for missing required fields", async () => {
-      await seedUser(dbHandle);
       const app = await buildAgentsTestApp({ user: TEST_USER, dbHandle });
       close = () => app.close();
       const res = await app.inject({
@@ -96,10 +105,9 @@ describe("agents routes", () => {
 
   describe("GET /api/agents", () => {
     it("returns the agent list", async () => {
-      await seedUser(dbHandle);
       await dbHandle.db.insert(agent).values({
-        id: "ag1",
-        ownerUserId: "u-test",
+        id: AGENT_ID,
+        ownerUserId: TEST_USER.id,
         name: "bot",
         label: "Bot",
       });
@@ -110,62 +118,57 @@ describe("agents routes", () => {
       const res = await app.inject({ method: "GET", url: "/api/agents" });
       expect(res.statusCode).toBe(200);
       expect(res.json().agents).toHaveLength(1);
-      expect(res.json().agents[0].id).toBe("ag1");
+      expect(res.json().agents[0].id).toBe(AGENT_ID);
     });
   });
 
   describe("DELETE /api/agents/:id", () => {
     it("deletes owned agent and returns 204", async () => {
-      await seedUser(dbHandle);
       await dbHandle.db.insert(agent).values({
-        id: "ag1",
-        ownerUserId: "u-test",
+        id: AGENT_ID,
+        ownerUserId: TEST_USER.id,
         name: "bot",
         label: "Bot",
       });
       const app = await buildAgentsTestApp({ user: TEST_USER, dbHandle });
       close = () => app.close();
 
-      const res = await app.inject({ method: "DELETE", url: "/api/agents/ag1" });
+      const res = await app.inject({ method: "DELETE", url: `/api/agents/${AGENT_ID}` });
       expect(res.statusCode).toBe(204);
       const remaining = await dbHandle.db
         .select()
         .from(agent)
-        .where(eq(agent.id, "ag1"));
+        .where(eq(agent.id, AGENT_ID));
       expect(remaining).toHaveLength(0);
     });
 
     it("returns 404 for unowned agent", async () => {
-      await seedUser(dbHandle);
-      await seedUser(dbHandle, "other");
       await dbHandle.db.insert(agent).values({
-        id: "ag1",
-        ownerUserId: "other",
+        id: AGENT_ID,
+        ownerUserId: OTHER_USER.id,
         name: "bot",
         label: "Bot",
       });
       const app = await buildAgentsTestApp({ user: TEST_USER, dbHandle });
       close = () => app.close();
 
-      const res = await app.inject({ method: "DELETE", url: "/api/agents/ag1" });
+      const res = await app.inject({ method: "DELETE", url: `/api/agents/${AGENT_ID}` });
       expect(res.statusCode).toBe(404);
     });
 
     it("returns 404 when agent missing", async () => {
-      await seedUser(dbHandle);
       const app = await buildAgentsTestApp({ user: TEST_USER, dbHandle });
       close = () => app.close();
-      const res = await app.inject({ method: "DELETE", url: "/api/agents/missing" });
+      const res = await app.inject({ method: "DELETE", url: `/api/agents/missing-${SUITE_SUFFIX}` });
       expect(res.statusCode).toBe(404);
     });
   });
 
   describe("POST /api/agents/:id/policies", () => {
     it("sets policy and returns 204", async () => {
-      await seedUser(dbHandle);
       await dbHandle.db.insert(agent).values({
-        id: "ag1",
-        ownerUserId: "u-test",
+        id: AGENT_ID,
+        ownerUserId: TEST_USER.id,
         name: "bot",
         label: "Bot",
       });
@@ -174,24 +177,23 @@ describe("agents routes", () => {
 
       const res = await app.inject({
         method: "POST",
-        url: "/api/agents/ag1/policies",
+        url: `/api/agents/${AGENT_ID}/policies`,
         payload: { policyText: "permit(principal, action, resource);" },
       });
       expect(res.statusCode).toBe(204);
       const row = await dbHandle.db
         .select()
         .from(agent)
-        .where(eq(agent.id, "ag1"));
+        .where(eq(agent.id, AGENT_ID));
       expect(row[0].policyText).toBe("permit(principal, action, resource);");
     });
   });
 
   describe("POST /api/agents/:id/tokens", () => {
     it("mints a token and returns 201", async () => {
-      await seedUser(dbHandle);
       await dbHandle.db.insert(agent).values({
-        id: "ag1",
-        ownerUserId: "u-test",
+        id: AGENT_ID,
+        ownerUserId: TEST_USER.id,
         name: "bot",
         label: "Bot",
       });
@@ -200,7 +202,7 @@ describe("agents routes", () => {
 
       const res = await app.inject({
         method: "POST",
-        url: "/api/agents/ag1/tokens",
+        url: `/api/agents/${AGENT_ID}/tokens`,
         payload: { expiresInSeconds: 3600 },
       });
       expect(res.statusCode).toBe(201);
@@ -213,22 +215,21 @@ describe("agents routes", () => {
         .from(agentToken)
         .where(eq(agentToken.id, body.tokenId));
       expect(stored).toHaveLength(1);
-      expect(stored[0].agentId).toBe("ag1");
+      expect(stored[0].agentId).toBe(AGENT_ID);
     });
   });
 
   describe("POST /api/agents/tokens/:tokenId/revoke", () => {
     it("revokes a token and returns 204", async () => {
-      await seedUser(dbHandle);
       await dbHandle.db.insert(agent).values({
-        id: "ag1",
-        ownerUserId: "u-test",
+        id: AGENT_ID,
+        ownerUserId: TEST_USER.id,
         name: "bot",
         label: "Bot",
       });
       await dbHandle.db.insert(agentToken).values({
-        id: "tid1",
-        agentId: "ag1",
+        id: TOKEN_ID,
+        agentId: AGENT_ID,
         tokenHash: "h",
         expiresAt: new Date("2099-01-01"),
       });
@@ -237,23 +238,22 @@ describe("agents routes", () => {
 
       const res = await app.inject({
         method: "POST",
-        url: "/api/agents/tokens/tid1/revoke",
+        url: `/api/agents/tokens/${TOKEN_ID}/revoke`,
       });
       expect(res.statusCode).toBe(204);
       const row = await dbHandle.db
         .select()
         .from(agentToken)
-        .where(eq(agentToken.id, "tid1"));
+        .where(eq(agentToken.id, TOKEN_ID));
       expect(row[0].revokedAt).toBeInstanceOf(Date);
     });
 
     it("returns 404 for missing token", async () => {
-      await seedUser(dbHandle);
       const app = await buildAgentsTestApp({ user: TEST_USER, dbHandle });
       close = () => app.close();
       const res = await app.inject({
         method: "POST",
-        url: "/api/agents/tokens/unknown/revoke",
+        url: `/api/agents/tokens/unknown-${SUITE_SUFFIX}/revoke`,
       });
       expect(res.statusCode).toBe(404);
     });

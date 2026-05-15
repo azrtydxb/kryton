@@ -1,12 +1,21 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest";
 import { eq } from "drizzle-orm";
-import { user } from "../../../db/schema/auth.js";
 import { embedJob } from "../../../db/schema/embeddings.js";
 import type { TestDbHandle } from "../../../test/db-fixture.js";
 import {
   buildKnowledgeTestApp,
+  cleanupKnowledgeTestUser,
   createKnowledgeTestDb,
-  resetKnowledgeTestDb,
+  createKnowledgeTestUser,
+  seedKnowledgeTestUser,
 } from "./helpers.js";
 
 /**
@@ -18,31 +27,24 @@ import {
  * up the real EmbedWorker.
  */
 
-const TEST_USER = { id: "u-ready", email: "ready@example.com", name: "R", role: "user" };
-
-async function seedUser(handle: TestDbHandle): Promise<void> {
-  await handle.db.insert(user).values({
-    id: TEST_USER.id,
-    name: TEST_USER.name,
-    email: TEST_USER.email,
-  });
-}
+const TEST_USER = createKnowledgeTestUser("ready");
 
 describe("knowledge / GET /api/search/semantic/ready", () => {
   let dbHandle: TestDbHandle;
   let close: (() => Promise<void>) | null = null;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     dbHandle = createKnowledgeTestDb();
+    await seedKnowledgeTestUser(dbHandle, TEST_USER);
   });
 
   afterAll(async () => {
+    await cleanupKnowledgeTestUser(dbHandle, TEST_USER.id);
     await dbHandle.close();
   });
 
   beforeEach(async () => {
-    await resetKnowledgeTestDb(dbHandle);
-    await seedUser(dbHandle);
+    await dbHandle.db.delete(embedJob).where(eq(embedJob.userId, TEST_USER.id));
   });
 
   afterEach(async () => {
@@ -76,8 +78,6 @@ describe("knowledge / GET /api/search/semantic/ready", () => {
   });
 
   it("reports pendingJobs for the calling user from the worker decorator", async () => {
-    // Seed a couple of jobs so the stub worker's pendingCount has something
-    // to return; the stub itself just runs a count against EmbedJob.
     await dbHandle.db.insert(embedJob).values([
       { userId: TEST_USER.id, notePath: "a.md", op: "upsert", attempts: 0 },
       { userId: TEST_USER.id, notePath: "b.md", op: "upsert", attempts: 0 },

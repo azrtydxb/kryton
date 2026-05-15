@@ -1,47 +1,61 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest";
 import { eq } from "drizzle-orm";
-import { user } from "../../../db/schema/auth.js";
 import { searchIndex } from "../../../db/schema/notes.js";
 import { embedJob } from "../../../db/schema/embeddings.js";
 import type { TestDbHandle } from "../../../test/db-fixture.js";
 import {
   buildKnowledgeTestApp,
+  cleanupKnowledgeTestUser,
   createKnowledgeTestDb,
-  resetKnowledgeTestDb,
+  createKnowledgeTestUser,
+  seedKnowledgeTestUser,
 } from "./helpers.js";
 
 /**
  * Phase 5 — POST /api/search/semantic/reindex.
  *
  * scope=self enqueues an upsert job for every SearchIndex row owned by the
- * caller; scope=all does the same across every user (admin only).
+ * caller; scope=all does the same across every user (admin only). Tests run
+ * with per-suite unique userIds so the scope=all assertion is bounded to
+ * this suite's rows (filtered by ALICE/ADMIN ids).
  */
 
-const ALICE = { id: "u-alice", email: "alice@example.com", name: "Alice", role: "user" };
-const ADMIN = { id: "u-admin", email: "admin@example.com", name: "Admin", role: "admin" };
-
-async function seedUsers(handle: TestDbHandle): Promise<void> {
-  await handle.db.insert(user).values([
-    { id: ALICE.id, name: ALICE.name, email: ALICE.email },
-    { id: ADMIN.id, name: ADMIN.name, email: ADMIN.email },
-  ]);
-}
+const ALICE = createKnowledgeTestUser("alice");
+const ADMIN = createKnowledgeTestUser("admin", "admin");
 
 describe("knowledge / POST /api/search/semantic/reindex", () => {
   let dbHandle: TestDbHandle;
   let close: (() => Promise<void>) | null = null;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     dbHandle = createKnowledgeTestDb();
+    await seedKnowledgeTestUser(dbHandle, ALICE);
+    await seedKnowledgeTestUser(dbHandle, ADMIN);
   });
 
   afterAll(async () => {
+    await cleanupKnowledgeTestUser(dbHandle, ALICE.id);
+    await cleanupKnowledgeTestUser(dbHandle, ADMIN.id);
     await dbHandle.close();
   });
 
   beforeEach(async () => {
-    await resetKnowledgeTestDb(dbHandle);
-    await seedUsers(dbHandle);
+    await dbHandle.db.delete(embedJob).where(eq(embedJob.userId, ALICE.id));
+    await dbHandle.db.delete(embedJob).where(eq(embedJob.userId, ADMIN.id));
+    await dbHandle.db
+      .delete(searchIndex)
+      .where(eq(searchIndex.userId, ALICE.id));
+    await dbHandle.db
+      .delete(searchIndex)
+      .where(eq(searchIndex.userId, ADMIN.id));
   });
 
   afterEach(async () => {
@@ -126,7 +140,11 @@ describe("knowledge / POST /api/search/semantic/reindex", () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ enqueued: 0 });
 
-    const jobs = await dbHandle.db.select().from(embedJob);
+    // Scope to ALICE — other parallel suites may have their own jobs.
+    const jobs = await dbHandle.db
+      .select()
+      .from(embedJob)
+      .where(eq(embedJob.userId, ALICE.id));
     expect(jobs).toHaveLength(0);
   });
 });

@@ -1,10 +1,24 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { buildNotesTestApp, type NotesTestApp } from "./helpers.js";
+import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
+import {
+  buildNotesTestApp,
+  cleanupNotesTestUser,
+  createNotesTestUser,
+  seedNotesTestUser,
+  type NotesTestApp,
+} from "./helpers.js";
 
-const TEST_USER = { id: "user1234", email: "a@b.co", name: "Alice", role: "user" };
+const TEST_USER = createNotesTestUser("notes");
 
 describe("notes module / notes routes", () => {
   let ctx: NotesTestApp | null = null;
+
+  beforeAll(async () => {
+    await seedNotesTestUser(TEST_USER);
+  });
+  afterAll(async () => {
+    await cleanupNotesTestUser(TEST_USER.id);
+  });
+
   afterEach(async () => {
     if (ctx) await ctx.cleanup();
     ctx = null;

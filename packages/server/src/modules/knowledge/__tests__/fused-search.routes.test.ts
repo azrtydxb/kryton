@@ -1,13 +1,23 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { user } from "../../../db/schema/auth.js";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest";
+import { eq } from "drizzle-orm";
 import { searchIndex, graphEdge } from "../../../db/schema/notes.js";
 import { noteEmbeddingChunk } from "../../../db/schema/embeddings.js";
 import type { TestDbHandle } from "../../../test/db-fixture.js";
 import { setFusionWeights } from "../services/fusion-weights.service.js";
 import {
   buildKnowledgeTestApp,
+  cleanupKnowledgeTestUser,
   createKnowledgeTestDb,
-  resetKnowledgeTestDb,
+  createKnowledgeTestUser,
+  seedKnowledgeTestUser,
 } from "./helpers.js";
 
 /**
@@ -26,36 +36,33 @@ function oneHot(idx: number): Float32Array {
   return v;
 }
 
-const TEST_USER = {
-  id: "u-fused",
-  email: "fused@example.com",
-  name: "F",
-  role: "user",
-};
-
-async function seedUser(handle: TestDbHandle): Promise<void> {
-  await handle.db.insert(user).values({
-    id: TEST_USER.id,
-    name: TEST_USER.name,
-    email: TEST_USER.email,
-  });
-}
+const TEST_USER = createKnowledgeTestUser("fused");
 
 describe("knowledge / GET /api/search (fused)", () => {
   let dbHandle: TestDbHandle;
   let close: (() => Promise<void>) | null = null;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     dbHandle = createKnowledgeTestDb();
+    await seedKnowledgeTestUser(dbHandle, TEST_USER);
   });
 
   afterAll(async () => {
+    await cleanupKnowledgeTestUser(dbHandle, TEST_USER.id);
     await dbHandle.close();
   });
 
   beforeEach(async () => {
-    await resetKnowledgeTestDb(dbHandle);
-    await seedUser(dbHandle);
+    // Per-test scoped reset for this user's rows only.
+    await dbHandle.db
+      .delete(noteEmbeddingChunk)
+      .where(eq(noteEmbeddingChunk.userId, TEST_USER.id));
+    await dbHandle.db
+      .delete(graphEdge)
+      .where(eq(graphEdge.userId, TEST_USER.id));
+    await dbHandle.db
+      .delete(searchIndex)
+      .where(eq(searchIndex.userId, TEST_USER.id));
   });
 
   afterEach(async () => {
@@ -104,9 +111,6 @@ describe("knowledge / GET /api/search (fused)", () => {
 
   it("fused happy path: semantic boost lifts the closer note", async () => {
     const now = new Date("2026-05-11T00:00:00Z");
-    // Both notes share a lexical token so they appear in lexical results
-    // tied. The fake embedder maps the query to oneHot(0); near.md owns
-    // oneHot(0), far.md owns oneHot(1). Sem rank should put near.md first.
     await dbHandle.db.insert(searchIndex).values([
       {
         notePath: "near.md",
@@ -177,7 +181,6 @@ describe("knowledge / GET /api/search (fused)", () => {
     const body = res.json();
     expect(body.length).toBeGreaterThanOrEqual(2);
     expect(body[0].path).toBe("near.md");
-    // Snippet should be drawn from the best semantic chunk.
     expect(body[0].snippet).toContain("semantically nearest");
     expect(body[0].score).toBeGreaterThan(body[1].score);
     expect(typeof body[0].score).toBe("number");
@@ -185,10 +188,6 @@ describe("knowledge / GET /api/search (fused)", () => {
 
   it("graph boost: neighbour of a top hit gets ranked above an unconnected weak match", async () => {
     const now = new Date("2026-05-11T00:00:00Z");
-    // top.md is the obvious lexical+semantic winner. neighbour.md has no
-    // lexical match and no embedding (so no semantic match either) but is
-    // graph-linked to top.md. loner.md has no lexical match, no embedding,
-    // and no graph connection — it should not appear at all.
     await dbHandle.db.insert(searchIndex).values([
       {
         notePath: "top.md",
@@ -271,16 +270,11 @@ describe("knowledge / GET /api/search (fused)", () => {
     expect(paths).toContain("top.md");
     expect(paths).toContain("neighbour.md");
     expect(paths).not.toContain("loner.md");
-    // Top should outrank the graph-only neighbour.
     expect(paths.indexOf("top.md")).toBeLessThan(paths.indexOf("neighbour.md"));
   });
 
   it("custom fusion weights re-order results: lex-only weight ignores graph neighbour", async () => {
     const now = new Date("2026-05-11T00:00:00Z");
-    // Same setup as the graph-boost test: top.md has the lexical+semantic
-    // hit; neighbour.md only appears via the graph layer. With default
-    // weights (0.2 graph), neighbour appears. With lex-only weights
-    // (graph=0), neighbour MUST drop out entirely.
     await dbHandle.db.insert(searchIndex).values([
       {
         notePath: "top.md",
@@ -345,7 +339,6 @@ describe("knowledge / GET /api/search (fused)", () => {
     });
     close = () => app.close();
 
-    // Tilt the weights all the way to lexical — graph contribution = 0.
     await setFusionWeights(app, TEST_USER.id, { lex: 1, sem: 0, graph: 0 });
 
     const res = await app.inject({
@@ -356,7 +349,6 @@ describe("knowledge / GET /api/search (fused)", () => {
     const body = res.json();
     const paths = body.map((r: { path: string }) => r.path);
     expect(paths).toContain("top.md");
-    // Graph-only neighbour must NOT appear under lex-only weights.
     expect(paths).not.toContain("neighbour.md");
   });
 

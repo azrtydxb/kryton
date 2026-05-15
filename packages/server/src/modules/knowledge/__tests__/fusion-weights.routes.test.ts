@@ -1,10 +1,21 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { user } from "../../../db/schema/auth.js";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest";
+import { eq } from "drizzle-orm";
+import { settings } from "../../../db/schema/settings.js";
 import type { TestDbHandle } from "../../../test/db-fixture.js";
 import {
   buildKnowledgeTestApp,
+  cleanupKnowledgeTestUser,
   createKnowledgeTestDb,
-  resetKnowledgeTestDb,
+  createKnowledgeTestUser,
+  seedKnowledgeTestUser,
 } from "./helpers.js";
 
 /**
@@ -12,36 +23,26 @@ import {
  * Settings table (key: "fusion_weights").
  */
 
-const TEST_USER = {
-  id: "u-fw",
-  email: "fw@example.com",
-  name: "F",
-  role: "user",
-};
-
-async function seedUser(handle: TestDbHandle): Promise<void> {
-  await handle.db.insert(user).values({
-    id: TEST_USER.id,
-    name: TEST_USER.name,
-    email: TEST_USER.email,
-  });
-}
+const TEST_USER = createKnowledgeTestUser("fw");
 
 describe("knowledge / /api/search/weights", () => {
   let dbHandle: TestDbHandle;
   let close: (() => Promise<void>) | null = null;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     dbHandle = createKnowledgeTestDb();
+    await seedKnowledgeTestUser(dbHandle, TEST_USER);
   });
 
   afterAll(async () => {
+    await cleanupKnowledgeTestUser(dbHandle, TEST_USER.id);
     await dbHandle.close();
   });
 
   beforeEach(async () => {
-    await resetKnowledgeTestDb(dbHandle);
-    await seedUser(dbHandle);
+    // Clear this user's Settings rows so each test starts from "no
+    // stored weights → defaults".
+    await dbHandle.db.delete(settings).where(eq(settings.userId, TEST_USER.id));
   });
 
   afterEach(async () => {
@@ -72,7 +73,6 @@ describe("knowledge / /api/search/weights", () => {
     });
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    // 1/2.5=0.4 ; 0.5/2.5=0.2
     expect(body.lex).toBeCloseTo(0.4, 5);
     expect(body.sem).toBeCloseTo(0.4, 5);
     expect(body.graph).toBeCloseTo(0.2, 5);

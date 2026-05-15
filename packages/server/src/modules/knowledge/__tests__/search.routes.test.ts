@@ -1,37 +1,44 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { user } from "../../../db/schema/auth.js";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest";
+import { eq } from "drizzle-orm";
 import { searchIndex } from "../../../db/schema/notes.js";
 import type { TestDbHandle } from "../../../test/db-fixture.js";
 import {
   buildKnowledgeTestApp,
+  cleanupKnowledgeTestUser,
   createKnowledgeTestDb,
-  resetKnowledgeTestDb,
+  createKnowledgeTestUser,
+  seedKnowledgeTestUser,
 } from "./helpers.js";
 
-const TEST_USER = { id: "u-1", email: "alice@example.com", name: "Alice", role: "user" };
-
-async function seedUser(dbHandle: TestDbHandle): Promise<void> {
-  await dbHandle.db.insert(user).values({
-    id: TEST_USER.id,
-    name: TEST_USER.name,
-    email: TEST_USER.email,
-  });
-}
+const TEST_USER = createKnowledgeTestUser("search");
 
 describe("knowledge / search routes", () => {
   let dbHandle: TestDbHandle;
   let close: (() => Promise<void>) | null = null;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     dbHandle = createKnowledgeTestDb();
+    await seedKnowledgeTestUser(dbHandle, TEST_USER);
   });
 
   afterAll(async () => {
+    await cleanupKnowledgeTestUser(dbHandle, TEST_USER.id);
     await dbHandle.close();
   });
 
   beforeEach(async () => {
-    await resetKnowledgeTestDb(dbHandle);
+    // Per-test scoped reset: only this suite's user's index rows.
+    await dbHandle.db
+      .delete(searchIndex)
+      .where(eq(searchIndex.userId, TEST_USER.id));
   });
 
   afterEach(async () => {
@@ -40,7 +47,6 @@ describe("knowledge / search routes", () => {
   });
 
   it("GET /api/search returns FTS-matched rows from the user's index", async () => {
-    await seedUser(dbHandle);
     await dbHandle.db.insert(searchIndex).values([
       {
         notePath: "Welcome.md",
@@ -79,7 +85,6 @@ describe("knowledge / search routes", () => {
   });
 
   it("GET /api/search uses English stemming (running matches run)", async () => {
-    await seedUser(dbHandle);
     await dbHandle.db.insert(searchIndex).values({
       notePath: "Run.md",
       userId: TEST_USER.id,

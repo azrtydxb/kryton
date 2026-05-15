@@ -1,14 +1,23 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest";
 import { and, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
-import { user } from "../../../db/schema/auth.js";
 import { searchIndex } from "../../../db/schema/notes.js";
 import { embedJob } from "../../../db/schema/embeddings.js";
 import type { TestDbHandle } from "../../../test/db-fixture.js";
 import {
   buildKnowledgeTestApp,
+  cleanupKnowledgeTestUser,
   createKnowledgeTestDb,
-  resetKnowledgeTestDb,
+  createKnowledgeTestUser,
+  seedKnowledgeTestUser,
 } from "./helpers.js";
 
 /**
@@ -20,31 +29,27 @@ import {
  * worker is active to drain them.
  */
 
-const TEST_USER = { id: "u-1", email: "alice@example.com", name: "Alice", role: "user" };
-
-async function seedUser(dbHandle: TestDbHandle): Promise<void> {
-  await dbHandle.db.insert(user).values({
-    id: TEST_USER.id,
-    name: TEST_USER.name,
-    email: TEST_USER.email,
-  });
-}
+const TEST_USER = createKnowledgeTestUser("enq");
 
 describe("SearchService → EmbedJob enqueue", () => {
   let dbHandle: TestDbHandle;
   let app: FastifyInstance | null = null;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     dbHandle = createKnowledgeTestDb();
+    await seedKnowledgeTestUser(dbHandle, TEST_USER);
   });
 
   afterAll(async () => {
+    await cleanupKnowledgeTestUser(dbHandle, TEST_USER.id);
     await dbHandle.close();
   });
 
   beforeEach(async () => {
-    await resetKnowledgeTestDb(dbHandle);
-    await seedUser(dbHandle);
+    await dbHandle.db.delete(embedJob).where(eq(embedJob.userId, TEST_USER.id));
+    await dbHandle.db
+      .delete(searchIndex)
+      .where(eq(searchIndex.userId, TEST_USER.id));
     app = await buildKnowledgeTestApp({
       user: TEST_USER,
       dbHandle,
@@ -60,11 +65,17 @@ describe("SearchService → EmbedJob enqueue", () => {
   it("indexNote enqueues an upsert job alongside the SearchIndex write", async () => {
     await app!.knowledge.indexNote("test/foo.md", "# Foo\n\nbody", TEST_USER.id);
 
-    const idx = await dbHandle.db.select().from(searchIndex);
+    const idx = await dbHandle.db
+      .select()
+      .from(searchIndex)
+      .where(eq(searchIndex.userId, TEST_USER.id));
     expect(idx).toHaveLength(1);
     expect(idx[0].notePath).toBe("test/foo.md");
 
-    const jobs = await dbHandle.db.select().from(embedJob);
+    const jobs = await dbHandle.db
+      .select()
+      .from(embedJob)
+      .where(eq(embedJob.userId, TEST_USER.id));
     expect(jobs).toHaveLength(1);
     expect(jobs[0]).toMatchObject({
       userId: TEST_USER.id,
@@ -78,14 +89,20 @@ describe("SearchService → EmbedJob enqueue", () => {
   it("removeFromIndex enqueues a delete job", async () => {
     await app!.knowledge.indexNote("test/foo.md", "# Foo\n\nbody", TEST_USER.id);
     // Clear the upsert job so we can observe just the delete.
-    await dbHandle.db.delete(embedJob);
+    await dbHandle.db.delete(embedJob).where(eq(embedJob.userId, TEST_USER.id));
 
     await app!.knowledge.removeFromIndex("test/foo.md", TEST_USER.id);
 
-    const idx = await dbHandle.db.select().from(searchIndex);
+    const idx = await dbHandle.db
+      .select()
+      .from(searchIndex)
+      .where(eq(searchIndex.userId, TEST_USER.id));
     expect(idx).toHaveLength(0);
 
-    const jobs = await dbHandle.db.select().from(embedJob);
+    const jobs = await dbHandle.db
+      .select()
+      .from(embedJob)
+      .where(eq(embedJob.userId, TEST_USER.id));
     expect(jobs).toHaveLength(1);
     expect(jobs[0]).toMatchObject({
       userId: TEST_USER.id,
@@ -96,17 +113,21 @@ describe("SearchService → EmbedJob enqueue", () => {
 
   it("renameInIndex enqueues a delete + an upsert", async () => {
     await app!.knowledge.indexNote("test/old.md", "# Old\n\nbody", TEST_USER.id);
-    await dbHandle.db.delete(embedJob);
+    await dbHandle.db.delete(embedJob).where(eq(embedJob.userId, TEST_USER.id));
 
     await app!.knowledge.renameInIndex("test/old.md", "test/new.md", TEST_USER.id);
 
-    const idx = await dbHandle.db.select().from(searchIndex);
+    const idx = await dbHandle.db
+      .select()
+      .from(searchIndex)
+      .where(eq(searchIndex.userId, TEST_USER.id));
     expect(idx).toHaveLength(1);
     expect(idx[0].notePath).toBe("test/new.md");
 
     const jobs = await dbHandle.db
       .select()
       .from(embedJob)
+      .where(eq(embedJob.userId, TEST_USER.id))
       .orderBy(embedJob.notePath);
     expect(jobs).toHaveLength(2);
     const byPath = Object.fromEntries(jobs.map((j) => [j.notePath, j]));
@@ -130,7 +151,10 @@ describe("SearchService → EmbedJob enqueue", () => {
     await app!.knowledge.indexNote("test/foo.md", "# v2", TEST_USER.id);
     await app!.knowledge.indexNote("test/foo.md", "# v3", TEST_USER.id);
 
-    const jobs = await dbHandle.db.select().from(embedJob);
+    const jobs = await dbHandle.db
+      .select()
+      .from(embedJob)
+      .where(eq(embedJob.userId, TEST_USER.id));
     expect(jobs).toHaveLength(1);
     expect(jobs[0].op).toBe("upsert");
     expect(jobs[0].attempts).toBe(0);
@@ -138,23 +162,29 @@ describe("SearchService → EmbedJob enqueue", () => {
   });
 });
 
+const OFF_USER = createKnowledgeTestUser("enqoff");
+
 describe("SearchService → EmbedJob enqueue (provider=off)", () => {
   let dbHandle: TestDbHandle;
   let app: FastifyInstance | null = null;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     dbHandle = createKnowledgeTestDb();
+    await seedKnowledgeTestUser(dbHandle, OFF_USER);
   });
 
   afterAll(async () => {
+    await cleanupKnowledgeTestUser(dbHandle, OFF_USER.id);
     await dbHandle.close();
   });
 
   beforeEach(async () => {
-    await resetKnowledgeTestDb(dbHandle);
-    await seedUser(dbHandle);
+    await dbHandle.db.delete(embedJob).where(eq(embedJob.userId, OFF_USER.id));
+    await dbHandle.db
+      .delete(searchIndex)
+      .where(eq(searchIndex.userId, OFF_USER.id));
     app = await buildKnowledgeTestApp({
-      user: TEST_USER,
+      user: OFF_USER,
       dbHandle,
       embedderProvider: "off",
     });
@@ -166,12 +196,18 @@ describe("SearchService → EmbedJob enqueue (provider=off)", () => {
   });
 
   it("does NOT enqueue when embedderState.provider is 'off'", async () => {
-    await app!.knowledge.indexNote("test/foo.md", "# Foo", TEST_USER.id);
+    await app!.knowledge.indexNote("test/foo.md", "# Foo", OFF_USER.id);
 
-    const idx = await dbHandle.db.select().from(searchIndex);
+    const idx = await dbHandle.db
+      .select()
+      .from(searchIndex)
+      .where(eq(searchIndex.userId, OFF_USER.id));
     expect(idx).toHaveLength(1);
 
-    const jobs = await dbHandle.db.select().from(embedJob);
+    const jobs = await dbHandle.db
+      .select()
+      .from(embedJob)
+      .where(eq(embedJob.userId, OFF_USER.id));
     expect(jobs).toHaveLength(0);
   });
 });
