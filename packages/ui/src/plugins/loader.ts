@@ -84,7 +84,6 @@ export async function loadPlugin(
   }
 
   // Dynamic import of the plugin's ESM bundle (Vite/webpack handle /* @vite-ignore */).
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const mod: ClientPluginModule = await import(/* @vite-ignore */ bundleUrl);
 
   if (typeof mod.activate !== "function") {

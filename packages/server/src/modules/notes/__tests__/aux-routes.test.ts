@@ -250,6 +250,10 @@ describe("notes-aux routes", () => {
 
   describe("attachments routes", () => {
     it("uploads a file and downloads it back", async () => {
+      // Attachments are now scoped to an existing note; seed p1.md
+      // first so the upload route's notePath verification passes.
+      await app.notes.writeNote("p1.md", "# p1\n", TEST_USER.id);
+
       const boundary = "----testboundary12345";
       const body = Buffer.concat([
         Buffer.from(`--${boundary}\r\n`),

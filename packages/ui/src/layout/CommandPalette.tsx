@@ -49,14 +49,23 @@ export function CommandPalette({
 }: CommandPaletteProps) {
   const [query, setQuery] = React.useState("");
   const [selectedIndex, setSelectedIndex] = React.useState(0);
+  const [prevOpen, setPrevOpen] = React.useState(open);
+  const [prevQuery, setPrevQuery] = React.useState(query);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
-  // Reset state whenever palette is opened
-  React.useEffect(() => {
+  // Reset state whenever palette is opened (derived-from-input pattern)
+  if (prevOpen !== open) {
+    setPrevOpen(open);
     if (open) {
       setQuery("");
       setSelectedIndex(0);
-      // Focus with a microtask to ensure the DOM is painted
+      setPrevQuery("");
+    }
+  }
+
+  // Focus input when palette opens
+  React.useEffect(() => {
+    if (open) {
       requestAnimationFrame(() => inputRef.current?.focus());
     }
   }, [open]);
@@ -66,10 +75,11 @@ export function CommandPalette({
     return actions.filter((a) => fuzzyMatch(query, a.label) || fuzzyMatch(query, a.group ?? ""));
   }, [actions, query]);
 
-  // Reset selection when results change
-  React.useEffect(() => {
+  // Reset selection when query changes (derived-from-input pattern)
+  if (prevQuery !== query) {
+    setPrevQuery(query);
     setSelectedIndex(0);
-  }, [query]);
+  }
 
   const handleKeyDown = React.useCallback(
     (e: React.KeyboardEvent) => {
@@ -90,8 +100,6 @@ export function CommandPalette({
     [filtered, selectedIndex, onClose],
   );
 
-  if (!open) return null;
-
   // Group actions
   const groups = React.useMemo(() => {
     const map = new Map<string, CommandAction[]>();
@@ -102,6 +110,8 @@ export function CommandPalette({
     }
     return Array.from(map.entries());
   }, [filtered]);
+
+  if (!open) return null;
 
   const activeOptionId =
     filtered.length > 0 ? `cp-option-${selectedIndex}` : undefined;

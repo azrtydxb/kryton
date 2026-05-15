@@ -85,7 +85,6 @@ export function FileTree({
   // immediately after dragstart would otherwise see a stale null and the
   // drop zone would silently reject the first drag attempt.
   const [draggedPath, setDraggedPath] = useState<string | null>(null);
-  const [draggedType, setDraggedType] = useState<"file" | "folder" | null>(null);
   const draggedPathRef = useRef<string | null>(null);
   const draggedTypeRef = useRef<"file" | "folder" | null>(null);
   const [dragOverPath, setDragOverPath] = useState<string | null>(null);
@@ -210,7 +209,6 @@ export function FileTree({
     draggedPathRef.current = node.path;
     draggedTypeRef.current = node.type;
     setDraggedPath(node.path);
-    setDraggedType(node.type);
   }, []);
 
   const handleDragOver = useCallback(
@@ -314,7 +312,6 @@ export function FileTree({
     draggedPathRef.current = null;
     draggedTypeRef.current = null;
     setDraggedPath(null);
-    setDraggedType(null);
     setDragOverPath(null);
   }, []);
 

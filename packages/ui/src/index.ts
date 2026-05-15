@@ -1,4 +1,4 @@
-export const KRYTON_UI_VERSION = "4.4.0-pre.9";
+export { KRYTON_UI_VERSION } from "./_version";
 
 // Utilities
 export * from "./lib/utils";

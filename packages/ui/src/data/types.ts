@@ -43,6 +43,7 @@ export interface KrytonDataAdapter {
   settings: {
     get(key: string): string | null;
     set(key: string, value: string): Promise<void>;
+    list?(): SettingData[];
   };
   noteShares: { list(): NoteShareData[]; };
   trashItems: {

@@ -99,7 +99,8 @@ describe("fetchPluginManifest", () => {
   });
 
   it("defaults tags to [] when absent in response", async () => {
-    const { tags: _tags, ...base } = makeManifest();
+    const base: Partial<ReturnType<typeof makeManifest>> = { ...makeManifest() };
+    delete base.tags;
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => base,

@@ -120,9 +120,39 @@ export function registerYjsRoutes(
     await p;
   };
 
+  /**
+   * Authorize an authenticated user against a docId before allowing
+   * them to open or create the corresponding Y.Doc. Without this, any
+   * authenticated user could create arbitrary docIds and accumulate
+   * server-side state, and could open someone else's docId in the
+   * cache (persistence.loadYjsDoc enforces user-scoping for the disk
+   * snapshot, but the in-memory entry is keyed by docId alone).
+   *
+   * Convention: docId is the note path within the requesting user's
+   * own notes directory. Shared-note collab uses HTTP today, not WS,
+   * so any shared-note docId convention will need to be added here
+   * when that lands.
+   */
+  const authorizeDoc = async (docId: string, auth: AuthInfo): Promise<void> => {
+    try {
+      await app.notes.readNote(docId, auth.userId);
+    } catch (err) {
+      app.log.debug(
+        { err: err instanceof Error ? err.message : String(err), docId, userId: auth.userId },
+        "yjs docId authorization failed",
+      );
+      throw new Error("forbidden", { cause: err });
+    }
+  };
+
   const ensureDoc = async (docId: string, auth: AuthInfo): Promise<DocEntry> => {
     const cached = docs.get(docId);
     if (cached) {
+      if (cached.userId !== auth.userId) {
+        // Cache collision across users — refuse rather than expose
+        // another user's in-memory doc.
+        throw new Error("forbidden");
+      }
       // Cancel any pending eviction since a new client is connecting.
       if (cached.evictTimer) {
         clearTimeout(cached.evictTimer);
@@ -130,6 +160,7 @@ export function registerYjsRoutes(
       }
       return cached;
     }
+    await authorizeDoc(docId, auth);
     // Coalesce concurrent first-time-fills so two clients connecting in
     // the same tick don't construct rival Y.Doc instances.
     const inflight = ensureDocInFlight.get(docId);
@@ -279,15 +310,14 @@ export function registerYjsRoutes(
     });
   };
 
-  // Extract token from query string OR Sec-WebSocket-Protocol header.
+  // Extract bearer token from Sec-WebSocket-Protocol. Query-string tokens
+  // are no longer accepted because they leak via access logs, browser
+  // history, and proxies. Convention: "kryton-token, <token>".
   const extractToken = (req: FastifyRequest): string | null => {
-    const q = (req.query as { token?: string }) ?? {};
-    if (q.token) return q.token;
     const proto = req.headers["sec-websocket-protocol"];
     if (typeof proto === "string" && proto.length > 0) {
-      // Convention: "kryton-token, <token>"
       const parts = proto.split(",").map((s) => s.trim());
-      if (parts.length >= 2) return parts[1];
+      if (parts.length >= 2 && parts[0] === "kryton-token") return parts[1];
       return parts[0];
     }
     return null;
@@ -334,6 +364,11 @@ export function registerYjsRoutes(
         return;
       }
       onConnection(socket, docId, auth).catch((e) => {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg === "forbidden") {
+          socket.close(1008, "forbidden");
+          return;
+        }
         app.log.error({ err: e, docId }, "yjs onConnection failed");
         socket.close(1011, "internal");
       });

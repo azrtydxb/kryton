@@ -1,4 +1,5 @@
 import { useState, useEffect, type FormEvent, type CSSProperties, type ReactNode, type InputHTMLAttributes } from 'react';
+import { KRYTON_UI_VERSION } from '@azrtydxb/ui';
 import { useAuth } from '../hooks/useAuth';
 import { authApi } from '../lib/api';
 import { authClient } from '../lib/auth-client';
@@ -592,7 +593,7 @@ export default function LoginPage() {
             <span className="dot pulse" style={{ background: 'var(--accent-good)' }} />
             server online
           </span>
-          <span style={{ color: 'var(--fg-4)' }}>v4.4.0-pre.9</span>
+          <span style={{ color: 'var(--fg-4)' }}>v{KRYTON_UI_VERSION}</span>
         </div>
       </div>
     </div>

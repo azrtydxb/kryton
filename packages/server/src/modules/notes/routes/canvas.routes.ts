@@ -4,14 +4,7 @@ import { z } from "zod";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { ConflictError, NotFoundError, ValidationError } from "../../../lib/errors.js";
-
-
-
-
-
-function ensureExtension(filePath: string, ext: string): string {
-  return filePath.endsWith(ext) ? filePath : `${filePath}${ext}`;
-}
+import { ensureExtension } from "../../../lib/pathUtils.js";
 
 function validatePathWithinBase(fullPath: string, baseDir: string): void {
   const resolvedPath = path.resolve(fullPath);

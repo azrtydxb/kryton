@@ -202,7 +202,6 @@ function FrontmatterBlock({ frontmatter }: { frontmatter: Frontmatter }) {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 const IMAGE_EXTENSIONS = /\.(png|jpg|jpeg|gif|svg|webp|bmp)$/i;
-const MAX_EMBED_DEPTH = 3;
 
 function escapeHtml(str: string): string {
   return str
@@ -368,10 +367,12 @@ export const NotePreviewReact = React.forwardRef<
     [onLinkClick, onCreateNote],
   );
 
-  const headingCounterRef = useRef(0);
-  headingCounterRef.current = 0;
-
   const headingComponents = useMemo(() => {
+    // Counter is scoped per `content` revision; including content in the
+    // dependency array below ensures a fresh counter on every change so
+    // heading ids remain stable across renders for the same content.
+    const contentVersion = content.length;
+    const counter = { value: 0 };
     const makeHeading = (
       Tag: "h1" | "h2" | "h3" | "h4" | "h5" | "h6",
     ) => {
@@ -379,9 +380,9 @@ export const NotePreviewReact = React.forwardRef<
         children,
         ...props
       }: React.HTMLAttributes<HTMLHeadingElement>) => {
-        headingCounterRef.current++;
+        counter.value++;
         return (
-          <Tag id={`heading-${headingCounterRef.current}`} {...props}>
+          <Tag id={`heading-${contentVersion}-${counter.value}`} {...props}>
             {children}
           </Tag>
         );
@@ -395,7 +396,7 @@ export const NotePreviewReact = React.forwardRef<
       h5: makeHeading("h5"),
       h6: makeHeading("h6"),
     };
-  }, []);
+  }, [content]);
 
   const codeComponent = useMemo(() => {
     return function CodeBlock({

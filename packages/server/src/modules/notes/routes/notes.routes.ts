@@ -17,13 +17,7 @@ import {
 } from "../schemas/notes.schemas.js";
 import type { NoteService } from "../services/note.service.js";
 import { getUserNotesDir } from "../services/user-notes-dir.service.js";
-
-function decodePathParam(raw: string): string {
-  return decodeURIComponent(raw);
-}
-function ensureExtension(filePath: string, ext: string): string {
-  return filePath.endsWith(ext) ? filePath : `${filePath}${ext}`;
-}
+import { decodePathParam, ensureExtension } from "../../../lib/pathUtils.js";
 
 export interface NotesRoutesDeps {
   notesDir: string;

@@ -54,7 +54,7 @@ export function DiagnosticsPanel({
       <section className="space-y-2">
         <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Sync state</h3>
         <pre className="max-h-48 overflow-auto rounded-md border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-          {syncState != null
+          {syncState !== null && syncState !== undefined
             ? JSON.stringify(syncState, null, 2)
             : "No sync state available."}
         </pre>

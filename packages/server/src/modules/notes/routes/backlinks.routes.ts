@@ -2,19 +2,9 @@ import type { FastifyPluginAsync } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { ValidationError } from "../../../lib/errors.js";
+import { decodePathParam, ensureExtension } from "../../../lib/pathUtils.js";
 
 // its decorator. The knowledge-agent's port lives in modules/knowledge/.
-
-
-function decodePathParam(raw: string | string[] | undefined): string {
-  if (raw === undefined) return "";
-  const joined = Array.isArray(raw) ? raw.join("/") : raw;
-  return decodeURIComponent(joined);
-}
-
-function ensureExtension(filePath: string, ext: string): string {
-  return filePath.endsWith(ext) ? filePath : `${filePath}${ext}`;
-}
 
 const backlinkSchema = z.object({
   path: z.string(),

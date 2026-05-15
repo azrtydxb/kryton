@@ -1,9 +1,9 @@
 // packages/ui/src/data/hooks.ts
 import { useEffect, useReducer, useState } from "react";
 import { useKrytonData } from "./KrytonDataProvider";
-import type { NoteFilter, NoteData, FolderData, TagData, SettingData, NoteShareData, TrashItemData, SyncStatus } from "./types";
+import type { NoteFilter, NoteData, FolderData, TagData, SettingData, NoteShareData, TrashItemData, SyncStatus, KrytonDataAdapter } from "./types";
 
-function makeListHook<T>(entityType: string, getList: (a: any) => T[]) {
+function makeListHook<T>(entityType: string, getList: (a: KrytonDataAdapter) => T[]) {
   return function useList(): T[] {
     const adapter = useKrytonData();
     const [, forceUpdate] = useReducer((n: number) => n + 1, 0);
@@ -22,7 +22,6 @@ export function useUiNotes(filter?: NoteFilter): NoteData[] {
   useEffect(() => {
     const off = adapter.subscribe("notes", "*", () => forceUpdate());
     return off;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adapter, filterKey]);
   return adapter.notes.list(filter);
 }

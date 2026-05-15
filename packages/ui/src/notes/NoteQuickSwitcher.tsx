@@ -43,7 +43,14 @@ export function NoteQuickSwitcher({
 }: NoteQuickSwitcherProps) {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [prevQuery, setPrevQuery] = useState(query);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Reset selection when query changes (derived-from-input pattern)
+  if (prevQuery !== query) {
+    setPrevQuery(query);
+    setSelectedIndex(0);
+  }
 
   const filtered = useMemo(
     () =>
@@ -58,10 +65,6 @@ export function NoteQuickSwitcher({
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
-
-  useEffect(() => {
-    setSelectedIndex(0);
-  }, [query]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
