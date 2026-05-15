@@ -373,7 +373,7 @@ Deferred to follow-ups:
 
 ---
 
-## 8a. Worked example — what changes for "rename a note"
+## 9. Worked example — what changes for "rename a note"
 
 To make the migration plan concrete, here's how a rename flows today vs. after each phase.
 
@@ -408,7 +408,7 @@ The `useRenameNote()` hook is the only renaming code in the client; `useNotes.ts
 
 ---
 
-## 9. Open questions
+## 10. Open questions
 
 - Should we split `useNotesQuery.ts` once it has 8+ hooks (`useFoldersQuery.ts`, `useSharesQuery.ts`, `useTagsQuery.ts`)? Probably yes after Phase 2 — flagged here for the implementer.
 - Do we keep the `tabId` vs `path` duality (`packages/client/src/lib/api.ts:24`) or fold the "shared:" prefix into the path itself? Recommend keeping it — it's the cleanest way to disambiguate shared vs owned notes that share a path, and `useActiveNote()` can encapsulate the parsing.
@@ -416,7 +416,7 @@ The `useRenameNote()` hook is the only renaming code in the client; `useNotes.ts
 
 ---
 
-## 10. Done definition
+## 11. Done definition
 
 - `useNotes.ts` does not exist.
 - `HttpAdapter` retains only: Yjs/WebSocket lifecycle, `subscribe`, `getSyncStatus`/`triggerSync`, `currentUser`. Its entity arrays are gone or are derived views over RQ.
