@@ -10,11 +10,16 @@ export default defineConfig({
     include: ["src/**/__tests__/**/*.test.ts"],
     globalSetup: ["./src/test/global-setup.ts"],
     // The self-hosted runner shares CPU with other workloads, so the
-    // per-test fastify boot can take several seconds on a bad day. 30 s
-    // is an honest envelope — if a test actually does anything that
-    // takes that long the timeout still flags a real bug.
-    testTimeout: 30_000,
-    hookTimeout: 30_000,
+    // per-test fastify boot can take several seconds on a bad day. The
+    // 30s envelope was tripping during contended CI runs (an 11-test
+    // file finishing in 91s wall-time, one test hitting 30s). 60s is
+    // generous but anything beyond that is genuinely stuck and worth
+    // failing on. The per-branch concurrency block in
+    // .github/workflows/ci.yml also cancels older runs for the same
+    // ref so a single PR's stacked pushes can't double-load the
+    // runner — different PRs can still run concurrently though.
+    testTimeout: 60_000,
+    hookTimeout: 60_000,
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov"],
