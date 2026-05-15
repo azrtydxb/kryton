@@ -156,9 +156,11 @@ export function GraphPanel({
   }, []);
 
   // Dispatch a synthetic wheel event on the canvas wrapper to leverage
-  // useViewport.web's existing wheel-zoom handler. The factor used by
-  // applyWheelZoom is Math.exp(-deltaY / 300); we mirror it locally so
-  // the legend %% stays in sync with the actual transform.
+  // useViewport.web's existing wheel-zoom handler. GraphView's
+  // onZoomChange callback is the single source of truth for the
+  // indicator — it fires on this synthetic wheel, on real wheel
+  // events, and on programmatic recentre, so the legend percentage
+  // stays in sync with the actual transform without local shadowing.
   const dispatchZoom = useCallback((deltaY: number) => {
     const wrap = (expanded ? expandedCanvasWrapRef.current : canvasWrapRef.current);
     const target = wrap?.querySelector('canvas') ?? wrap;
@@ -172,11 +174,6 @@ export function GraphPanel({
       cancelable: true,
     });
     target.dispatchEvent(evt);
-    setZoom((z) => {
-      const next = z * Math.exp(-deltaY / 300);
-      // Clamp to GRAPH_CONFIG.zoom range used by useViewport (0.2 .. 5 typical).
-      return Math.max(0.1, Math.min(10, next));
-    });
   }, [expanded]);
 
   const handleRecenter = useCallback(() => {
@@ -365,6 +362,7 @@ export function GraphPanel({
               recenterRef={recenterRef}
               starredPaths={starredPaths}
               showAllLabels={fullscreen}
+              onZoomChange={setZoom}
             />
             {renderCornerControls()}
             {tooltip && renderHoverCard(tooltip)}
@@ -464,6 +462,7 @@ export function GraphPanel({
                   recenterRef={expandedRecenterRef}
                   starredPaths={starredPaths}
                   showAllLabels
+                  onZoomChange={setZoom}
                 />
                 {renderCornerControls()}
                 {tooltip && renderHoverCard(tooltip)}
