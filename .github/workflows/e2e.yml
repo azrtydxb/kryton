@@ -88,3 +88,186 @@ jobs:
         # fails on the bind-mounted workspace.
         if: always()
         run: chown -R 1001:1001 . || true
+
+  # Three parallel smoke jobs exercise each deployment surface end-to-
+  # end against a real artifact. They share no state with the `e2e`
+  # job above and run concurrently as siblings.
+  compose-smoke:
+    # Brings up the production compose stack, polls /health until it
+    # returns 200, then tears it down. Runs on the publish scale set
+    # because we need real docker access (the default arc-azrtydxb
+    # pods don't have a docker daemon socket the way `-publish` does).
+    runs-on: arc-azrtydxb-publish
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - name: Generate compose env
+        # docker-compose.prod.yml uses ${VAR:?} for required values.
+        # Provide the minimum set so the stack boots in CI.
+        run: |
+          cat > .env <<'EOF'
+          POSTGRES_PASSWORD=kryton-smoke
+          BETTER_AUTH_SECRET=ci-smoke-secret-must-be-at-least-32-characters-long
+          BETTER_AUTH_URL=http://localhost:3001
+          APP_URL=http://localhost:3001
+          EOF
+      - name: docker compose up
+        run: docker compose -f docker-compose.prod.yml --env-file .env up -d
+      - name: Wait for /health
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:3001/health > /dev/null; then
+              echo "health OK after ${i}s"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "health never came up"
+          docker compose -f docker-compose.prod.yml logs --tail=200
+          exit 1
+      - name: Teardown
+        if: always()
+        run: docker compose -f docker-compose.prod.yml --env-file .env down -v || true
+
+  helm-smoke:
+    # Spins up a kind cluster inside the runner, installs the chart
+    # from the repo, waits for the kryton Pod ready + /health 200,
+    # tears down the cluster.
+    runs-on: arc-azrtydxb-publish
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - name: Install kind
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: kryton-helm-smoke
+          wait: 120s
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.2
+      - name: Helm dependency update
+        run: helm dependency update charts/kryton
+      - name: Helm install
+        run: |
+          helm install kryton charts/kryton \
+            --namespace kryton-smoke --create-namespace \
+            --wait --timeout 5m
+      - name: Health check via port-forward
+        run: |
+          set -euo pipefail
+          kubectl -n kryton-smoke wait --for=condition=Ready pod \
+            -l app.kubernetes.io/name=kryton --timeout=300s
+          kubectl -n kryton-smoke port-forward svc/kryton 8080:80 &
+          PF=$!
+          trap "kill $PF || true" EXIT
+          sleep 5
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8080/health > /dev/null; then
+              echo "helm /health OK after ${i} polls"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "helm /health never came up"
+          kubectl -n kryton-smoke get all
+          kubectl -n kryton-smoke logs -l app.kubernetes.io/name=kryton --tail=200
+          exit 1
+      - name: Teardown
+        if: always()
+        run: kind delete cluster --name kryton-helm-smoke || true
+
+  operator-smoke:
+    # Same as helm-smoke but installs the CRD bundle + operator
+    # Deployment first, then applies a minimal Kryton CR and waits
+    # for status.conditions[Ready]=True before asserting /health.
+    runs-on: arc-azrtydxb-publish
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - name: Install kind
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: kryton-operator-smoke
+          wait: 120s
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.2
+      - name: Apply CRD bundle
+        run: |
+          set -euo pipefail
+          for f in operator/config/crd/bases/*.yaml; do
+            kubectl apply -f "$f"
+          done
+      - name: Deploy operator
+        # The operator image is built and pushed by release.yml. In
+        # the e2e workflow we install via the same helm chart pattern
+        # the operator project uses under operator/config; this assumes
+        # WS-C ships a `make deploy` equivalent or a deploy manifest at
+        # operator/config/default. Fall back to kustomize build.
+        run: |
+          set -euo pipefail
+          kubectl create namespace kryton-operator-system || true
+          if [ -d operator/config/default ]; then
+            kubectl kustomize operator/config/default | kubectl apply -f -
+          else
+            echo "No operator/config/default kustomize root found" >&2
+            exit 1
+          fi
+          kubectl -n kryton-operator-system rollout status \
+            deploy --timeout=300s
+      - name: Apply minimal Kryton CR
+        run: |
+          cat <<'EOF' | kubectl apply -f -
+          apiVersion: kryton.azrtydxb.io/v1alpha1
+          kind: Kryton
+          metadata:
+            name: smoke
+            namespace: default
+          spec:
+            values:
+              ingress:
+                enabled: false
+              postgresql:
+                enabled: true
+          EOF
+      - name: Wait for Ready condition
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 60); do
+            ready=$(kubectl get kryton smoke -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "")
+            if [ "$ready" = "True" ]; then
+              echo "Kryton CR Ready after ${i} polls"
+              break
+            fi
+            sleep 5
+          done
+          kubectl wait --for=condition=Ready pod \
+            -l app.kubernetes.io/name=kryton --timeout=300s
+      - name: Health check via port-forward
+        run: |
+          set -euo pipefail
+          kubectl port-forward svc/smoke-kryton 8080:80 &
+          PF=$!
+          trap "kill $PF || true" EXIT
+          sleep 5
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8080/health > /dev/null; then
+              echo "operator /health OK after ${i} polls"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "operator /health never came up"
+          kubectl get kryton smoke -o yaml || true
+          kubectl get all -A
+          kubectl -n kryton-operator-system logs -l control-plane=controller-manager --tail=200 || true
+          exit 1
+      - name: Teardown
+        if: always()
+        run: kind delete cluster --name kryton-operator-smoke || true
