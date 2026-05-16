@@ -66,10 +66,10 @@
 
 ### Tasks
 
-- [ ] **B1.** Create `charts/kryton/Chart.yaml` with `apiVersion: v2`, `name: kryton`, `type: application`. `version` and `appVersion` both set to the current `package.json` version. `dependencies` block referencing `bitnami/postgresql` pinned to a current major version. Use `condition: postgresql.enabled` so the dep is opt-out.
-- [ ] **B2.** Write `charts/kryton/values.yaml`. Top-level groups: `image`, `replicaCount`, `service`, `ingress` (default `enabled: false`), `persistence`, `postgresql` (default `enabled: true`, override image to a pgvector image), `externalSecrets` (default `enabled: false`), `resources`, `nodeSelector`, `tolerations`, `affinity`, `podSecurityContext`, `securityContext`, `serviceMonitor` (default `enabled: false`), `env` (the schema-driven block — non-secret defaults).
-- [ ] **B3.** Write `charts/kryton/values.schema.json` describing the values structure (JSON Schema draft 2020-12). Cover the same top-level groups. This will be regenerated/validated by WS-D against `config-schema.json`; for now write a hand-crafted version that matches `values.yaml`.
-- [ ] **B4.** Templates:
+- [x] **B1.** Create `charts/kryton/Chart.yaml` with `apiVersion: v2`, `name: kryton`, `type: application`. `version` and `appVersion` both set to the current `package.json` version. `dependencies` block referencing `bitnami/postgresql` pinned to a current major version. Use `condition: postgresql.enabled` so the dep is opt-out.
+- [x] **B2.** Write `charts/kryton/values.yaml`. Top-level groups: `image`, `replicaCount`, `service`, `ingress` (default `enabled: false`), `persistence`, `postgresql` (default `enabled: true`, override image to a pgvector image), `externalSecrets` (default `enabled: false`), `resources`, `nodeSelector`, `tolerations`, `affinity`, `podSecurityContext`, `securityContext`, `serviceMonitor` (default `enabled: false`), `env` (the schema-driven block — non-secret defaults).
+- [x] **B3.** Write `charts/kryton/values.schema.json` describing the values structure (JSON Schema draft 2020-12). Cover the same top-level groups. This will be regenerated/validated by WS-D against `config-schema.json`; for now write a hand-crafted version that matches `values.yaml`.
+- [x] **B4.** Templates:
   - `templates/_helpers.tpl` — name, fullname, labels, selectorLabels helpers (standard helm pattern).
   - `templates/deployment.yaml` — kryton Deployment. Image from `.Values.image`. ContainerPort from `.Values.service.port`. EnvFrom both the ConfigMap and the Secret. Liveness + readiness probes against `/health`. VolumeMounts for `.Values.persistence`. ImagePullSecrets if set.
   - `templates/service.yaml` — ClusterIP service.
@@ -81,7 +81,7 @@
   - `templates/servicemonitor.yaml` — gated by `.Values.serviceMonitor.enabled`. Targets the kryton service, scrape path configurable.
   - `templates/tests/connection-test.yaml` — `helm test` Pod that hits `http://<svc>:<port>/health` via wget, exits 0 on 200.
   - `templates/NOTES.txt` — install summary (URL to access, postgres status, ingress URL if enabled).
-- [ ] **B5.** Set the postgresql subchart's image to pgvector via `values.yaml`:
+- [x] **B5.** Set the postgresql subchart's image to pgvector via `values.yaml`:
   ```yaml
   postgresql:
     enabled: true
@@ -92,11 +92,11 @@
       username: kryton
       database: kryton
   ```
-- [ ] **B6.** Write `charts/kryton/README.md` documenting top-level values, install command (both `helm install` from a local dir and from `oci://`), upgrade considerations, and an example `values-production.yaml`.
-- [ ] **B7.** Add `charts/kryton/.helmignore` excluding `tests/`, `*.md`, etc.
-- [ ] **B8.** Run `helm lint charts/kryton` locally — must pass with zero warnings.
-- [ ] **B9.** Run `helm template charts/kryton --set ingress.enabled=true --set externalSecrets.enabled=false` and pipe through `kubeconform -strict` — must validate.
-- [ ] **B10.** Run `helm dependency update charts/kryton`, verify the postgres tgz is fetched.
+- [x] **B6.** Write `charts/kryton/README.md` documenting top-level values, install command (both `helm install` from a local dir and from `oci://`), upgrade considerations, and an example `values-production.yaml`.
+- [x] **B7.** Add `charts/kryton/.helmignore` excluding `tests/`, `*.md`, etc.
+- [x] **B8.** Run `helm lint charts/kryton` locally — must pass with zero warnings.
+- [x] **B9.** Run `helm template charts/kryton --set ingress.enabled=true --set externalSecrets.enabled=false` and pipe through `kubeconform -strict` — must validate.
+- [x] **B10.** Run `helm dependency update charts/kryton`, verify the postgres tgz is fetched.
 
 ---
 
