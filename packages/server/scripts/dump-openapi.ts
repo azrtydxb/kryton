@@ -52,6 +52,14 @@ async function main(): Promise<void> {
   const spec = app.swagger() as Record<string, unknown>;
   await app.close();
 
+  // Normalize info.version to a fixed sentinel. The package version
+  // changes every release but carries no API-shape signal — letting
+  // it through would make every version bump fail the drift gate even
+  // when no actual route/schema changed.
+  if (spec.info && typeof spec.info === "object") {
+    (spec.info as Record<string, unknown>).version = "0.0.0";
+  }
+
   const serialized = stableStringify(spec);
 
   if (checkOnly) {
