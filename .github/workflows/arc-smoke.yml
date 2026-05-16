@@ -29,6 +29,12 @@ on:
         default: "false"
         type: choice
         options: ["false", "true"]
+      scale_set:
+        description: "Which ARC scale set to land on"
+        required: false
+        default: "arc-azrtydxb-publish"
+        type: choice
+        options: ["arc-azrtydxb", "arc-azrtydxb-publish"]
 
 env:
   TEST_IMAGE: ghcr.io/${{ github.repository }}/arc-smoke-test
@@ -36,7 +42,7 @@ env:
 
 jobs:
   smoke:
-    runs-on: arc-azrtydxb
+    runs-on: ${{ inputs.scale_set || 'arc-azrtydxb-publish' }}
     permissions:
       contents: read
       packages: write
