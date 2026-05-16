@@ -9,14 +9,54 @@ env:
   IMAGE_NAME: ${{ github.repository }}/kryton
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+# Layout:
+#
+#   typecheck ─┐
+#   lint       │
+#   test       ├── build-arm64 ─┐
+#   e2e        │                ├── manifest ── release
+#   build ─────┴── build-amd64 ─┘
+#
+# Five parallel gate jobs replace the old monolithic `ci`. `build`
+# uploads server-dist + client-dist artifacts that the per-arch
+# docker jobs download in parallel. arm64 (local dind) and amd64
+# (remote NAS BuildKit) build concurrently — neither builder waits
+# on the other. `manifest` stitches the digests into a multi-arch
+# tag. `release` cuts the GitHub release.
+
 jobs:
-  # Gate before publishing: typecheck, lint, unit tests, AND the full
-  # E2E suite (API + MCP + session-restart-persistence). Same shape as
-  # ci.yml's build job, plus the e2e step. A red here blocks the docker
-  # build/push and the GitHub release.
-  ci:
-    # ARC v2 scale-set on the kw cluster (k3s ARM64). Ephemeral runner
-    # pods with a dind sidecar.
+  typecheck:
+    runs-on: arc-azrtydxb
+    container:
+      image: node:24
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build:shared
+      - run: npm run typecheck
+      - if: always()
+        run: chown -R 1001:1001 . || true
+
+  lint:
+    runs-on: arc-azrtydxb
+    container:
+      image: node:24
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run lint
+      - if: always()
+        run: chown -R 1001:1001 . || true
+
+  test:
     runs-on: arc-azrtydxb
     container:
       image: node:24
@@ -34,25 +74,12 @@ jobs:
           --health-timeout 3s
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build shared packages (ui, sdk)
-        run: npm run build:shared
-
-      - name: TypeCheck
-        run: npm run typecheck
-
-      - name: Lint
-        run: npm run lint
-
+      - run: npm ci
+      - run: npm run build:shared
       - name: Install pgvector extension + psql client
         env:
           PGPASSWORD: kryton
@@ -60,12 +87,10 @@ jobs:
           apt-get update -qq
           apt-get install -y -qq --no-install-recommends postgresql-client
           psql -h postgres -U kryton -d kryton_test -c "CREATE EXTENSION IF NOT EXISTS vector"
-
       - name: Run drizzle migrations
         env:
           POSTGRES_URL: postgres://kryton:kryton@postgres:5432/kryton_test
         run: npm run db:migrate --workspace=packages/server
-
       - name: Unit tests
         run: npm run test
         env:
@@ -75,7 +100,44 @@ jobs:
           BETTER_AUTH_SECRET: ci-test-secret-must-be-at-least-32-characters-long
           BETTER_AUTH_URL: http://localhost:3001
           APP_URL: http://localhost:5173
+      - if: always()
+        run: chown -R 1001:1001 . || true
 
+  e2e:
+    runs-on: arc-azrtydxb
+    container:
+      image: node:24
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: kryton
+          POSTGRES_PASSWORD: kryton
+          POSTGRES_DB: kryton_test
+        options: >-
+          --health-cmd "pg_isready -U kryton -d kryton_test"
+          --health-interval 5s
+          --health-retries 10
+          --health-timeout 3s
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build:shared
+      - name: Install pgvector extension + psql client
+        env:
+          PGPASSWORD: kryton
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends postgresql-client
+          psql -h postgres -U kryton -d kryton_test -c "CREATE EXTENSION IF NOT EXISTS vector"
+      - name: Run drizzle migrations
+        env:
+          POSTGRES_URL: postgres://kryton:kryton@postgres:5432/kryton_test
+        run: npm run db:migrate --workspace=packages/server
       - name: E2E suite (API + MCP + restart-persistence)
         run: npm run test:e2e --workspace=packages/server
         env:
@@ -86,42 +148,49 @@ jobs:
           BETTER_AUTH_URL: http://localhost:3001
           APP_URL: http://localhost:5173
           SEMANTIC_PROVIDER: "off"
-
-      - name: Build
-        run: npm run build
-
-      - name: Restore workspace ownership to runner user
-        # ARC runner UID is 1001; the job container runs as root and
-        # would otherwise leave root-owned files in the bind-mounted
-        # workspace, blocking post-job cleanup.
-        if: always()
+      - if: always()
         run: chown -R 1001:1001 . || true
 
-      - name: Upload client dist
-        uses: actions/upload-artifact@v4
+  build:
+    # Produces server-dist + client-dist artifacts consumed by the
+    # docker fan-out. Doesn't gate on typecheck/lint/test — those run
+    # in parallel as siblings; their failure independently blocks the
+    # docker jobs via `needs`.
+    runs-on: arc-azrtydxb
+    container:
+      image: node:24
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build:shared
+      - run: npm run build
+      - if: always()
+        run: chown -R 1001:1001 . || true
+      - uses: actions/upload-artifact@v4
         with:
           name: client-dist
           path: packages/client/dist
-
-      - name: Upload server dist
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: server-dist
           path: packages/server/dist
 
-  # Multi-arch docker build + push, entirely on ARC. arm64 builds in
+  # Multi-arch docker build/push, fan-out per arch. arm64 builds in
   # the dind sidecar natively; amd64 builds on the remote BuildKit at
-  # 192.168.10.253:1234 natively (~15× faster than QEMU). Both push by
-  # digest to ghcr.io, then a single `buildx imagetools create`
-  # assembles the manifest list. Replaces the old GH-hosted matrix
-  # (ubuntu-latest amd64 + ubuntu-24.04-arm arm64) + separate manifest
-  # job.
+  # 192.168.10.253:1234 natively (~15× faster than QEMU). Each job
+  # pushes by digest to ghcr.io; the `manifest` job assembles the
+  # final multi-arch tags. Splitting per arch lets the two builders
+  # run truly concurrently instead of sequentially in one job.
   #
   # The cookbook's `--name multi --append` snippet doesn't work in
-  # current buildx (mixed drivers are unsupported). The two-builder
-  # pattern below was verified by the arc-smoke workflow.
-  docker:
-    needs: ci
+  # current buildx (mixed drivers are unsupported). Per-job builders
+  # sidestep that entirely.
+  build-arm64:
+    needs: [typecheck, lint, test, e2e, build]
     # `arc-azrtydxb-publish` is identical to `arc-azrtydxb` except its
     # pod template omits the `ghcr.io → 192.168.10.122` hostAlias. The
     # mirror is a pull-through cache that doesn't accept writes AND
@@ -134,28 +203,24 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Download client dist
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: client-dist
           path: packages/client/dist
-
-      - name: Download server dist
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           name: server-dist
           path: packages/server/dist
-
       - name: Log in to Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -165,8 +230,7 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest
-
-      - name: Set up two buildx builders
+      - name: Set up local arm64 builder
         run: |
           # arm64 native via the dind sidecar.  The inline buildkitd
           # config marks the cluster zot registry as insecure so this
@@ -182,28 +246,9 @@ jobs:
             --driver docker-container \
             --platform linux/arm64 \
             --buildkitd-config /tmp/buildkitd-local.toml
-
-          # amd64 native via the remote BuildKit on 192.168.10.253.
-          # Certs + endpoint are auto-injected into every arc-azrtydxb
-          # runner pod by the AutoscalingRunnerSet template.  The NAS
-          # buildkit already has the cluster zot registry trusted via
-          # /etc/buildkit/buildkitd.toml (registry."192.168.10.123:5000"
-          # with cluster-ca.crt), so no inline config is needed here —
-          # remote-driver builders inherit the daemon's config.
-          docker buildx create \
-            --name remote-amd64 \
-            --driver remote \
-            --platform linux/amd64 \
-            --driver-opt cacert="$BUILDKIT_CLIENT_CA" \
-            --driver-opt cert="$BUILDKIT_CLIENT_CERT" \
-            --driver-opt key="$BUILDKIT_CLIENT_KEY" \
-            "$BUILDKIT_AMD64_ENDPOINT"
-
           docker buildx inspect --bootstrap local-arm64
-          docker buildx inspect --bootstrap remote-amd64
-
       - name: Build + push arm64 (digest only)
-        id: build_arm64
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -219,42 +264,121 @@ jobs:
           cache-to: type=registry,ref=192.168.10.123:5000/buildcache/kryton:linux-arm64,mode=max,image-manifest=true
           outputs: type=image,"name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}",push-by-digest=true,name-canonical=true,push=true
 
+  build-amd64:
+    needs: [typecheck, lint, test, e2e, build]
+    runs-on: arc-azrtydxb-publish
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: client-dist
+          path: packages/client/dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: server-dist
+          path: packages/server/dist
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+      - name: Set up remote amd64 builder
+        run: |
+          # amd64 native via the remote BuildKit on 192.168.10.253.
+          # Certs + endpoint are auto-injected into every arc-azrtydxb
+          # runner pod by the AutoscalingRunnerSet template. Remote-
+          # driver builders inherit the daemon's registry trust config;
+          # we cannot patch it from the workflow.
+          docker buildx create \
+            --name remote-amd64 \
+            --driver remote \
+            --platform linux/amd64 \
+            --driver-opt cacert="$BUILDKIT_CLIENT_CA" \
+            --driver-opt cert="$BUILDKIT_CLIENT_CERT" \
+            --driver-opt key="$BUILDKIT_CLIENT_KEY" \
+            "$BUILDKIT_AMD64_ENDPOINT"
+          docker buildx inspect --bootstrap remote-amd64
       - name: Build + push amd64 (digest only)
-        id: build_amd64
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
           builder: remote-amd64
           platforms: linux/amd64
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=192.168.10.123:5000/buildcache/kryton:linux-amd64
-          cache-to: type=registry,ref=192.168.10.123:5000/buildcache/kryton:linux-amd64,mode=max,image-manifest=true
+          # Cache goes to ghcr.io instead of the cluster zot. The NAS
+          # buildkit-container's /etc/buildkit/buildkitd.toml does NOT
+          # currently trust the cluster CA, so pushing cache layers to
+          # https://192.168.10.123:5000 fails with x509 unknown-
+          # authority. ghcr.io has a public CA chain that everything
+          # trusts and we're already authenticated for image push.
+          # TODO: when buildkit-container on the NAS gets cluster-
+          # ca.crt mounted + buildkitd.toml updated, switch back to
+          # 192.168.10.123:5000/buildcache/kryton:linux-amd64 for the
+          # LAN-speed advantage.
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/buildcache:linux-amd64
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository }}/buildcache:linux-amd64,mode=max,image-manifest=true
           outputs: type=image,"name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}",push-by-digest=true,name-canonical=true,push=true
 
+  manifest:
+    needs: [build-arm64, build-amd64]
+    runs-on: arc-azrtydxb-publish
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
       - name: Assemble multi-arch manifest list
-        # The action's `digest` output is the sha256 of the pushed image
-        # per platform. `imagetools create` stitches them into a manifest
-        # list under the human-friendly tags from metadata-action.
+        # The per-arch jobs' `digest` outputs are the sha256 of each
+        # pushed image. `imagetools create` stitches them into a
+        # manifest list under the human-friendly tags from
+        # metadata-action.
         run: |
           docker buildx imagetools create \
             $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build_arm64.outputs.digest }}" \
-            "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build_amd64.outputs.digest }}"
-
+            "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build-arm64.outputs.digest }}" \
+            "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build-amd64.outputs.digest }}"
       - name: Inspect manifest
         run: docker buildx imagetools inspect "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
 
   release:
-    needs: [ci, docker]
+    needs: [typecheck, lint, test, e2e, build, manifest]
     runs-on: arc-azrtydxb
     permissions:
       contents: write
-
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: Generate release notes
         id: changelog
         uses: orhun/git-cliff-action@v4
@@ -263,7 +387,6 @@ jobs:
           args: --latest --strip header
         env:
           OUTPUT: CHANGELOG.md
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:

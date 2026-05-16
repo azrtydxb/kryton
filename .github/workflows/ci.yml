@@ -7,13 +7,17 @@ name: CI
 # Trigger the full E2E suite manually from the Actions tab → "E2E"
 # workflow → Run workflow. Tag a `v*` commit to cut a release (runs
 # E2E gate + docker build/push + GitHub release).
+#
+# Layout: four parallel jobs (typecheck, lint, test-build,
+# openapi-check) — each runs its own cached `npm ci` on a fresh ARC
+# pod. Wall clock = max(slowest job) instead of sum.
 
 on:
   push:
     branches: [master]
-    # Don't burn ~8 minutes of CI on doc-only pushes to master. The
-    # release.yml workflow has its own gates so this is just the
-    # fast-tier feedback loop.
+    # Don't burn CI on doc-only pushes to master. The release.yml
+    # workflow has its own gates so this is just the fast-tier
+    # feedback loop.
     paths-ignore:
       - 'docs/**'
       - '**/*.md'
@@ -45,15 +49,48 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  build:
-    # ARC v2 scale-set on the kw cluster (k3s ARM64). Ephemeral runner
-    # pods with a dind sidecar; minRunners=0, maxRunners=20. The single
-    # label `arc-azrtydxb` is the only valid form — scale-set runners
-    # don't accept multi-label arrays like the old kryton-248 box did.
+  typecheck:
     runs-on: arc-azrtydxb
-    # Run inside a node container so the service-container postgres is
-    # reachable via its docker-network hostname (`postgres:5432`) instead
-    # of via a host-published port.
+    container:
+      image: node:24
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - name: Build shared packages (ui, sdk)
+        run: npm run build:shared
+      - name: TypeCheck
+        run: npm run typecheck
+      - name: Restore workspace ownership to runner user
+        if: always()
+        run: chown -R 1001:1001 . || true
+
+  lint:
+    runs-on: arc-azrtydxb
+    container:
+      image: node:24
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Restore workspace ownership to runner user
+        if: always()
+        run: chown -R 1001:1001 . || true
+
+  test-build:
+    # Unit tests + production build kept together: the build step
+    # exercises the same workspace state the tests left behind and the
+    # two share install/build:shared cost. Postgres lives here for the
+    # unit-test suite.
+    runs-on: arc-azrtydxb
     container:
       image: node:24
     services:
@@ -70,25 +107,13 @@ jobs:
           --health-timeout 3s
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
+      - run: npm ci
       - name: Build shared packages (ui, sdk)
         run: npm run build:shared
-
-      - name: TypeCheck
-        run: npm run typecheck
-
-      - name: Lint
-        run: npm run lint
-
       - name: Install pgvector extension + psql client
         env:
           PGPASSWORD: kryton
@@ -96,12 +121,10 @@ jobs:
           apt-get update -qq
           apt-get install -y -qq --no-install-recommends postgresql-client
           psql -h postgres -U kryton -d kryton_test -c "CREATE EXTENSION IF NOT EXISTS vector"
-
       - name: Run drizzle migrations
         env:
           POSTGRES_URL: postgres://kryton:kryton@postgres:5432/kryton_test
         run: npm run db:migrate --workspace=packages/server
-
       - name: Unit tests
         run: npm run test
         env:
@@ -111,10 +134,52 @@ jobs:
           BETTER_AUTH_SECRET: ci-test-secret-must-be-at-least-32-characters-long
           BETTER_AUTH_URL: http://localhost:3001
           APP_URL: http://localhost:5173
-
       - name: Build
         run: npm run build
+      - name: Restore workspace ownership to runner user
+        if: always()
+        run: chown -R 1001:1001 . || true
 
+  openapi-check:
+    # Snapshot drift gate. Splits off from test-build because the
+    # check is cheap and doesn't depend on the production build, only
+    # on build:shared. Postgres is required because route registration
+    # opens DB connections during spec extraction.
+    runs-on: arc-azrtydxb
+    container:
+      image: node:24
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: kryton
+          POSTGRES_PASSWORD: kryton
+          POSTGRES_DB: kryton_test
+        options: >-
+          --health-cmd "pg_isready -U kryton -d kryton_test"
+          --health-interval 5s
+          --health-retries 10
+          --health-timeout 3s
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - name: Build shared packages (ui, sdk)
+        run: npm run build:shared
+      - name: Install pgvector extension + psql client
+        env:
+          PGPASSWORD: kryton
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends postgresql-client
+          psql -h postgres -U kryton -d kryton_test -c "CREATE EXTENSION IF NOT EXISTS vector"
+      - name: Run drizzle migrations
+        env:
+          POSTGRES_URL: postgres://kryton:kryton@postgres:5432/kryton_test
+        run: npm run db:migrate --workspace=packages/server
       - name: OpenAPI snapshot drift check
         run: npm run openapi:check --workspace=packages/server
         env:
@@ -124,13 +189,6 @@ jobs:
           BETTER_AUTH_URL: http://localhost:3001
           APP_URL: http://localhost:5173
           OPENAPI_ENABLED: "true"
-
       - name: Restore workspace ownership to runner user
-        # The job container runs as root by default but the ARC runner
-        # process is UID 1001. Files written by the job would be owned
-        # by root on the bind-mounted workspace, blocking
-        # actions/checkout's post-job cleanup. Hand ownership back so
-        # any subsequent host-based step (and post-job cleanup) works.
-        # `if: always()` ensures this runs on failure too.
         if: always()
         run: chown -R 1001:1001 . || true
