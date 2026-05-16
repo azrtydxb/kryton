@@ -89,3 +89,28 @@ PVC name (supports persistence.existingClaim).
 {{ include "kryton.fullname" . }}-data
 {{- end -}}
 {{- end -}}
+
+{{/*
+Postgresql subchart hostname. Bitnami's `postgresql` subchart produces
+a primary Service named `<release>-postgresql` (or honors
+postgresql.fullnameOverride for multi-instance).
+*/}}
+{{- define "kryton.postgresqlHost" -}}
+{{- if .Values.postgresql.fullnameOverride -}}
+{{- .Values.postgresql.fullnameOverride -}}
+{{- else -}}
+{{- printf "%s-postgresql" .Release.Name -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Postgresql subchart Secret name. Bitnami stores the user password
+under key `password` in this Secret.
+*/}}
+{{- define "kryton.postgresqlSecretName" -}}
+{{- if .Values.postgresql.auth.existingSecret -}}
+{{- .Values.postgresql.auth.existingSecret -}}
+{{- else -}}
+{{- include "kryton.postgresqlHost" . -}}
+{{- end -}}
+{{- end -}}

@@ -234,3 +234,9 @@ postgresql:
       enabled: true
       size: 10Gi
     resources: {}
+    # pgvector/pgvector:pg16 is built on the upstream postgres image,
+    # which writes its PID/socket lock under /var/run/postgresql. The
+    # bitnami pre-baked image is hardened for read-only root fs; the
+    # pgvector image is not. Disable to keep the override workable.
+    containerSecurityContext:
+      readOnlyRootFilesystem: false

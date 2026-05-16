@@ -53,6 +53,21 @@ spec:
                 name: {{ include "kryton.configMapName" . }}
             - secretRef:
                 name: {{ include "kryton.secretName" . }}
+          {{- if and .Values.postgresql.enabled (not .Values.env.secret.POSTGRES_URL) }}
+          # POSTGRES_URL auto-synthesized from the embedded subchart.
+          # The password is pulled from bitnami's secret at pod-start;
+          # K8s env-var substitution (`$(VAR)`) inlines it into
+          # POSTGRES_URL. Setting env.secret.POSTGRES_URL explicitly
+          # in values.yaml disables this synthesis.
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kryton.postgresqlSecretName" . }}
+                  key: password
+            - name: POSTGRES_URL
+              value: postgres://{{ .Values.postgresql.auth.username }}:$(POSTGRES_PASSWORD)@{{ include "kryton.postgresqlHost" . }}:5432/{{ .Values.postgresql.auth.database }}
+          {{- end }}
           {{- with .Values.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}
