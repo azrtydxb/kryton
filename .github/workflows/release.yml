@@ -370,6 +370,67 @@ jobs:
       - name: Inspect manifest
         run: docker buildx imagetools inspect "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
 
+  # Mirror the freshly-published multi-arch image from ghcr.io to the
+  # in-cluster zot at 192.168.10.123:5000 so harbor.kw.local shows the
+  # latest kryton tags too. Uses `docker buildx imagetools create`,
+  # which does a server-side registry-to-registry transfer (no
+  # rebuild, no local pull) and preserves the multi-arch manifest
+  # list. Anonymous push works — same path the arm64 buildcache has
+  # been using since the cluster zot was wired up. Runs in parallel
+  # with `release`; not a gate (mirror failures don't block the
+  # GitHub release).
+  mirror:
+    needs: [manifest]
+    runs-on: arc-azrtydxb-publish
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Log in to ghcr (source)
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+      - name: Set up buildx with insecure zot trust
+        # Same inline buildkitd config the arm64 build job uses to
+        # push cache layers to the zot. `http=false, insecure=true`
+        # means "use HTTPS but skip cert verification" — required
+        # because the zot serves a cluster-CA-signed cert that the
+        # buildkit-container's trust store doesn't include.
+        run: |
+          cat > /tmp/buildkitd-mirror.toml <<'EOF'
+          [registry."192.168.10.123:5000"]
+            http = false
+            insecure = true
+          EOF
+          docker buildx create \
+            --name mirror \
+            --driver docker-container \
+            --buildkitd-config /tmp/buildkitd-mirror.toml \
+            --use
+          docker buildx inspect --bootstrap mirror
+      - name: Mirror tags to cluster zot
+        # imagetools create with one source = pure copy. The manifest
+        # list and all referenced blobs are transferred from ghcr to
+        # the zot in a single buildkit operation per tag.
+        run: |
+          set -euo pipefail
+          for src in $(jq -r '.tags[]' <<< "$DOCKER_METADATA_OUTPUT_JSON"); do
+            dst="${src/ghcr.io/192.168.10.123:5000}"
+            echo "Mirroring: $src → $dst"
+            docker buildx imagetools create --tag "$dst" "$src"
+          done
+
   release:
     needs: [typecheck, lint, test, e2e, build, manifest]
     runs-on: arc-azrtydxb
