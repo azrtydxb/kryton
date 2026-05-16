@@ -117,21 +117,26 @@ kubectl apply -f config/samples/kryton_v1alpha1_kryton_minimal.yaml
 |---|---|
 | C1 init scaffold | done |
 | C2 create-api + helm chart binding | done |
-| C3 go:embed wrapper | done (skeleton, real helm-SDK wiring TODO once WS-B chart lands) |
+| C3 go:embed wrapper | done — helm action client loads chart from the embedded FS |
 | C4 CRD operator-only fields | done |
-| C5 operator-only reconcilers | done (resource generators + tests; controller wiring stub) |
+| C5 operator-only reconcilers | done — controller wired against `api/v1alpha1.Kryton` |
 | C6 RBAC | done |
 | C7 Dockerfile | done |
 | C8 CRD bundle commit | done |
 | C9 unit tests | done |
 | C10 README | done |
 
-Outstanding follow-up (post-merge with WS-B):
+Implementation notes:
 
-1. Replace `internal/helm/reconciler.go` stub with the real
-   `helm-operator-plugins` reconciler wiring (loader.LoadFS + GVK + value
-   mapper for `fullnameOverride`).
-2. Replace controller-stub `SetupWithManager` with the full
-   `For(&v1alpha1.Kryton{}).Owns(...)` chain once the v1alpha1 Go types are
-   generated.
-3. envtest-based integration coverage for `KrytonExtrasReconciler` end-to-end.
+- The helm side uses `helm.sh/helm/v3/pkg/action` directly rather than
+  `helm-operator-plugins`, because the latter pins to an older
+  controller-runtime/k8s.io minor than the rest of this operator. The
+  install/upgrade action client is fully stable across helm v3.x and gives
+  us first-class control over value injection (`fullnameOverride`,
+  `postgresql.fullnameOverride`, `image.tag`).
+- The v1alpha1 Go types in `api/v1alpha1/` are maintained by hand (no
+  `controller-gen` in the helm-sdk layout); keep them in sync with
+  `config/crd/bases/kryton.azrtydxb.io_krytons.yaml`.
+
+Possible future improvement: envtest-based integration coverage for
+`KrytonExtrasReconciler` end-to-end against a real apiserver.
