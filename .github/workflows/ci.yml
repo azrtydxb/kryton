@@ -8,9 +8,10 @@ name: CI
 # workflow → Run workflow. Tag a `v*` commit to cut a release (runs
 # E2E gate + docker build/push + GitHub release).
 #
-# Layout: four parallel jobs (typecheck, lint, test-build,
-# openapi-check) — each runs its own cached `npm ci` on a fresh ARC
-# pod. Wall clock = max(slowest job) instead of sum.
+# Layout: five parallel jobs (typecheck, lint, test-build,
+# openapi-check, deployment-sync-check) — each runs its own cached
+# `npm ci` on a fresh ARC pod. Wall clock = max(slowest job) instead
+# of sum.
 
 on:
   push:
@@ -136,6 +137,43 @@ jobs:
           APP_URL: http://localhost:5173
       - name: Build
         run: npm run build
+      - name: Restore workspace ownership to runner user
+        if: always()
+        run: chown -R 1001:1001 . || true
+
+  deployment-sync-check:
+    # Drift-prevention gate. Verifies the server config schema
+    # (packages/server/config-schema.json — produced by WS-A) is in
+    # lockstep with docker-compose.prod.yml, the Helm chart at
+    # charts/kryton/, and the operator CRD at
+    # operator/config/crd/bases/. Tolerates missing artifacts during
+    # initial bring-up of the parallel workstreams that deliver them;
+    # the gate activates retroactively as each surface lands.
+    runs-on: arc-azrtydxb
+    container:
+      image: node:24
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - name: Install helm + kubeconform
+        run: |
+          set -euo pipefail
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends curl ca-certificates
+          curl -fsSL https://get.helm.sh/helm-v3.16.3-linux-amd64.tar.gz \
+            | tar -xz -C /tmp
+          install -m 0755 /tmp/linux-amd64/helm /usr/local/bin/helm
+          curl -fsSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz \
+            | tar -xz -C /tmp
+          install -m 0755 /tmp/kubeconform /usr/local/bin/kubeconform
+          helm version
+          kubeconform -v
+      - name: Deployment sync check
+        run: npm run sync:check
       - name: Restore workspace ownership to runner user
         if: always()
         run: chown -R 1001:1001 . || true
