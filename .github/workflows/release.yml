@@ -7,22 +7,27 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}/kryton
+  OPERATOR_IMAGE_NAME: ${{ github.repository }}/kryton-operator
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 # Layout:
 #
 #   typecheck ─┐
-#   lint       │
-#   test       ├── build-arm64 ─┐
-#   e2e        │                ├── manifest ── release
-#   build ─────┴── build-amd64 ─┘
+#   lint       │                                                  ┌── helm-publish ──┐
+#   test       ├── build-arm64 ────────────┐                      │                  │
+#   e2e        │                           ├── manifest ──────────┼── mirror         ├── release
+#   build ─────┴── build-amd64 ────────────┘                      │                  │
+#               ├── build-operator-arm64 ─┐                       └── manifest-operator
+#               └── build-operator-amd64 ─┴── manifest-operator ──┘
 #
-# Five parallel gate jobs replace the old monolithic `ci`. `build`
-# uploads server-dist + client-dist artifacts that the per-arch
-# docker jobs download in parallel. arm64 (local dind) and amd64
-# (remote NAS BuildKit) build concurrently — neither builder waits
-# on the other. `manifest` stitches the digests into a multi-arch
-# tag. `release` cuts the GitHub release.
+# Server image DAG (top half) mirrors the prior shape unchanged.
+# Operator image DAG (bottom half) follows the same per-arch pattern:
+# local-arm64 dind + remote-amd64 NAS BuildKit, then `manifest-
+# operator` stitches the digests. `helm-publish` packages and pushes
+# the chart OCI artifact in parallel with the server `manifest` chain.
+# `mirror` is extended to copy the chart and operator image to the
+# cluster zot alongside the server image. `release` waits on the
+# server manifest, the operator manifest, and helm-publish.
 
 jobs:
   typecheck:
@@ -419,7 +424,7 @@ jobs:
             --buildkitd-config /tmp/buildkitd-mirror.toml \
             --use
           docker buildx inspect --bootstrap mirror
-      - name: Mirror tags to cluster zot
+      - name: Mirror server tags to cluster zot
         # imagetools create with one source = pure copy. The manifest
         # list and all referenced blobs are transferred from ghcr to
         # the zot in a single buildkit operation per tag.
@@ -427,12 +432,235 @@ jobs:
           set -euo pipefail
           for src in $(jq -r '.tags[]' <<< "$DOCKER_METADATA_OUTPUT_JSON"); do
             dst="${src/ghcr.io/192.168.10.123:5000}"
-            echo "Mirroring: $src → $dst"
+            echo "Mirroring server: $src → $dst"
             docker buildx imagetools create --tag "$dst" "$src"
           done
+      - name: Extract operator metadata
+        id: meta-operator
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.OPERATOR_IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+      - name: Mirror operator tags to cluster zot
+        run: |
+          set -euo pipefail
+          for src in $(jq -r '.tags[]' <<< '${{ steps.meta-operator.outputs.json }}'); do
+            dst="${src/ghcr.io/192.168.10.123:5000}"
+            echo "Mirroring operator: $src → $dst"
+            docker buildx imagetools create --tag "$dst" "$src"
+          done
+      - name: Mirror helm chart artifact to cluster zot
+        # Helm OCI charts are plain OCI artifacts; `imagetools create`
+        # copies them the same way as image manifests. Source path is
+        # the chart artifact published by `helm-publish`.
+        env:
+          VERSION: ${{ github.ref_name }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          # Strip leading `v` from tag → chart semver.
+          CHART_VER="${VERSION#v}"
+          SRC="ghcr.io/${OWNER}/charts/kryton:${CHART_VER}"
+          DST="192.168.10.123:5000/${OWNER}/charts/kryton:${CHART_VER}"
+          echo "Mirroring chart: $SRC → $DST"
+          docker buildx imagetools create --tag "$DST" "$SRC"
+
+  # Package + push the Helm chart as an OCI artifact to ghcr.io.
+  # Runs in parallel with `mirror` and `release`; gated on `manifest`
+  # so the server image referenced by the chart's appVersion exists
+  # by the time the chart is published.
+  helm-publish:
+    needs: [manifest]
+    runs-on: arc-azrtydxb-publish
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      chart-ref: ${{ steps.push.outputs.chart-ref }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.2
+      - name: Log in to ghcr (helm OCI)
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" \
+            | helm registry login ghcr.io \
+              --username "${{ github.actor }}" \
+              --password-stdin
+      - name: Resolve chart version from tag
+        id: ver
+        run: |
+          REF="${GITHUB_REF_NAME}"
+          echo "version=${REF#v}" >> "$GITHUB_OUTPUT"
+      - name: Helm dependency update
+        run: helm dependency update charts/kryton
+      - name: Helm package
+        run: |
+          helm package charts/kryton \
+            --version "${{ steps.ver.outputs.version }}" \
+            --app-version "${{ steps.ver.outputs.version }}" \
+            --destination .
+      - name: Helm push to ghcr
+        id: push
+        run: |
+          set -euo pipefail
+          PKG="kryton-${{ steps.ver.outputs.version }}.tgz"
+          DEST="oci://ghcr.io/${{ github.repository_owner }}/charts"
+          echo "Pushing $PKG → $DEST"
+          helm push "$PKG" "$DEST"
+          echo "chart-ref=ghcr.io/${{ github.repository_owner }}/charts/kryton:${{ steps.ver.outputs.version }}" >> "$GITHUB_OUTPUT"
+
+  # Operator image build, fan-out per arch. Mirrors the per-arch
+  # pattern used for the server image: local-arm64 dind, remote-amd64
+  # NAS BuildKit. arm64 cache → cluster zot, amd64 cache → ghcr (per
+  # the cluster-CA trust gap on the NAS buildkit-container).
+  build-operator-arm64:
+    needs: [typecheck, lint, test, e2e]
+    runs-on: arc-azrtydxb-publish
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.OPERATOR_IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+      - name: Set up local arm64 builder
+        run: |
+          cat > /tmp/buildkitd-local.toml <<'EOF'
+          [registry."192.168.10.123:5000"]
+            http = false
+            insecure = true
+          EOF
+          docker buildx create \
+            --name local-arm64-operator \
+            --driver docker-container \
+            --platform linux/arm64 \
+            --buildkitd-config /tmp/buildkitd-local.toml
+          docker buildx inspect --bootstrap local-arm64-operator
+      - name: Build + push operator arm64 (digest only)
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: operator
+          file: operator/Dockerfile
+          builder: local-arm64-operator
+          platforms: linux/arm64
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=192.168.10.123:5000/buildcache/kryton-operator:linux-arm64
+          cache-to: type=registry,ref=192.168.10.123:5000/buildcache/kryton-operator:linux-arm64,mode=max,image-manifest=true
+          outputs: type=image,"name=${{ env.REGISTRY }}/${{ env.OPERATOR_IMAGE_NAME }}",push-by-digest=true,name-canonical=true,push=true
+
+  build-operator-amd64:
+    needs: [typecheck, lint, test, e2e]
+    runs-on: arc-azrtydxb-publish
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.OPERATOR_IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+      - name: Set up remote amd64 builder
+        run: |
+          docker buildx create \
+            --name remote-amd64-operator \
+            --driver remote \
+            --platform linux/amd64 \
+            --driver-opt cacert="$BUILDKIT_CLIENT_CA" \
+            --driver-opt cert="$BUILDKIT_CLIENT_CERT" \
+            --driver-opt key="$BUILDKIT_CLIENT_KEY" \
+            "$BUILDKIT_AMD64_ENDPOINT"
+          docker buildx inspect --bootstrap remote-amd64-operator
+      - name: Build + push operator amd64 (digest only)
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: operator
+          file: operator/Dockerfile
+          builder: remote-amd64-operator
+          platforms: linux/amd64
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/buildcache-operator:linux-amd64
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository }}/buildcache-operator:linux-amd64,mode=max,image-manifest=true
+          outputs: type=image,"name=${{ env.REGISTRY }}/${{ env.OPERATOR_IMAGE_NAME }}",push-by-digest=true,name-canonical=true,push=true
+
+  manifest-operator:
+    needs: [build-operator-arm64, build-operator-amd64]
+    runs-on: arc-azrtydxb-publish
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.OPERATOR_IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+      - name: Assemble multi-arch operator manifest list
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            "${{ env.REGISTRY }}/${{ env.OPERATOR_IMAGE_NAME }}@${{ needs.build-operator-arm64.outputs.digest }}" \
+            "${{ env.REGISTRY }}/${{ env.OPERATOR_IMAGE_NAME }}@${{ needs.build-operator-amd64.outputs.digest }}"
+      - name: Inspect operator manifest
+        run: docker buildx imagetools inspect "${{ env.REGISTRY }}/${{ env.OPERATOR_IMAGE_NAME }}:latest"
+      - name: Upload CRD bundle as release asset
+        # The CRD bundle from `make manifests` under operator/config/crd/bases
+        # is published as a workflow artifact here so the `release` job
+        # can attach it to the GitHub Release.
+        uses: actions/upload-artifact@v4
+        with:
+          name: operator-crd-bundle
+          path: operator/config/crd/bases/
 
   release:
-    needs: [typecheck, lint, test, e2e, build, manifest]
+    needs: [typecheck, lint, test, e2e, build, manifest, manifest-operator, helm-publish]
     runs-on: arc-azrtydxb
     permissions:
       contents: write
@@ -448,8 +676,31 @@ jobs:
           args: --latest --strip header
         env:
           OUTPUT: CHANGELOG.md
+      - name: Download CRD bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: operator-crd-bundle
+          path: crd-bundle
+      - name: Bundle CRDs into single yaml
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          if [ -d crd-bundle ] && [ -n "$(ls -A crd-bundle 2>/dev/null)" ]; then
+            # Concatenate every CRD into a single multi-document yaml so
+            # users can `kubectl apply -f kryton-crds.yaml` in one shot.
+            first=1
+            for f in crd-bundle/*.yaml; do
+              if [ $first -eq 0 ]; then
+                echo "---" >> release-assets/kryton-crds.yaml
+              fi
+              cat "$f" >> release-assets/kryton-crds.yaml
+              first=0
+            done
+          fi
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           body_path: CHANGELOG.md
           generate_release_notes: false
+          files: |
+            release-assets/kryton-crds.yaml
