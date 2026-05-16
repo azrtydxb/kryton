@@ -1,0 +1,272 @@
+{
+  "fields": [
+    {
+      "default": "development",
+      "description": "Runtime environment.",
+      "name": "NODE_ENV",
+      "required": false,
+      "secret": false,
+      "type": "enum",
+      "userFacing": true,
+      "values": [
+        "development",
+        "test",
+        "production"
+      ]
+    },
+    {
+      "default": "info",
+      "description": "Pino log level for the server.",
+      "name": "LOG_LEVEL",
+      "required": false,
+      "secret": false,
+      "type": "enum",
+      "userFacing": false,
+      "values": [
+        "fatal",
+        "error",
+        "warn",
+        "info",
+        "debug",
+        "trace",
+        "silent"
+      ]
+    },
+    {
+      "default": 3001,
+      "description": "TCP port the HTTP server listens on.",
+      "name": "PORT",
+      "required": false,
+      "secret": false,
+      "type": "number",
+      "userFacing": true
+    },
+    {
+      "default": "0.0.0.0",
+      "description": "Interface the HTTP server binds to.",
+      "name": "HOST",
+      "required": false,
+      "secret": false,
+      "type": "string",
+      "userFacing": true
+    },
+    {
+      "description": "Postgres connection string for the Drizzle data layer.",
+      "name": "POSTGRES_URL",
+      "required": false,
+      "secret": true,
+      "type": "string",
+      "userFacing": true
+    },
+    {
+      "description": "Signing secret for Better-Auth sessions (min 32 chars).",
+      "name": "BETTER_AUTH_SECRET",
+      "required": true,
+      "secret": true,
+      "type": "string",
+      "userFacing": true
+    },
+    {
+      "default": "http://localhost:3001",
+      "description": "Public URL the server is reachable at for Better-Auth.",
+      "name": "BETTER_AUTH_URL",
+      "required": false,
+      "secret": false,
+      "type": "string",
+      "userFacing": true
+    },
+    {
+      "default": "http://localhost:5173",
+      "description": "Public URL of the client app (used for redirects / CORS).",
+      "name": "APP_URL",
+      "required": false,
+      "secret": false,
+      "type": "string",
+      "userFacing": true
+    },
+    {
+      "default": "http://localhost:5173",
+      "description": "Comma-separated list of allowed CORS origins.",
+      "name": "CORS_ORIGINS",
+      "required": false,
+      "secret": false,
+      "type": "string",
+      "userFacing": true
+    },
+    {
+      "default": 1000,
+      "description": "Max requests per rate-limit window per client.",
+      "name": "RATE_LIMIT_MAX",
+      "required": false,
+      "secret": false,
+      "type": "number",
+      "userFacing": true
+    },
+    {
+      "default": "1 minute",
+      "description": "Rate-limit window (e.g. \"1 minute\").",
+      "name": "RATE_LIMIT_WINDOW",
+      "required": false,
+      "secret": false,
+      "type": "string",
+      "userFacing": true
+    },
+    {
+      "default": "../../notes",
+      "description": "Filesystem path for note storage.",
+      "name": "NOTES_DIR",
+      "required": false,
+      "secret": false,
+      "type": "string",
+      "userFacing": false
+    },
+    {
+      "default": "localhost",
+      "description": "WebAuthn Relying Party ID (typically the public hostname).",
+      "name": "WEBAUTHN_RP_ID",
+      "required": false,
+      "secret": false,
+      "type": "string",
+      "userFacing": true
+    },
+    {
+      "description": "Google OAuth client ID (public identifier).",
+      "name": "GOOGLE_CLIENT_ID",
+      "required": false,
+      "secret": false,
+      "type": "string",
+      "userFacing": true
+    },
+    {
+      "description": "Google OAuth client secret.",
+      "name": "GOOGLE_CLIENT_SECRET",
+      "required": false,
+      "secret": true,
+      "type": "string",
+      "userFacing": true
+    },
+    {
+      "description": "GitHub OAuth client ID (public identifier).",
+      "name": "GITHUB_CLIENT_ID",
+      "required": false,
+      "secret": false,
+      "type": "string",
+      "userFacing": true
+    },
+    {
+      "description": "GitHub OAuth client secret.",
+      "name": "GITHUB_CLIENT_SECRET",
+      "required": false,
+      "secret": true,
+      "type": "string",
+      "userFacing": true
+    },
+    {
+      "description": "SMTP server hostname for outbound mail.",
+      "name": "SMTP_HOST",
+      "required": false,
+      "secret": false,
+      "type": "string",
+      "userFacing": true
+    },
+    {
+      "description": "SMTP server port.",
+      "name": "SMTP_PORT",
+      "required": false,
+      "secret": false,
+      "type": "number",
+      "userFacing": true
+    },
+    {
+      "description": "Whether to use TLS for SMTP (\"true\"/\"false\").",
+      "name": "SMTP_SECURE",
+      "required": false,
+      "secret": false,
+      "type": "string",
+      "userFacing": true
+    },
+    {
+      "description": "SMTP auth username.",
+      "name": "SMTP_USER",
+      "required": false,
+      "secret": false,
+      "type": "string",
+      "userFacing": true
+    },
+    {
+      "description": "SMTP auth password.",
+      "name": "SMTP_PASS",
+      "required": false,
+      "secret": true,
+      "type": "string",
+      "userFacing": true
+    },
+    {
+      "description": "Default From: address for outbound mail.",
+      "name": "SMTP_FROM",
+      "required": false,
+      "secret": false,
+      "type": "string",
+      "userFacing": true
+    },
+    {
+      "default": "true",
+      "description": "Enable the /docs OpenAPI UI (\"true\"/\"false\").",
+      "name": "OPENAPI_ENABLED",
+      "required": false,
+      "secret": false,
+      "type": "string",
+      "userFacing": false
+    },
+    {
+      "default": "pgvector-local",
+      "description": "Semantic-search embedder backend (\"off\" disables).",
+      "name": "SEMANTIC_PROVIDER",
+      "required": false,
+      "secret": false,
+      "type": "enum",
+      "userFacing": true,
+      "values": [
+        "pgvector-local",
+        "novamem",
+        "off"
+      ]
+    },
+    {
+      "default": "Xenova/all-MiniLM-L6-v2",
+      "description": "HuggingFace model id for the local embedder.",
+      "name": "SEMANTIC_MODEL",
+      "required": false,
+      "secret": false,
+      "type": "string",
+      "userFacing": false
+    },
+    {
+      "default": 384,
+      "description": "Embedding vector dimensions (must match the model).",
+      "name": "SEMANTIC_DIMENSIONS",
+      "required": false,
+      "secret": false,
+      "type": "number",
+      "userFacing": false
+    },
+    {
+      "default": 256,
+      "description": "Tokens per semantic-search chunk.",
+      "name": "SEMANTIC_CHUNK_TOKENS",
+      "required": false,
+      "secret": false,
+      "type": "number",
+      "userFacing": false
+    },
+    {
+      "default": 32,
+      "description": "Token overlap between adjacent chunks.",
+      "name": "SEMANTIC_CHUNK_OVERLAP",
+      "required": false,
+      "secret": false,
+      "type": "number",
+      "userFacing": false
+    }
+  ]
+}
