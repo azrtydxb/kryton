@@ -122,7 +122,15 @@ jobs:
   # pattern below was verified by the arc-smoke workflow.
   docker:
     needs: ci
-    runs-on: arc-azrtydxb
+    # `arc-azrtydxb-publish` is identical to `arc-azrtydxb` except its
+    # pod template omits the `ghcr.io → 192.168.10.122` hostAlias. The
+    # mirror is a pull-through cache that doesn't accept writes AND
+    # serves a cluster-CA-signed cert that buildkit-container doesn't
+    # trust — both made push from inside dind fail with a TLS
+    # 'unknown authority' error on the regular arc-azrtydxb scale set.
+    # Without the hostAlias, ghcr.io resolves to its real public CDN
+    # via CoreDNS and pushes work with the standard public TLS chain.
+    runs-on: arc-azrtydxb-publish
     permissions:
       contents: read
       packages: write
