@@ -183,35 +183,32 @@ jobs:
 
       - name: Build + push arm64 (digest only)
         id: build_arm64
-        run: |
-          docker buildx build \
-            --builder local-arm64 \
-            --platform linux/arm64 \
-            --labels '${{ steps.meta.outputs.labels }}' \
-            --cache-from type=gha,scope=linux-arm64 \
-            --cache-to type=gha,mode=max,scope=linux-arm64 \
-            --output type=image,"name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}",push-by-digest=true,name-canonical=true,push=true \
-            --metadata-file arm64-meta.json \
-            .
-          ARM_DIGEST=$(jq -r '."containerimage.digest"' arm64-meta.json)
-          echo "digest=$ARM_DIGEST" >> "$GITHUB_OUTPUT"
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          builder: local-arm64
+          platforms: linux/arm64
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=linux-arm64
+          cache-to: type=gha,mode=max,scope=linux-arm64
+          outputs: type=image,"name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}",push-by-digest=true,name-canonical=true,push=true
 
       - name: Build + push amd64 (digest only)
         id: build_amd64
-        run: |
-          docker buildx build \
-            --builder remote-amd64 \
-            --platform linux/amd64 \
-            --labels '${{ steps.meta.outputs.labels }}' \
-            --cache-from type=gha,scope=linux-amd64 \
-            --cache-to type=gha,mode=max,scope=linux-amd64 \
-            --output type=image,"name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}",push-by-digest=true,name-canonical=true,push=true \
-            --metadata-file amd64-meta.json \
-            .
-          AMD_DIGEST=$(jq -r '."containerimage.digest"' amd64-meta.json)
-          echo "digest=$AMD_DIGEST" >> "$GITHUB_OUTPUT"
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          builder: remote-amd64
+          platforms: linux/amd64
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=linux-amd64
+          cache-to: type=gha,mode=max,scope=linux-amd64
+          outputs: type=image,"name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}",push-by-digest=true,name-canonical=true,push=true
 
       - name: Assemble multi-arch manifest list
+        # The action's `digest` output is the sha256 of the pushed image
+        # per platform. `imagetools create` stitches them into a manifest
+        # list under the human-friendly tags from metadata-action.
         run: |
           docker buildx imagetools create \
             $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
