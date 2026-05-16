@@ -1,0 +1,48 @@
+Kryton has been installed.
+
+Release:    {{ .Release.Name }}
+Namespace:  {{ .Release.Namespace }}
+Image:      {{ include "kryton.image" . }}
+Chart:      {{ .Chart.Name }}-{{ .Chart.Version }}
+
+1. Service
+   The kryton server is exposed via a {{ .Values.service.type }} Service named
+   "{{ include "kryton.fullname" . }}" on port {{ .Values.service.port }}.
+
+{{- if .Values.ingress.enabled }}
+
+2. Ingress
+   The following hosts are exposed via Ingress:
+   {{- range .Values.ingress.hosts }}
+   - http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
+   {{- end }}
+{{- else }}
+
+2. Local access
+   Forward the service port to your workstation:
+     kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "kryton.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+   Then open: http://127.0.0.1:{{ .Values.service.port }}
+{{- end }}
+
+3. Postgres
+{{- if .Values.postgresql.enabled }}
+   An in-cluster postgresql subchart (pgvector image) was deployed.
+   The kryton pod connects via env.secret.POSTGRES_URL — set this on install
+   to a URL pointing at "{{ .Release.Name }}-postgresql" if not already set.
+{{- else }}
+   The postgresql subchart is disabled; ensure env.secret.POSTGRES_URL
+   points at an external Postgres reachable from the cluster.
+{{- end }}
+
+4. Secrets
+{{- if .Values.externalSecrets.enabled }}
+   ExternalSecrets is enabled — secrets are pulled from
+   {{ .Values.externalSecrets.secretStoreKind }}/{{ .Values.externalSecrets.secretStoreName }}.
+{{- else }}
+   A plain Secret "{{ include "kryton.secretName" . }}" was created.
+   BETTER_AUTH_SECRET MUST be set to a 32+ char value via
+   --set env.secret.BETTER_AUTH_SECRET=... before the pod will start.
+{{- end }}
+
+5. Health
+   helm test {{ .Release.Name }} --namespace {{ .Release.Namespace }}
