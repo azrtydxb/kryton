@@ -3,23 +3,22 @@ kind: Kryton
 metadata:
   name: kryton-sample
 spec:
-  # Default values copied from <project_dir>/helm-charts/kryton/values.yaml
-  env: {}
-  externalSecrets:
-    enabled: false
-  image:
-    pullPolicy: IfNotPresent
-    repository: ghcr.io/azrtydxb/kryton/kryton
-    tag: latest
-  ingress:
-    enabled: false
-  persistence:
-    enabled: false
-  postgresql:
-    enabled: false
-  replicaCount: 1
-  service:
-    port: 3000
-    type: ClusterIP
-  
-  
+  version: "4.5.0"
+  values:
+    ingress:
+      enabled: false
+    postgresql:
+      enabled: true
+  backup:
+    schedule: "0 3 * * *"
+    retention: "30d"
+    s3:
+      bucket: kryton-backups
+      endpoint: https://s3.example.com
+      prefix: kryton-sample/
+      credentialsSecretRef:
+        name: kryton-backup-s3
+  plugins: []
+  snapshot:
+    schedule: "0 4 * * *"
+    retention: "7d"

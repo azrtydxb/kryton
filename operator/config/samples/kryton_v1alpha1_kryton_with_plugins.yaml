@@ -1,0 +1,14 @@
+apiVersion: kryton.azrtydxb.io/v1alpha1
+kind: Kryton
+metadata:
+  name: kryton-with-plugins
+spec:
+  version: "4.5.0"
+  values:
+    persistence:
+      enabled: true
+      size: 10Gi
+  plugins:
+    - name: example-plugin
+      url: https://example.com/plugins/example-1.2.3.tar.gz
+      sha256: "0000000000000000000000000000000000000000000000000000000000000000"
