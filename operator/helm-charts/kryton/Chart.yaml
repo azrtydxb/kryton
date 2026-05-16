@@ -1,0 +1,7 @@
+apiVersion: v2
+appVersion: 0.0.0
+description: Placeholder chart for operator scaffolding; replaced at build time by
+  charts/kryton/ from WS-B.
+name: kryton
+type: application
+version: 0.0.0

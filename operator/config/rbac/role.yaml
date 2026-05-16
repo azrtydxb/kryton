@@ -28,4 +28,34 @@ rules:
   verbs:
   - create
 
+##
+## Rules for kryton.azrtydxb.io/v1alpha1, Kind: Kryton
+##
+- apiGroups:
+  - kryton.azrtydxb.io
+  resources:
+  - krytons
+  - krytons/status
+  - krytons/finalizers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- verbs:
+  - "*"
+  apiGroups:
+  - ""
+  resources:
+  - "services"
+- verbs:
+  - "*"
+  apiGroups:
+  - "apps"
+  resources:
+  - "deployments"
+
 # +kubebuilder:scaffold:rules

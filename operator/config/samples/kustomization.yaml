@@ -1,0 +1,4 @@
+## Append samples of your project ##
+resources:
+- kryton_v1alpha1_kryton.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples

@@ -9,4 +9,12 @@ plugins:
   manifests.sdk.operatorframework.io/v2: {}
   scorecard.sdk.operatorframework.io/v2: {}
 projectName: kryton-operator
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: azrtydxb.io
+  group: kryton
+  kind: Kryton
+  version: v1alpha1
 version: "3"
