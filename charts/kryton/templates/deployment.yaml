@@ -80,20 +80,29 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- if .Values.persistence.enabled }}
           volumeMounts:
+            {{- if .Values.persistence.enabled }}
             - name: data
               mountPath: {{ .Values.persistence.mountPath }}
               {{- with .Values.persistence.subPath }}
               subPath: {{ . }}
               {{- end }}
-          {{- end }}
-      {{- if .Values.persistence.enabled }}
+            {{- end }}
+            # Plugins dir. The server hardcodes <cwd>/plugins (=/app/plugins
+            # in the official image) and the pod runs non-root, so we need a
+            # writable mount there. emptyDir is intentional: plugins are
+            # either bundled in the image or downloaded by the operator's
+            # init-container at pod start, so durability isn't needed.
+            - name: plugins
+              mountPath: /app/plugins
       volumes:
+        {{- if .Values.persistence.enabled }}
         - name: data
           persistentVolumeClaim:
             claimName: {{ include "kryton.pvcName" . }}
-      {{- end }}
+        {{- end }}
+        - name: plugins
+          emptyDir: {}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
