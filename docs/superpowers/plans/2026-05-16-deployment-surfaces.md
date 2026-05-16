@@ -45,14 +45,14 @@
 
 ### Tasks
 
-- [ ] **A1.** Read the current `packages/server/src/config/index.ts` and identify the Zod schema(s) declaring env-var fields. Map every env var to: `name`, Zod type, required vs optional, default value if any, current description (if any).
-- [ ] **A2.** Extend the schema's per-field metadata to carry `secret: boolean` and `userFacing: boolean`. Approach: a small TypeScript helper `withMeta(zodField, { secret, userFacing, description })` that stores metadata in a `WeakMap` keyed by the Zod field, since Zod doesn't have a stable metadata API across versions. Re-export the schema unchanged for runtime use.
-- [ ] **A3.** Audit every env field and assign correct `secret` + `userFacing` values. Postgres password, BETTER_AUTH_SECRET, API tokens → `secret: true`. Internal-only knobs (LOG_LEVEL, debug flags) → `userFacing: false`. Document the audit decisions inline.
-- [ ] **A4.** Write `packages/server/scripts/dump-config-schema.ts` that imports the schema, walks each field, resolves type / required / default / secret / userFacing / description, and writes `packages/server/config-schema.json` as `{ fields: [...] }`. Stable key order, trailing newline (match `dump-openapi.ts` style).
-- [ ] **A5.** Add `config:dump` and `config:check` scripts to `packages/server/package.json`. `config:check` runs the dumper to a temp file and diffs against `config-schema.json` (mirror the `openapi:check` pattern).
-- [ ] **A6.** Unit tests for the schema dumper: every metadata field round-trips, types map correctly (`ZodString` → `"string"`, `ZodNumber` → `"number"`, `ZodEnum` → `"enum"` with `values`), defaults serialize.
-- [ ] **A7.** Run `npm run config:dump`, commit `config-schema.json`.
-- [ ] **A8.** Sanity check: `npm run config:check` exits 0.
+- [x] **A1.** Read the current `packages/server/src/config/index.ts` and identify the Zod schema(s) declaring env-var fields. Map every env var to: `name`, Zod type, required vs optional, default value if any, current description (if any).
+- [x] **A2.** Extend the schema's per-field metadata to carry `secret: boolean` and `userFacing: boolean`. Approach: a small TypeScript helper `withMeta(zodField, { secret, userFacing, description })` that stores metadata in a `WeakMap` keyed by the Zod field, since Zod doesn't have a stable metadata API across versions. Re-export the schema unchanged for runtime use.
+- [x] **A3.** Audit every env field and assign correct `secret` + `userFacing` values. Postgres password, BETTER_AUTH_SECRET, API tokens → `secret: true`. Internal-only knobs (LOG_LEVEL, debug flags) → `userFacing: false`. Document the audit decisions inline.
+- [x] **A4.** Write `packages/server/scripts/dump-config-schema.ts` that imports the schema, walks each field, resolves type / required / default / secret / userFacing / description, and writes `packages/server/config-schema.json` as `{ fields: [...] }`. Stable key order, trailing newline (match `dump-openapi.ts` style).
+- [x] **A5.** Add `config:dump` and `config:check` scripts to `packages/server/package.json`. `config:check` runs the dumper to a temp file and diffs against `config-schema.json` (mirror the `openapi:check` pattern).
+- [x] **A6.** Unit tests for the schema dumper: every metadata field round-trips, types map correctly (`ZodString` → `"string"`, `ZodNumber` → `"number"`, `ZodEnum` → `"enum"` with `values`), defaults serialize.
+- [x] **A7.** Run `npm run config:dump`, commit `config-schema.json`.
+- [x] **A8.** Sanity check: `npm run config:check` exits 0.
 
 ---
 
