@@ -240,3 +240,11 @@ postgresql:
     # pgvector image is not. Disable to keep the override workable.
     containerSecurityContext:
       readOnlyRootFilesystem: false
+    # Enable the pgvector extension on first DB init. The image ships
+    # the extension binaries; this turns it on. Without it the
+    # server's vector-typed migrations fail with `type "vector" does
+    # not exist`. Runs once, idempotent (IF NOT EXISTS).
+    initdb:
+      scripts:
+        00-pgvector.sql: |
+          CREATE EXTENSION IF NOT EXISTS vector;
