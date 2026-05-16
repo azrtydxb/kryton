@@ -11,59 +11,74 @@ import (
 // BackupParams is the projection of Kryton.spec.backup needed to render
 // the backup CronJob. Kept as a plain struct so this package can be
 // unit-tested without dragging in the generated CRD types.
+//
+// Target storage is any S3-compatible object store (MinIO, Garage,
+// SeaweedFS, etc.). No AWS-specific behaviour or hostnames; the
+// endpoint is always explicit.
 type BackupParams struct {
-	Name              string
-	Namespace         string
-	Schedule          string
-	Retention         string
-	S3Bucket          string
-	S3Endpoint        string
-	S3Region          string
-	S3Prefix          string
-	S3CredsSecretName string
+	Name      string
+	Namespace string
+	Schedule  string
+	Retention string
+	// Object-store target. Bucket is required; Endpoint is the URL of
+	// the S3-compatible service; Region is optional (some
+	// implementations ignore it but mc still wants the field set).
+	Bucket            string
+	Endpoint          string
+	Region            string
+	Prefix            string
+	CredsSecretName   string
 	// PostgresSecretName provides PGHOST/PGUSER/PGPASSWORD/PGDATABASE keys.
 	PostgresSecretName string
 }
 
-// BuildBackupCronJob renders the pg_dump → S3 CronJob for a Kryton CR.
+// BuildBackupCronJob renders the pg_dump → object-store CronJob for a
+// Kryton CR.
 //
 // The script: dumps the configured database with `pg_dump --format=custom`,
-// uploads the result to S3 keyed by timestamp under <prefix>, then sweeps
-// objects older than retention via the aws CLI.
+// installs `mc` (MinIO client — works against any S3-compatible service),
+// configures it for the given endpoint+creds, uploads the dump keyed by
+// timestamp under <prefix>, then sweeps objects older than retention.
+// Runs in a plain `postgres:16` image so no separate backup image needs
+// to be built or published.
 func BuildBackupCronJob(p BackupParams) *batchv1.CronJob {
-	if p.S3Prefix == "" {
-		p.S3Prefix = p.Name + "/"
+	if p.Prefix == "" {
+		p.Prefix = p.Name + "/"
 	}
 	script := `set -euo pipefail
+# Install mc once per pod. Static binary, ~30MB; postgres:16 has curl.
+if ! command -v mc >/dev/null 2>&1; then
+  curl -fsSL "https://dl.min.io/client/mc/release/linux-amd64/mc" -o /usr/local/bin/mc
+  chmod +x /usr/local/bin/mc
+fi
+mc alias set store "$OBJECT_STORE_ENDPOINT" "$OBJECT_STORE_ACCESS_KEY" "$OBJECT_STORE_SECRET_KEY"
+
 ts=$(date -u +%Y%m%dT%H%M%SZ)
 out="/tmp/${PGDATABASE}-${ts}.dump"
 pg_dump --format=custom --no-owner --no-acl \
   --host="$PGHOST" --port="${PGPORT:-5432}" \
   --username="$PGUSER" --dbname="$PGDATABASE" \
   --file="$out"
-aws s3 cp "$out" "s3://${S3_BUCKET}/${S3_PREFIX}${PGDATABASE}-${ts}.dump" \
-  ${S3_ENDPOINT:+--endpoint-url=$S3_ENDPOINT}
-# Sweep: list, parse LastModified, delete anything older than retention.
-aws s3api list-objects-v2 \
-  --bucket "$S3_BUCKET" \
-  --prefix "$S3_PREFIX" \
-  ${S3_ENDPOINT:+--endpoint-url=$S3_ENDPOINT} \
-  --query "Contents[?LastModified<='$(date -u -d "-${RETENTION}" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v"-${RETENTION_AMOUNT}${RETENTION_UNIT}" +%Y-%m-%dT%H:%M:%SZ)'].Key" \
-  --output text | tr '\t' '\n' | while read -r key; do
-    [ -n "$key" ] && aws s3 rm "s3://${S3_BUCKET}/${key}" ${S3_ENDPOINT:+--endpoint-url=$S3_ENDPOINT}
-  done
+
+mc cp "$out" "store/${OBJECT_STORE_BUCKET}/${OBJECT_STORE_PREFIX}${PGDATABASE}-${ts}.dump"
+
+# Sweep: mc's --older-than understands durations like 30d, 12h.
+mc rm --recursive --force --older-than "$RETENTION" \
+  "store/${OBJECT_STORE_BUCKET}/${OBJECT_STORE_PREFIX}" || true
 `
 
+	// Credentials secret must provide OBJECT_STORE_ACCESS_KEY and
+	// OBJECT_STORE_SECRET_KEY keys. Postgres secret provides PG* keys.
 	envFrom := []corev1.EnvFromSource{
 		{SecretRef: &corev1.SecretEnvSource{LocalObjectReference: corev1.LocalObjectReference{Name: p.PostgresSecretName}}},
-		{SecretRef: &corev1.SecretEnvSource{LocalObjectReference: corev1.LocalObjectReference{Name: p.S3CredsSecretName}}},
+		{SecretRef: &corev1.SecretEnvSource{LocalObjectReference: corev1.LocalObjectReference{Name: p.CredsSecretName}}},
 	}
 
 	env := []corev1.EnvVar{
-		{Name: "S3_BUCKET", Value: p.S3Bucket},
-		{Name: "S3_ENDPOINT", Value: p.S3Endpoint},
-		{Name: "S3_REGION", Value: p.S3Region},
-		{Name: "S3_PREFIX", Value: p.S3Prefix},
+		{Name: "OBJECT_STORE_BUCKET", Value: p.Bucket},
+		{Name: "OBJECT_STORE_ENDPOINT", Value: p.Endpoint},
+		{Name: "OBJECT_STORE_REGION", Value: p.Region},
+		{Name: "OBJECT_STORE_PREFIX", Value: p.Prefix},
 		{Name: "RETENTION", Value: p.Retention},
 	}
 
@@ -91,7 +106,7 @@ aws s3api list-objects-v2 \
 							RestartPolicy: corev1.RestartPolicyOnFailure,
 							Containers: []corev1.Container{{
 								Name:    "pgdump",
-								Image:   "ghcr.io/azrtydxb/kryton/pgdump-s3:pg16",
+								Image:   "postgres:16",
 								Command: []string{"/bin/sh", "-c", script},
 								EnvFrom: envFrom,
 								Env:     env,

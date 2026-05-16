@@ -2,7 +2,7 @@
 
 The Kryton Operator manages Kryton instances as Kubernetes custom resources. It embeds the official Helm chart and adds lifecycle features the chart cannot express on its own:
 
-- **Backup / restore** — scheduled `pg_dump` to S3-compatible storage with retention.
+- **Backup / restore** — scheduled `pg_dump` to S3-compatible object storage (MinIO, Garage, SeaweedFS, etc.) with retention.
 - **Plugin install** — pre-install plugins by URL with sha256 verification before the server pod starts.
 - **Volume snapshots** — scheduled `VolumeSnapshot` resources against the data PVC.
 - **Multi-instance** — multiple isolated Kryton instances on one cluster, declaratively.
@@ -61,7 +61,7 @@ metadata:
 spec:
   version: "4.6.0"           # appVersion (image tag) to deploy
   values: {}                 # passthrough to the embedded chart's values.yaml
-  backup: {}                 # optional: scheduled pg_dump to S3
+  backup: {}                 # optional: scheduled pg_dump to S3-compatible storage
   plugins: []                # optional: plugins to pre-install
   snapshot: {}               # optional: scheduled VolumeSnapshot
 status:
@@ -112,18 +112,17 @@ spec:
         - host: kryton.example.com
           paths: [{ path: /, pathType: Prefix }]
   backup:
-    schedule: "0 3 * * *"        # 03:00 UTC daily
+    schedule: "0 3 * * *"             # 03:00 UTC daily
     retention: "30d"
-    s3:
-      endpoint: https://s3.us-east-1.amazonaws.com
+    objectStore:
+      endpoint: https://minio.kw.local  # any S3-compatible service
       bucket: kryton-backups
-      region: us-east-1
       prefix: prod/
       credentialsSecretRef:
-        name: kryton-s3-creds    # keys: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+        name: kryton-backup-creds       # keys: OBJECT_STORE_ACCESS_KEY, OBJECT_STORE_SECRET_KEY
 ```
 
-The operator emits a `CronJob` that runs `pg_dump` against the embedded (or external) Postgres and uploads the dump to S3. A sweep step deletes objects older than `retention`. No Velero or external backup operator required.
+The operator emits a `CronJob` that runs `pg_dump` against the embedded (or external) Postgres and uploads the dump to the configured object store using `mc` (MinIO client — works with any S3-compatible service). A sweep step deletes objects older than `retention`. No Velero, no AWS dependency, no separate backup image — the CronJob runs `postgres:16` and installs `mc` at runtime.
 
 ### With pre-installed plugins
 
@@ -194,11 +193,11 @@ The operator passes the CR's `metadata.name` through `fullnameOverride` so each 
 When `spec.backup` is set, the operator reconciles a `CronJob` named `<cr-name>-backup` in the CR's namespace. Each run:
 
 1. Resolves the Postgres DSN from the same source the server uses (embedded subchart Secret, or external Secret reference).
-2. Runs `pg_dump --format=custom --no-owner --no-acl` into a stream.
-3. Pipes through `gzip` and uploads to `s3://<bucket>/<prefix>/<cr-name>/<timestamp>.dump.gz`.
-4. Sweeps objects under the prefix older than `retention`.
+2. Runs `pg_dump --format=custom --no-owner --no-acl` into a file.
+3. Uploads to `<bucket>/<prefix><database>-<timestamp>.dump` using `mc` (MinIO client, installed at runtime in the `postgres:16` image).
+4. Sweeps objects under the prefix older than `retention` (`mc rm --recursive --older-than <retention>`).
 
-S3 credentials come from `spec.backup.s3.credentialsSecretRef`. The Secret must contain `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. For non-AWS S3-compatible storage (Minio, R2, B2), set `endpoint` accordingly.
+Object-store credentials come from `spec.backup.objectStore.credentialsSecretRef`. The Secret must contain `OBJECT_STORE_ACCESS_KEY` and `OBJECT_STORE_SECRET_KEY`. Endpoint URL is always explicit (`spec.backup.objectStore.endpoint`) — point it at MinIO, Garage, SeaweedFS, or any other S3-compatible service.
 
 ### Inspect backup history
 
@@ -215,12 +214,12 @@ Restoration is intentionally **not** automated by the operator — it's destruct
 # 1. Scale the kryton Deployment to 0 so nothing writes during restore.
 kubectl -n kryton scale deploy/<cr-name> --replicas=0
 
-# 2. Download the dump.
-aws s3 cp s3://kryton-backups/prod/<cr-name>/2026-05-15T03-00-00.dump.gz ./restore.dump.gz
-gunzip restore.dump.gz
+# 2. Download the dump (mc works against any S3-compatible endpoint).
+mc alias set store https://minio.kw.local "$ACCESS_KEY" "$SECRET_KEY"
+mc cp store/kryton-backups/prod/<cr-name>-2026-05-15T03-00-00.dump ./restore.dump
 
 # 3. Run pg_restore against the target Postgres.
-kubectl -n kryton exec -it sts/<cr-name>-postgres-primary -- \
+kubectl -n kryton exec -it sts/<cr-name>-postgresql -- \
   bash -c 'PGPASSWORD=$POSTGRES_PASSWORD pg_restore --clean --if-exists \
     -U kryton -d kryton' < restore.dump
 

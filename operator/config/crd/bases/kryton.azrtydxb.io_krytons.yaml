@@ -54,23 +54,31 @@ spec:
                       description: Cron expression (UTC) for pg_dump.
                       type: string
                     retention:
-                      description: Retention duration (e.g. "30d"). Older S3 objects are swept.
+                      description: Retention duration (e.g. "30d"). Older objects in the target bucket are swept.
                       type: string
-                    s3:
+                    objectStore:
+                      description: |
+                        S3-compatible object store target (MinIO, Garage, SeaweedFS,
+                        or any other service that speaks the S3 protocol). No AWS-
+                        specific behaviour; endpoint is always explicit.
                       type: object
                       required:
                         - bucket
+                        - endpoint
                       properties:
                         bucket:
                           type: string
                         endpoint:
+                          description: Full URL of the S3-compatible service (e.g. https://minio.kw.local).
                           type: string
                         region:
+                          description: Optional. Some implementations ignore it but mc still wants the field set.
                           type: string
                         prefix:
+                          description: Key prefix inside the bucket. Defaults to "<cr-name>/".
                           type: string
                         credentialsSecretRef:
-                          description: Name of a Secret with AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY.
+                          description: Name of a Secret with keys OBJECT_STORE_ACCESS_KEY and OBJECT_STORE_SECRET_KEY.
                           type: object
                           required:
                             - name

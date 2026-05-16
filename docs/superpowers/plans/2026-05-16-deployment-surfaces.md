@@ -122,7 +122,7 @@
       Snapshot *SnapshotSpec          `json:"snapshot,omitempty"`
   }
   ```
-  `BackupSpec`: schedule (cron), retention (duration), s3 config (bucket, endpoint, credsSecretRef).
+  `BackupSpec`: schedule (cron), retention (duration), objectStore config (bucket, endpoint, region, prefix, credentialsSecretRef) for S3-compatible targets (MinIO/Garage/SeaweedFS).
   `PluginSpec`: name, url, sha256 digest.
   `SnapshotSpec`: schedule, retention.
 - [x] **C5.** Implement the operator-only reconciler logic (separate controller, not the helm one):

@@ -12,12 +12,12 @@ spec:
   backup:
     schedule: "0 3 * * *"
     retention: "30d"
-    s3:
+    objectStore:
       bucket: kryton-backups
-      endpoint: https://s3.example.com
+      endpoint: https://minio.kw.local
       prefix: kryton-sample/
       credentialsSecretRef:
-        name: kryton-backup-s3
+        name: kryton-backup-creds
   plugins: []
   snapshot:
     schedule: "0 4 * * *"

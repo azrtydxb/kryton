@@ -4,7 +4,7 @@ Kubernetes operator for Kryton. Manages `Kryton` custom resources by installing
 and upgrading the [kryton helm chart](../charts/kryton) on each reconcile, then
 layering operator-only resources on top:
 
-- Postgres **backup** CronJob (`pg_dump` → S3 with retention sweep).
+- Postgres **backup** CronJob (`pg_dump` → S3-compatible object store with retention sweep).
 - **Plugin** init-container that downloads and sha256-verifies user-declared
   plugin archives into the kryton persistence volume before the server boots.
 - VolumeSnapshot **scheduler** CronJob.
@@ -58,7 +58,7 @@ embed mechanic is verified end-to-end.
 | `values` | object (passthrough) | Forwarded verbatim to the helm chart's values. |
 | `backup.schedule` | cron string | `pg_dump` cron expression (UTC). |
 | `backup.retention` | duration | Retention window for backup objects. |
-| `backup.s3` | object | Bucket, endpoint, region, prefix, credentialsSecretRef. |
+| `backup.objectStore` | object | S3-compatible target: bucket, endpoint, region, prefix, credentialsSecretRef. Works with MinIO, Garage, SeaweedFS, etc. |
 | `plugins[]` | list of `{name,url,sha256}` | Plugins to pre-install. |
 | `snapshot.schedule` | cron string | VolumeSnapshot cron. |
 | `snapshot.retention` | duration | VolumeSnapshot retention. |
@@ -97,11 +97,14 @@ kubectl apply -f config/samples/kryton_v1alpha1_kryton_minimal.yaml
   `fullnameOverride: <metadata.name>` (injected by the helm reconciler), so
   multiple instances in the same namespace never collide on Service or PVC
   names.
-- **Backups** require an S3-credentials Secret (referenced by
-  `backup.s3.credentialsSecretRef`) containing `AWS_ACCESS_KEY_ID` and
-  `AWS_SECRET_ACCESS_KEY` keys, plus a postgres-credentials Secret with
-  `PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE`. The chart's postgres subchart
-  emits the latter under `<release>-postgresql` by default.
+- **Backups** require an object-store credentials Secret (referenced by
+  `backup.objectStore.credentialsSecretRef`) containing
+  `OBJECT_STORE_ACCESS_KEY` and `OBJECT_STORE_SECRET_KEY` keys, plus a
+  postgres-credentials Secret with `PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE`.
+  The chart's postgres subchart emits the latter under `<release>-postgresql`
+  by default. The backup CronJob runs in a plain `postgres:16` image and
+  installs `mc` (MinIO client) at runtime — no AWS dependency, no separate
+  backup image to maintain.
 - **Plugins** are dropped into the persistence volume's `/plugins` directory.
   The server's existing plugin loader picks them up at boot — no server
   changes required.
