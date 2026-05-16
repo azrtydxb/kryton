@@ -1,13 +1,31 @@
 services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      - POSTGRES_USER=kryton
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      - POSTGRES_DB=kryton
+    volumes:
+      - kryton-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "kryton", "-d", "kryton"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
   kryton:
-    image: ghcr.io/piwi3910/kryton/kryton:latest
+    image: ghcr.io/azrtydxb/kryton/kryton:latest
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "3100:3000"
     volumes:
       - ./notes:/notes
       - kryton-data:/data
     environment:
-      - DATABASE_URL=file:/data/kryton.db
+      - POSTGRES_URL=postgres://kryton:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/kryton
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET}
       - APP_URL=${APP_URL:-http://localhost:3100}
       - BETTER_AUTH_URL=${BETTER_AUTH_URL:-http://localhost:3100}
@@ -16,3 +34,4 @@ services:
 
 volumes:
   kryton-data:
+  kryton-postgres:

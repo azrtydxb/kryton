@@ -529,6 +529,13 @@ jobs:
       digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
+      - name: Sync chart into operator embed
+        # The operator's Dockerfile expects the helm chart at
+        # operator/internal/chartfs/chart/. The chart lives at
+        # charts/kryton/; sync-chart copies it in. Without this step
+        # the build would embed the placeholder chart from WS-C bring-
+        # up, not the real one.
+        run: cd operator && make sync-chart
       - name: Log in to Container Registry
         uses: docker/login-action@v3
         with:
@@ -580,6 +587,8 @@ jobs:
       digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
+      - name: Sync chart into operator embed
+        run: cd operator && make sync-chart
       - name: Log in to Container Registry
         uses: docker/login-action@v3
         with:

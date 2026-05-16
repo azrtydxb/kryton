@@ -243,7 +243,7 @@ These are answered as part of the single delivery (no deferral):
 
 - **Plugin install via CR.** `spec.plugins[]` declares plugin URLs/digests; operator pre-installs them into a volume mounted at the server's plugins dir before the server pod starts (init-container pattern). Server's existing plugin loader picks them up at boot. No changes needed to the server plugin API.
 - **Backup mechanics.** `spec.backup.schedule` (cron) triggers a Job that runs `pg_dump` against the configured postgres URL and uploads to S3-compatible storage via env-configured creds. `spec.backup.retention` enforced by a sweep step. No Velero dependency.
-- **Multi-instance on a single cluster.** Each `Kryton` CR gets `metadata.name`-prefixed releases. The operator passes `fullnameOverride: <cr-name>` and `postgres.fullnameOverride: <cr-name>-postgres` into helm values to ensure no naming collisions. Storage PVCs likewise scoped by name.
+- **Multi-instance on a single cluster.** Each `Kryton` CR gets `metadata.name`-prefixed releases. The operator passes `fullnameOverride: <cr-name>` and `postgresql.fullnameOverride: <cr-name>-postgresql` into helm values to ensure no naming collisions (the subchart key matches bitnami's chart name, `postgresql`). Storage PVCs likewise scoped by name.
 
 ## Acceptance
 
