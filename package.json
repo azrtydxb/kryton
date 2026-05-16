@@ -1,6 +1,6 @@
 {
   "name": "kryton",
-  "version": "4.4.0-pre.11",
+  "version": "4.5.0",
   "private": true,
   "workspaces": [
     "packages/*"
