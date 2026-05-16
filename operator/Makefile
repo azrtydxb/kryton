@@ -82,8 +82,27 @@ help: ## Display this help.
 run: helm-operator ## Run against the configured Kubernetes cluster in ~/.kube/config
 	$(HELM_OPERATOR) run
 
+# CHART_SRC is the canonical helm chart source (owned by WS-B).
+# CHART_DST is the embed location consumed by //go:embed in internal/chartfs.
+CHART_SRC ?= ../charts/kryton
+CHART_DST ?= internal/chartfs/chart
+
+.PHONY: sync-chart
+sync-chart: ## Copy charts/kryton/ into the operator's embed directory.
+	@if [ ! -d "$(CHART_SRC)" ]; then \
+		echo "warn: $(CHART_SRC) not found; using placeholder chart"; \
+		rm -rf "$(CHART_DST)" && mkdir -p "$(CHART_DST)" && cp -R internal/chart-placeholder/kryton/. "$(CHART_DST)/"; \
+	else \
+		rm -rf "$(CHART_DST)" && mkdir -p "$(CHART_DST)" && cp -R "$(CHART_SRC)"/. "$(CHART_DST)/"; \
+	fi
+	@touch "$(CHART_DST)/.keep"
+
+.PHONY: test
+test: ## Run unit tests.
+	go test ./...
+
 .PHONY: docker-build
-docker-build: ## Build docker image with the manager.
+docker-build: sync-chart ## Build docker image with the manager.
 	$(CONTAINER_TOOL) build -t ${IMG} .
 
 .PHONY: docker-push
@@ -98,7 +117,7 @@ docker-push: ## Push docker image with the manager.
 # To properly provided solutions that supports more than one platform you should use this option.
 PLATFORMS ?= linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
 .PHONY: docker-buildx
-docker-buildx: ## Build and push docker image for the manager for cross-platform support
+docker-buildx: sync-chart ## Build and push docker image for the manager for cross-platform support
 	- $(CONTAINER_TOOL) buildx create --name project-v3-builder
 	$(CONTAINER_TOOL) buildx use project-v3-builder
 	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile .

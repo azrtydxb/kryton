@@ -109,10 +109,10 @@
 
 ### Tasks
 
-- [ ] **C1.** From `operator/`, run `operator-sdk init --domain=azrtydxb.io --repo=github.com/azrtydxb/kryton/operator --plugins=helm`. Commit the scaffold.
-- [ ] **C2.** Add a Kryton CRD: `operator-sdk create api --group=kryton --version=v1alpha1 --kind=Kryton --helm-chart=../charts/kryton`. This wires the helm-based reconciler to the chart at the integration-point path.
-- [ ] **C3.** Convert the chart embed from path-reference to `//go:embed` so the operator image is self-contained: copy the embed step into a small wrapper around `helm.NewClient`, then bind the embedded FS to the chart resolver. Reference operator-sdk's helm SDK docs for the embed pattern.
-- [ ] **C4.** Extend the CRD `Kryton` type with operator-only spec fields:
+- [x] **C1.** From `operator/`, run `operator-sdk init --domain=azrtydxb.io --repo=github.com/azrtydxb/kryton/operator --plugins=helm`. Commit the scaffold.
+- [x] **C2.** Add a Kryton CRD: `operator-sdk create api --group=kryton --version=v1alpha1 --kind=Kryton --helm-chart=../charts/kryton`. This wires the helm-based reconciler to the chart at the integration-point path.
+- [x] **C3.** Convert the chart embed from path-reference to `//go:embed` so the operator image is self-contained: copy the embed step into a small wrapper around `helm.NewClient`, then bind the embedded FS to the chart resolver. Reference operator-sdk's helm SDK docs for the embed pattern.
+- [x] **C4.** Extend the CRD `Kryton` type with operator-only spec fields:
   ```go
   type KrytonSpec struct {
       Version  string                 `json:"version"`
@@ -125,15 +125,15 @@
   `BackupSpec`: schedule (cron), retention (duration), s3 config (bucket, endpoint, credsSecretRef).
   `PluginSpec`: name, url, sha256 digest.
   `SnapshotSpec`: schedule, retention.
-- [ ] **C5.** Implement the operator-only reconciler logic (separate controller, not the helm one):
+- [x] **C5.** Implement the operator-only reconciler logic (separate controller, not the helm one):
   - Backup: emit a CronJob that runs `pg_dump` against the configured postgres URL → uploads to S3 via env-configured creds → sweeps older-than-retention objects.
   - Plugins: pre-install via an init-container on the kryton pod that downloads each plugin URL, verifies sha256, drops into the persistence volume's plugins dir.
   - Snapshot: VolumeSnapshot resource on the PVC at the schedule, retention via sweep.
-- [ ] **C6.** RBAC manifests for the operator (`operator/config/rbac/`): permissions to manage Deployments/Services/Ingresses/ConfigMaps/Secrets/PVCs/Jobs/CronJobs/VolumeSnapshots in the operator's namespace, plus the helm release ConfigMaps.
-- [ ] **C7.** `operator/Dockerfile` — multi-stage Go build, distroless or scratch runtime base. Multi-arch via buildx.
-- [ ] **C8.** Generate the CRD bundle: `make manifests` produces `operator/config/crd/bases/kryton.azrtydxb.io_krytons.yaml`. Commit.
-- [ ] **C9.** Operator unit tests for the operator-only reconcile logic (envtest-based) — backup, plugin install, snapshot paths.
-- [ ] **C10.** Write `operator/README.md` documenting CRD install, operator deploy, example `Kryton` CRs (minimal, with backup, with plugins, multi-instance).
+- [x] **C6.** RBAC manifests for the operator (`operator/config/rbac/`): permissions to manage Deployments/Services/Ingresses/ConfigMaps/Secrets/PVCs/Jobs/CronJobs/VolumeSnapshots in the operator's namespace, plus the helm release ConfigMaps.
+- [x] **C7.** `operator/Dockerfile` — multi-stage Go build, distroless or scratch runtime base. Multi-arch via buildx.
+- [x] **C8.** Generate the CRD bundle: `make manifests` produces `operator/config/crd/bases/kryton.azrtydxb.io_krytons.yaml`. Commit.
+- [x] **C9.** Operator unit tests for the operator-only reconcile logic (envtest-based) — backup, plugin install, snapshot paths.
+- [x] **C10.** Write `operator/README.md` documenting CRD install, operator deploy, example `Kryton` CRs (minimal, with backup, with plugins, multi-instance).
 
 ---
 
