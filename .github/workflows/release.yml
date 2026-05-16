@@ -168,15 +168,28 @@ jobs:
 
       - name: Set up two buildx builders
         run: |
-          # arm64 native via the dind sidecar.
+          # arm64 native via the dind sidecar.  The inline buildkitd
+          # config marks the cluster zot registry as insecure so this
+          # builder can push/pull cache layers without needing the
+          # cluster CA in buildkit-container's trust store.
+          cat > /tmp/buildkitd-local.toml <<'EOF'
+          [registry."192.168.10.123:5000"]
+            http = false
+            insecure = true
+          EOF
           docker buildx create \
             --name local-arm64 \
             --driver docker-container \
-            --platform linux/arm64
+            --platform linux/arm64 \
+            --buildkitd-config /tmp/buildkitd-local.toml
 
           # amd64 native via the remote BuildKit on 192.168.10.253.
           # Certs + endpoint are auto-injected into every arc-azrtydxb
-          # runner pod by the AutoscalingRunnerSet template.
+          # runner pod by the AutoscalingRunnerSet template.  The NAS
+          # buildkit already has the cluster zot registry trusted via
+          # /etc/buildkit/buildkitd.toml (registry."192.168.10.123:5000"
+          # with cluster-ca.crt), so no inline config is needed here —
+          # remote-driver builders inherit the daemon's config.
           docker buildx create \
             --name remote-amd64 \
             --driver remote \
@@ -197,8 +210,13 @@ jobs:
           builder: local-arm64
           platforms: linux/arm64
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=linux-arm64
-          cache-to: type=gha,mode=max,scope=linux-arm64
+          # Buildkit cache lives in the in-cluster zot registry at
+          # 192.168.10.123:5000 — pushes/pulls over the cluster LAN
+          # instead of GHA cache over the NAS uplink. mode=max stores
+          # all intermediate layers (full hit rate); image-manifest=true
+          # uses OCI manifest format which buildx and crane both prefer.
+          cache-from: type=registry,ref=192.168.10.123:5000/buildcache/kryton:linux-arm64
+          cache-to: type=registry,ref=192.168.10.123:5000/buildcache/kryton:linux-arm64,mode=max,image-manifest=true
           outputs: type=image,"name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}",push-by-digest=true,name-canonical=true,push=true
 
       - name: Build + push amd64 (digest only)
@@ -209,8 +227,8 @@ jobs:
           builder: remote-amd64
           platforms: linux/amd64
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=linux-amd64
-          cache-to: type=gha,mode=max,scope=linux-amd64
+          cache-from: type=registry,ref=192.168.10.123:5000/buildcache/kryton:linux-amd64
+          cache-to: type=registry,ref=192.168.10.123:5000/buildcache/kryton:linux-amd64,mode=max,image-manifest=true
           outputs: type=image,"name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}",push-by-digest=true,name-canonical=true,push=true
 
       - name: Assemble multi-arch manifest list
