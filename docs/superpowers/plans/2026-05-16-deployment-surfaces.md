@@ -201,9 +201,9 @@
 
 ### Tasks
 
-- [ ] **F1.** Write `docs/HELM.md`: install command (from OCI + from local), values reference (link to `charts/kryton/README.md`), upgrade flow, postgres options, ingress examples, ExternalSecrets example, troubleshooting (probe failures, common values mistakes).
-- [ ] **F2.** Write `docs/OPERATOR.md`: install (CRD bundle + operator Deployment), example CRs (minimal, with backup, with plugins, multi-instance), backup/restore procedures, plugin installation flow, upgrade procedure (operator first, then bump `spec.version` per CR), troubleshooting.
-- [ ] **F3.** Update `README.md`'s install/deploy section to list all three paths (compose for single-host, helm for k8s, operator for managed lifecycle) with one-liner pros/cons and links to the detailed docs.
+- [x] **F1.** Write `docs/HELM.md`: install command (from OCI + from local), values reference (link to `charts/kryton/README.md`), upgrade flow, postgres options, ingress examples, ExternalSecrets example, troubleshooting (probe failures, common values mistakes).
+- [x] **F2.** Write `docs/OPERATOR.md`: install (CRD bundle + operator Deployment), example CRs (minimal, with backup, with plugins, multi-instance), backup/restore procedures, plugin installation flow, upgrade procedure (operator first, then bump `spec.version` per CR), troubleshooting.
+- [x] **F3.** Update `README.md`'s install/deploy section to list all three paths (compose for single-host, helm for k8s, operator for managed lifecycle) with one-liner pros/cons and links to the detailed docs.
 - [ ] **F4.** After all other workstreams land and CI is green, update branch protection on master to add `deployment-sync-check` to the required checks. Use:
   ```
   gh api -X PATCH repos/azrtydxb/kryton/branches/master/protection/required_status_checks \
