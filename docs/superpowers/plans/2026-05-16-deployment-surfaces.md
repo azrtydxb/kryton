@@ -148,22 +148,22 @@
 
 ### Tasks
 
-- [ ] **D1.** Write `scripts/check-deployment-sync.ts`. Load `packages/server/config-schema.json` → canonical field list.
-- [ ] **D2.** Compose check: parse `docker-compose.prod.yml`, find the kryton service's `environment:` block. For each schema field:
+- [x] **D1.** Write `scripts/check-deployment-sync.ts`. Load `packages/server/config-schema.json` → canonical field list.
+- [x] **D2.** Compose check: parse `docker-compose.prod.yml`, find the kryton service's `environment:` block. For each schema field:
   - Required + secret → must appear as `KEY: ${KEY:?}` (no default).
   - Required + non-secret → must appear with a default literal OR `${KEY:?}`.
   - Optional → may appear with default; absence is OK.
   - Compose has no env keys missing from the schema (orphan detection).
-- [ ] **D3.** Helm check: parse `charts/kryton/values.yaml` and `values.schema.json`. For each schema field:
+- [x] **D3.** Helm check: parse `charts/kryton/values.yaml` and `values.schema.json`. For each schema field:
   - Required + secret → must be referenced by `templates/secret.yaml` (or `externalsecret.yaml`), never `configmap.yaml`.
   - Required + non-secret → must have a values.yaml default OR be marked required in `values.schema.json`.
   - Optional → may be present.
-- [ ] **D4.** Run `helm lint charts/kryton` and `helm template charts/kryton | kubeconform -strict` from within the check. Fail the gate if either fails.
-- [ ] **D5.** CRD check: parse `operator/config/crd/bases/kryton.azrtydxb.io_krytons.yaml`. Extract `spec.values` schema. Assert it's a superset of `charts/kryton/values.schema.json` (every property in values.schema.json appears under CRD `spec.values`).
-- [ ] **D6.** Output format: structured failure messages naming the field, the missing surface, and a concrete fix (the exact line to add). Exit 1 on any mismatch.
-- [ ] **D7.** Unit tests with synthetic schema + synthetic compose/helm/CRD fixtures covering each mismatch class.
-- [ ] **D8.** Add `sync:check` to root `package.json`: `tsx scripts/check-deployment-sync.ts`.
-- [ ] **D9.** Add `deployment-sync-check` job to `.github/workflows/ci.yml` as a 5th parallel sibling alongside `typecheck`, `lint`, `test-build`, `openapi-check`. Cached `npm ci`, runs `helm` + `kubeconform` (install in step), runs `npm run sync:check`.
+- [x] **D4.** Run `helm lint charts/kryton` and `helm template charts/kryton | kubeconform -strict` from within the check. Fail the gate if either fails.
+- [x] **D5.** CRD check: parse `operator/config/crd/bases/kryton.azrtydxb.io_krytons.yaml`. Extract `spec.values` schema. Assert it's a superset of `charts/kryton/values.schema.json` (every property in values.schema.json appears under CRD `spec.values`).
+- [x] **D6.** Output format: structured failure messages naming the field, the missing surface, and a concrete fix (the exact line to add). Exit 1 on any mismatch.
+- [x] **D7.** Unit tests with synthetic schema + synthetic compose/helm/CRD fixtures covering each mismatch class.
+- [x] **D8.** Add `sync:check` to root `package.json`: `tsx scripts/check-deployment-sync.ts`.
+- [x] **D9.** Add `deployment-sync-check` job to `.github/workflows/ci.yml` as a 5th parallel sibling alongside `typecheck`, `lint`, `test-build`, `openapi-check`. Cached `npm ci`, runs `helm` + `kubeconform` (install in step), runs `npm run sync:check`.
 
 ---
 
