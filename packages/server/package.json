@@ -19,6 +19,8 @@
     "stress:yjs:rate": "tsx scripts/yjs-stress/op-rate-ceiling.ts",
     "openapi:dump": "tsx scripts/dump-openapi.ts",
     "openapi:check": "tsx scripts/dump-openapi.ts --check",
+    "config:dump": "tsx scripts/dump-config-schema.ts",
+    "config:check": "tsx scripts/dump-config-schema.ts --check",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
