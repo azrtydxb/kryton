@@ -24,6 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
+	krytonv1alpha1 "github.com/azrtydxb/kryton/operator/api/v1alpha1"
 	"github.com/azrtydxb/kryton/operator/internal/chartfs"
 	"github.com/azrtydxb/kryton/operator/internal/controller"
 	helmreconciler "github.com/azrtydxb/kryton/operator/internal/helm"
@@ -36,6 +37,7 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(krytonv1alpha1.AddToScheme(scheme))
 }
 
 func main() {
