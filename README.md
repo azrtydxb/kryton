@@ -248,6 +248,70 @@ If you'd rather use a Postgres you already have, make sure it's 16+ and run `CRE
 
 ---
 
+## Deployment
+
+Kryton supports three deployment surfaces, all version-locked to the same app image and kept in sync by a CI drift gate. Pick the one that matches your environment.
+
+| Surface | Best for | Pros | Cons |
+|---|---|---|---|
+| **Docker Compose** | Single host, evaluation, small teams | One command, no orchestrator, Postgres bundled | No HA, manual upgrades, single node only |
+| **Helm chart** | Kubernetes clusters, declarative config | Standard K8s, ingress / PVC / secrets handled, OCI distribution | You manage backups, plugins, multi-instance lifecycle yourself |
+| **Kubernetes Operator** | Production K8s, multiple instances, managed lifecycle | Scheduled backups, plugin pre-install with sha256 verify, snapshots, multi-instance via CRDs | Extra moving piece, CRD install required |
+
+### Docker Compose
+
+Single-host self-hosting using `docker-compose.prod.yml`:
+
+```bash
+git clone https://github.com/azrtydxb/kryton.git
+cd kryton
+cp .env.example .env   # fill in BETTER_AUTH_SECRET, POSTGRES_URL etc.
+docker compose -f docker-compose.prod.yml up -d
+```
+
+### Helm
+
+Install on any Kubernetes cluster from the OCI registry:
+
+```bash
+helm install kryton oci://ghcr.io/azrtydxb/charts/kryton \
+  --version 4.6.0 \
+  --namespace kryton --create-namespace \
+  --set ingress.enabled=true \
+  --set ingress.hosts[0].host=kryton.example.com
+```
+
+Full values reference, Postgres options, ExternalSecrets, and troubleshooting in **[docs/HELM.md](docs/HELM.md)**.
+
+### Operator
+
+Manage one or more Kryton instances declaratively, with scheduled backups, plugin pre-installation, and snapshots:
+
+```bash
+kubectl apply -f https://github.com/azrtydxb/kryton/releases/download/v4.6.0/kryton-crds.yaml
+kubectl create namespace kryton-system
+kubectl apply -n kryton-system \
+  -f https://github.com/azrtydxb/kryton/releases/download/v4.6.0/kryton-operator.yaml
+
+kubectl apply -f - <<'EOF'
+apiVersion: kryton.azrtydxb.io/v1alpha1
+kind: Kryton
+metadata: { name: kryton, namespace: kryton }
+spec:
+  version: "4.6.0"
+  values:
+    ingress:
+      enabled: true
+      hosts:
+        - host: kryton.example.com
+          paths: [{ path: /, pathType: Prefix }]
+EOF
+```
+
+CRD reference, example CRs (minimal, with backup, with plugins, multi-instance), backup/restore procedures, and troubleshooting in **[docs/OPERATOR.md](docs/OPERATOR.md)**.
+
+---
+
 ## Environment Variables
 
 | Variable | Required | Description |
