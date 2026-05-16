@@ -1,0 +1,236 @@
+# Default values for kryton.
+# This is a YAML-formatted file.
+# All keys documented here are surfaced in values.schema.json.
+
+# -- Number of kryton server replicas.
+replicaCount: 1
+
+image:
+  # -- Container image repository for the kryton server.
+  repository: ghcr.io/azrtydxb/kryton/kryton
+  # -- Image pull policy.
+  pullPolicy: IfNotPresent
+  # -- Overrides Chart.appVersion. Leave empty to track appVersion.
+  tag: ""
+
+# -- Image pull secrets for private registries (e.g. ghcr).
+imagePullSecrets: []
+# -- Override the chart name fragment used in object names.
+nameOverride: ""
+# -- Fully override the release fullname.
+fullnameOverride: ""
+
+serviceAccount:
+  # -- Whether to create a ServiceAccount for the kryton pod.
+  create: true
+  # -- Annotations to add to the ServiceAccount.
+  annotations: {}
+  # -- Name of the ServiceAccount. If unset and create=true, a name is generated.
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 1000
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  # -- Kubernetes Service type.
+  type: ClusterIP
+  # -- Service port exposed on the ClusterIP.
+  port: 3001
+  # -- Container port the kryton server listens on (matches env.PORT).
+  targetPort: 3001
+  # -- Optional annotations on the Service.
+  annotations: {}
+
+ingress:
+  # -- Enable Ingress for the kryton service.
+  enabled: false
+  # -- IngressClassName (e.g. nginx, traefik).
+  className: ""
+  # -- Annotations applied to the Ingress.
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: kryton.local
+      paths:
+        - path: /
+          pathType: Prefix
+  # -- TLS configuration. Each entry must list hosts and the cluster Secret name.
+  tls: []
+    # - secretName: kryton-tls
+    #   hosts:
+    #     - kryton.local
+
+resources: {}
+  # limits:
+  #   cpu: 1000m
+  #   memory: 1Gi
+  # requests:
+  #   cpu: 100m
+  #   memory: 256Mi
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+readinessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+autoscaling:
+  # -- Enable a HorizontalPodAutoscaler for the kryton Deployment.
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+persistence:
+  # -- Enable a chart-managed PVC for notes / plugin data / attachments.
+  enabled: true
+  # -- StorageClass name. Empty string = use the cluster default.
+  storageClass: ""
+  # -- Access modes for the PVC.
+  accessModes:
+    - ReadWriteOnce
+  # -- PVC size.
+  size: 10Gi
+  # -- Existing PVC name to use instead of provisioning a new one. If set,
+  #    storageClass / size / accessModes above are ignored.
+  existingClaim: ""
+  # -- Mount path inside the kryton container. Matches env.NOTES_DIR.
+  mountPath: /data/notes
+  # -- Optional sub-path inside the volume.
+  subPath: ""
+  # -- Optional annotations for the PVC.
+  annotations: {}
+
+serviceMonitor:
+  # -- Emit a Prometheus Operator ServiceMonitor for /metrics scraping.
+  enabled: false
+  # -- Additional labels for the ServiceMonitor (required by some operators).
+  labels: {}
+  # -- Scrape interval.
+  interval: 30s
+  # -- Scrape path on the service port.
+  path: /metrics
+  # -- Scrape timeout.
+  scrapeTimeout: 10s
+
+externalSecrets:
+  # -- When true, emit an ExternalSecret resource instead of a plain Secret.
+  #    Requires external-secrets-operator installed in the cluster.
+  enabled: false
+  # -- Name of the ClusterSecretStore that the ExternalSecret references.
+  secretStoreName: ""
+  # -- Kind of the secret store reference. Typically ClusterSecretStore.
+  secretStoreKind: ClusterSecretStore
+  # -- Refresh interval for the ExternalSecret.
+  refreshInterval: 1h
+  # -- Optional remote key prefix prepended to each remoteRef.key (e.g. "kryton/").
+  remoteKeyPrefix: ""
+
+# -----------------------------------------------------------------------------
+# Application environment
+#
+# `env.config` holds non-secret env vars (rendered into a ConfigMap and consumed
+# via envFrom). `env.secret` holds secret env vars (rendered into a Secret OR an
+# ExternalSecret when externalSecrets.enabled=true).
+#
+# Keys must match the names the kryton server expects at runtime
+# (see packages/server/src/config/env.ts).
+# -----------------------------------------------------------------------------
+env:
+  config:
+    NODE_ENV: "production"
+    LOG_LEVEL: "info"
+    PORT: "3001"
+    HOST: "0.0.0.0"
+    BETTER_AUTH_URL: "http://localhost:3001"
+    APP_URL: "http://localhost:5173"
+    CORS_ORIGINS: "http://localhost:5173"
+    RATE_LIMIT_MAX: "1000"
+    RATE_LIMIT_WINDOW: "1 minute"
+    NOTES_DIR: "/data/notes"
+    WEBAUTHN_RP_ID: "localhost"
+    OPENAPI_ENABLED: "true"
+    SEMANTIC_PROVIDER: "pgvector-local"
+    SEMANTIC_MODEL: "Xenova/all-MiniLM-L6-v2"
+    SEMANTIC_DIMENSIONS: "384"
+    SEMANTIC_CHUNK_TOKENS: "256"
+    SEMANTIC_CHUNK_OVERLAP: "32"
+  # -- Secret env. Each key is the env-var name. Values are plain strings when
+  #    externalSecrets.enabled=false; when enabled, each value is the remoteRef
+  #    key in the upstream secret store (a literal string).
+  secret:
+    # BETTER_AUTH_SECRET MUST be at least 32 characters. Override on install.
+    BETTER_AUTH_SECRET: ""
+    # Postgres URL. If postgresql.enabled=true and this is empty, the chart
+    # templates synthesize a URL pointing at the in-cluster subchart.
+    POSTGRES_URL: ""
+    GOOGLE_CLIENT_ID: ""
+    GOOGLE_CLIENT_SECRET: ""
+    GITHUB_CLIENT_ID: ""
+    GITHUB_CLIENT_SECRET: ""
+    SMTP_HOST: ""
+    SMTP_PORT: ""
+    SMTP_SECURE: ""
+    SMTP_USER: ""
+    SMTP_PASS: ""
+    SMTP_FROM: ""
+
+# -----------------------------------------------------------------------------
+# Postgres subchart (bitnami/postgresql with the pgvector image override).
+# Set postgresql.enabled=false to use an external database; in that case
+# populate env.secret.POSTGRES_URL.
+# -----------------------------------------------------------------------------
+postgresql:
+  enabled: true
+  # Required when overriding the postgresql subchart image to a non-bitnami one
+  # (pgvector/pgvector here). See bitnami/charts#30850.
+  global:
+    security:
+      allowInsecureImages: true
+  image:
+    repository: pgvector/pgvector
+    tag: pg16
+  auth:
+    username: kryton
+    database: kryton
+    # Leave empty to let the subchart auto-generate. For production set
+    # explicitly OR provide existingSecret.
+    password: ""
+    postgresPassword: ""
+    existingSecret: ""
+  primary:
+    persistence:
+      enabled: true
+      size: 10Gi
+    resources: {}

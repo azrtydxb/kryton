@@ -1,0 +1,3 @@
+# Unpacked subcharts are reconstituted via `helm dependency build`; we commit
+# only the pinned tgz + Chart.lock.
+charts/*/

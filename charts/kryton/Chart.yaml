@@ -1,0 +1,30 @@
+apiVersion: v2
+name: kryton
+description: |
+  Kryton — self-hostable note-taking & knowledge server.
+  Ships the server image, ConfigMap/Secret wiring, optional Ingress,
+  chart-managed persistence, and an optional bitnami/postgresql
+  subchart pinned to the pgvector image so semantic search works
+  out of the box.
+type: application
+version: 4.5.0
+appVersion: "4.5.0"
+kubeVersion: ">=1.25.0-0"
+home: https://github.com/azrtydxb/kryton
+sources:
+  - https://github.com/azrtydxb/kryton
+maintainers:
+  - name: azrtydxb
+    url: https://github.com/azrtydxb
+keywords:
+  - notes
+  - knowledge-base
+  - self-hosted
+  - pgvector
+  - semantic-search
+icon: https://raw.githubusercontent.com/azrtydxb/kryton/master/logos/kryton.svg
+dependencies:
+  - name: postgresql
+    version: "16.4.5"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
