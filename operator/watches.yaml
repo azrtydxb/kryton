@@ -1,0 +1,6 @@
+# Use the 'create api' subcommand to add watches to this file.
+- group: kryton.azrtydxb.io
+  version: v1alpha1
+  kind: Kryton
+  chart: helm-charts/kryton
+# +kubebuilder:scaffold:watch

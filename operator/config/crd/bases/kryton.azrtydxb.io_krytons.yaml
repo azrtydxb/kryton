@@ -1,0 +1,137 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: krytons.kryton.azrtydxb.io
+spec:
+  group: kryton.azrtydxb.io
+  names:
+    kind: Kryton
+    listKind: KrytonList
+    plural: krytons
+    singular: kryton
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      schema:
+        openAPIV3Schema:
+          description: Kryton is the Schema for the krytons API.
+          type: object
+          properties:
+            apiVersion:
+              type: string
+            kind:
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: |
+                KrytonSpec describes the desired state of a Kryton instance.
+                `values` is passed through to the embedded helm chart; the other fields
+                are reconciled by operator-only controllers (backup, plugins, snapshot).
+              type: object
+              required:
+                - version
+              properties:
+                version:
+                  description: appVersion of the kryton server image to deploy.
+                  type: string
+                values:
+                  description: Passthrough values forwarded to the embedded helm chart.
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                backup:
+                  description: Postgres backup CronJob configuration.
+                  type: object
+                  required:
+                    - schedule
+                  properties:
+                    schedule:
+                      description: Cron expression (UTC) for pg_dump.
+                      type: string
+                    retention:
+                      description: Retention duration (e.g. "30d"). Older S3 objects are swept.
+                      type: string
+                    s3:
+                      type: object
+                      required:
+                        - bucket
+                      properties:
+                        bucket:
+                          type: string
+                        endpoint:
+                          type: string
+                        region:
+                          type: string
+                        prefix:
+                          type: string
+                        credentialsSecretRef:
+                          description: Name of a Secret with AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY.
+                          type: object
+                          required:
+                            - name
+                          properties:
+                            name:
+                              type: string
+                plugins:
+                  description: |
+                    Plugins to pre-install via an init-container. Each is downloaded
+                    from `url`, verified against `sha256`, and dropped into the
+                    persistence volume's plugins directory.
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - name
+                      - url
+                      - sha256
+                    properties:
+                      name:
+                        type: string
+                      url:
+                        type: string
+                      sha256:
+                        description: Hex-encoded SHA-256 digest of the plugin archive.
+                        type: string
+                        pattern: "^[a-fA-F0-9]{64}$"
+                snapshot:
+                  description: VolumeSnapshot schedule for the persistence PVC.
+                  type: object
+                  required:
+                    - schedule
+                  properties:
+                    schedule:
+                      type: string
+                    retention:
+                      type: string
+                    volumeSnapshotClassName:
+                      type: string
+            status:
+              description: KrytonStatus reflects the observed state.
+              type: object
+              x-kubernetes-preserve-unknown-fields: true
+              properties:
+                helmRevision:
+                  type: integer
+                observedVersion:
+                  type: string
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time

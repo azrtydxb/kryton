@@ -1,0 +1,18 @@
+# Placeholder values. Real chart values defined by WS-B in charts/kryton/values.yaml.
+image:
+  repository: ghcr.io/azrtydxb/kryton/kryton
+  tag: "latest"
+  pullPolicy: IfNotPresent
+replicaCount: 1
+service:
+  type: ClusterIP
+  port: 3000
+ingress:
+  enabled: false
+persistence:
+  enabled: false
+postgresql:
+  enabled: false
+externalSecrets:
+  enabled: false
+env: {}

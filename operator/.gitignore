@@ -1,0 +1,19 @@
+
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin
+
+# editor and IDE paraphernalia
+.idea
+*.swp
+*.swo
+*~
+
+# Embedded chart contents (populated by `make sync-chart` from charts/kryton/).
+# Only the .keep placeholder is tracked.
+internal/chartfs/chart/*
+!internal/chartfs/chart/.keep
