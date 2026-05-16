@@ -177,15 +177,15 @@
 
 ### Tasks
 
-- [ ] **E1.** Add `helm-publish` job to release.yml. `needs: [manifest]`. Steps: install helm, `helm package charts/kryton`, log in to ghcr, `helm push kryton-<ver>.tgz oci://ghcr.io/${{ github.repository_owner }}/charts`. Outputs the resulting OCI URL.
-- [ ] **E2.** Add operator build jobs to release.yml: `build-operator-arm64` + `build-operator-amd64` (parallel, mirroring the existing `build-arm64`/`build-amd64` pattern). Image name `${{ env.REGISTRY }}/${{ github.repository }}/kryton-operator`. Push by digest. Outputs digest.
-- [ ] **E3.** Add `manifest-operator` job: `needs: [build-operator-arm64, build-operator-amd64]`. Uses `imagetools create` to assemble the multi-arch operator image, same pattern as the existing `manifest` job.
-- [ ] **E4.** Extend `mirror` job (or add a sibling `chart-mirror` + `operator-mirror`): mirror the chart OCI artifact and the operator image to the cluster zot using the same `docker buildx imagetools create` pattern. Source: `ghcr.io/.../charts/kryton:<ver>` and `ghcr.io/.../kryton-operator:<ver>`. Dest: `192.168.10.123:5000/...` equivalent paths.
-- [ ] **E5.** Update `release` job's `needs:` to include `helm-publish` and `manifest-operator`.
-- [ ] **E6.** Add `compose-smoke` to e2e.yml. Brings up `docker compose -f docker-compose.prod.yml up -d`, waits for the kryton container's `/health` endpoint to return 200, tears down.
-- [ ] **E7.** Add `helm-smoke` to e2e.yml. Installs `kind`, creates a cluster, `helm install kryton charts/kryton --wait`, asserts `/health` via port-forward or NodePort, teardown.
-- [ ] **E8.** Add `operator-smoke` to e2e.yml. Same as helm-smoke but: installs the CRD bundle, deploys the operator, applies a minimal `Kryton` CR, waits for `status.conditions[Ready]=True`, asserts `/health`, teardown.
-- [ ] **E9.** Verify the existing concurrency / cancel-in-progress settings still apply to the added jobs.
+- [x] **E1.** Add `helm-publish` job to release.yml. `needs: [manifest]`. Steps: install helm, `helm package charts/kryton`, log in to ghcr, `helm push kryton-<ver>.tgz oci://ghcr.io/${{ github.repository_owner }}/charts`. Outputs the resulting OCI URL.
+- [x] **E2.** Add operator build jobs to release.yml: `build-operator-arm64` + `build-operator-amd64` (parallel, mirroring the existing `build-arm64`/`build-amd64` pattern). Image name `${{ env.REGISTRY }}/${{ github.repository }}/kryton-operator`. Push by digest. Outputs digest.
+- [x] **E3.** Add `manifest-operator` job: `needs: [build-operator-arm64, build-operator-amd64]`. Uses `imagetools create` to assemble the multi-arch operator image, same pattern as the existing `manifest` job.
+- [x] **E4.** Extend `mirror` job (or add a sibling `chart-mirror` + `operator-mirror`): mirror the chart OCI artifact and the operator image to the cluster zot using the same `docker buildx imagetools create` pattern. Source: `ghcr.io/.../charts/kryton:<ver>` and `ghcr.io/.../kryton-operator:<ver>`. Dest: `192.168.10.123:5000/...` equivalent paths.
+- [x] **E5.** Update `release` job's `needs:` to include `helm-publish` and `manifest-operator`.
+- [x] **E6.** Add `compose-smoke` to e2e.yml. Brings up `docker compose -f docker-compose.prod.yml up -d`, waits for the kryton container's `/health` endpoint to return 200, tears down.
+- [x] **E7.** Add `helm-smoke` to e2e.yml. Installs `kind`, creates a cluster, `helm install kryton charts/kryton --wait`, asserts `/health` via port-forward or NodePort, teardown.
+- [x] **E8.** Add `operator-smoke` to e2e.yml. Same as helm-smoke but: installs the CRD bundle, deploys the operator, applies a minimal `Kryton` CR, waits for `status.conditions[Ready]=True`, asserts `/health`, teardown.
+- [x] **E9.** Verify the existing concurrency / cancel-in-progress settings still apply to the added jobs. (Neither workflow declared a `concurrency:` block originally; nothing to migrate. New jobs share the same workflow-run scope as the existing jobs.)
 
 ---
 
