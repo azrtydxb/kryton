@@ -24,7 +24,9 @@
     "prepare": "husky",
     "build:shared": "npm run build --workspace=packages/ui --workspace=packages/sdk",
     "test:shared": "npm run test --workspace=packages/ui",
-    "release": "node scripts/release.js"
+    "release": "node scripts/release.js",
+    "sync:check": "tsx scripts/check-deployment-sync.ts",
+    "sync:check:test": "vitest run --config scripts/vitest.config.ts"
   },
   "dependencies": {
     "react": "19.2.4"
