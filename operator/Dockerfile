@@ -14,6 +14,7 @@ COPY go.mod go.sum* ./
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
+COPY api/ api/
 COPY cmd/ cmd/
 COPY internal/ internal/
 
