@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### CLI
+- **`@azrtydxb/kryton-init`** — new npm package. One-shot installer that detects every supported AI agent host on the machine (Claude Code, Cursor, Claude Desktop, Codex, OpenCode, Cline, Continue, KiloCode, RooCode) and wires Kryton as an MCP server. Mints an API key via the existing `/api/api-keys` endpoint; idempotent; supports `install` / `uninstall` / `status` / `detect` / `mcp` subcommands and `--dry-run`.
+- **`@azrtydxb/kryton-mcp`** — new npm package. stdio MCP shim that forwards JSON-RPC frames from stdio-only hosts to Kryton's HTTP MCP endpoint (`POST /api/mcp` + `GET /api/mcp` SSE), preserving the `mcp-session-id` round-trip and bearer auth.
+- **Release plumbing** — new `cli-publish` workflow triggered on `cli-v*` tags. Builds + tests both packages, then publishes them to npm under `@azrtydxb/` in order (`kryton-mcp` before `kryton-init`).
+- See [`docs/CLI.md`](docs/CLI.md) for usage.
+
 ## v3.1.0
 
 ### Security
