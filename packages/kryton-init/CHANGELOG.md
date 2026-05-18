@@ -1,5 +1,11 @@
 # @azrtydxb/kryton-init
 
+## 0.3.1
+
+### Patch Changes
+
+- e1fcf02: Send `scope: "read-write"` when minting the API key. Kryton's `POST /api/api-keys` requires it; previous versions failed with `VALIDATION_ERROR` against any current server.
+
 ## 0.3.0
 
 ### Minor Changes
