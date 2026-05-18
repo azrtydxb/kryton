@@ -406,27 +406,25 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest
-      - name: Install skopeo
-        # `docker buildx imagetools create` runs client-side and does
-        # not honor the buildkitd insecure-registry config, so it
-        # cannot push to the cluster zot (cluster-CA cert -> x509
-        # unknown-authority). skopeo has explicit per-direction TLS
-        # flags (--dest-tls-verify=false) and is the right tool for
-        # cross-registry copies with mismatched trust.
-        run: |
-          set -euo pipefail
-          apt-get update -qq
-          apt-get install -y -qq --no-install-recommends skopeo jq
-          skopeo --version
       - name: Mirror server tags to cluster zot
+        # `docker buildx imagetools create` is client-side and ignores
+        # the buildkitd insecure-registry config, so cross-registry
+        # copies to the cluster zot (cluster-CA cert) fail with x509
+        # unknown-authority. skopeo has explicit per-direction TLS
+        # flags. Run via the official quay.io/skopeo/stable image
+        # because the runner user can't apt-get (non-root pod).
+        # docker login already wrote ghcr creds to ~/.docker/config.json,
+        # which we mount into the skopeo container as its authfile.
         run: |
           set -euo pipefail
           for src in $(jq -r '.tags[]' <<< "$DOCKER_METADATA_OUTPUT_JSON"); do
             dst="${src/ghcr.io/192.168.10.123:5000}"
             echo "Mirroring server: $src → $dst"
-            skopeo copy --multi-arch all \
+            docker run --rm \
+              -v /home/runner/.docker/config.json:/auth.json:ro \
+              quay.io/skopeo/stable copy --multi-arch all \
               --src-tls-verify=true --dest-tls-verify=false \
-              --authfile /home/runner/.docker/config.json \
+              --authfile /auth.json \
               "docker://$src" "docker://$dst"
           done
       - name: Extract operator metadata
@@ -444,14 +442,14 @@ jobs:
           for src in $(jq -r '.tags[]' <<< '${{ steps.meta-operator.outputs.json }}'); do
             dst="${src/ghcr.io/192.168.10.123:5000}"
             echo "Mirroring operator: $src → $dst"
-            skopeo copy --multi-arch all \
+            docker run --rm \
+              -v /home/runner/.docker/config.json:/auth.json:ro \
+              quay.io/skopeo/stable copy --multi-arch all \
               --src-tls-verify=true --dest-tls-verify=false \
-              --authfile /home/runner/.docker/config.json \
+              --authfile /auth.json \
               "docker://$src" "docker://$dst"
           done
       - name: Mirror helm chart artifact to cluster zot
-        # Helm OCI charts are plain OCI artifacts; skopeo copies them
-        # the same way as image manifests.
         env:
           VERSION: ${{ github.ref_name }}
           OWNER: ${{ github.repository_owner }}
@@ -461,9 +459,11 @@ jobs:
           SRC="ghcr.io/${OWNER}/charts/kryton:${CHART_VER}"
           DST="192.168.10.123:5000/${OWNER}/charts/kryton:${CHART_VER}"
           echo "Mirroring chart: $SRC → $DST"
-          skopeo copy \
+          docker run --rm \
+            -v /home/runner/.docker/config.json:/auth.json:ro \
+            quay.io/skopeo/stable copy \
             --src-tls-verify=true --dest-tls-verify=false \
-            --authfile /home/runner/.docker/config.json \
+            --authfile /auth.json \
             "docker://$SRC" "docker://$DST"
 
   # Package + push the Helm chart as an OCI artifact to ghcr.io.
