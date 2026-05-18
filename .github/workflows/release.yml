@@ -497,6 +497,19 @@ jobs:
           echo "version=${REF#v}" >> "$GITHUB_OUTPUT"
       - name: Helm dependency update
         run: helm dependency update charts/kryton
+      - name: Unpack subchart tgzs
+        # `helm package` rejects tgz-only deps with a misleading
+        # "missing in charts/ directory" error. Unpack each tgz into
+        # the directory layout it actually wants.
+        run: |
+          set -euo pipefail
+          cd charts/kryton/charts
+          for f in *.tgz; do
+            [ -f "$f" ] || continue
+            tar -xzf "$f"
+            rm "$f"
+          done
+          ls
       - name: Helm package
         run: |
           helm package charts/kryton \

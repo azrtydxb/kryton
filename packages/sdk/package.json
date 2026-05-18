@@ -1,6 +1,6 @@
 {
   "name": "@azrtydxb/sdk",
-  "version": "4.6.3",
+  "version": "4.6.4",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
