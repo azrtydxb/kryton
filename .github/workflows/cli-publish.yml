@@ -48,8 +48,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     if: github.ref == 'refs/heads/master'
-    # NPM_CONFIG_PROVENANCE disabled for first-publish bootstrap;
-    # re-enable after Trusted Publishers are bound on npm.org.
+    env:
+      NPM_CONFIG_PROVENANCE: "true"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -77,8 +77,3 @@ jobs:
           commit: "chore(release): version cli packages"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Bootstrap auth via classic token for the first publish.
-          # changesets-action looks for NPM_TOKEN (not NODE_AUTH_TOKEN)
-          # to decide between token-auth and OIDC. After packages exist
-          # on npm we'll bind Trusted Publishers and remove this.
-          NPM_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
