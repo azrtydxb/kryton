@@ -34,6 +34,28 @@ async function writeStarred(
     });
 }
 
+// Rewrite favorites after a rename so stars follow the note/folder
+// to its new location instead of being orphaned.
+async function rewriteStarred(
+  app: FastifyInstance,
+  userId: string,
+  rewrite: (p: string) => string | null,
+): Promise<void> {
+  const current = await readStarred(app, userId);
+  let changed = false;
+  const next: string[] = [];
+  for (const p of current) {
+    const mapped = rewrite(p);
+    if (mapped === null) {
+      changed = true;
+      continue;
+    }
+    if (mapped !== p) changed = true;
+    next.push(mapped);
+  }
+  if (changed) await writeStarred(app, userId, next);
+}
+
 interface ToolDefinition {
   name: string;
   description: string;
@@ -218,7 +240,7 @@ export function getToolDefinitions(): ToolDefinition[] {
     },
     {
       name: "write_daily_note",
-      description: "Create or replace today's daily note (at daily/YYYY-MM-DD.md). Use append_to_note instead if you want to add to existing content without overwriting.",
+      description: "Create or replace today's daily note (at Daily/YYYY-MM-DD.md). Use append_to_note instead if you want to add to existing content without overwriting.",
       inputSchema: {
         type: "object",
         properties: {
@@ -284,7 +306,7 @@ export function getToolDefinitions(): ToolDefinition[] {
     },
     {
       name: "list_daily_notes",
-      description: "List all daily notes (daily/YYYY-MM-DD.md), newest first.",
+      description: "List all daily notes (Daily/YYYY-MM-DD.md), newest first.",
       inputSchema: {
         type: "object",
         properties: {
@@ -437,7 +459,7 @@ export async function executeTool(
     }
     case "get_daily_note": {
       const { format } = await import("date-fns");
-      const dailyPath = `daily/${format(new Date(), "yyyy-MM-dd")}.md`;
+      const dailyPath = `Daily/${format(new Date(), "yyyy-MM-dd")}.md`;
       try {
         return await app.notes.readNote(dailyPath, userId);
       } catch {
@@ -450,10 +472,10 @@ export async function executeTool(
         const noteSvc = await import("../../notes/services/note.service.js");
         const svc = new noteSvc.NoteService(app);
         // Must `await` so the ENOENT rejection from a missing
-        // templates/ folder lands in this catch — `return svc.…`
+        // Templates/ folder lands in this catch — `return svc.…`
         // hands an unresolved promise back to the caller and the
         // rejection escapes the try/catch.
-        return await svc.scanDirectory(path.join(userDir, "templates"));
+        return await svc.scanDirectory(path.join(userDir, "Templates"));
       } catch {
         return [];
       }
@@ -463,7 +485,7 @@ export async function executeTool(
       if (templateName.includes("/") || templateName.includes("\\") || templateName.includes("..")) {
         throw new Error("Invalid template name");
       }
-      const templateContent = (await app.notes.readNote(`templates/${templateName}.md`, userId)) as { content: string };
+      const templateContent = (await app.notes.readNote(`Templates/${templateName}.md`, userId)) as { content: string };
       await app.notes.writeNote(args.notePath as string, templateContent.content, userId);
       return { success: true, path: args.notePath };
     }
@@ -480,6 +502,7 @@ export async function executeTool(
       const oldFull = oldPath.endsWith(".md") ? oldPath : oldPath + ".md";
       const newFull = newPath.endsWith(".md") ? newPath : newPath + ".md";
       await svc.renameNote(userDir, oldFull, newFull, userId);
+      await rewriteStarred(app, userId, (p) => (p === oldFull ? newFull : p));
       return { success: true, oldPath: oldFull, newPath: newFull };
     }
     case "append_to_note": {
@@ -508,7 +531,7 @@ export async function executeTool(
       const yyyy = today.getUTCFullYear();
       const mm = String(today.getUTCMonth() + 1).padStart(2, "0");
       const dd = String(today.getUTCDate()).padStart(2, "0");
-      const dailyPath = `daily/${yyyy}-${mm}-${dd}.md`;
+      const dailyPath = `Daily/${yyyy}-${mm}-${dd}.md`;
       await app.notes.writeNote(dailyPath, content, userId);
       return { success: true, path: dailyPath };
     }
@@ -586,7 +609,7 @@ export async function executeTool(
       const svc = new noteSvc.NoteService(app);
       let tree: unknown[];
       try {
-        tree = (await svc.scanDirectory(path.join(userDir, "daily"))) as unknown[];
+        tree = (await svc.scanDirectory(path.join(userDir, "Daily"))) as unknown[];
       } catch {
         return [];
       }
@@ -612,12 +635,17 @@ export async function executeTool(
     case "empty_trash":
       await app.trash.emptyAll(userId);
       return { success: true };
-    case "rename_folder":
-      return app.folders.rename(
-        userId,
-        args.oldPath as string,
-        args.newPath as string,
+    case "rename_folder": {
+      const oldFolder = args.oldPath as string;
+      const newFolder = args.newPath as string;
+      const result = await app.folders.rename(userId, oldFolder, newFolder);
+      const oldPrefix = oldFolder.endsWith("/") ? oldFolder : oldFolder + "/";
+      const newPrefix = newFolder.endsWith("/") ? newFolder : newFolder + "/";
+      await rewriteStarred(app, userId, (p) =>
+        p.startsWith(oldPrefix) ? newPrefix + p.slice(oldPrefix.length) : p,
       );
+      return result;
+    }
     case "delete_folder":
       await app.folders.delete(userId, args.path as string);
       return { success: true };
