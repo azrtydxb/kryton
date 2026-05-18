@@ -179,6 +179,15 @@ jobs:
           install -m 0755 /tmp/kubeconform /usr/local/bin/kubeconform
           helm version
           kubeconform -v
+      - name: Fetch helm chart dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          # sync:check shells out to `helm template charts/kryton`, which
+          # requires subchart tarballs to be present in charts/kryton/charts/.
+          # `helm dependency build` resolves them from Chart.lock without
+          # touching the network beyond the declared repos.
+          helm dependency build charts/kryton
       - name: Deployment sync check
         run: npm run sync:check
       - name: Restore workspace ownership to runner user
