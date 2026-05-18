@@ -1,6 +1,6 @@
 {
   "name": "@azrtydxb/kryton-init",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": false,
   "description": "Interactive installer that signs in to a Kryton server, mints an API key, and wires every supported AI agent host (Claude Code, Cursor, Codex, OpenCode, Cline, Continue, KiloCode, RooCode, Claude Desktop) to use it",
   "license": "Apache-2.0",
