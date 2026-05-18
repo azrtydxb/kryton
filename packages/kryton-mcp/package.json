@@ -1,7 +1,7 @@
 {
   "name": "@azrtydxb/kryton-mcp",
-  "version": "0.1.0",
-  "description": "MCP stdio shim for Kryton \u2014 bridges stdio JSON-RPC to a Kryton server's /api/mcp HTTP transport.",
+  "version": "0.2.0",
+  "description": "MCP stdio shim for Kryton — bridges stdio JSON-RPC to a Kryton server's /api/mcp HTTP transport.",
   "license": "Apache-2.0",
   "type": "module",
   "main": "dist/index.js",
