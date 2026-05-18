@@ -34,6 +34,12 @@ async function readStarredRow(
   return JSON.parse(row.value) as string[];
 }
 
+async function clearStarred(ctx: NotesTestApp, userId: string): Promise<void> {
+  await ctx.app.db
+    .delete(settings)
+    .where(and(eq(settings.userId, userId), eq(settings.key, "starred")));
+}
+
 describe("MCP tools / canonical Templates and Daily folders", () => {
   let ctx: NotesTestApp | null = null;
 
@@ -172,10 +178,7 @@ describe("MCP tools / canonical Templates and Daily folders", () => {
     )) as Array<{ path: string }>;
 
     const paths = result.map((r) => r.path).sort();
-    expect(paths).toEqual([
-      expect.stringMatching(/Daily\/2026-05-17\.md$/),
-      expect.stringMatching(/Daily\/2026-05-18\.md$/),
-    ]);
+    expect(paths).toEqual(["Daily/2026-05-17.md", "Daily/2026-05-18.md"]);
   });
 });
 
@@ -189,7 +192,12 @@ describe("MCP tools / favorites follow renames", () => {
     await cleanupNotesTestUser(TEST_USER.id);
   });
   afterEach(async () => {
-    if (ctx) await ctx.cleanup();
+    if (ctx) {
+      // Wipe the starred row so favorites don't bleed between tests sharing
+      // a single test user.
+      await clearStarred(ctx, TEST_USER.id);
+      await ctx.cleanup();
+    }
     ctx = null;
   });
 

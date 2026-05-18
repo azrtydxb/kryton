@@ -609,7 +609,7 @@ export async function executeTool(
       const svc = new noteSvc.NoteService(app);
       let tree: unknown[];
       try {
-        tree = (await svc.scanDirectory(path.join(userDir, "Daily"))) as unknown[];
+        tree = (await svc.scanDirectory(path.join(userDir, "Daily"), "Daily")) as unknown[];
       } catch {
         return [];
       }

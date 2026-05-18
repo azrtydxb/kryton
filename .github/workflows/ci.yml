@@ -160,6 +160,7 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - name: Install helm + kubeconform
+        shell: bash
         run: |
           set -euo pipefail
           apt-get update -qq
