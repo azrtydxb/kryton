@@ -1,5 +1,11 @@
 # @azrtydxb/kryton-mcp
 
+## 0.2.1
+
+### Patch Changes
+
+- 0d8de5f: Internal: validate Trusted Publishers + Sigstore provenance pipeline. No user-visible behaviour changes.
+
 ## 0.2.0
 
 ### Minor Changes
