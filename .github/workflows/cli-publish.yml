@@ -49,7 +49,7 @@ jobs:
     timeout-minutes: 15
     if: github.ref == 'refs/heads/master'
     env:
-      NPM_CONFIG_PROVENANCE: "true"
+      # NPM_CONFIG_PROVENANCE: "true"  # disabled for first publish bootstrap; re-enable after TP set up
     steps:
       - uses: actions/checkout@v4
         with:
