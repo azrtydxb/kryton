@@ -160,18 +160,45 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - name: Install helm + kubeconform
+        shell: bash
         run: |
           set -euo pipefail
           apt-get update -qq
           apt-get install -y -qq --no-install-recommends curl ca-certificates
-          curl -fsSL https://get.helm.sh/helm-v3.16.3-linux-amd64.tar.gz \
+          # arc-azrtydxb is ARM64 — pick the right arch instead of hard-coding amd64.
+          case "$(uname -m)" in
+            aarch64|arm64) ARCH=arm64 ;;
+            x86_64) ARCH=amd64 ;;
+            *) echo "unsupported arch $(uname -m)" >&2; exit 1 ;;
+          esac
+          curl -fsSL "https://get.helm.sh/helm-v3.16.3-linux-${ARCH}.tar.gz" \
             | tar -xz -C /tmp
-          install -m 0755 /tmp/linux-amd64/helm /usr/local/bin/helm
-          curl -fsSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz \
+          install -m 0755 "/tmp/linux-${ARCH}/helm" /usr/local/bin/helm
+          curl -fsSL "https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-${ARCH}.tar.gz" \
             | tar -xz -C /tmp
           install -m 0755 /tmp/kubeconform /usr/local/bin/kubeconform
           helm version
           kubeconform -v
+      - name: Fetch + unpack helm chart dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          # sync:check shells out to `helm template charts/kryton`. Two
+          # quirks need handling:
+          #   1. bitnami occasionally republishes the same postgresql version
+          #      with a new digest, so a committed Chart.lock + .tgz drift out
+          #      of sync. Wiping both before `dependency update` resolves
+          #      everything in one consistent fetch.
+          #   2. helm 3.16.3 fails to load the bitnami postgresql .tgz as a
+          #      subchart on this runner (helm dep list reports "ok", but
+          #      lint/template both insist the dep is missing). Unpacking the
+          #      tarball into a sibling directory makes the loader find it
+          #      reliably.
+          helm repo add bitnami https://charts.bitnami.com/bitnami
+          helm repo update bitnami
+          rm -f charts/kryton/Chart.lock charts/kryton/charts/*.tgz
+          helm dependency update charts/kryton
+          tar -xzf charts/kryton/charts/postgresql-16.4.5.tgz -C charts/kryton/charts/
       - name: Deployment sync check
         run: npm run sync:check
       - name: Restore workspace ownership to runner user
