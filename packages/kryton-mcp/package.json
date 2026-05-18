@@ -1,0 +1,47 @@
+{
+  "name": "@azrtydxb/kryton-mcp",
+  "version": "0.1.0",
+  "description": "MCP stdio shim for Kryton — bridges stdio JSON-RPC to a Kryton server's /api/mcp HTTP transport.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "kryton-mcp": "dist/bin.js"
+  },
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --test --enable-source-maps dist/test/*.test.js",
+    "pretest": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.28.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=20.19"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/azrtydxb/kryton.git",
+    "directory": "packages/kryton-mcp"
+  },
+  "homepage": "https://github.com/azrtydxb/kryton#readme",
+  "bugs": {
+    "url": "https://github.com/azrtydxb/kryton/issues"
+  }
+}
