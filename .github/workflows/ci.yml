@@ -179,34 +179,26 @@ jobs:
           install -m 0755 /tmp/kubeconform /usr/local/bin/kubeconform
           helm version
           kubeconform -v
-      - name: Fetch helm chart dependencies
+      - name: Fetch + unpack helm chart dependencies
         shell: bash
         run: |
           set -euo pipefail
-          # sync:check shells out to `helm template charts/kryton`. helm's
-          # CheckDependencies refuses to load when Chart.lock + the on-disk
-          # tarball + the freshly-published upstream chart disagree on digest
-          # (bitnami occasionally republishes the same version). Wipe the
-          # tracked tarball + lock first so `dependency update` resolves
-          # everything in one consistent fetch.
+          # sync:check shells out to `helm template charts/kryton`. Two
+          # quirks need handling:
+          #   1. bitnami occasionally republishes the same postgresql version
+          #      with a new digest, so a committed Chart.lock + .tgz drift out
+          #      of sync. Wiping both before `dependency update` resolves
+          #      everything in one consistent fetch.
+          #   2. helm 3.16.3 fails to load the bitnami postgresql .tgz as a
+          #      subchart on this runner (helm dep list reports "ok", but
+          #      lint/template both insist the dep is missing). Unpacking the
+          #      tarball into a sibling directory makes the loader find it
+          #      reliably.
           helm repo add bitnami https://charts.bitnami.com/bitnami
           helm repo update bitnami
           rm -f charts/kryton/Chart.lock charts/kryton/charts/*.tgz
           helm dependency update charts/kryton
-          ls -la charts/kryton/charts/
-          cat charts/kryton/Chart.lock
-          echo '--- helm version ---'
-          helm version
-          echo '--- subchart tarball metadata ---'
-          ls -la charts/kryton/charts/
-          file charts/kryton/charts/postgresql-16.4.5.tgz || true
-          echo '--- unpack the tarball manually so the loader can find it ---'
-          # helm 3.16.3 fails to load the bitnami postgresql tarball as a
-          # subchart in this runner; unpacked-dir form loads reliably.
           tar -xzf charts/kryton/charts/postgresql-16.4.5.tgz -C charts/kryton/charts/
-          ls -la charts/kryton/charts/
-          echo '--- helm lint after unpack ---'
-          helm lint charts/kryton
       - name: Deployment sync check
         run: npm run sync:check
       - name: Restore workspace ownership to runner user
