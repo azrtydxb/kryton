@@ -1,140 +1,79 @@
-name: CLI Publish
+name: CLI Release
+
+# Per-package npm publish driven by Changesets. Mirrors the
+# `azrtydxb/novamem` pattern.
+#
+# Flow:
+#   1. PR adds `.changeset/<slug>.md` describing what changed and which
+#      packages bump (patch / minor / major). Run `npx changeset` to
+#      generate one. The file is committed alongside the change.
+#   2. On every push to `master`, the changesets action looks for
+#      unconsumed `.changeset/*.md` files. If any exist, it opens
+#      (or updates) a "Version Packages" PR that bumps the affected
+#      package.json versions, regenerates per-package CHANGELOGs, and
+#      deletes the consumed changeset files.
+#   3. When that "Version Packages" PR is merged, this same workflow
+#      runs with no pending changesets — the action then runs
+#      `changeset publish` which only publishes packages whose
+#      package.json version doesn't yet exist on npm. So one merge =
+#      N publishes (only the changed packages).
+#
+# Auth: npm Trusted Publishers (OIDC) — no `NPM_TOKEN` secret. Each
+# of the two publishable packages has a Trusted Publisher binding on
+# npmjs.com pointing at this workflow file + repo. Node 24 ships
+# npm 11.x which does the OIDC handshake for the publish PUT itself.
+#
+# Provenance: `--provenance` (via `publishConfig.provenance: true`
+# in each package.json + `NPM_CONFIG_PROVENANCE: "true"` env) attaches
+# a Sigstore attestation tying each tarball to this exact workflow
+# run + commit. Requires `id-token: write`.
 
 on:
   push:
-    tags: ['cli-v*']
-  # Manual trigger lets us re-run cli-publish.yml from master (so
-  # workflow fixes are picked up) while publishing an existing tag's
-  # version. Use:
-  # `gh workflow run cli-publish.yml --ref master -f tag=cli-v<existing>`.
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Existing cli-v* tag to publish (omit to use github.ref_name)'
-        required: false
-        type: string
+    branches: [master]
+  workflow_dispatch: {}
 
-# Layout:
-#
-#   resolve-version ── test-mcp ──┐
-#                  └── test-init ─┴── publish-mcp ── publish-init
-#
-# Two npm packages, published independently to npm under @azrtydxb/.
-# Build + test each package before publishing. publish-init waits on
-# publish-mcp so the shim is on the registry by the time kryton-init's
-# install path advertises `npx @azrtydxb/kryton-mcp`.
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+concurrency:
+  group: cli-release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  resolve-version:
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.ver.outputs.version }}
-    steps:
-      - name: Resolve semver from tag
-        id: ver
-        env:
-          # workflow_dispatch passes tag via inputs; push event uses ref_name.
-          REF: ${{ inputs.tag || github.ref_name }}
-        run: |
-          set -euo pipefail
-          # Tag format: cli-v0.1.0 → 0.1.0
-          VERSION="${REF#cli-v}"
-          if [ "$VERSION" = "$REF" ]; then
-            echo "::error::Tag '$REF' does not match expected format 'cli-v<semver>'"
-            exit 1
-          fi
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Resolved CLI version: $VERSION"
-
-  test-mcp:
-    needs: [resolve-version]
-    runs-on: ubuntu-latest
+  release:
+    name: changesets release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    if: github.ref == 'refs/heads/master'
+    env:
+      NPM_CONFIG_PROVENANCE: "true"
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
-          cache: 'npm'
+          node-version: 24
+          cache: npm
+          registry-url: "https://registry.npmjs.org"
       - run: npm ci
-      - name: Build kryton-mcp
-        run: npm run build --workspace=packages/kryton-mcp
-      - name: Test kryton-mcp
-        run: npm run test --workspace=packages/kryton-mcp
-
-  test-init:
-    needs: [resolve-version]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Build CLI packages
+        run: |
+          npm run -w @azrtydxb/kryton-mcp build
+          npm run -w @azrtydxb/kryton-init build
+      - name: Test CLI packages
+        run: |
+          npm run -w @azrtydxb/kryton-mcp test
+          npm run -w @azrtydxb/kryton-init test
+      - name: Version + publish
+        uses: changesets/action@v1
         with:
-          node-version: '24'
-          cache: 'npm'
-      - run: npm ci
-      - name: Build kryton-init
-        run: npm run build --workspace=packages/kryton-init
-      - name: Test kryton-init
-        run: npm run test --workspace=packages/kryton-init
-
-  publish-mcp:
-    needs: [resolve-version, test-mcp, test-init]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: 'npm'
-          registry-url: 'https://registry.npmjs.org'
-      - run: npm ci
-      - name: Pin package version
+          version: npx changeset version
+          publish: npx changeset publish
+          title: "chore(release): version cli packages"
+          commit: "chore(release): version cli packages"
         env:
-          VERSION: ${{ needs.resolve-version.outputs.version }}
-        run: |
-          npm version "$VERSION" \
-            --workspace=packages/kryton-mcp \
-            --no-git-tag-version \
-            --allow-same-version
-      - name: Build kryton-mcp
-        run: npm run build --workspace=packages/kryton-mcp
-      - name: Publish kryton-mcp to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          npm publish \
-            --workspace=packages/kryton-mcp \
-            --access public \
-            --provenance
-
-  publish-init:
-    needs: [resolve-version, publish-mcp]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: 'npm'
-          registry-url: 'https://registry.npmjs.org'
-      - run: npm ci
-      - name: Pin package version
-        env:
-          VERSION: ${{ needs.resolve-version.outputs.version }}
-        run: |
-          npm version "$VERSION" \
-            --workspace=packages/kryton-init \
-            --no-git-tag-version \
-            --allow-same-version
-      - name: Build kryton-init
-        run: npm run build --workspace=packages/kryton-init
-      - name: Publish kryton-init to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          npm publish \
-            --workspace=packages/kryton-init \
-            --access public \
-            --provenance
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@3.1.4/schema.json",
+  "changelog": "@changesets/cli/changelog",
+  "commit": false,
+  "fixed": [],
+  "linked": [],
+  "access": "public",
+  "baseBranch": "master",
+  "updateInternalDependencies": "patch",
+  "ignore": [
+    "@azrtydxb/client",
+    "@azrtydxb/core",
+    "@azrtydxb/core-react",
+    "@azrtydxb/notes",
+    "@azrtydxb/sdk",
+    "@azrtydxb/server",
+    "@azrtydxb/ui",
+    "kryton"
+  ]
+}
