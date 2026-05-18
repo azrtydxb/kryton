@@ -195,12 +195,12 @@ jobs:
           helm dependency update charts/kryton
           ls -la charts/kryton/charts/
           cat charts/kryton/Chart.lock
-          echo '--- tarball top-level entries ---'
-          tar -tzf charts/kryton/charts/postgresql-16.4.5.tgz | head -5
-          echo '--- inner Chart.yaml ---'
-          tar -xzOf charts/kryton/charts/postgresql-16.4.5.tgz postgresql/Chart.yaml | head -10 || true
-          echo '--- helm show chart (loader sees) ---'
-          helm show chart charts/kryton/charts/postgresql-16.4.5.tgz | head -10 || true
+          echo '--- helm dependency build (post-update sanity) ---'
+          helm dependency build charts/kryton
+          echo '--- helm lint ---'
+          helm lint charts/kryton || true
+          echo '--- helm template (verify) ---'
+          helm template charts/kryton --debug 2>&1 | tail -20 || true
       - name: Deployment sync check
         shell: bash
         run: |
