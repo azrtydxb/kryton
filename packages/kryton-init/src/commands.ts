@@ -165,12 +165,19 @@ async function resolveApiKey(
     }
   }
 
-  // Mint flow.
-  const email = await input({
-    message: "Email",
-    validate: (v) => v.includes("@") || "must be an email address",
-  });
-  const password = await passwordPrompt({ message: "Password", mask: "*" });
+  // Mint flow. Non-interactive auth via KRYTON_EMAIL + KRYTON_PASSWORD
+  // env vars (both required); falls back to prompts when either unset.
+  const envEmail = process.env.KRYTON_EMAIL?.trim();
+  const envPass = process.env.KRYTON_PASSWORD;
+  const email = envEmail && envEmail.includes("@")
+    ? envEmail
+    : await input({
+        message: "Email",
+        validate: (v) => v.includes("@") || "must be an email address",
+      });
+  const password = envPass && envPass.length > 0
+    ? envPass
+    : await passwordPrompt({ message: "Password", mask: "*" });
   console.log("Signing in...");
   const cookie = await signIn({ server, email, password });
   console.log("Signed in. Minting an API key...");
