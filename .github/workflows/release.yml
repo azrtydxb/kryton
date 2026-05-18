@@ -3,6 +3,11 @@ name: Release
 on:
   push:
     tags: ['v*']
+  # Allow manual re-runs against an existing tag without cutting a new
+  # one. Pick the tag in the GitHub Actions UI (or `gh workflow run
+  # release.yml --ref v<existing-tag>`) and the workflow uses that ref
+  # for everything that previously came from the push event.
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
