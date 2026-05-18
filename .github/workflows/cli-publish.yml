@@ -77,8 +77,8 @@ jobs:
           commit: "chore(release): version cli packages"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Bootstrap auth via classic token for the first publish. After
-          # the packages exist on npm we'll bind Trusted Publishers and
-          # this secret can be removed (OIDC + NPM_CONFIG_PROVENANCE
-          # above already does the Sigstore attestation).
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # Bootstrap auth via classic token for the first publish.
+          # changesets-action looks for NPM_TOKEN (not NODE_AUTH_TOKEN)
+          # to decide between token-auth and OIDC. After packages exist
+          # on npm we'll bind Trusted Publishers and remove this.
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
