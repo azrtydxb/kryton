@@ -93,8 +93,11 @@ resources: {}
   #   memory: 256Mi
 
 livenessProbe:
+  # Server exposes /healthz (basic alive) and /readyz (alive + DB).
+  # Liveness uses /healthz so a transient DB blip doesn't get the pod
+  # killed; readiness uses /readyz so traffic only routes when DB is up.
   httpGet:
-    path: /health
+    path: /healthz
     port: http
   initialDelaySeconds: 30
   periodSeconds: 10
@@ -102,7 +105,7 @@ livenessProbe:
   failureThreshold: 3
 readinessProbe:
   httpGet:
-    path: /health
+    path: /readyz
     port: http
   initialDelaySeconds: 5
   periodSeconds: 5

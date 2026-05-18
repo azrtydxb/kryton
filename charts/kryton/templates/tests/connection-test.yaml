@@ -17,5 +17,5 @@ spec:
         - -c
         - |
           wget --spider --quiet \
-            "http://{{ include "kryton.fullname" . }}:{{ .Values.service.port }}/health" \
-            && echo "kryton /health OK"
+            "http://{{ include "kryton.fullname" . }}:{{ .Values.service.port }}/healthz" \
+            && echo "kryton /healthz OK"
