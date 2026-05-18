@@ -185,8 +185,10 @@ jobs:
           set -euo pipefail
           # sync:check shells out to `helm template charts/kryton`, which
           # requires subchart tarballs to be present in charts/kryton/charts/.
-          # `helm dependency build` resolves them from Chart.lock without
-          # touching the network beyond the declared repos.
+          # `helm dependency build` needs the bitnami repo registered first,
+          # then reconstitutes the subchart from Chart.lock.
+          helm repo add bitnami https://charts.bitnami.com/bitnami
+          helm repo update bitnami
           helm dependency build charts/kryton
       - name: Deployment sync check
         run: npm run sync:check
