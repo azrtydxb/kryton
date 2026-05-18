@@ -183,18 +183,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # sync:check shells out to `helm template charts/kryton`, which
-          # requires subchart tarballs to be present in charts/kryton/charts/.
-          # `helm dependency build` needs the bitnami repo registered first,
-          # then reconstitutes the subchart from Chart.lock.
+          # sync:check shells out to `helm template charts/kryton`. helm's
+          # CheckDependencies refuses to load when Chart.lock + the on-disk
+          # tarball + the freshly-published upstream chart disagree on digest
+          # (bitnami occasionally republishes the same version). Wipe the
+          # tracked tarball + lock first so `dependency update` resolves
+          # everything in one consistent fetch.
           helm repo add bitnami https://charts.bitnami.com/bitnami
           helm repo update bitnami
-          # `update` is permissive: it refreshes the local subchart cache and
-          # rewrites Chart.lock if upstream republished with a new digest.
-          # `build` was rejecting the existing tarball as outdated and then
-          # leaving charts/ empty, causing `helm template` to fail downstream.
+          rm -f charts/kryton/Chart.lock charts/kryton/charts/*.tgz
           helm dependency update charts/kryton
           ls -la charts/kryton/charts/
+          cat charts/kryton/Chart.lock
       - name: Deployment sync check
         shell: bash
         run: |
