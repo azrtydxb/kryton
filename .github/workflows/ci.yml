@@ -189,7 +189,12 @@ jobs:
           # then reconstitutes the subchart from Chart.lock.
           helm repo add bitnami https://charts.bitnami.com/bitnami
           helm repo update bitnami
-          helm dependency build charts/kryton
+          # `update` is permissive: it refreshes the local subchart cache and
+          # rewrites Chart.lock if upstream republished with a new digest.
+          # `build` was rejecting the existing tarball as outdated and then
+          # leaving charts/ empty, causing `helm template` to fail downstream.
+          helm dependency update charts/kryton
+          ls -la charts/kryton/charts/
       - name: Deployment sync check
         run: npm run sync:check
       - name: Restore workspace ownership to runner user
