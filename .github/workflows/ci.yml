@@ -165,10 +165,16 @@ jobs:
           set -euo pipefail
           apt-get update -qq
           apt-get install -y -qq --no-install-recommends curl ca-certificates
-          curl -fsSL https://get.helm.sh/helm-v3.16.3-linux-amd64.tar.gz \
+          # arc-azrtydxb is ARM64 — pick the right arch instead of hard-coding amd64.
+          case "$(uname -m)" in
+            aarch64|arm64) ARCH=arm64 ;;
+            x86_64) ARCH=amd64 ;;
+            *) echo "unsupported arch $(uname -m)" >&2; exit 1 ;;
+          esac
+          curl -fsSL "https://get.helm.sh/helm-v3.16.3-linux-${ARCH}.tar.gz" \
             | tar -xz -C /tmp
-          install -m 0755 /tmp/linux-amd64/helm /usr/local/bin/helm
-          curl -fsSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz \
+          install -m 0755 "/tmp/linux-${ARCH}/helm" /usr/local/bin/helm
+          curl -fsSL "https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-${ARCH}.tar.gz" \
             | tar -xz -C /tmp
           install -m 0755 /tmp/kubeconform /usr/local/bin/kubeconform
           helm version
