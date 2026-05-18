@@ -195,24 +195,20 @@ jobs:
           helm dependency update charts/kryton
           ls -la charts/kryton/charts/
           cat charts/kryton/Chart.lock
-          echo '--- helm dependency build (post-update sanity) ---'
-          helm dependency build charts/kryton
-          echo '--- helm lint ---'
-          helm lint charts/kryton || true
-          echo '--- helm template (verify) ---'
-          helm template charts/kryton --debug 2>&1 | tail -20 || true
+          echo '--- helm version ---'
+          helm version
+          echo '--- subchart tarball metadata ---'
+          ls -la charts/kryton/charts/
+          file charts/kryton/charts/postgresql-16.4.5.tgz || true
+          echo '--- unpack the tarball manually so the loader can find it ---'
+          # helm 3.16.3 fails to load the bitnami postgresql tarball as a
+          # subchart in this runner; unpacked-dir form loads reliably.
+          tar -xzf charts/kryton/charts/postgresql-16.4.5.tgz -C charts/kryton/charts/
+          ls -la charts/kryton/charts/
+          echo '--- helm lint after unpack ---'
+          helm lint charts/kryton
       - name: Deployment sync check
-        shell: bash
-        run: |
-          set -euo pipefail
-          # Debug: confirm the dep tarball is still on disk before sync:check.
-          ls -la charts/kryton/charts/ || true
-          helm dependency list charts/kryton || true
-          echo '--- Chart.lock ---'
-          cat charts/kryton/Chart.lock
-          echo '--- direct helm template (full stderr) ---'
-          helm template charts/kryton --debug 2>&1 | head -30 || true
-          npm run sync:check
+        run: npm run sync:check
       - name: Restore workspace ownership to runner user
         if: always()
         run: chown -R 1001:1001 . || true
