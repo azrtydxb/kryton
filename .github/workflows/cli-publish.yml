@@ -48,8 +48,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     if: github.ref == 'refs/heads/master'
-    env:
-      # NPM_CONFIG_PROVENANCE: "true"  # disabled for first publish bootstrap; re-enable after TP set up
+    # NPM_CONFIG_PROVENANCE disabled for first-publish bootstrap;
+    # re-enable after Trusted Publishers are bound on npm.org.
     steps:
       - uses: actions/checkout@v4
         with:
