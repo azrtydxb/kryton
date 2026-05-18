@@ -412,19 +412,20 @@ jobs:
         # copies to the cluster zot (cluster-CA cert) fail with x509
         # unknown-authority. skopeo has explicit per-direction TLS
         # flags. Run via the official quay.io/skopeo/stable image
-        # because the runner user can't apt-get (non-root pod).
-        # docker login already wrote ghcr creds to ~/.docker/config.json,
-        # which we mount into the skopeo container as its authfile.
+        # because the runner user can't apt-get (non-root pod). The
+        # dind sidecar can't see the runner pod's ~/.docker/config.json,
+        # so credentials are passed via --src-creds populated from a
+        # step env that github actions resolves before bash runs.
+        env:
+          SRC_CREDS: ${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           for src in $(jq -r '.tags[]' <<< "$DOCKER_METADATA_OUTPUT_JSON"); do
             dst="${src/ghcr.io/192.168.10.123:5000}"
             echo "Mirroring server: $src → $dst"
-            docker run --rm \
-              -v /home/runner/.docker/config.json:/auth.json:ro \
-              quay.io/skopeo/stable copy --multi-arch all \
+            docker run --rm quay.io/skopeo/stable copy --multi-arch all \
               --src-tls-verify=true --dest-tls-verify=false \
-              --authfile /auth.json \
+              --src-creds="$SRC_CREDS" \
               "docker://$src" "docker://$dst"
           done
       - name: Extract operator metadata
@@ -437,33 +438,32 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest
       - name: Mirror operator tags to cluster zot
+        env:
+          SRC_CREDS: ${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           for src in $(jq -r '.tags[]' <<< '${{ steps.meta-operator.outputs.json }}'); do
             dst="${src/ghcr.io/192.168.10.123:5000}"
             echo "Mirroring operator: $src → $dst"
-            docker run --rm \
-              -v /home/runner/.docker/config.json:/auth.json:ro \
-              quay.io/skopeo/stable copy --multi-arch all \
+            docker run --rm quay.io/skopeo/stable copy --multi-arch all \
               --src-tls-verify=true --dest-tls-verify=false \
-              --authfile /auth.json \
+              --src-creds="$SRC_CREDS" \
               "docker://$src" "docker://$dst"
           done
       - name: Mirror helm chart artifact to cluster zot
         env:
           VERSION: ${{ github.ref_name }}
           OWNER: ${{ github.repository_owner }}
+          SRC_CREDS: ${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           CHART_VER="${VERSION#v}"
           SRC="ghcr.io/${OWNER}/charts/kryton:${CHART_VER}"
           DST="192.168.10.123:5000/${OWNER}/charts/kryton:${CHART_VER}"
           echo "Mirroring chart: $SRC → $DST"
-          docker run --rm \
-            -v /home/runner/.docker/config.json:/auth.json:ro \
-            quay.io/skopeo/stable copy \
+          docker run --rm quay.io/skopeo/stable copy \
             --src-tls-verify=true --dest-tls-verify=false \
-            --authfile /auth.json \
+            --src-creds="$SRC_CREDS" \
             "docker://$SRC" "docker://$DST"
 
   # Package + push the Helm chart as an OCI artifact to ghcr.io.
