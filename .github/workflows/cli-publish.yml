@@ -81,4 +81,4 @@ jobs:
           # changesets-action looks for NPM_TOKEN (not NODE_AUTH_TOKEN)
           # to decide between token-auth and OIDC. After packages exist
           # on npm we'll bind Trusted Publishers and remove this.
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
