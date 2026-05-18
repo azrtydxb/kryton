@@ -385,7 +385,10 @@ jobs:
   # with `release`; not a gate (mirror failures don't block the
   # GitHub release).
   mirror:
-    needs: [manifest]
+    # Needs both image manifests AND the helm chart push: mirror copies
+    # all three artifacts to the cluster zot, and reading the chart
+    # back from ghcr races against helm-publish's push otherwise.
+    needs: [manifest, manifest-operator, helm-publish]
     runs-on: arc-azrtydxb-publish
     permissions:
       contents: read
