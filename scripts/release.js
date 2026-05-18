@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { resolve } from "node:path";
 
@@ -26,13 +26,16 @@ if (branch !== "master") {
   process.exit(1);
 }
 
+// Some packages here (packages/core, packages/core-react) were removed by
+// later refactors; skip any path that no longer exists rather than fail.
 const packageFiles = [
   "package.json",
   "packages/core/package.json",
   "packages/core-react/package.json",
   "packages/ui/package.json",
-];
+].filter((f) => existsSync(resolve(f)));
 
+const bumpedPackageFiles = [];
 for (const file of packageFiles) {
   const path = resolve(file);
   const pkg = JSON.parse(readFileSync(path, "utf8"));
@@ -44,13 +47,14 @@ for (const file of packageFiles) {
     pkg.peerDependencies["@azrtydxb/core-react"] = newVersion;
   }
   writeFileSync(path, JSON.stringify(pkg, null, 2) + "\n");
+  bumpedPackageFiles.push(file);
   console.log(`bumped ${file} → ${newVersion}`);
 }
 
 const sourceConstantUpdates = [
   { file: "packages/core/src/index.ts", name: "KRYTON_CORE_VERSION" },
   { file: "packages/core-react/src/index.ts", name: "KRYTON_CORE_REACT_VERSION" },
-];
+].filter(({ file }) => existsSync(resolve(file)));
 const sourceFiles = [];
 for (const { file, name } of sourceConstantUpdates) {
   const path = resolve(file);
@@ -67,7 +71,7 @@ for (const { file, name } of sourceConstantUpdates) {
 }
 
 exec("npm install");
-exec(`git add ${packageFiles.join(" ")} ${sourceFiles.join(" ")} package-lock.json`);
+exec(`git add ${bumpedPackageFiles.join(" ")} ${sourceFiles.join(" ")} package-lock.json`);
 exec(`git commit -m "chore(release): v${newVersion}"`);
 exec(`git tag v${newVersion}`);
 
