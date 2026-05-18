@@ -116,7 +116,7 @@ export async function mintApiKey(opts: MintOpts): Promise<MintedKey> {
       cookie: opts.sessionCookie,
       origin,
     },
-    body: JSON.stringify({ name: opts.name }),
+    body: JSON.stringify({ name: opts.name, scope: "read-write" }),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
