@@ -9,12 +9,8 @@
   "updateInternalDependencies": "patch",
   "ignore": [
     "@azrtydxb/client",
-    "@azrtydxb/core",
-    "@azrtydxb/core-react",
-    "@azrtydxb/notes",
     "@azrtydxb/sdk",
     "@azrtydxb/server",
-    "@azrtydxb/ui",
-    "kryton"
+    "@azrtydxb/ui"
   ]
 }
