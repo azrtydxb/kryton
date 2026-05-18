@@ -5,6 +5,14 @@
 # -- Number of kryton server replicas.
 replicaCount: 1
 
+# -- Deployment update strategy. Defaults to Recreate because the
+#    PVC is ReadWriteOnce: rolling updates would deadlock waiting for
+#    the old pod to release the volume. Switch to RollingUpdate only
+#    if you've configured RWX storage and multi-replica.
+strategy:
+  type: Recreate
+  rollingUpdate: {}
+
 image:
   # -- Container image repository for the kryton server.
   repository: ghcr.io/azrtydxb/kryton/kryton

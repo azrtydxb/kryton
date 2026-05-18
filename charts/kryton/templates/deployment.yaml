@@ -8,6 +8,19 @@ spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
   {{- end }}
+  strategy:
+    # When persistence is enabled and the PVC accessMode is RWO (the
+    # default — the chart only supports RWO single-replica anyway),
+    # rolling updates deadlock: the new pod can't mount the PVC until
+    # the old pod releases it, but the old pod isn't terminated until
+    # the new one is ready. Recreate avoids that. Allow RollingUpdate
+    # only when the user explicitly opts in (e.g. RWX/ReadWriteMany
+    # storage with multi-replica).
+    type: {{ .Values.strategy.type | default "Recreate" }}
+    {{- if eq (.Values.strategy.type | default "Recreate") "RollingUpdate" }}
+    rollingUpdate:
+      {{- toYaml .Values.strategy.rollingUpdate | nindent 6 }}
+    {{- end }}
   selector:
     matchLabels:
       {{- include "kryton.selectorLabels" . | nindent 6 }}
