@@ -3,11 +3,16 @@ name: Release
 on:
   push:
     tags: ['v*']
-  # Allow manual re-runs against an existing tag without cutting a new
-  # one. Pick the tag in the GitHub Actions UI (or `gh workflow run
-  # release.yml --ref v<existing-tag>`) and the workflow uses that ref
-  # for everything that previously came from the push event.
+  # Manual trigger lets us re-run release.yml from master (so workflow
+  # fixes are picked up) while publishing an existing tag's version.
+  # Use: `gh workflow run release.yml --ref master -f tag=v<existing-tag>`.
+  # The `tag` input replaces github.ref_name for chart/version strings.
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing v* tag to publish (omit to use github.ref_name)'
+        required: false
+        type: string
 
 env:
   REGISTRY: ghcr.io
@@ -460,7 +465,9 @@ jobs:
           done
       - name: Mirror helm chart artifact to cluster zot
         env:
-          VERSION: ${{ github.ref_name }}
+          # Prefer the workflow_dispatch input if provided; otherwise
+          # fall back to the tag that triggered the push event.
+          VERSION: ${{ inputs.tag || github.ref_name }}
           OWNER: ${{ github.repository_owner }}
           SRC_CREDS: ${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -500,8 +507,10 @@ jobs:
               --password-stdin
       - name: Resolve chart version from tag
         id: ver
+        env:
+          # workflow_dispatch passes tag via inputs; push event uses ref_name.
+          REF: ${{ inputs.tag || github.ref_name }}
         run: |
-          REF="${GITHUB_REF_NAME}"
           echo "version=${REF#v}" >> "$GITHUB_OUTPUT"
       - name: Helm dependency update
         run: helm dependency update charts/kryton
