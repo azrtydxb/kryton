@@ -11,6 +11,15 @@ export {
   type HostHooks,
 } from "./host-hooks";
 export {
+  setEditorOption,
+  getEditorOptions,
+  subscribeEditorOptions,
+  resetEditorOptions,
+  type EditorOptions,
+  type EditorOptionValue,
+  type EditorOptionsListener,
+} from "./editor-options";
+export {
   setActiveEditor,
   getEditorPlugins,
   subscribeEditorPlugins,

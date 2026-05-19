@@ -15,6 +15,7 @@ import {
   subscribeEditorTransactions,
 } from "./editor-registry";
 import { getHostHooks } from "./host-hooks";
+import { setEditorOption } from "./editor-options";
 import type { ActivePluginInfo, ClientPluginAPI, ClientPluginModule } from "./types";
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -257,6 +258,7 @@ function buildEditorApi(): ClientPluginAPI["editor"] {
     getActiveState: () => getActiveEditorState(),
     dispatch: (tr) => dispatchToActiveEditor(tr),
     onTransaction: (cb) => subscribeEditorTransactions(cb),
+    setOption: (name, value) => setEditorOption(name, value),
   };
 }
 

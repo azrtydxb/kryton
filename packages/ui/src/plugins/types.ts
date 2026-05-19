@@ -273,6 +273,15 @@ export interface ClientPluginAPI {
         state: import("../editor/state").EditorState,
       ) => void,
     ): () => void;
+    /**
+     * Set a host-level editor option. Known keys today:
+     *   - "lineNumbers" (boolean, default false) — toggles the gutter
+     *     rendered by EditorView. vim-mode's `:set number` calls into
+     *     this with true.
+     * Unknown keys are accepted (forward compatibility) but have no
+     * effect until the host learns to read them.
+     */
+    setOption(name: string, value: boolean | number | string): void;
   };
   notify: {
     info(message: string): void;

@@ -25,6 +25,11 @@ import {
   setActiveEditor,
   subscribeEditorPlugins,
 } from "../../../plugins/editor-registry";
+import {
+  getEditorOptions,
+  subscribeEditorOptions,
+  type EditorOptions,
+} from "../../../plugins/editor-options";
 
 /**
  * Snapshot of one remote collaborator's selection, rendered as a colored
@@ -123,6 +128,15 @@ export function EditorView({
   >(() => getEditorPlugins());
   React.useEffect(() => {
     return subscribeEditorPlugins(setDynamicPlugins);
+  }, []);
+
+  // Editor options bag — driven by api.editor.setOption from plugins.
+  // Today: "lineNumbers" toggles the gutter render below.
+  const [editorOptions, setEditorOptions] = React.useState<EditorOptions>(
+    () => getEditorOptions(),
+  );
+  React.useEffect(() => {
+    return subscribeEditorOptions(setEditorOptions);
   }, []);
   const allPlugins = React.useMemo(
     () => [...plugins, ...dynamicPlugins],
@@ -590,11 +604,13 @@ export function EditorView({
 
   return (
     <div className={className ?? "ed-shell"} data-editor-shell="" style={{ position: "relative" }}>
-      <div className="ed-gutter" aria-hidden="true">
-        {Array.from({ length: lineCount }, (_, i) => (
-          <span key={i} className="ed-ln">{i + 1}</span>
-        ))}
-      </div>
+      {editorOptions.lineNumbers && (
+        <div className="ed-gutter" aria-hidden="true" data-testid="ed-gutter">
+          {Array.from({ length: lineCount }, (_, i) => (
+            <span key={i} className="ed-ln">{i + 1}</span>
+          ))}
+        </div>
+      )}
       <div
         ref={rootRef}
         contentEditable

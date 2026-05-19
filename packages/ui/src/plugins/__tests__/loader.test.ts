@@ -65,6 +65,7 @@ function makeApi(): ClientPluginAPI {
       getActiveState: vi.fn(),
       dispatch: vi.fn(),
       onTransaction: vi.fn(() => () => {}),
+      setOption: vi.fn(),
     } as unknown as ClientPluginAPI["editor"],
     notify: {
       info: vi.fn(),
