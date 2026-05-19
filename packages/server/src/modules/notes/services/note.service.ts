@@ -1,5 +1,6 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { createHash } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { and, eq } from "drizzle-orm";
 import { moveToTrash } from "./trash.service.js";
@@ -16,6 +17,43 @@ function isEnoent(err: unknown): boolean {
     "code" in err &&
     (err as { code?: unknown }).code === "ENOENT"
   );
+}
+
+/**
+ * Self-write dedupe cache. Every server-initiated disk write records
+ * `(absolutePath, sha256, ts)` here. The disk watcher (Phase 1.5) checks
+ * this on every fs event to skip self-write echoes — a sha match proves
+ * the watcher is seeing OUR write rather than an external one that happens
+ * to have arrived within the TTL window. Bounded by both TTL and entry
+ * count so a bulk import can't grow the map without limit.
+ */
+const SELF_WRITE_TTL_MS = 10_000;
+const SELF_WRITE_MAX_ENTRIES = 1024;
+const selfWriteCache = new Map<string, { sha: string; ts: number }>();
+
+function sha256Hex(content: string): string {
+  return createHash("sha256").update(content, "utf-8").digest("hex");
+}
+
+function recordSelfWrite(absPath: string, content: string): void {
+  if (selfWriteCache.size >= SELF_WRITE_MAX_ENTRIES) {
+    const oldest = selfWriteCache.keys().next().value;
+    if (oldest !== undefined) selfWriteCache.delete(oldest);
+  }
+  // Delete + set moves the key to the end of insertion order on overwrite,
+  // preserving LRU semantics for frequently-edited notes.
+  selfWriteCache.delete(absPath);
+  selfWriteCache.set(absPath, { sha: sha256Hex(content), ts: Date.now() });
+}
+
+export function wasRecentSelfWrite(absPath: string, diskContent: string): boolean {
+  const hit = selfWriteCache.get(absPath);
+  if (!hit) return false;
+  if (Date.now() - hit.ts > SELF_WRITE_TTL_MS) {
+    selfWriteCache.delete(absPath);
+    return false;
+  }
+  return hit.sha === sha256Hex(diskContent);
 }
 
 /**
@@ -162,6 +200,9 @@ export class NoteService {
     }
 
     await fs.writeFile(fullPath, content, "utf-8");
+    // Record before any awaited work yields so the watcher always finds
+    // the entry if it fires while indexing is still pending.
+    recordSelfWrite(fullPath, content);
 
     const knowledge = this.app.knowledge;
     if (knowledge) {
