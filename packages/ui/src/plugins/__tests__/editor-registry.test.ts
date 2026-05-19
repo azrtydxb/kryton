@@ -10,13 +10,10 @@ import {
   subscribeEditorPlugins,
   subscribeEditorTransactions,
 } from "../editor-registry";
+import { createEditorState } from "../../editor/state";
 import type { EditorPlugin, EditorState, Transaction } from "../../editor/state";
 
-const fakeState: EditorState = {
-  doc: "hello",
-  tree: { type: "root", children: [] } as unknown as EditorState["tree"],
-  selection: { anchor: 0, head: 0 },
-};
+const fakeState: EditorState = createEditorState("hello");
 
 const fakeTr: Transaction = { ops: [], selection: null };
 
