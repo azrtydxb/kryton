@@ -17,7 +17,7 @@ function makeAdapter(initial: NoteData[]): KrytonDataAdapter & { _trigger(): voi
     noteShares: { list: () => [] },
     trashItems: { list: () => [], restore: async () => {}, purge: async () => {}, purgeAll: async () => {} },
     subscribe: (_t, _ids, cb) => { subs.add(cb); return () => subs.delete(cb); },
-    openDocument: async () => new Y.Doc(), closeDocument: () => {}, getAwareness: () => null, readNoteContent: () => null,
+    openDocument: async () => new Y.Doc(), closeDocument: () => {}, getAwareness: () => null, readNoteContent: () => null, hasLiveDocument: () => false,
     getSyncStatus: () => ({ lastPullAt: null, lastPushAt: null, pending: 0, online: true }),
     triggerSync: async () => {},
     currentUser: () => null,

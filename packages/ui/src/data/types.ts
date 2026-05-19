@@ -59,6 +59,12 @@ export interface KrytonDataAdapter {
   closeDocument(noteId: string): void;
   getAwareness(noteId: string): Awareness | null;
   readNoteContent(noteId: string): string | null;
+  /**
+   * Whether an in-memory Y.Doc currently exists for `noteId`. Callers
+   * (notably the HTTP debounced save path) use this to skip writes that
+   * the live Y session is already persisting via the server flush.
+   */
+  hasLiveDocument(noteId: string): boolean;
 
   getSyncStatus(): SyncStatus;
   triggerSync(): Promise<void>;

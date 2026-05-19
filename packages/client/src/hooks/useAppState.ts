@@ -7,12 +7,18 @@ import { useNotes } from './useNotes';
 import { useAuth } from './useAuth';
 import { GraphData } from '../lib/api';
 import { useUIStore } from '../stores/uiStore';
+import { useHttpAdapter } from '../data/httpAdapterContext';
 import { useGraphQuery, useStarredNotes, useSharedNotes, useGraphRealtimeUpdates } from './useNotesQuery';
 
 export function useAppState(pluginManager?: import('../plugins/PluginManager').ClientPluginManager | null) {
   const { user, loading } = useAuth();
   const themeCtx = useTheme();
-  const notes = useNotes(user?.id);
+  const adapter = useHttpAdapter();
+  // `isLiveDocument` lets useNotes suppress the debounced HTTP PUT for
+  // any path that currently has a Y.Doc session — the server's Y flush
+  // is authoritative for those paths.
+  const isLiveDocument = useCallback((path: string) => adapter.hasLiveDocument(path), [adapter]);
+  const notes = useNotes(user?.id, isLiveDocument);
   const queryClient = useQueryClient();
 
   // --- Zustand UI state (replaces all useState calls) ---

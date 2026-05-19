@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { HttpAdapter } from "../HttpAdapter";
 
 // Helper to build a minimal fetch mock returning JSON
@@ -487,5 +487,88 @@ describe("HttpAdapter — applyVaultEvent", () => {
     const call = (fetchMock as unknown as { mock: { calls: unknown[][] } }).mock.calls[0];
     const init = call[1] as { headers: Record<string, string> };
     expect(init.headers["X-Kryton-Client-Id"]).toBe("tab-xyz");
+  });
+});
+
+describe("HttpAdapter — document lifecycle", () => {
+  // Minimal WebSocket stub that captures listeners but never opens a
+  // real socket. The lifecycle tests only assert tracking inside the
+  // adapter; they don't care about message flow.
+  class StubWebSocket {
+    static instances: StubWebSocket[] = [];
+    url: string;
+    readyState = 0;
+    binaryType = "arraybuffer";
+    private listeners: Map<string, ((ev: Event) => void)[]> = new Map();
+    constructor(url: string) {
+      this.url = url;
+      StubWebSocket.instances.push(this);
+    }
+    addEventListener(type: string, fn: (ev: Event) => void) {
+      const arr = this.listeners.get(type) ?? [];
+      arr.push(fn);
+      this.listeners.set(type, arr);
+    }
+    removeEventListener() {}
+    send() {}
+    close() {
+      this.readyState = 3;
+      const closeListeners = this.listeners.get("close") ?? [];
+      for (const fn of closeListeners) fn(new Event("close"));
+    }
+  }
+
+  const originalWebSocket = globalThis.WebSocket;
+
+  beforeEach(() => {
+    StubWebSocket.instances = [];
+    (globalThis as unknown as { WebSocket: typeof StubWebSocket }).WebSocket = StubWebSocket;
+  });
+
+  afterEach(() => {
+    (globalThis as unknown as { WebSocket: typeof WebSocket }).WebSocket = originalWebSocket;
+  });
+
+  it("hasLiveDocument is false before openDocument and true after", async () => {
+    const adapter = new HttpAdapter({ fetch: makeFetch({}), baseUrl: "" });
+    expect(adapter.hasLiveDocument("Welcome.md")).toBe(false);
+
+    await adapter.openDocument("Welcome.md");
+    expect(adapter.hasLiveDocument("Welcome.md")).toBe(true);
+    expect(adapter.hasLiveDocument("Other.md")).toBe(false);
+  });
+
+  it("closeDocument clears the live entry", async () => {
+    const adapter = new HttpAdapter({ fetch: makeFetch({}), baseUrl: "" });
+    await adapter.openDocument("Welcome.md");
+    expect(adapter.hasLiveDocument("Welcome.md")).toBe(true);
+
+    adapter.closeDocument("Welcome.md");
+    expect(adapter.hasLiveDocument("Welcome.md")).toBe(false);
+  });
+
+  it("openDocument is idempotent — same path returns the same Y.Doc", async () => {
+    const adapter = new HttpAdapter({ fetch: makeFetch({}), baseUrl: "" });
+    const doc1 = await adapter.openDocument("Note.md");
+    const doc2 = await adapter.openDocument("Note.md");
+    expect(doc2).toBe(doc1);
+    // Only one WS spawned despite two open calls.
+    expect(StubWebSocket.instances).toHaveLength(1);
+  });
+
+  it("closeDocument is idempotent — calling twice does not throw", async () => {
+    const adapter = new HttpAdapter({ fetch: makeFetch({}), baseUrl: "" });
+    await adapter.openDocument("Note.md");
+    adapter.closeDocument("Note.md");
+    expect(() => adapter.closeDocument("Note.md")).not.toThrow();
+    expect(adapter.hasLiveDocument("Note.md")).toBe(false);
+  });
+
+  it("getAwareness returns the awareness instance for an open doc", async () => {
+    const adapter = new HttpAdapter({ fetch: makeFetch({}), baseUrl: "" });
+    await adapter.openDocument("Note.md");
+    const a = adapter.getAwareness("Note.md");
+    expect(a).not.toBeNull();
+    expect(adapter.getAwareness("Other.md")).toBeNull();
   });
 });

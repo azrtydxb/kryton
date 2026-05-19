@@ -1,4 +1,6 @@
 import {
+  useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   useMemo,
@@ -6,7 +8,16 @@ import {
   forwardRef,
   type CSSProperties,
 } from 'react';
-import { EditorView, type EditorPlugin, type EditorState } from '@azrtydxb/ui';
+import {
+  EditorView,
+  createEditorState,
+  createYjsBinding,
+  type EditorPlugin,
+  type EditorState,
+  type Transaction,
+  type YjsBinding,
+} from '@azrtydxb/ui';
+import type * as Y from 'yjs';
 import { Icons } from '../Icons';
 import { usePrefs, type EditorLayout } from '../../stores/prefsStore';
 import { useUIStore } from '../../stores/uiStore';
@@ -35,7 +46,9 @@ export interface EditorHandle {
 
 interface EditorProps {
   /** Initial document text — treated as uncontrolled after mount.
-   *  To switch to a different note, remount via a `key` change at the parent. */
+   *  To switch to a different note, remount via a `key` change at the parent.
+   *  Ignored when `ytext` is provided — collab mode reads the doc from
+   *  the Y.Text. */
   content: string;
   onChange: (content: string) => void;
   /** Passed for future wiki-link plugin wiring; currently unused. */
@@ -44,6 +57,15 @@ interface EditorProps {
   plugins?: readonly EditorPlugin[];
   onWikilinkClick?: (target: string) => void;
   className?: string;
+  /**
+   * When set, the editor binds its local state to this Y.Text via
+   * `createYjsBinding`. Local edits route through the binding (which
+   * mirrors them into Y.Text inside a Y transaction), and remote
+   * Y.Text deltas update the editor state via the binding's observer.
+   * When omitted, the editor falls back to the existing uncontrolled
+   * mode driven by `content` + the parent's `onChange` debounced save.
+   */
+  ytext?: Y.Text | null;
 }
 
 function countWords(text: string): number {
@@ -73,9 +95,11 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     plugins = [],
     onWikilinkClick,
     className,
+    ytext,
   }: EditorProps,
   ref,
 ) {
+  const collabMode = !!ytext;
   // localDoc tracks the current doc for imperative mutations.
   // Initialised once from `content`; updated by toolbar commands.
   const [localDoc, setLocalDoc] = useState(content);
@@ -84,6 +108,76 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   // selectionRef tracks the last known selection offsets.
   const selectionRef = useRef<{ anchor: number; head: number }>({ anchor: 0, head: 0 });
   const editorRootRef = useRef<HTMLDivElement>(null);
+
+  // Collab mode: the editor state is owned here and driven by the
+  // yjsBinding. Local edits flow editor → onDispatch → binding.applyLocal
+  // → Y.Text + setControlledState. Remote Y.Text events flow through the
+  // binding's observer → setControlledState. The EditorView reads
+  // `controlledState` as its source of truth.
+  const [controlledState, setControlledState] = useState<EditorState | null>(null);
+  const controlledStateRef = useRef<EditorState | null>(null);
+  const bindingRef = useRef<YjsBinding | null>(null);
+
+  // Reset the controlled state when ytext switches (or clears). Tracked
+  // via state-vs-prop comparison (not a ref) to satisfy the React 19
+  // "no refs / setState in effect" rules.
+  const [trackedYtext, setTrackedYtext] = useState<Y.Text | null | undefined>(ytext);
+  if (trackedYtext !== ytext) {
+    setTrackedYtext(ytext);
+    if (!ytext) {
+      setControlledState(null);
+    } else {
+      const seeded = createEditorState(ytext.toString());
+      setControlledState(seeded);
+      setLocalDoc(seeded.doc);
+    }
+  }
+
+  // Mirror controlledState into a ref so the yjsBinding's getState
+  // callback can read the latest value synchronously without forcing a
+  // closure refresh on every state change.
+  useLayoutEffect(() => {
+    controlledStateRef.current = controlledState;
+  }, [controlledState]);
+
+  useEffect(() => {
+    if (!ytext) {
+      bindingRef.current = null;
+      return;
+    }
+    // The render-phase derive above has already populated
+    // controlledStateRef from ytext; the binding's setState callbacks
+    // will keep it in lockstep going forward.
+    const initial = controlledStateRef.current ?? createEditorState(ytext.toString());
+    const binding = createYjsBinding(
+      ytext,
+      () => controlledStateRef.current ?? initial,
+      (next) => {
+        controlledStateRef.current = next;
+        setControlledState(next);
+        setLocalDoc(next.doc);
+        selectionRef.current = next.selection;
+        onChange(next.doc);
+        if (onCursorStateChange) {
+          const offset = next.selection.head;
+          const textBefore = next.doc.slice(0, offset);
+          const lines = textBefore.split('\n');
+          const line = lines.length;
+          const col = (lines[lines.length - 1]?.length ?? 0) + 1;
+          onCursorStateChange({ line, col, wordCount: countWords(next.doc) });
+        }
+      },
+    );
+    bindingRef.current = binding;
+    return () => {
+      binding.dispose();
+      bindingRef.current = null;
+    };
+  // onChange / onCursorStateChange identities are stable enough for our
+  // callers (they come from useCallback in useAppCallbacks). Re-binding
+  // on every render would tear down the Y observer mid-typing.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ytext]);
 
   const handleChange = (state: EditorState) => {
     selectionRef.current = state.selection;
@@ -102,9 +196,36 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     }
   };
 
+  // Controlled-mode dispatch: ops route through the Y.js binding; a
+  // selection-only transaction (no ops) bypasses the binding and just
+  // updates the local controlled state so the cursor moves.
+  const handleDispatch = (tr: Transaction) => {
+    if (tr.ops.length === 0) {
+      const base = controlledStateRef.current;
+      if (!base) return;
+      const next = { ...base, selection: tr.selection ?? base.selection };
+      controlledStateRef.current = next;
+      setControlledState(next);
+      selectionRef.current = next.selection;
+      return;
+    }
+    bindingRef.current?.applyLocal(tr);
+  };
+
   // Apply a toolbar mutation: update localDoc state and bump mountKey to
-  // remount EditorView with the new content.
+  // remount EditorView with the new content (uncontrolled mode only).
+  // In collab mode, toolbar mutations are routed through the binding so
+  // remote peers see the change.
   const applyMutation = (nextDoc: string, newOffset: number) => {
+    if (collabMode && bindingRef.current) {
+      const base = controlledStateRef.current;
+      const fromDoc = base?.doc ?? localDoc;
+      bindingRef.current.applyLocal({
+        ops: [{ kind: 'replace', from: 0, to: fromDoc.length, text: nextDoc }],
+        selection: { anchor: newOffset, head: newOffset },
+      });
+      return;
+    }
     setLocalDoc(nextDoc);
     setMountKey((k) => k + 1);
     selectionRef.current = { anchor: newOffset, head: newOffset };
@@ -168,14 +289,24 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 
   return (
     <div ref={editorRootRef} className={className ?? 'h-full w-full'}>
-      <EditorView
-        key={mountKey}
-        initialDoc={localDoc}
-        plugins={plugins}
-        onChange={handleChange}
-        onWikilinkClick={onWikilinkClick}
-        className="h-full w-full"
-      />
+      {collabMode && controlledState ? (
+        <EditorView
+          plugins={plugins}
+          controlledState={controlledState}
+          onDispatch={handleDispatch}
+          onWikilinkClick={onWikilinkClick}
+          className="h-full w-full"
+        />
+      ) : (
+        <EditorView
+          key={mountKey}
+          initialDoc={localDoc}
+          plugins={plugins}
+          onChange={handleChange}
+          onWikilinkClick={onWikilinkClick}
+          className="h-full w-full"
+        />
+      )}
     </div>
   );
 });

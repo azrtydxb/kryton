@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { api } from '../lib/api';
 import { exportNoteToPdf } from '../lib/exportPdf';
 import { useUIStore } from '../stores/uiStore';
+import { useHttpAdapter } from '../data/httpAdapterContext';
 import { AppState } from './useAppState';
 
 export function useAppCallbacks(state: AppState) {
@@ -19,6 +20,7 @@ export function useAppCallbacks(state: AppState) {
 
   const storeEnterEditMode = useUIStore((s) => s.enterEditMode);
   const storeCancelEdit = useUIStore((s) => s.cancelEdit);
+  const adapter = useHttpAdapter();
 
   const toggleStar = useCallback((path: string) => {
     setStarredPaths(prev => {
@@ -66,6 +68,13 @@ export function useAppCallbacks(state: AppState) {
    * Centralised here so every view's tab strip uses the same flow.
    */
   const handleTabClose = useCallback((path: string) => {
+    // Tear down any live Y.Doc for this path BEFORE the tab is removed
+    // from the store so the editor unmount handler doesn't race with
+    // the store update. Shared notes never opened a Y session (per
+    // EditModeView), so the call is a no-op for them.
+    if (!path.startsWith('shared:')) {
+      adapter.closeDocument(path);
+    }
     const next = useUIStore.getState().closeTab(path);
     const activeId = notes.activeNote?.tabId ?? notes.activeNote?.path;
     if (path !== activeId) return;
@@ -91,7 +100,7 @@ export function useAppCallbacks(state: AppState) {
       setEditContent(null);
       setOriginalContent(null);
     }
-  }, [notes, setEditing, setEditContent, setOriginalContent]);
+  }, [notes, setEditing, setEditContent, setOriginalContent, adapter]);
 
   const handleLinkClick = useCallback((noteName: string) => {
     const findNote = (nodes: typeof notes.tree): string | null => {
