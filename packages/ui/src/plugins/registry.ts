@@ -3,6 +3,7 @@ import type {
   SidebarPanelRegistration,
   StatusBarItemRegistration,
   EditorToolbarButtonRegistration,
+  TopbarActionRegistration,
   SettingsSectionRegistration,
   PageRegistration,
   NoteActionRegistration,
@@ -20,6 +21,7 @@ export class PluginSlotRegistry {
   private sidebarPanels: SidebarPanelRegistration[] = [];
   private statusBarItems: StatusBarItemRegistration[] = [];
   private editorToolbarButtons: EditorToolbarButtonRegistration[] = [];
+  private topbarActions: TopbarActionRegistration[] = [];
   private settingsSections: SettingsSectionRegistration[] = [];
   private pages: PageRegistration[] = [];
   private noteActions: NoteActionRegistration[] = [];
@@ -82,6 +84,21 @@ export class PluginSlotRegistry {
 
   getEditorToolbarButtons(): EditorToolbarButtonRegistration[] {
     return [...this.editorToolbarButtons].sort((a, b) => a.order - b.order);
+  }
+
+  // File Tree Actions (sidebar Files-section header)
+
+  registerTopbarAction(
+    pluginId: string,
+    component: ComponentType,
+    options: { id: string; order?: number }
+  ): void {
+    this.topbarActions.push({ ...options, pluginId, component, order: options.order ?? 100 });
+    this.notify();
+  }
+
+  getTopbarActions(): TopbarActionRegistration[] {
+    return [...this.topbarActions].sort((a, b) => a.order - b.order);
   }
 
   // Settings
@@ -173,6 +190,7 @@ export class PluginSlotRegistry {
     this.sidebarPanels = this.sidebarPanels.filter((r) => r.pluginId !== pluginId);
     this.statusBarItems = this.statusBarItems.filter((r) => r.pluginId !== pluginId);
     this.editorToolbarButtons = this.editorToolbarButtons.filter((r) => r.pluginId !== pluginId);
+    this.topbarActions = this.topbarActions.filter((r) => r.pluginId !== pluginId);
     this.settingsSections = this.settingsSections.filter((r) => r.pluginId !== pluginId);
     this.pages = this.pages.filter((r) => r.pluginId !== pluginId);
     this.noteActions = this.noteActions.filter((r) => r.pluginId !== pluginId);

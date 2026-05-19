@@ -29,6 +29,7 @@ function makeApi(): ClientPluginAPI {
       registerSettingsSection: vi.fn(),
       registerPage: vi.fn(),
       registerNoteAction: vi.fn(),
+      registerTopbarAction: vi.fn(),
       closePane: vi.fn(),
     },
     markdown: {

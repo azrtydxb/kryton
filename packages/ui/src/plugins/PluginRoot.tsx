@@ -341,6 +341,8 @@ export function buildClientApi(
         registry.registerStatusBarItem(pluginId, component, options),
       registerEditorToolbarButton: (component, options) =>
         registry.registerEditorToolbarButton(pluginId, component, options),
+      registerTopbarAction: (component, options) =>
+        registry.registerTopbarAction(pluginId, component, options),
       registerSettingsSection: (component, options) =>
         registry.registerSettingsSection(pluginId, component, options),
       registerPage: (component, options) =>

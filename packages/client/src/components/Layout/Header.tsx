@@ -13,6 +13,7 @@ import { Icons } from '../Icons';
 import { usePrefs } from '../../stores/prefsStore';
 import { useUIStore } from '../../stores/uiStore';
 import { formatShortcut } from '../../lib/platform';
+import { PluginSlot } from '../PluginSlot/PluginSlot';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -192,6 +193,10 @@ export function Header({
 
       {/* right cluster */}
       <IndexingPill />
+      {/* Plugin-contributed topbar actions (e.g. Mass Upload) — rendered
+          immediately before the New note "+" so always-visible global
+          actions sit next to the search bar and primary +. */}
+      <PluginSlot slot="topbar-actions" />
       {onNewNote && (
         <HeaderBtn onClick={onNewNote} title={`New note (${formatShortcut(['mod', 'shift', 'N'])})`} ariaLabel="New note">
           <Icons.Plus size={14} />

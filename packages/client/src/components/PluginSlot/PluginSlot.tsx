@@ -3,7 +3,12 @@ import { usePluginSlots } from "@azrtydxb/ui";
 import { PluginErrorBoundary } from "../../plugins/PluginErrorBoundary";
 
 interface PluginSlotProps {
-  slot: "sidebar" | "statusbar-left" | "statusbar-right" | "editor-toolbar";
+  slot:
+    | "sidebar"
+    | "statusbar-left"
+    | "statusbar-right"
+    | "editor-toolbar"
+    | "topbar-actions";
 }
 
 /**
@@ -41,6 +46,13 @@ export function PluginSlot({ slot }: PluginSlotProps) {
       break;
     case "editor-toolbar":
       items = plugins.editorToolbarButtons.map((p) => ({
+        id: p.id,
+        pluginId: p.pluginId,
+        component: p.component,
+      }));
+      break;
+    case "topbar-actions":
+      items = plugins.topbarActions.map((p) => ({
         id: p.id,
         pluginId: p.pluginId,
         component: p.component,

@@ -3,6 +3,7 @@ import type {
   SidebarPanelRegistration,
   StatusBarItemRegistration,
   EditorToolbarButtonRegistration,
+  TopbarActionRegistration,
   PageRegistration,
   NoteActionRegistration,
   CommandRegistration,
@@ -20,6 +21,7 @@ export interface PluginContextValue {
   statusBarLeft: StatusBarItemRegistration[];
   statusBarRight: StatusBarItemRegistration[];
   editorToolbarButtons: EditorToolbarButtonRegistration[];
+  topbarActions: TopbarActionRegistration[];
   pages: PageRegistration[];
   noteActions: NoteActionRegistration[];
   commands: CommandRegistration[];
@@ -55,6 +57,7 @@ export function PluginProvider({
     statusBarLeft: registry.getStatusBarItems("left"),
     statusBarRight: registry.getStatusBarItems("right"),
     editorToolbarButtons: registry.getEditorToolbarButtons(),
+    topbarActions: registry.getTopbarActions(),
     pages: registry.getPages(),
     noteActions: registry.getNoteActions(),
     commands: registry.getCommands(),

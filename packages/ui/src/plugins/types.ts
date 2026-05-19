@@ -81,6 +81,16 @@ export interface EditorToolbarButtonRegistration {
   component: ComponentType;
 }
 
+/** Plugin-contributed action rendered in the sidebar's Files section
+ *  header next to the built-in New note / New folder buttons. Use for
+ *  always-visible file-tree-scoped actions (bulk upload, import, etc.). */
+export interface TopbarActionRegistration {
+  id: string;
+  pluginId: string;
+  order: number;
+  component: ComponentType;
+}
+
 export interface SettingsSectionRegistration {
   id: string;
   pluginId: string;
@@ -179,6 +189,13 @@ export interface ClientPluginAPI {
       options: { id: string; position: "left" | "right"; order?: number }
     ): void;
     registerEditorToolbarButton(
+      component: ComponentType,
+      options: { id: string; order?: number }
+    ): void;
+    /** Register a button rendered in the sidebar's Files-section header
+     *  next to the built-in New note / New folder buttons. Always
+     *  visible (independent of editor / view mode). */
+    registerTopbarAction(
       component: ComponentType,
       options: { id: string; order?: number }
     ): void;

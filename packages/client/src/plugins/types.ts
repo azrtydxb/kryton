@@ -142,6 +142,10 @@ export interface ClientPluginAPI {
       icon: string;
       onClick: (notePath: string) => void;
     }): void;
+    registerTopbarAction(
+      component: ComponentType,
+      options: { id: string; order?: number }
+    ): void;
   };
   markdown: {
     registerCodeFenceRenderer(
