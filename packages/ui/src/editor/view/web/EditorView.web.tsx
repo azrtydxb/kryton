@@ -17,6 +17,21 @@ import { domRangeToSelection, selectionToDomRange } from "./selection";
 import { interpretBeforeInput } from "./beforeinput";
 import { normalizeClipboardData } from "./paste";
 
+/**
+ * Snapshot of one remote collaborator's selection, rendered as a colored
+ * caret + name label overlaid on the editor surface. Cursor offsets are
+ * char positions into the document text (the same coordinate space as
+ * `EditorState.selection`).
+ */
+export interface RemoteCursorDecoration {
+  id: string;
+  anchor: number;
+  head: number;
+  color: string;
+  name: string;
+  kind: "user" | "agent";
+}
+
 export interface EditorViewProps {
   /** Initial source text, only used on mount. Ignored when `controlledState`
    *  is provided — controlled mode reads the doc from `controlledState`. */
@@ -39,6 +54,13 @@ export interface EditorViewProps {
    */
   controlledState?: EditorState;
   onDispatch?: (tr: Transaction) => void;
+  /**
+   * Remote collaborator cursors rendered as colored carets + name
+   * labels. Positions are document char offsets in the same space as
+   * `state.selection`. The local user is the caller's responsibility to
+   * exclude (filter by clientID before passing in).
+   */
+  remoteCursors?: ReadonlyArray<RemoteCursorDecoration>;
 }
 
 const KIND_CLASS: Record<string, string> = {
@@ -59,7 +81,7 @@ const KIND_CLASS: Record<string, string> = {
 
 export function EditorView({
   initialDoc = "", plugins = [], onChange, onWikilinkClick, className,
-  controlledState, onDispatch,
+  controlledState, onDispatch, remoteCursors,
 }: EditorViewProps) {
   const rootRef = React.useRef<HTMLDivElement | null>(null);
   const composingRef = React.useRef(false);
@@ -204,8 +226,75 @@ export function EditorView({
   const runs = projectDom(state.doc, decos);
   const lineCount = state.doc.split("\n").length;
 
+  // Remote cursor overlays — position colored carets + labels at the
+  // DOM rect computed for each remote `head` offset. Recomputes on every
+  // render of the editor body (which already covers doc / decoration
+  // changes) and whenever the remote cursor list changes identity.
+  const [cursorRects, setCursorRects] = React.useState<
+    Array<{ id: string; top: number; left: number; height: number; color: string; name: string; kind: "user" | "agent" }>
+  >([]);
+  const cursorRectsRef = React.useRef(cursorRects);
+  cursorRectsRef.current = cursorRects;
+  const overlayRef = React.useRef<HTMLDivElement | null>(null);
+  React.useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (!root || !remoteCursors || remoteCursors.length === 0) {
+      if (cursorRectsRef.current.length > 0) setCursorRects([]);
+      return;
+    }
+    const containerRect = root.getBoundingClientRect();
+    const next: typeof cursorRects = [];
+    for (const rc of remoteCursors) {
+      const offset = rc.head;
+      let placed = false;
+      for (const child of Array.from(root.children)) {
+        const fromAttr = child.getAttribute("data-from");
+        const toAttr = child.getAttribute("data-to");
+        if (fromAttr === null || toAttr === null) continue;
+        const from = Number(fromAttr);
+        const to = Number(toAttr);
+        if (offset >= from && offset <= to) {
+          const textNode = child.firstChild ?? child;
+          const local = Math.max(0, Math.min((textNode.textContent ?? "").length, offset - from));
+          try {
+            const range = document.createRange();
+            range.setStart(textNode, local);
+            range.setEnd(textNode, local);
+            const rect = range.getBoundingClientRect();
+            // Empty lines collapse to a zero-width rect at (0,0) on some
+            // engines — fall back to the parent span's rect in that case.
+            const useRect = rect.height > 0 ? rect : (child as HTMLElement).getBoundingClientRect();
+            next.push({
+              id: rc.id,
+              top: useRect.top - containerRect.top + root.scrollTop,
+              left: useRect.left - containerRect.left + root.scrollLeft,
+              height: useRect.height || 16,
+              color: rc.color,
+              name: rc.name,
+              kind: rc.kind,
+            });
+            placed = true;
+          } catch {
+            // ignore
+          }
+          break;
+        }
+      }
+      void placed;
+    }
+    // Stable-by-id comparison: only re-set state when something actually changed.
+    const prev = cursorRectsRef.current;
+    const same =
+      next.length === prev.length &&
+      next.every((n, i) => {
+        const p = prev[i];
+        return p && p.id === n.id && p.top === n.top && p.left === n.left && p.height === n.height && p.color === n.color && p.name === n.name && p.kind === n.kind;
+      });
+    if (!same) setCursorRects(next);
+  });
+
   return (
-    <div className={className ?? "ed-shell"} data-editor-shell="">
+    <div className={className ?? "ed-shell"} data-editor-shell="" style={{ position: "relative" }}>
       <div className="ed-gutter" aria-hidden="true">
         {Array.from({ length: lineCount }, (_, i) => (
           <span key={i} className="ed-ln">{i + 1}</span>
@@ -223,6 +312,7 @@ export function EditorView({
         onSelect={onSelect}
         onClick={onClick}
         data-editor-root=""
+        style={{ position: "relative" }}
       >
         {runs.map((run, i) => (
           <span
@@ -236,6 +326,70 @@ export function EditorView({
             {run.text}
           </span>
         ))}
+        <div
+          ref={overlayRef}
+          aria-hidden="true"
+          data-remote-cursor-overlay=""
+          style={{
+            position: "absolute",
+            inset: 0,
+            pointerEvents: "none",
+            overflow: "hidden",
+          }}
+        >
+          {cursorRects.map((rc) => (
+            <div
+              key={rc.id}
+              data-remote-cursor={rc.id}
+              data-remote-cursor-kind={rc.kind}
+              style={{
+                position: "absolute",
+                top: rc.top,
+                left: rc.left,
+                height: rc.height,
+                width: 2,
+                background: rc.color,
+                pointerEvents: "none",
+              }}
+            >
+              <div
+                style={{
+                  position: "absolute",
+                  top: -2,
+                  left: 0,
+                  transform: "translateY(-100%)",
+                  padding: "1px 4px",
+                  borderRadius: 3,
+                  fontSize: 10,
+                  fontFamily: "var(--font-mono, monospace)",
+                  lineHeight: 1.2,
+                  color: "#fff",
+                  background: rc.color,
+                  whiteSpace: "nowrap",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                <span>{rc.name}</span>
+                {rc.kind === "agent" && (
+                  <span
+                    style={{
+                      fontSize: 8,
+                      fontWeight: 600,
+                      letterSpacing: 0.5,
+                      padding: "0 3px",
+                      borderRadius: 2,
+                      background: "rgba(0,0,0,0.25)",
+                    }}
+                  >
+                    AI
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
