@@ -28,12 +28,13 @@ resources:
 # be able to communicate with the Webhook Server.
 #- ../network-policy
 
-# Uncomment the patches line if you enable Metrics
-patches:
-# [METRICS] The following patch will enable the metrics endpoint using HTTPS and the port :8443.
-# More info: https://book.kubebuilder.io/reference/metrics
-- path: manager_metrics_patch.yaml
-  target:
-    kind: Deployment
+# [METRICS] Re-add this patch once cmd/manager/main.go supports the
+# --metrics-secure / --metrics-require-rbac / --metrics-bind-address=:8443
+# flags. The current scaffold patches crashed the manager because the
+# binary only wires the default --metrics-bind-address=:8080.
+# patches:
+# - path: manager_metrics_patch.yaml
+#   target:
+#     kind: Deployment
 
 

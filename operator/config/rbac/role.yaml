@@ -57,6 +57,14 @@ rules:
   - "apps"
   resources:
   - "deployments"
+  - "statefulsets"
+# The bitnami postgresql subchart renders a PodDisruptionBudget.
+- apiGroups:
+  - "policy"
+  resources:
+  - "poddisruptionbudgets"
+  verbs:
+  - "*"
 
 ##
 ## Rules for operator-only fields (backup, plugins, snapshot).
@@ -118,6 +126,21 @@ rules:
   resources:
   - roles
   - rolebindings
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+# The bitnami postgresql subchart renders a NetworkPolicy; without this
+# grant the helm upgrade fails with a forbidden error from the resource
+# diff step that the helm action client runs before applying.
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - networkpolicies
   verbs:
   - get
   - list

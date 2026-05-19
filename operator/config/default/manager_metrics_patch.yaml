@@ -1,12 +1,7 @@
-# This patch adds the args to allow exposing the metrics endpoint using HTTPS
-- op: add
-  path: /spec/template/spec/containers/0/args/0
-  value: --metrics-bind-address=:8443
-# This patch adds the args to allow securing the metrics endpoint
-- op: add
-  path: /spec/template/spec/containers/0/args/0
-  value: --metrics-secure
-# This patch adds the args to allow RBAC-based authn/authz the metrics endpoint
-- op: add
-  path: /spec/template/spec/containers/0/args/0
-  value: --metrics-require-rbac
+# The operator-sdk scaffolded patches assumed --metrics-secure /
+# --metrics-require-rbac / --metrics-bind-address=:8443 flags that
+# cmd/manager/main.go does not (yet) wire up. Until the manager binary
+# grows HTTPS + RBAC for its metrics endpoint, leave the default
+# :8080 plain-HTTP bind in place. Re-enable HTTPS by extending main.go
+# first and then restoring the flags here.
+[]
