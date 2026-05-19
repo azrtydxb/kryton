@@ -20,6 +20,7 @@ import { templatesRoutes } from "./routes/templates.routes.js";
 import { tagsRoutes } from "./routes/tags.routes.js";
 import { trashEmptyRoutes, trashRoutes } from "./routes/trash.routes.js";
 import { registerAuxRoutes } from "./aux-routes.js";
+import type { VaultEventOrigin } from "../vault-events/types.js";
 
 /**
  * Surface exposed to other modules via `app.notes`.
@@ -34,9 +35,18 @@ export interface NotesApi {
   /** Read a note's content + metadata. */
   readNote(userPath: string, userId: string): Promise<{ content: string; modifiedAt: Date | string | null }>;
   /** Write (create or update) a note. */
-  writeNote(userPath: string, content: string, userId: string): Promise<void>;
+  writeNote(
+    userPath: string,
+    content: string,
+    userId: string,
+    origin?: VaultEventOrigin,
+  ): Promise<void>;
   /** Delete a note (move to trash). */
-  deleteNote(userPath: string, userId: string): Promise<void>;
+  deleteNote(
+    userPath: string,
+    userId: string,
+    origin?: VaultEventOrigin,
+  ): Promise<void>;
   /** Scan the user's note tree. */
   scanDirectory(userId: string): Promise<unknown[]>;
 }
@@ -88,13 +98,13 @@ const notesModuleImpl: FastifyPluginAsync = async (app) => {
         const data = await noteService.readNote(dir, userPath);
         return { content: data.content, modifiedAt: data.modifiedAt ?? null };
       },
-      async writeNote(userPath, content, userId) {
+      async writeNote(userPath, content, userId, origin) {
         const dir = await getUserNotesDir(notesDir, userId);
-        await noteService.writeNote(dir, userPath, content, userId);
+        await noteService.writeNote(dir, userPath, content, userId, origin);
       },
-      async deleteNote(userPath, userId) {
+      async deleteNote(userPath, userId, origin) {
         const dir = await getUserNotesDir(notesDir, userId);
-        await noteService.deleteNote(dir, userPath, userId);
+        await noteService.deleteNote(dir, userPath, userId, origin);
       },
       async scanDirectory(userId) {
         const dir = await getUserNotesDir(notesDir, userId);
@@ -108,7 +118,7 @@ const notesModuleImpl: FastifyPluginAsync = async (app) => {
     app.decorate("trash", new TrashApi(app, notesDir));
   }
   if (!app.hasDecorator("folders")) {
-    app.decorate("folders", new FoldersApi(notesDir, noteService));
+    app.decorate("folders", new FoldersApi(app, notesDir, noteService));
   }
   if (!app.hasDecorator("noteService")) {
     app.decorate("noteService", noteService);

@@ -1,8 +1,10 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import type { FastifyInstance } from "fastify";
 import { ValidationError } from "../../../lib/errors.js";
 import type { NoteService } from "./note.service.js";
 import { getUserNotesDir } from "./user-notes-dir.service.js";
+import type { VaultEventOrigin } from "../../vault-events/types.js";
 
 /**
  * In-process folder API consumed by:
@@ -14,17 +16,29 @@ import { getUserNotesDir } from "./user-notes-dir.service.js";
  */
 export class FoldersApi {
   constructor(
+    private readonly app: FastifyInstance,
     private readonly notesDir: string,
     private readonly noteService: NoteService,
   ) {}
 
   /** Create a folder relative to the user's notes dir. */
-  async create(userId: string, folderPath: string): Promise<{ path: string }> {
+  async create(
+    userId: string,
+    folderPath: string,
+    origin?: VaultEventOrigin,
+  ): Promise<{ path: string }> {
     if (!folderPath) throw new ValidationError("Path is required");
     const userDir = await getUserNotesDir(this.notesDir, userId);
     const fullPath = path.join(userDir, folderPath);
     this.assertWithin(fullPath, userDir);
     await fs.mkdir(fullPath, { recursive: true });
+    this.app.vaultEvents?.emit(userId, {
+      kind: "folder.created",
+      path: folderPath,
+      clientId: origin?.clientId ?? null,
+      agentId: origin?.agentId ?? null,
+      agentName: origin?.agentName ?? null,
+    });
     return { path: folderPath };
   }
 
@@ -33,7 +47,11 @@ export class FoldersApi {
    * NoteService delete pipeline first so it lands in trash and the
    * indexes update. Non-md files (rare) get dropped.
    */
-  async delete(userId: string, folderPath: string): Promise<void> {
+  async delete(
+    userId: string,
+    folderPath: string,
+    origin?: VaultEventOrigin,
+  ): Promise<void> {
     if (!folderPath) throw new ValidationError("Path is required");
     const userDir = await getUserNotesDir(this.notesDir, userId);
     const fullPath = path.join(userDir, folderPath);
@@ -41,9 +59,19 @@ export class FoldersApi {
 
     const markdownFiles = await collectMarkdownFiles(userDir, folderPath);
     for (const relPath of markdownFiles) {
-      await this.noteService.deleteNote(userDir, relPath, userId);
+      // Each inner note delete emits its own `note.deleted` event so
+      // clients can drop the rows immediately; the trailing
+      // `folder.deleted` event lets them collapse the folder row too.
+      await this.noteService.deleteNote(userDir, relPath, userId, origin);
     }
     await fs.rm(fullPath, { recursive: true, force: true });
+    this.app.vaultEvents?.emit(userId, {
+      kind: "folder.deleted",
+      path: folderPath,
+      clientId: origin?.clientId ?? null,
+      agentId: origin?.agentId ?? null,
+      agentName: origin?.agentName ?? null,
+    });
   }
 
   /** Rename or move a folder. */
@@ -51,6 +79,7 @@ export class FoldersApi {
     userId: string,
     oldPath: string,
     newPath: string,
+    origin?: VaultEventOrigin,
   ): Promise<{ oldPath: string; newPath: string }> {
     if (!oldPath || !newPath) {
       throw new ValidationError("oldPath and newPath are required");
@@ -63,6 +92,14 @@ export class FoldersApi {
 
     await fs.mkdir(path.dirname(newFull), { recursive: true });
     await fs.rename(oldFull, newFull);
+    this.app.vaultEvents?.emit(userId, {
+      kind: "folder.renamed",
+      from: oldPath,
+      to: newPath,
+      clientId: origin?.clientId ?? null,
+      agentId: origin?.agentId ?? null,
+      agentName: origin?.agentName ?? null,
+    });
     return { oldPath, newPath };
   }
 

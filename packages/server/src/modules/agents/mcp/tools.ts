@@ -1,7 +1,6 @@
 import * as path from "path";
 import type { FastifyInstance } from "fastify";
 import { eq, and } from "drizzle-orm";
-import { validatePathWithinBase } from "../../../lib/pathUtils.js";
 import { settings } from "../../../db/schema/settings.js";
 
 const STARRED_KEY = "starred";
@@ -450,12 +449,11 @@ export async function executeTool(
       return filterFolders(tree);
     }
     case "create_folder": {
-      const userDir = await app.notes.getUserNotesDir(userId);
-      const folderPath = path.join(userDir, args.path as string);
-      validatePathWithinBase(folderPath, userDir);
-      const { mkdir } = await import("fs/promises");
-      await mkdir(folderPath, { recursive: true });
-      return { success: true, path: args.path };
+      // Route through app.folders.create so the vault-events emission
+      // (and path-safety check inside FoldersApi) stays consistent with
+      // the REST handler.
+      const result = await app.folders.create(userId, args.path as string);
+      return { success: true, path: result.path };
     }
     case "get_daily_note": {
       const { format } = await import("date-fns");

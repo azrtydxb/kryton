@@ -18,6 +18,7 @@ import {
 import type { NoteService } from "../services/note.service.js";
 import { getUserNotesDir } from "../services/user-notes-dir.service.js";
 import { decodePathParam, ensureExtension } from "../../../lib/pathUtils.js";
+import { originFromRequest } from "../../vault-events/index.js";
 
 export interface NotesRoutesDeps {
   notesDir: string;
@@ -110,7 +111,13 @@ export function notesRoutes(deps: NotesRoutesDeps): FastifyPluginAsync {
         const { path: notePath, content } = req.body;
         const fullNotePath = ensureExtension(notePath, ".md");
 
-        await noteService.writeNote(userDir, fullNotePath, content ?? "", ctx.user.id);
+        await noteService.writeNote(
+          userDir,
+          fullNotePath,
+          content ?? "",
+          ctx.user.id,
+          originFromRequest(req, ctx),
+        );
         reply.status(201);
         return { path: fullNotePath, message: "Note created" };
       },
@@ -138,7 +145,13 @@ export function notesRoutes(deps: NotesRoutesDeps): FastifyPluginAsync {
         if (!notePath) throw new ValidationError("Path is required");
 
         const fullNotePath = ensureExtension(notePath, ".md");
-        await noteService.writeNote(userDir, fullNotePath, req.body.content, ctx.user.id);
+        await noteService.writeNote(
+          userDir,
+          fullNotePath,
+          req.body.content,
+          ctx.user.id,
+          originFromRequest(req, ctx),
+        );
         return { path: fullNotePath, message: "Note updated" };
       },
     );
@@ -164,7 +177,12 @@ export function notesRoutes(deps: NotesRoutesDeps): FastifyPluginAsync {
         if (!notePath) throw new ValidationError("Path is required");
 
         const fullNotePath = ensureExtension(notePath, ".md");
-        await noteService.deleteNote(userDir, fullNotePath, ctx.user.id);
+        await noteService.deleteNote(
+          userDir,
+          fullNotePath,
+          ctx.user.id,
+          originFromRequest(req, ctx),
+        );
         return { message: "Note deleted" };
       },
     );
@@ -209,7 +227,13 @@ export function notesRenameRoutes(deps: NotesRoutesDeps): FastifyPluginAsync {
         const fullOldPath = ensureExtension(oldPath, ".md");
         const fullNewPath = ensureExtension(req.body.newPath, ".md");
 
-        await noteService.renameNote(userDir, fullOldPath, fullNewPath, ctx.user.id);
+        await noteService.renameNote(
+          userDir,
+          fullOldPath,
+          fullNewPath,
+          ctx.user.id,
+          originFromRequest(req, ctx),
+        );
         return { oldPath: fullOldPath, newPath: fullNewPath, message: "Note renamed" };
       },
     );
