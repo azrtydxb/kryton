@@ -1,8 +1,10 @@
-import { ComponentType, useRef, useState, useEffect } from 'react';
+import { ComponentType, useRef, useState, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { useDebouncedCallback } from 'use-debounce';
+import type { RemoteCursorDecoration } from '@azrtydxb/ui';
 import { FileNode } from '../../lib/api';
 import { Editor, type EditorCursorState, type EditorHandle, EditorTabStrip, ModePills } from '../Editor/Editor';
 import { EditorToolbar } from '../Editor/EditorToolbar';
+import { PresenceStrip, type PresenceEntry } from '../Editor/PresenceStrip';
 import { Preview } from '../Preview/Preview';
 // OutgoingLinksPanel intentionally removed to match design handoff: the
 // editor surface has only the tab strip + body + EditorMeta (28px). Outgoing
@@ -11,6 +13,8 @@ import { Icons } from '../Icons';
 import { usePrefs } from '../../stores/prefsStore';
 import { useYjsDocument } from '../../hooks/useYjsDocument';
 import { useToastStore } from '../../stores/toastStore';
+import { useAuth } from '../../hooks/useAuth';
+import { presenceColor } from '../../lib/presenceColor';
 
 type SaveStatus = 'unchanged' | 'unsaved' | 'saving' | 'saved' | 'error';
 
@@ -65,7 +69,76 @@ export function EditModeView({
   // shared paths is explicitly out of scope per the design doc.
   const isShared = activeNote.tabId?.startsWith('shared:') ?? false;
   const yjsPath = isShared ? null : activeNote.path;
-  const { ytext, status: yjsStatus } = useYjsDocument(yjsPath);
+  const { user } = useAuth();
+  const identity = useMemo(() => {
+    if (!user) return null;
+    return {
+      id: user.id,
+      name: user.name || user.email || 'You',
+      color: presenceColor(user.id, 'user'),
+    };
+  }, [user]);
+  const { ytext, awareness, status: yjsStatus, publishCursor } = useYjsDocument(yjsPath, identity);
+
+  // Subscribe to remote awareness states via useSyncExternalStore so the
+  // component re-renders exactly when peers join, leave, move cursors,
+  // or republish identity. Snapshot returns a referentially stable tuple
+  // keyed on the awareness clock + state count to avoid React's
+  // "snapshot changed on every render" warning.
+  const remoteStates = useSyncExternalStore(
+    (cb) => {
+      if (!awareness) return () => {};
+      awareness.on('update', cb);
+      return () => awareness.off('update', cb);
+    },
+    () => awareness?.getStates() ?? null,
+    () => null,
+  );
+
+  const localClientId = awareness?.clientID ?? -1;
+  const remoteCursors = useMemo<ReadonlyArray<RemoteCursorDecoration>>(() => {
+    if (!remoteStates) return [];
+    const out: RemoteCursorDecoration[] = [];
+    for (const [clientId, state] of remoteStates.entries()) {
+      if (clientId === localClientId) continue;
+      const s = state as { user?: { id?: string; name?: string; color?: string; kind?: 'user' | 'agent' }; cursor?: { anchor?: number; head?: number } };
+      const u = s.user;
+      if (!u || typeof u.id !== 'string' || typeof u.name !== 'string' || typeof u.color !== 'string') continue;
+      const c = s.cursor;
+      if (!c || typeof c.anchor !== 'number' || typeof c.head !== 'number') continue;
+      out.push({
+        id: `${clientId}`,
+        anchor: c.anchor,
+        head: c.head,
+        color: u.color,
+        name: u.name,
+        kind: u.kind === 'agent' ? 'agent' : 'user',
+      });
+    }
+    return out;
+  }, [remoteStates, localClientId]);
+
+  const presenceEntries = useMemo<ReadonlyArray<PresenceEntry>>(() => {
+    if (!remoteStates) return [];
+    const seen = new Set<string>();
+    const out: PresenceEntry[] = [];
+    for (const [clientId, state] of remoteStates.entries()) {
+      if (clientId === localClientId) continue;
+      const s = state as { user?: { id?: string; name?: string; color?: string; kind?: 'user' | 'agent' } };
+      const u = s.user;
+      if (!u || typeof u.id !== 'string' || typeof u.name !== 'string' || typeof u.color !== 'string') continue;
+      // Dedupe by id across multiple clients of the same user.
+      if (seen.has(u.id)) continue;
+      seen.add(u.id);
+      out.push({
+        id: u.id,
+        name: u.name,
+        color: u.color,
+        kind: u.kind === 'agent' ? 'agent' : 'user',
+      });
+    }
+    return out;
+  }, [remoteStates, localClientId]);
 
   // Surface a one-shot toast when the live-sync handshake fails so the
   // user knows the editor has fallen back to the HTTP save path. The
@@ -170,6 +243,9 @@ export function EditModeView({
           display: 'flex', alignItems: 'center', gap: 8,
           padding: '0 12px 0 4px', height: 38,
         }}>
+          {presenceEntries.length > 0 && (
+            <PresenceStrip entries={presenceEntries} />
+          )}
           <ModePills />
           {/* Star / Share / More — per prototype/app/editor.jsx EditorTabBar */}
           {headerBtn({
@@ -214,7 +290,9 @@ export function EditModeView({
                 content={editContent ?? activeNote.content}
                 onChange={onContentChange}
                 onCursorStateChange={onCursorStateChange}
+                onSelectionChange={yjsStatus === 'connected' ? publishCursor : undefined}
                 ytext={yjsStatus === 'connected' ? ytext : null}
+                remoteCursors={remoteCursors}
               />
             </div>
           </div>

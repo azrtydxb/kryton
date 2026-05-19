@@ -14,6 +14,7 @@ import {
   createYjsBinding,
   type EditorPlugin,
   type EditorState,
+  type RemoteCursorDecoration,
   type Transaction,
   type YjsBinding,
 } from '@azrtydxb/ui';
@@ -66,6 +67,20 @@ interface EditorProps {
    * mode driven by `content` + the parent's `onChange` debounced save.
    */
   ytext?: Y.Text | null;
+  /**
+   * Remote collaborator cursors rendered as colored carets + labels
+   * over the editor surface. Caller is responsible for filtering out
+   * the local user (compare against `awareness.clientID`).
+   */
+  remoteCursors?: ReadonlyArray<RemoteCursorDecoration>;
+  /**
+   * Fired with every selection change (caret moves, drags, typing).
+   * Used by the awareness pipeline to publish the local cursor without
+   * re-publishing identity. Offsets are character positions in the
+   * Y.Text("content") coordinate space (same space as the editor's
+   * internal `EditorState.selection`).
+   */
+  onSelectionChange?: (anchor: number, head: number) => void;
 }
 
 function countWords(text: string): number {
@@ -96,6 +111,8 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     onWikilinkClick,
     className,
     ytext,
+    remoteCursors,
+    onSelectionChange,
   }: EditorProps,
   ref,
 ) {
@@ -157,6 +174,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
         setControlledState(next);
         setLocalDoc(next.doc);
         selectionRef.current = next.selection;
+        onSelectionChange?.(next.selection.anchor, next.selection.head);
         onChange(next.doc);
         if (onCursorStateChange) {
           const offset = next.selection.head;
@@ -181,6 +199,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
 
   const handleChange = (state: EditorState) => {
     selectionRef.current = state.selection;
+    onSelectionChange?.(state.selection.anchor, state.selection.head);
     const doc = state.doc;
     // Keep localDoc in sync for imperative ops without triggering remount.
     setLocalDoc(doc);
@@ -207,6 +226,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
       controlledStateRef.current = next;
       setControlledState(next);
       selectionRef.current = next.selection;
+      onSelectionChange?.(next.selection.anchor, next.selection.head);
       return;
     }
     bindingRef.current?.applyLocal(tr);
@@ -296,6 +316,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
           onDispatch={handleDispatch}
           onWikilinkClick={onWikilinkClick}
           className="h-full w-full"
+          remoteCursors={remoteCursors}
         />
       ) : (
         <EditorView
@@ -305,6 +326,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
           onChange={handleChange}
           onWikilinkClick={onWikilinkClick}
           className="h-full w-full"
+          remoteCursors={remoteCursors}
         />
       )}
     </div>

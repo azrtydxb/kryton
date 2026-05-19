@@ -53,9 +53,42 @@ const DEBOUNCE_MAX_MS = 30_000;
 // Eviction grace period after last client disconnects.
 const EVICT_GRACE_MS = 60_000;
 
+/**
+ * Synthetic agent-presence settle window. After a server-routed AI edit
+ * lands in a live doc we publish a transient `kind:"agent"` awareness
+ * state on a fresh local Awareness instance under the registry, then
+ * clear it after this many milliseconds so connected human clients see a
+ * brief "AI is editing" pill. Re-firing within the window resets the
+ * timer (debounced so rapid-fire edits don't churn presence).
+ */
+const AGENT_PRESENCE_TTL_MS = 4_000;
+
+/**
+ * Deterministic hue mapping for synthetic agent presence colors. Mirrors
+ * the client-side `presenceColor` agent palette (warm wedge 10°–50°) so
+ * the cursor / avatar color is consistent regardless of whether the
+ * agent presence was minted client-side (future WS-bearer path) or
+ * server-side here.
+ */
+function agentPresenceColor(agentId: string): string {
+  let h = 5381;
+  for (let i = 0; i < agentId.length; i++) {
+    h = ((h << 5) + h) ^ agentId.charCodeAt(i);
+  }
+  const hue = 10 + ((h >>> 0) % 40);
+  return `hsl(${hue}, 72%, 50%)`;
+}
+
 interface AuthInfo {
   userId: string;
   agentId: string | null;
+}
+
+interface AgentPresence {
+  /** Synthetic clientID we registered against the doc's Awareness map. */
+  clientId: number;
+  /** Pending clear timer; fires AGENT_PRESENCE_TTL_MS after the last edit. */
+  clearTimer: NodeJS.Timeout;
 }
 
 interface DocEntry {
@@ -78,6 +111,13 @@ interface DocEntry {
    * edits, null for disk-watcher edits, null for plain client typing).
    */
   lastEditOrigin: YServerOrigin | null;
+  /**
+   * Transient synthetic agent presences keyed by agentId. Server-routed
+   * AI edits publish into here so connected human clients see an "AI is
+   * editing" pill on the same awareness channel; the entry is cleared
+   * after `AGENT_PRESENCE_TTL_MS` of quiet, debounced per agent.
+   */
+  agentPresences: Map<string, AgentPresence>;
 }
 
 export interface YjsRegistry {
@@ -266,6 +306,86 @@ export function registerYjsRoutes(
   };
 
   /**
+   * Mint a stable synthetic Awareness clientID for an agent. Real Y
+   * client IDs come from `doc.clientID` which yjs generates as a 32-bit
+   * unsigned random; pushing the synthetic id into the negative half of
+   * the int range avoids any plausible collision while keeping the
+   * value a finite number (the y-protocols encoder writes varints).
+   *
+   * Stable across calls for the same agentId so repeated edits update
+   * the SAME awareness entry instead of stacking presences.
+   */
+  const agentClientId = (agentId: string): number => {
+    let h = 5381;
+    for (let i = 0; i < agentId.length; i++) {
+      h = ((h << 5) + h) ^ agentId.charCodeAt(i);
+    }
+    // Map into a high positive band well above any realistic yjs random.
+    // 2^31 + (h mod 2^30) keeps it in a 31-bit unsigned region that
+    // varint encoding tolerates and that yjs clientID generation never
+    // hits in practice.
+    return 0x7000_0000 + ((h >>> 0) & 0x0fff_ffff);
+  };
+
+  const publishAgentPresence = (
+    entry: DocEntry,
+    agentId: string,
+    agentName: string,
+  ): void => {
+    const clientId = agentClientId(agentId);
+    const existing = entry.agentPresences.get(agentId);
+    // Idempotent state: write a fresh awareness entry every time so the
+    // clock advances and the encoded update broadcasts to peers (even
+    // if the same agent re-fires before the TTL elapses).
+    const state = {
+      user: {
+        id: agentId,
+        name: agentName,
+        color: agentPresenceColor(agentId),
+        kind: "agent" as const,
+      },
+    };
+    const prevMeta = entry.awareness.meta.get(clientId);
+    // Start at clock=1 so the client's `applyAwarenessUpdate` accepts
+    // the entry — its check is `currClock < clock`, and currClock for
+    // an unknown client defaults to 0. A clock of 0 would be silently
+    // dropped on the receiving end.
+    const clock = prevMeta === undefined ? 1 : prevMeta.clock + 1;
+    const isNew = !entry.awareness.states.has(clientId);
+    entry.awareness.states.set(clientId, state);
+    entry.awareness.meta.set(clientId, {
+      clock,
+      lastUpdated: Date.now(),
+    });
+    entry.awareness.emit("update", [
+      { added: isNew ? [clientId] : [], updated: isNew ? [] : [clientId], removed: [] },
+      "server",
+    ]);
+
+    if (existing) clearTimeout(existing.clearTimer);
+    const clearTimer = setTimeout(() => {
+      const presence = entry.agentPresences.get(agentId);
+      if (!presence) return;
+      const meta = entry.awareness.meta.get(clientId);
+      const nextClock = (meta?.clock ?? 0) + 1;
+      entry.awareness.states.delete(clientId);
+      entry.awareness.meta.set(clientId, {
+        clock: nextClock,
+        lastUpdated: Date.now(),
+      });
+      entry.awareness.emit("update", [
+        { added: [], updated: [], removed: [clientId] },
+        "server",
+      ]);
+      entry.agentPresences.delete(agentId);
+    }, AGENT_PRESENCE_TTL_MS);
+    // Don't keep the event loop alive on the timer alone — when the
+    // process is otherwise idle the presence clear is best-effort.
+    if (typeof clearTimer.unref === "function") clearTimer.unref();
+    entry.agentPresences.set(agentId, { clientId, clearTimer });
+  };
+
+  /**
    * Authorize an authenticated user against a docId before allowing
    * them to open or create the corresponding Y.Doc. Without this, any
    * authenticated user could create arbitrary docIds and accumulate
@@ -363,6 +483,7 @@ export function registerYjsRoutes(
         flushing: null,
         evictTimer: null,
         lastEditOrigin: null,
+        agentPresences: new Map(),
       };
       docs.set(docId, entry);
       await incUserCount(auth.userId);
@@ -513,6 +634,10 @@ export function registerYjsRoutes(
         if (entry.evictTimer) clearTimeout(entry.evictTimer);
         entry.evictTimer = setTimeout(() => {
           if (entry.clients.size === 0) {
+            for (const presence of entry.agentPresences.values()) {
+              clearTimeout(presence.clearTimer);
+            }
+            entry.agentPresences.clear();
             docs.delete(docId);
             decUserCount(entry.userId);
           }
@@ -616,6 +741,12 @@ export function registerYjsRoutes(
         ytext.delete(0, ytext.length);
         ytext.insert(0, newContent);
       }, yOrigin);
+      // Publish a transient agent presence so human collaborators see
+      // an "AI is editing" pill on the same awareness channel. Skipped
+      // for non-agent server writes (e.g. raw HTTP PUT with no agent).
+      if (origin.agentId) {
+        publishAgentPresence(entry, origin.agentId, origin.agentName ?? "AI");
+      }
     },
     async applyDiskUpdate(docId, userId, diskContent) {
       const entry = docs.get(docId);
