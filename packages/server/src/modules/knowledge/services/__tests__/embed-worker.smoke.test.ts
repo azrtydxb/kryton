@@ -141,6 +141,14 @@ describe("EmbedWorker (smoke)", () => {
 
   it("treats ENOENT (missing file) as a delete: clears chunks + removes job", async () => {
     const notePath = "ghost.md";
+    const fullPath = path.join(notesDir, TEST_USER_ID, notePath);
+
+    // Defensively ensure the file does NOT exist. Without this, prior state
+    // (or another test polluting the user dir) silently routes the worker
+    // into the upsert path and the assertions below fail confusingly with
+    // "expected length 0 got 1" instead of pointing at the real cause.
+    await fs.rm(fullPath, { force: true });
+    await expect(fs.access(fullPath)).rejects.toMatchObject({ code: "ENOENT" });
 
     // Seed pre-existing chunks for this note (as if a prior embed had run).
     await handle.db.insert(searchIndex).values({
