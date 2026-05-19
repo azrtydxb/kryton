@@ -42,6 +42,28 @@ function makeApi(): ClientPluginAPI {
       usePluginSettings: () => null,
     },
     api: { fetch: vi.fn() as unknown as ClientPluginAPI["api"]["fetch"] },
+    notes: {
+      list: vi.fn(),
+      get: vi.fn(),
+      getContent: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      openByPath: vi.fn(),
+      replaceFenceAtRange: vi.fn(),
+    } as unknown as ClientPluginAPI["notes"],
+    storage: {
+      get: vi.fn(),
+      set: vi.fn(),
+      delete: vi.fn(),
+      list: vi.fn(),
+    } as unknown as ClientPluginAPI["storage"],
+    editor: {
+      registerPlugin: vi.fn(() => () => {}),
+      getActiveState: vi.fn(),
+      dispatch: vi.fn(),
+      onTransaction: vi.fn(() => () => {}),
+    } as unknown as ClientPluginAPI["editor"],
     notify: {
       info: vi.fn(),
       success: vi.fn(),

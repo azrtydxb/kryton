@@ -36,6 +36,24 @@ export interface ActivePluginInfo {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
+// Built-in API value types (notes / storage)
+// ──────────────────────────────────────────────────────────────────────────────
+
+export interface PluginNoteEntry {
+  name: string;
+  path: string;
+  type: "file" | "directory";
+  children?: PluginNoteEntry[];
+}
+
+export interface PluginNoteFile {
+  path: string;
+  content: string;
+  title: string;
+  modifiedAt: string;
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 // Slot registrations (mirrors packages/client/src/plugins/types.ts)
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -193,6 +211,41 @@ export interface ClientPluginAPI {
   };
   api: {
     fetch(path: string, options?: RequestInit): Promise<Response>;
+  };
+  notes: {
+    list(folder?: string): Promise<PluginNoteEntry[]>;
+    get(path: string): Promise<PluginNoteFile>;
+    getContent(path: string): Promise<string>;
+    create(path: string, content: string): Promise<{ ok: true }>;
+    update(path: string, content: string): Promise<{ ok: true }>;
+    delete(path: string): Promise<{ ok: true }>;
+    openByPath(path: string): Promise<{ ok: true }>;
+    replaceFenceAtRange(
+      path: string,
+      range: { startLine: number; endLine: number },
+      newSource: string,
+    ): Promise<{ ok: true }>;
+  };
+  storage: {
+    get(key: string): Promise<unknown>;
+    set(key: string, value: unknown): Promise<{ ok: true }>;
+    delete(key: string): Promise<{ ok: true }>;
+    list(prefix?: string): Promise<
+      Array<{ key: string; value: unknown; userId: string | null }>
+    >;
+  };
+  editor: {
+    registerPlugin(
+      plugin: import("../editor/state").EditorPlugin,
+    ): () => void;
+    getActiveState(): import("../editor/state").EditorState | null;
+    dispatch(tr: import("../editor/state").Transaction): void;
+    onTransaction(
+      cb: (
+        tr: import("../editor/state").Transaction,
+        state: import("../editor/state").EditorState,
+      ) => void,
+    ): () => void;
   };
   notify: {
     info(message: string): void;

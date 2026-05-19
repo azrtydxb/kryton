@@ -16,6 +16,12 @@ import { projectDom } from "./projectDom";
 import { domRangeToSelection, selectionToDomRange } from "./selection";
 import { interpretBeforeInput } from "./beforeinput";
 import { normalizeClipboardData } from "./paste";
+import {
+  emitEditorTransaction,
+  getEditorPlugins,
+  setActiveEditor,
+  subscribeEditorPlugins,
+} from "../../../plugins/editor-registry";
 
 /**
  * Snapshot of one remote collaborator's selection, rendered as a colored
@@ -106,6 +112,38 @@ export function EditorView({
     setStateInternal(next);
   }, [onChange]);
 
+  // Plugins dynamically registered via api.editor.registerPlugin. Merged
+  // with the explicit `plugins` prop on every render so decorations /
+  // onKeyDown handlers come from both sources.
+  const [dynamicPlugins, setDynamicPlugins] = React.useState<
+    readonly EditorPlugin[]
+  >(() => getEditorPlugins());
+  React.useEffect(() => {
+    return subscribeEditorPlugins(setDynamicPlugins);
+  }, []);
+  const allPlugins = React.useMemo(
+    () => [...plugins, ...dynamicPlugins],
+    [plugins, dynamicPlugins],
+  );
+  const allPluginsRef = React.useRef(allPlugins);
+  React.useLayoutEffect(() => {
+    allPluginsRef.current = allPlugins;
+  }, [allPlugins]);
+
+  const dispatchTransaction = React.useCallback(
+    (transaction: Transaction) => {
+      if (onDispatchRef.current) {
+        onDispatchRef.current(transaction);
+        emitEditorTransaction(transaction, stateRef.current);
+        return;
+      }
+      const next = applyTransaction(stateRef.current, transaction);
+      setState(next);
+      emitEditorTransaction(transaction, next);
+    },
+    [setState],
+  );
+
   const dispatch = React.useCallback((tr: { ops: Operation[]; selection: Selection | null }) => {
     const transaction = transactionFromOps(tr.ops, tr.selection ?? undefined);
     if (onDispatchRef.current) {
@@ -114,11 +152,26 @@ export function EditorView({
       // ops route through the binding before being reflected back as the
       // next `controlledState`.
       onDispatchRef.current(transaction);
+      emitEditorTransaction(transaction, stateRef.current);
       return;
     }
     historyRef.current.record(stateRef.current, tr);
-    setState(applyTransaction(stateRef.current, transaction));
+    const next = applyTransaction(stateRef.current, transaction);
+    setState(next);
+    emitEditorTransaction(transaction, next);
   }, [setState]);
+
+  // Register this view as the active editor for the module-scoped editor
+  // registry so client plugins' api.editor.{getActiveState,dispatch} talk
+  // to it. Latest mount wins (the host app mounts at most one EditorView
+  // for the active note).
+  React.useEffect(() => {
+    setActiveEditor({
+      getState: () => stateRef.current,
+      dispatch: dispatchTransaction,
+    });
+    return () => setActiveEditor(null);
+  }, [dispatchTransaction]);
 
   // After every render, replace selection in the DOM to match state.selection.
   React.useLayoutEffect(() => {
@@ -175,6 +228,27 @@ export function EditorView({
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    // Plugin cascade: each EditorPlugin with onKeyDown gets a chance to
+    // claim the event. The first non-null result wins. Returning a
+    // Transaction dispatches it; "prevent-default" swallows the event
+    // without dispatching. null passes through to the next plugin (then
+    // the editor's own keymap below).
+    for (const p of allPluginsRef.current) {
+      if (!p.onKeyDown) continue;
+      let result: ReturnType<NonNullable<EditorPlugin["onKeyDown"]>>;
+      try {
+        result = p.onKeyDown(e.nativeEvent, stateRef.current);
+      } catch (err) {
+        console.error(`[plugins] ${p.name}.onKeyDown threw:`, err);
+        continue;
+      }
+      if (result === null || result === undefined) continue;
+      e.preventDefault();
+      if (result === "prevent-default") return;
+      dispatchTransaction(result);
+      return;
+    }
+
     const meta = e.metaKey || e.ctrlKey;
     if (meta && e.key === "z" && !e.shiftKey) {
       // In controlled mode the local history stack is unused — undo/redo
@@ -221,7 +295,7 @@ export function EditorView({
 
   const decos = [
     ...emitDecorations(state.doc, state.tree),
-    ...collectDecorations(plugins, state),
+    ...collectDecorations(allPlugins, state),
   ];
   const runs = projectDom(state.doc, decos);
   const lineCount = state.doc.split("\n").length;

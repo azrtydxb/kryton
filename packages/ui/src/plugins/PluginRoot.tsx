@@ -8,6 +8,12 @@ import * as ReactDOM from "react-dom";
 import { PluginProvider } from "./PluginContext";
 import { PluginSlotRegistry } from "./registry";
 import { loadPlugin } from "./loader";
+import {
+  dispatchToActiveEditor,
+  getActiveEditorState,
+  registerEditorPlugin,
+  subscribeEditorTransactions,
+} from "./editor-registry";
 import type { ActivePluginInfo, ClientPluginAPI, ClientPluginModule } from "./types";
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -135,6 +141,115 @@ export function PluginRoot({ activePlugins, children }: PluginRootProps) {
 // API factory — mirrors ClientPluginManager.createClientApi() in packages/client
 // ──────────────────────────────────────────────────────────────────────────────
 
+async function jsonFetch<T>(
+  input: RequestInfo,
+  init?: RequestInit,
+): Promise<T> {
+  const res = await fetch(input, {
+    credentials: "include",
+    ...init,
+    headers: {
+      "X-Requested-With": "XMLHttpRequest",
+      ...(init?.headers ?? {}),
+    },
+  });
+  if (!res.ok) {
+    throw new Error(`${res.status} ${res.statusText}`);
+  }
+  // 204 / empty body → return null cast.
+  const text = await res.text();
+  return (text ? JSON.parse(text) : null) as T;
+}
+
+function buildNotesApi(): ClientPluginAPI["notes"] {
+  const base = "/api/plugin-builtin/notes";
+  const get = (path: string) =>
+    jsonFetch<{
+      path: string;
+      content: string;
+      title: string;
+      modifiedAt: string;
+    }>(`${base}/get?path=${encodeURIComponent(path)}`);
+
+  return {
+    list: (folder?: string) =>
+      jsonFetch(
+        `${base}/list${folder ? `?folder=${encodeURIComponent(folder)}` : ""}`,
+      ),
+    get,
+    getContent: async (path: string) => (await get(path)).content,
+    create: (path: string, content: string) =>
+      jsonFetch(`${base}/create`, {
+        method: "POST",
+        body: JSON.stringify({ path, content }),
+        headers: { "Content-Type": "application/json" },
+      }),
+    update: (path: string, content: string) =>
+      jsonFetch(`${base}/update`, {
+        method: "POST",
+        body: JSON.stringify({ path, content }),
+        headers: { "Content-Type": "application/json" },
+      }),
+    delete: (path: string) =>
+      jsonFetch(`${base}/delete?path=${encodeURIComponent(path)}`, {
+        method: "DELETE",
+      }),
+    openByPath: (path: string) =>
+      jsonFetch(`${base}/openByPath`, {
+        method: "POST",
+        body: JSON.stringify({ path }),
+        headers: { "Content-Type": "application/json" },
+      }),
+    replaceFenceAtRange: (path, range, newSource) =>
+      jsonFetch(`${base}/replaceFenceAtRange`, {
+        method: "POST",
+        body: JSON.stringify({ path, range, newSource }),
+        headers: { "Content-Type": "application/json" },
+      }),
+  };
+}
+
+function buildStorageApi(pluginId: string): ClientPluginAPI["storage"] {
+  const base = "/api/plugin-builtin/storage";
+  const headers = { "X-Kryton-Plugin-Id": pluginId };
+  const jsonHeaders = { ...headers, "Content-Type": "application/json" };
+
+  return {
+    get: async (key: string) => {
+      const r = await jsonFetch<{ value: unknown }>(
+        `${base}/get?key=${encodeURIComponent(key)}`,
+        { headers },
+      );
+      return r.value;
+    },
+    set: (key: string, value: unknown) =>
+      jsonFetch(`${base}/set`, {
+        method: "POST",
+        body: JSON.stringify({ key, value }),
+        headers: jsonHeaders,
+      }),
+    delete: (key: string) =>
+      jsonFetch(`${base}/delete?key=${encodeURIComponent(key)}`, {
+        method: "DELETE",
+        headers,
+      }),
+    list: (prefix?: string) =>
+      jsonFetch(
+        `${base}/list${prefix ? `?prefix=${encodeURIComponent(prefix)}` : ""}`,
+        { headers },
+      ),
+  };
+}
+
+function buildEditorApi(): ClientPluginAPI["editor"] {
+  return {
+    registerPlugin: (plugin) => registerEditorPlugin(plugin),
+    getActiveState: () => getActiveEditorState(),
+    dispatch: (tr) => dispatchToActiveEditor(tr),
+    onTransaction: (cb) => subscribeEditorTransactions(cb),
+  };
+}
+
 function buildClientApi(
   pluginId: string,
   registry: PluginSlotRegistry,
@@ -183,6 +298,9 @@ function buildClientApi(
         });
       },
     },
+    notes: buildNotesApi(),
+    storage: buildStorageApi(pluginId),
+    editor: buildEditorApi(),
     notify: {
       info: (msg) => console.log(`[plugin:${pluginId}]`, msg),
       success: (msg) => console.log(`[plugin:${pluginId}]`, msg),
