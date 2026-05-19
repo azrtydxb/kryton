@@ -294,25 +294,7 @@ describe("EditorView suggestion integration", () => {
     expect(document.querySelector('[data-suggestion-popup=""]')).toBeNull();
   });
 
-  it("Enter applies the suggestion and replaces the trigger range", async () => {
-    const plugin = makeSuggestionPlugin([
-      { id: "x", label: "Insert X", kind: "command", insert: "XYZ" },
-    ]);
-
-    let lastState: { doc: string } | null = null;
-    const { container } = render(
-      <EditorView
-        initialDoc=""
-        plugins={[plugin]}
-        onChange={(s) => {
-          lastState = s;
-        }}
-      />,
-    );
-    const root = container.querySelector(
-      '[data-editor-root=""]',
-    ) as HTMLDivElement;
-
+  async function typeSlashTrigger(root: HTMLDivElement) {
     const sel = window.getSelection()!;
     const r = document.createRange();
     r.setStart(root.firstChild ?? root, 0);
@@ -334,13 +316,86 @@ describe("EditorView suggestion integration", () => {
       await Promise.resolve();
       await Promise.resolve();
     });
+  }
 
-    // Doc now is "/"; trigger.from=1, caret=1; Enter should replace [1..1]
-    // with "XYZ" → doc becomes "/XYZ".
+  it("Enter on a slash suggestion consumes the trigger char by default", async () => {
+    const plugin = makeSuggestionPlugin([
+      { id: "x", label: "Insert X", kind: "command", insert: "XYZ" },
+    ]);
+
+    let lastState: { doc: string } | null = null;
+    const { container } = render(
+      <EditorView
+        initialDoc=""
+        plugins={[plugin]}
+        onChange={(s) => {
+          lastState = s;
+        }}
+      />,
+    );
+    const root = container.querySelector(
+      '[data-editor-root=""]',
+    ) as HTMLDivElement;
+    await typeSlashTrigger(root);
+
+    // Doc was "/", caret=1. Slash defaults to consume trigger:
+    //   replace [0..1] with "XYZ" → doc becomes "XYZ".
     fireEvent.keyDown(root, { key: "Enter" });
 
     expect(lastState).not.toBeNull();
-    expect((lastState as unknown as { doc: string }).doc).toBe("/XYZ");
+    expect((lastState as unknown as { doc: string }).doc).toBe("XYZ");
     expect(document.querySelector('[data-suggestion-popup=""]')).toBeNull();
+  });
+
+  it("replaceTrigger: false on a slash suggestion preserves the /", async () => {
+    const plugin = makeSuggestionPlugin([
+      {
+        id: "x",
+        label: "Keep slash",
+        kind: "command",
+        insert: "XYZ",
+        replaceTrigger: false,
+      },
+    ]);
+    let lastState: { doc: string } | null = null;
+    const { container } = render(
+      <EditorView
+        initialDoc=""
+        plugins={[plugin]}
+        onChange={(s) => {
+          lastState = s;
+        }}
+      />,
+    );
+    const root = container.querySelector(
+      '[data-editor-root=""]',
+    ) as HTMLDivElement;
+    await typeSlashTrigger(root);
+    fireEvent.keyDown(root, { key: "Enter" });
+    expect((lastState as unknown as { doc: string }).doc).toBe("/XYZ");
+  });
+
+  it("$cursor marker in insert text positions the caret inside the insertion", async () => {
+    const plugin = makeSuggestionPlugin([
+      { id: "b", label: "Bold", kind: "command", insert: "**$cursor**" },
+    ]);
+    let lastSel: { anchor: number; head: number } | null = null;
+    const { container } = render(
+      <EditorView
+        initialDoc=""
+        plugins={[plugin]}
+        onChange={(s) => {
+          lastSel = (s as unknown as { selection: typeof lastSel }).selection;
+        }}
+      />,
+    );
+    const root = container.querySelector(
+      '[data-editor-root=""]',
+    ) as HTMLDivElement;
+    await typeSlashTrigger(root);
+    fireEvent.keyDown(root, { key: "Enter" });
+    // Inserted text after stripping $cursor is "****" (4 chars), beginning at
+    // offset 0 (trigger consumed). $cursor was at index 2 → caret at 2.
+    expect(lastSel).toEqual({ anchor: 2, head: 2 });
   });
 });

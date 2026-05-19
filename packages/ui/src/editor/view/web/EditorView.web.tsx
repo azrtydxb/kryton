@@ -339,21 +339,35 @@ export function EditorView({
     return () => root.removeEventListener("beforeinput", handler);
   }, [dispatch, closeSuggestions, refreshSuggestions, updatePopupPos]);
 
-  // Apply the selected suggestion: replace [trigger.from..trigger.caret]
-  // with `insert`, place caret at end of the inserted text.
+  // Apply the selected suggestion. Replacement range:
+  //   default: [trigger.from .. trigger.caret] (the query the user typed)
+  //   replaceTrigger=true: extend back by the trigger char width so the "/"
+  //     (or "#", or "[[") is also consumed. Only slash is consumed by default
+  //     when no explicit flag is set — slash commands are meaningless without
+  //     consumption; tag/wikilink syntax markers stay.
+  // The `insert` string may contain a literal "$cursor" marker. If present
+  // it is stripped from the inserted text and the caret is placed at that
+  // position (so `**$cursor**` lands the caret between the asterisks).
   const applySuggestion = React.useCallback(
     (item: Suggestion) => {
       const t = triggerRef.current;
       if (!t) return;
-      const from = t.from;
+      const triggerWidth = t.kind === "wikilink" ? 2 : 1;
+      const consumeTrigger =
+        item.replaceTrigger ?? (t.kind === "slash"); // slash defaults to true
+      const from = consumeTrigger ? t.from - triggerWidth : t.from;
       const to = t.caret;
-      const text = item.insert;
+      const cursorIdx = item.insert.indexOf("$cursor");
+      const text =
+        cursorIdx === -1 ? item.insert : item.insert.replace("$cursor", "");
+      const caretPos =
+        cursorIdx === -1 ? from + text.length : from + cursorIdx;
       dispatch({
         ops:
           from === to
             ? [{ kind: "insert", at: from, text }]
             : [{ kind: "replace", from, to, text }],
-        selection: { anchor: from + text.length, head: from + text.length },
+        selection: { anchor: caretPos, head: caretPos },
       });
       closeSuggestions();
     },

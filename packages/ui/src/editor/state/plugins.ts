@@ -16,8 +16,21 @@ export interface Suggestion {
   id: string;
   label: string;
   kind: "note" | "tag" | "command";
-  /** The text to insert in place of [from..caret]. */
+  /**
+   * The text to insert. By default replaces [trigger.from..trigger.caret]
+   * (i.e. the query the user typed after the trigger char). If `insert`
+   * contains the literal string `$cursor`, that marker is removed and the
+   * caret is placed at its position after insertion (useful for wrapping
+   * commands like `**$cursor**`).
+   */
   insert: string;
+  /**
+   * When true, the trigger character(s) themselves are also consumed by the
+   * replacement. Default false — `#` and `[[` are kept (tag/wikilink want to
+   * preserve their syntactic markers); slash-command items typically set
+   * this so `/h1` becomes `# ` rather than `/# `.
+   */
+  replaceTrigger?: boolean;
 }
 
 /**
