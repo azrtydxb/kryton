@@ -321,9 +321,15 @@ export function EditModeView({
                 notePath={activeNote.path}
                 onNoteSelect={onNoteSelect}
                 getCodeFenceRenderer={getCodeFenceRenderer}
-                // Editing — plugin code-fence renderers (kanban,
-                // excalidraw, …) should show their editable controls.
-                interactive
+                // Only the Split layout shows preview AND editor at the
+                // same time — that's the only case where it makes sense
+                // for plugin code-fence renderers (kanban, excalidraw,
+                // …) to expose editable controls in the preview pane.
+                // When the user switches the inner tab to Preview the
+                // editor is hidden, so the preview should behave as a
+                // read-only render — matching what they'd see in pure
+                // PreviewModeView outside of editing.
+                interactive={layout === 'split'}
               />
             </div>
           </div>
