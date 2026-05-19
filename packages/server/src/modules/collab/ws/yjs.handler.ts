@@ -427,7 +427,49 @@ export function registerYjsRoutes(
     docId: string,
     auth: AuthInfo,
   ): Promise<void> => {
-    const entry = await ensureDoc(docId, auth);
+    // Register the message handler BEFORE awaiting ensureDoc. ensureDoc can
+    // take many ms (DB lookup + disk read + seed transaction); during that
+    // window the client may already have sent its sync step 1. Without an
+    // attached "message" listener those early frames are silently dropped
+    // by the underlying EventEmitter — leaving the client waiting for a
+    // step 2 reply that will never come. Buffering early messages and
+    // replaying them once ensureDoc resolves keeps the sync handshake
+    // resilient to local-loopback timing where there is no network RTT to
+    // mask the gap (tests + same-host clients).
+    const entryReady: Promise<DocEntry> = ensureDoc(docId, auth);
+    const earlyMessages: Buffer[] = [];
+    let entry: DocEntry | null = null;
+
+    const handleSyncFrame = (data: Buffer): void => {
+      if (!entry) {
+        earlyMessages.push(data);
+        return;
+      }
+      try {
+        const dec = decoding.createDecoder(new Uint8Array(data));
+        const messageType = decoding.readVarUint(dec);
+        if (messageType === MSG_SYNC) {
+          const replyEnc = encoding.createEncoder();
+          encoding.writeVarUint(replyEnc, MSG_SYNC);
+          syncProtocol.readSyncMessage(dec, replyEnc, entry.doc, socket);
+          if (encoding.length(replyEnc) > 1) {
+            socket.send(encoding.toUint8Array(replyEnc));
+          }
+        } else if (messageType === MSG_AWARENESS) {
+          const update = decoding.readVarUint8Array(dec);
+          awarenessProtocol.applyAwarenessUpdate(entry.awareness, update, socket);
+        }
+      } catch (e) {
+        app.log.warn(
+          { err: e instanceof Error ? e.message : String(e), docId },
+          "yjs message error",
+        );
+      }
+    };
+
+    socket.on("message", handleSyncFrame);
+
+    entry = await entryReady;
     entry.clients.add(socket);
 
     // Send sync step 1 (state vector) so client can compute the diff to send.
@@ -451,30 +493,12 @@ export function registerYjsRoutes(
       socket.send(encoding.toUint8Array(awarenessEnc));
     }
 
-    socket.on("message", (data: Buffer) => {
-      try {
-        const dec = decoding.createDecoder(new Uint8Array(data));
-        const messageType = decoding.readVarUint(dec);
-        if (messageType === MSG_SYNC) {
-          const replyEnc = encoding.createEncoder();
-          encoding.writeVarUint(replyEnc, MSG_SYNC);
-          // Pass `socket` as origin so the doc.on("update") listener skips
-          // broadcasting back to the sender.
-          syncProtocol.readSyncMessage(dec, replyEnc, entry.doc, socket);
-          if (encoding.length(replyEnc) > 1) {
-            socket.send(encoding.toUint8Array(replyEnc));
-          }
-        } else if (messageType === MSG_AWARENESS) {
-          const update = decoding.readVarUint8Array(dec);
-          awarenessProtocol.applyAwarenessUpdate(entry.awareness, update, socket);
-        }
-      } catch (e) {
-        app.log.warn(
-          { err: e instanceof Error ? e.message : String(e), docId },
-          "yjs message error",
-        );
-      }
-    });
+    // Replay anything the client sent while ensureDoc was still resolving.
+    // Order is preserved (FIFO from the buffer).
+    for (const buffered of earlyMessages) {
+      handleSyncFrame(buffered);
+    }
+    earlyMessages.length = 0;
 
     socket.on("close", () => {
       entry.clients.delete(socket);
