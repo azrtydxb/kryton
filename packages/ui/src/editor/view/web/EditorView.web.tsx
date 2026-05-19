@@ -16,6 +16,9 @@ import { projectDom } from "./projectDom";
 import { domRangeToSelection, selectionToDomRange } from "./selection";
 import { interpretBeforeInput } from "./beforeinput";
 import { normalizeClipboardData } from "./paste";
+import { detectTriggerOnInsert, refreshTrigger } from "./suggestionTrigger";
+import { SuggestionPopup } from "./SuggestionPopup";
+import type { Suggestion, SuggestionTrigger } from "../../state/plugins";
 import {
   emitEditorTransaction,
   getEditorPlugins,
@@ -130,6 +133,34 @@ export function EditorView({
     allPluginsRef.current = allPlugins;
   }, [allPlugins]);
 
+  // ── Suggestion popup state ────────────────────────────────────────────────
+  const [trigger, setTrigger] = React.useState<SuggestionTrigger | null>(null);
+  const triggerRef = React.useRef<SuggestionTrigger | null>(null);
+  React.useLayoutEffect(() => {
+    triggerRef.current = trigger;
+  }, [trigger]);
+  const [suggestionItems, setSuggestionItems] = React.useState<
+    readonly Suggestion[]
+  >([]);
+  const suggestionItemsRef = React.useRef<readonly Suggestion[]>([]);
+  React.useLayoutEffect(() => {
+    suggestionItemsRef.current = suggestionItems;
+  }, [suggestionItems]);
+  const [activeSuggestion, setActiveSuggestion] = React.useState(0);
+  const activeSuggestionRef = React.useRef(0);
+  React.useLayoutEffect(() => {
+    activeSuggestionRef.current = activeSuggestion;
+  }, [activeSuggestion]);
+  const [popupPos, setPopupPos] = React.useState<{ top: number; left: number } | null>(null);
+  const suggestionReqIdRef = React.useRef(0);
+
+  const closeSuggestions = React.useCallback(() => {
+    setTrigger(null);
+    setSuggestionItems([]);
+    setActiveSuggestion(0);
+    setPopupPos(null);
+  }, []);
+
   const dispatchTransaction = React.useCallback(
     (transaction: Transaction) => {
       if (onDispatchRef.current) {
@@ -180,6 +211,64 @@ export function EditorView({
     selectionToDomRange(root, state.selection);
   });
 
+  // Position the popup near the caret. Reads the live DOM selection rect
+  // and converts to viewport coords for the popup's `position: fixed`.
+  const updatePopupPos = React.useCallback(() => {
+    try {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return;
+      const r = sel.getRangeAt(0).cloneRange();
+      r.collapse(true);
+      const rect = r.getBoundingClientRect();
+      // Empty rect can occur on a brand-new line — fall back to root rect.
+      const useRect =
+        rect.width === 0 && rect.height === 0
+          ? rootRef.current?.getBoundingClientRect()
+          : rect;
+      if (!useRect) return;
+      setPopupPos({ top: useRect.bottom + 4, left: useRect.left });
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // Re-collect suggestions from every plugin for the current trigger.
+  // Uses a request-id to discard stale async results when the trigger
+  // changes or closes while the previous call was in flight.
+  const refreshSuggestions = React.useCallback(
+    async (t: SuggestionTrigger) => {
+      const reqId = ++suggestionReqIdRef.current;
+      const results = await Promise.all(
+        allPluginsRef.current.map(async (p) => {
+          if (!p.suggestions) return [] as Suggestion[];
+          try {
+            return await p.suggestions(stateRef.current, t);
+          } catch (err) {
+            console.error(`[plugins] ${p.name}.suggestions threw:`, err);
+            return [] as Suggestion[];
+          }
+        }),
+      );
+      if (reqId !== suggestionReqIdRef.current) return; // stale
+      if (triggerRef.current !== t && triggerRef.current?.from !== t.from) {
+        // Trigger replaced — drop these.
+        return;
+      }
+      const seen = new Set<string>();
+      const merged: Suggestion[] = [];
+      for (const batch of results) {
+        for (const item of batch) {
+          if (seen.has(item.id)) continue;
+          seen.add(item.id);
+          merged.push(item);
+        }
+      }
+      setSuggestionItems(merged);
+      setActiveSuggestion((prev) => Math.min(prev, Math.max(0, merged.length - 1)));
+    },
+    [],
+  );
+
   // React's synthetic `onBeforeInput` is mapped to the legacy `textInput` event,
   // not the modern `beforeinput`. Bind a native listener so we can preventDefault
   // on the real event and translate it into a Transaction.
@@ -192,11 +281,70 @@ export function EditorView({
       const interpreted = interpretBeforeInput(ev, stateRef.current.selection);
       if (!interpreted) return;
       ev.preventDefault();
+
+      // Trigger detection: only on insertText of a single character with
+      // a collapsed selection at the caret.
+      let newTrigger: SuggestionTrigger | null = null;
+      if (ev.inputType === "insertText" && ev.data && ev.data.length === 1) {
+        const sel = stateRef.current.selection;
+        if (sel.anchor === sel.head) {
+          newTrigger = detectTriggerOnInsert(
+            stateRef.current.doc,
+            sel.anchor,
+            ev.data,
+          );
+        }
+      }
+
       dispatch(interpreted);
+
+      if (newTrigger) {
+        setTrigger(newTrigger);
+        setActiveSuggestion(0);
+        // Seed a position so the popup mounts immediately; the precise
+        // caret coordinates are refined after the DOM reflects the insert.
+        setPopupPos((prev) => prev ?? { top: 0, left: 0 });
+        queueMicrotask(() => updatePopupPos());
+        void refreshSuggestions(newTrigger);
+      } else if (triggerRef.current) {
+        const next = refreshTrigger(
+          triggerRef.current,
+          stateRef.current.doc,
+          stateRef.current.selection.head,
+        );
+        if (!next) {
+          closeSuggestions();
+        } else {
+          setTrigger(next);
+          queueMicrotask(() => updatePopupPos());
+          void refreshSuggestions(next);
+        }
+      }
     };
     root.addEventListener("beforeinput", handler);
     return () => root.removeEventListener("beforeinput", handler);
-  }, [dispatch]);
+  }, [dispatch, closeSuggestions, refreshSuggestions, updatePopupPos]);
+
+  // Apply the selected suggestion: replace [trigger.from..trigger.caret]
+  // with `insert`, place caret at end of the inserted text.
+  const applySuggestion = React.useCallback(
+    (item: Suggestion) => {
+      const t = triggerRef.current;
+      if (!t) return;
+      const from = t.from;
+      const to = t.caret;
+      const text = item.insert;
+      dispatch({
+        ops:
+          from === to
+            ? [{ kind: "insert", at: from, text }]
+            : [{ kind: "replace", from, to, text }],
+        selection: { anchor: from + text.length, head: from + text.length },
+      });
+      closeSuggestions();
+    },
+    [dispatch, closeSuggestions],
+  );
 
   const onCompositionStart = () => { composingRef.current = true; };
   const onCompositionEnd = (e: React.CompositionEvent) => {
@@ -228,6 +376,42 @@ export function EditorView({
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    // Suggestion popup keymap — takes precedence over plugin onKeyDown
+    // handlers so the user can navigate/dismiss the popup regardless of
+    // what else is registered. Only intercepts when the popup is live
+    // AND has items.
+    if (triggerRef.current && suggestionItemsRef.current.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setActiveSuggestion(
+          (i) => (i + 1) % suggestionItemsRef.current.length,
+        );
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        const len = suggestionItemsRef.current.length;
+        setActiveSuggestion((i) => (i - 1 + len) % len);
+        return;
+      }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const item =
+          suggestionItemsRef.current[activeSuggestionRef.current];
+        if (item) applySuggestion(item);
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeSuggestions();
+        return;
+      }
+    } else if (triggerRef.current && e.key === "Escape") {
+      e.preventDefault();
+      closeSuggestions();
+      return;
+    }
+
     // Plugin cascade: each EditorPlugin with onKeyDown gets a chance to
     // claim the event. The first non-null result wins. Returning a
     // Transaction dispatches it; "prevent-default" swallows the event
@@ -271,6 +455,27 @@ export function EditorView({
     if (composingRef.current) return;
     const root = rootRef.current!;
     const next = domRangeToSelection(root);
+    // Refresh the suggestion trigger against the latest caret. If the
+    // caret moved out of bounds, this closes the popup. Run unconditionally
+    // because click-to-move doesn't always change the offset numbers (the
+    // user may click back inside the active trigger range — still valid).
+    if (triggerRef.current) {
+      const updated = refreshTrigger(
+        triggerRef.current,
+        stateRef.current.doc,
+        next.head,
+      );
+      if (!updated) {
+        closeSuggestions();
+      } else if (
+        updated.caret !== triggerRef.current.caret ||
+        updated.query !== triggerRef.current.query
+      ) {
+        setTrigger(updated);
+        queueMicrotask(() => updatePopupPos());
+        void refreshSuggestions(updated);
+      }
+    }
     if (next.anchor !== stateRef.current.selection.anchor || next.head !== stateRef.current.selection.head) {
       if (onDispatchRef.current) {
         // Controlled mode: a selection-only change is a transaction with
@@ -284,6 +489,20 @@ export function EditorView({
       setStateInternal(updated);
     }
   };
+
+  // Close the popup on any document mousedown outside the popup itself.
+  React.useEffect(() => {
+    if (!trigger) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('[data-suggestion-popup=""]')) return;
+      const root = rootRef.current;
+      if (root && target && root.contains(target)) return;
+      closeSuggestions();
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [trigger, closeSuggestions]);
 
   const onClick = (e: React.MouseEvent) => {
     const target = (e.target as HTMLElement).closest('[data-kind="wikilink"]') as HTMLElement | null;
@@ -308,7 +527,9 @@ export function EditorView({
     Array<{ id: string; top: number; left: number; height: number; color: string; name: string; kind: "user" | "agent" }>
   >([]);
   const cursorRectsRef = React.useRef(cursorRects);
-  cursorRectsRef.current = cursorRects;
+  React.useLayoutEffect(() => {
+    cursorRectsRef.current = cursorRects;
+  }, [cursorRects]);
   const overlayRef = React.useRef<HTMLDivElement | null>(null);
   React.useLayoutEffect(() => {
     const root = rootRef.current;
@@ -365,7 +586,7 @@ export function EditorView({
         return p && p.id === n.id && p.top === n.top && p.left === n.left && p.height === n.height && p.color === n.color && p.name === n.name && p.kind === n.kind;
       });
     if (!same) setCursorRects(next);
-  });
+  }, [remoteCursors, state]);
 
   return (
     <div className={className ?? "ed-shell"} data-editor-shell="" style={{ position: "relative" }}>
@@ -465,6 +686,16 @@ export function EditorView({
           ))}
         </div>
       </div>
+      {trigger && popupPos && suggestionItems.length > 0 && (
+        <SuggestionPopup
+          items={suggestionItems}
+          activeIndex={activeSuggestion}
+          top={popupPos.top}
+          left={popupPos.left}
+          onPick={applySuggestion}
+          onHover={setActiveSuggestion}
+        />
+      )}
     </div>
   );
 }
