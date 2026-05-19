@@ -34,6 +34,10 @@ export interface FileTreeNode {
   path: string;
   type: "file" | "folder";
   children?: FileTreeNode[];
+  /** ISO mtime for files; omitted on folders. */
+  updatedAt?: string;
+  /** Size in bytes for files; omitted on folders. */
+  size?: number;
 }
 
 export interface NoteData {
@@ -87,7 +91,14 @@ export class NoteService {
         const children = await this.scanDirectory(fullPath, relativePath);
         nodes.push({ name: entry.name, path: relativePath, type: "folder", children });
       } else if (entry.isFile() && entry.name.endsWith(".md")) {
-        nodes.push({ name: entry.name, path: relativePath, type: "file" });
+        const stat = await fs.stat(fullPath);
+        nodes.push({
+          name: entry.name,
+          path: relativePath,
+          type: "file",
+          updatedAt: stat.mtime.toISOString(),
+          size: stat.size,
+        });
       }
     }
     return nodes;

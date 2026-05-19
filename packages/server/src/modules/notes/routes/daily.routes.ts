@@ -78,10 +78,9 @@ export function dailyRoutes(deps: DailyRoutesDeps): FastifyPluginAsync {
 
         try {
           await fs.access(fullPath);
-          // exists already
           return await noteService.readNote(userDir, notePath);
         } catch {
-          // not yet — create it
+          // fall through to creation below
         }
 
         await fs.mkdir(path.join(userDir, "Daily"), { recursive: true });

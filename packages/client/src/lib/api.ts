@@ -5,6 +5,10 @@ export interface FileNode {
   path: string;
   type: 'file' | 'folder';
   children?: FileNode[];
+  /** ISO mtime for files; omitted on folders. */
+  updatedAt?: string;
+  /** Size in bytes for files; omitted on folders. */
+  size?: number;
 }
 
 export interface NoteData {

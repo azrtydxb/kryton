@@ -24,6 +24,14 @@ import type {
   NoteFilter,
 } from "@azrtydxb/ui";
 import * as Y from "yjs";
+import * as syncProtocol from "y-protocols/sync";
+import * as awarenessProtocol from "y-protocols/awareness";
+import * as encoding from "lib0/encoding";
+import * as decoding from "lib0/decoding";
+
+// Yjs WS message type constants (must match server: yjs.handler.ts).
+const MSG_SYNC = 0;
+const MSG_AWARENESS = 1;
 
 // ---- Server response shapes ------------------------------------------------
 
@@ -32,6 +40,8 @@ interface ServerFileNode {
   path: string;
   type: "file" | "folder";
   children?: ServerFileNode[];
+  updatedAt?: string;
+  size?: number;
 }
 
 interface ServerTrashItem {
@@ -57,7 +67,7 @@ function flattenTree(nodes: ServerFileNode[]): NoteData[] {
         path: node.path,
         title: node.name.replace(/\.md$/, ""),
         tags: "[]",
-        modifiedAt: 0,
+        modifiedAt: node.updatedAt ? new Date(node.updatedAt).getTime() : 0,
         version: 0,
       });
     } else if (node.children) {
@@ -108,6 +118,7 @@ export class HttpAdapter implements KrytonDataAdapter {
   // Yjs documents and their WebSocket connections
   private _docs: Map<string, Y.Doc> = new Map();
   private _sockets: Map<string, WebSocket> = new Map();
+  private _awareness: Map<string, awarenessProtocol.Awareness> = new Map();
 
   constructor(opts: HttpAdapterOptions) {
     this._fetch = opts.fetch ?? globalThis.fetch.bind(globalThis);
@@ -479,7 +490,9 @@ export class HttpAdapter implements KrytonDataAdapter {
     }
 
     const doc = new Y.Doc();
+    const awareness = new awarenessProtocol.Awareness(doc);
     this._docs.set(noteId, doc);
+    this._awareness.set(noteId, awareness);
 
     const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const wsBase = this.baseUrl
@@ -492,22 +505,98 @@ export class HttpAdapter implements KrytonDataAdapter {
 
     socket.binaryType = "arraybuffer";
 
+    const sendFramed = (build: (enc: encoding.Encoder) => void): void => {
+      if (socket.readyState !== WebSocket.OPEN) return;
+      const enc = encoding.createEncoder();
+      build(enc);
+      socket.send(encoding.toUint8Array(enc));
+    };
+
+    socket.addEventListener("open", () => {
+      // Sync step 1: send our state vector so the peer can compute the diff.
+      sendFramed((enc) => {
+        encoding.writeVarUint(enc, MSG_SYNC);
+        syncProtocol.writeSyncStep1(enc, doc);
+      });
+      // Announce our local awareness state, if any has been set.
+      const states = awareness.getStates();
+      if (states.size > 0) {
+        sendFramed((enc) => {
+          encoding.writeVarUint(enc, MSG_AWARENESS);
+          encoding.writeVarUint8Array(
+            enc,
+            awarenessProtocol.encodeAwarenessUpdate(awareness, [awareness.clientID]),
+          );
+        });
+      }
+    });
+
     socket.addEventListener("message", (event) => {
       const data =
         event.data instanceof ArrayBuffer
           ? new Uint8Array(event.data)
           : new Uint8Array(event.data);
-      Y.applyUpdate(doc, data);
-    });
-
-    doc.on("update", (update: Uint8Array) => {
-      if (socket.readyState === WebSocket.OPEN) {
-        socket.send(update);
+      try {
+        const dec = decoding.createDecoder(data);
+        const messageType = decoding.readVarUint(dec);
+        if (messageType === MSG_SYNC) {
+          const replyEnc = encoding.createEncoder();
+          encoding.writeVarUint(replyEnc, MSG_SYNC);
+          // `socket` as transactionOrigin lets the doc.on("update") handler
+          // skip echoing the resulting update back over the same socket.
+          syncProtocol.readSyncMessage(dec, replyEnc, doc, socket);
+          if (encoding.length(replyEnc) > 1 && socket.readyState === WebSocket.OPEN) {
+            socket.send(encoding.toUint8Array(replyEnc));
+          }
+        } else if (messageType === MSG_AWARENESS) {
+          awarenessProtocol.applyAwarenessUpdate(
+            awareness,
+            decoding.readVarUint8Array(dec),
+            socket,
+          );
+        }
+      } catch (err) {
+        console.warn("[yjs] message decode failed", err);
       }
     });
 
+    doc.on("update", (update: Uint8Array, origin: unknown) => {
+      // Skip echo when the update was produced by applying a message from
+      // this socket (see readSyncMessage above).
+      if (origin === socket) return;
+      sendFramed((enc) => {
+        encoding.writeVarUint(enc, MSG_SYNC);
+        syncProtocol.writeUpdate(enc, update);
+      });
+    });
+
+    awareness.on(
+      "update",
+      (
+        { added, updated, removed }: { added: number[]; updated: number[]; removed: number[] },
+        origin: unknown,
+      ) => {
+        // Server-originated awareness changes are applied with `socket` as origin;
+        // re-broadcasting them would loop.
+        if (origin === socket) return;
+        const changed = [...added, ...updated, ...removed];
+        sendFramed((enc) => {
+          encoding.writeVarUint(enc, MSG_AWARENESS);
+          encoding.writeVarUint8Array(
+            enc,
+            awarenessProtocol.encodeAwarenessUpdate(awareness, changed),
+          );
+        });
+      },
+    );
+
     socket.addEventListener("close", () => {
-      // Socket closed — doc stays alive; reconnection is out of scope for this adapter
+      // Socket closed — doc stays alive; reconnection is out of scope for this adapter.
+      awarenessProtocol.removeAwarenessStates(
+        awareness,
+        Array.from(awareness.getStates().keys()).filter((id) => id !== awareness.clientID),
+        "ws-close",
+      );
     });
 
     return doc;
@@ -519,6 +608,11 @@ export class HttpAdapter implements KrytonDataAdapter {
       socket.close();
       this._sockets.delete(noteId);
     }
+    const awareness = this._awareness.get(noteId);
+    if (awareness) {
+      awareness.destroy();
+      this._awareness.delete(noteId);
+    }
     const doc = this._docs.get(noteId);
     if (doc) {
       doc.destroy();
@@ -526,9 +620,8 @@ export class HttpAdapter implements KrytonDataAdapter {
     }
   }
 
-  // Awareness is not implemented in this basic adapter (requires y-protocols integration)
-  getAwareness(_noteId: string) {
-    return null;
+  getAwareness(noteId: string): awarenessProtocol.Awareness | null {
+    return this._awareness.get(noteId) ?? null;
   }
 
   readNoteContent(noteId: string): string | null {

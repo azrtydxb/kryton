@@ -30,12 +30,15 @@ export const sharedNotePathParamsSchema = z.object({
   "*": z.string(),
 });
 
-// File tree node — recursive
+// File tree node — recursive. `updatedAt` (ISO mtime) and `size` (bytes) are
+// populated for files; folders omit them.
 type FileTreeNode = {
   name: string;
   path: string;
   type: "file" | "folder";
   children?: FileTreeNode[];
+  updatedAt?: string;
+  size?: number;
 };
 const fileTreeNodeBase: z.ZodType<FileTreeNode> = z.lazy(() =>
   z.object({
@@ -43,6 +46,8 @@ const fileTreeNodeBase: z.ZodType<FileTreeNode> = z.lazy(() =>
     path: z.string(),
     type: z.enum(["file", "folder"]),
     children: z.array(fileTreeNodeBase).optional(),
+    updatedAt: z.string().optional(),
+    size: z.number().optional(),
   }),
 );
 export const fileTreeNodeSchema = fileTreeNodeBase.register(sharedSchemaRegistry, {

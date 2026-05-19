@@ -4,11 +4,10 @@
  * Replaces the editor pane (the sidebar + graph rail stay mounted around it).
  * Two display modes (list / grid) and a sort dropdown.
  *
- * Data source: the existing `FileNode` tree from `useNotes()` — flattened to
- * the leaves. Per-note metadata (tags, words, updated) is not yet exposed by
- * the data layer; we derive `title` from the basename and show wordcount /
- * updated as `—` when unknown. When richer metadata is added to NoteData this
- * view will pick it up via `noteMeta` prop.
+ * Data source: the `FileNode` tree from `useNotes()` flattened to the leaves.
+ * `updatedAt` comes from the server (file mtime). `tags` and `words` are not
+ * carried on the tree (bulk content reads would be expensive); callers can
+ * supply them via the optional `noteMeta` prop when a cheaper source exists.
  */
 import { useMemo, useState, useCallback, type CSSProperties } from 'react';
 import { Icons } from '../Icons';
@@ -51,13 +50,14 @@ function flattenTree(
         const parent = n.path.includes('/')
           ? n.path.slice(0, n.path.lastIndexOf('/'))
           : '';
+        const updatedSource = m?.updated ?? n.updatedAt;
         out.push({
           path: n.path,
           title: m?.title ?? basename,
           parent,
           tags: m?.tags ?? [],
           words: m?.words ?? null,
-          updated: m?.updated ? new Date(m.updated).getTime() : null,
+          updated: updatedSource ? new Date(updatedSource).getTime() : null,
           starred: starredPaths.has(n.path),
         });
       } else if (n.children) {
