@@ -187,6 +187,11 @@ export interface ClientPluginAPI {
       icon: string;
       onClick: (notePath: string) => void;
     }): void;
+    /**
+     * Close the currently focused note pane (Cmd+W intent). No-op when
+     * no pane is open or the host has not registered a closePane hook.
+     */
+    closePane(): void;
   };
   markdown: {
     registerCodeFenceRenderer(
@@ -225,6 +230,13 @@ export interface ClientPluginAPI {
       range: { startLine: number; endLine: number },
       newSource: string,
     ): Promise<{ ok: true }>;
+    /**
+     * Persist the currently focused editor buffer via the host's save
+     * pipeline. Resolves with the saved path + ISO timestamp. Rejects
+     * when no editor is focused or when the host has not registered a
+     * saveCurrent hook.
+     */
+    saveCurrent(): Promise<{ path: string; savedAt: string }>;
   };
   storage: {
     get(key: string): Promise<unknown>;

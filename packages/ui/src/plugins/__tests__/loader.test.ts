@@ -29,6 +29,7 @@ function makeApi(): ClientPluginAPI {
       registerSettingsSection: vi.fn(),
       registerPage: vi.fn(),
       registerNoteAction: vi.fn(),
+      closePane: vi.fn(),
     },
     markdown: {
       registerCodeFenceRenderer: vi.fn(),
@@ -51,6 +52,7 @@ function makeApi(): ClientPluginAPI {
       delete: vi.fn(),
       openByPath: vi.fn(),
       replaceFenceAtRange: vi.fn(),
+      saveCurrent: vi.fn(),
     } as unknown as ClientPluginAPI["notes"],
     storage: {
       get: vi.fn(),

@@ -14,6 +14,7 @@ import {
   registerEditorPlugin,
   subscribeEditorTransactions,
 } from "./editor-registry";
+import { getHostHooks } from "./host-hooks";
 import type { ActivePluginInfo, ClientPluginAPI, ClientPluginModule } from "./types";
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -206,6 +207,15 @@ function buildNotesApi(): ClientPluginAPI["notes"] {
         body: JSON.stringify({ path, range, newSource }),
         headers: { "Content-Type": "application/json" },
       }),
+    saveCurrent: () => {
+      const hook = getHostHooks().saveCurrent;
+      if (!hook) {
+        return Promise.reject(
+          new Error("notes.saveCurrent: no host save handler registered"),
+        );
+      }
+      return hook();
+    },
   };
 }
 
@@ -250,10 +260,10 @@ function buildEditorApi(): ClientPluginAPI["editor"] {
   };
 }
 
-function buildClientApi(
+export function buildClientApi(
   pluginId: string,
   registry: PluginSlotRegistry,
-  _info: ActivePluginInfo
+  _info: ActivePluginInfo,
 ): ClientPluginAPI {
   return {
     ui: {
@@ -269,6 +279,10 @@ function buildClientApi(
         registry.registerPage(pluginId, component, options),
       registerNoteAction: (options) =>
         registry.registerNoteAction(pluginId, options),
+      closePane: () => {
+        const hook = getHostHooks().closePane;
+        if (hook) hook();
+      },
     },
     markdown: {
       registerCodeFenceRenderer: (language, component) =>
