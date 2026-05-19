@@ -1,7 +1,7 @@
 import { useMemo, useEffect, useCallback, useState } from 'react';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { AuthProvider } from './hooks/useAuth';
-import { PluginSlotRegistry, PluginProvider, usePluginSlots } from '@azrtydxb/ui';
+import { PluginSlotRegistry, PluginProvider, usePluginSlots, setEditorOption } from '@azrtydxb/ui';
 import { ClientPluginManager } from './plugins/PluginManager';
 import { PluginSlot } from './components/PluginSlot/PluginSlot';
 import { useUIStore } from './stores/uiStore';
@@ -260,6 +260,15 @@ function AppContent() {
     activeNote: state.notes.activeNote,
     closeActiveNote: state.notes.closeActiveNote,
   });
+
+  // Restore the line-number gutter as the default for the desktop / web
+  // shell. The @azrtydxb/ui editor-options store ships with
+  // lineNumbers=false (Phase 4.4) so plugin-less embedders stay
+  // gutter-free, but the user expects line numbers in the main app.
+  // Set once at app boot — vim-mode's :set nonumber can still flip it.
+  useEffect(() => {
+    setEditorOption('lineNumbers', true);
+  }, []);
 
   const {
     user, loading,
