@@ -55,6 +55,7 @@ import { useAppState } from './hooks/useAppState';
 import { useAppCallbacks } from './hooks/useAppCallbacks';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useVaultEvents } from './hooks/useVaultEvents';
+import { useHostHooksWiring } from './hooks/useHostHooksWiring';
 import { Header } from './components/Layout/Header';
 import { SidebarLayout } from './components/Layout/SidebarLayout';
 import { RightPanel } from './components/Layout/RightPanel';
@@ -250,6 +251,15 @@ function AppContent() {
 
   const state = useAppState(pluginManager);
   const callbacks = useAppCallbacks(state);
+
+  // Wire the plugin host-hooks registry so api.notes.saveCurrent() and
+  // api.ui.closePane() reach the live shell. Effects re-run when the
+  // active note changes so the saveCurrent closure always sees the
+  // latest buffer.
+  useHostHooksWiring({
+    activeNote: state.notes.activeNote,
+    closeActiveNote: state.notes.closeActiveNote,
+  });
 
   const {
     user, loading,
