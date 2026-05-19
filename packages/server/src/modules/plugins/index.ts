@@ -74,8 +74,22 @@ const pluginsModuleImpl = (options: PluginsModuleOptions = {}): FastifyPluginAsy
   async (app) => {
     const pluginsDir =
       options.pluginsDir ?? path.resolve(process.cwd(), "plugins");
+    // Resolve notesDir consistently with the host's NotesService (which
+    // honors app.config.NOTES_DIR, default "../../notes" relative to cwd).
+    // Using `path.resolve(cwd, "notes")` here meant the plugin builtin
+    // routes wrote to a different directory than the rest of the app, so
+    // a note created via api.notes.update never appeared in the host
+    // file tree. Fall back to the cwd-local "notes" only when neither an
+    // option nor the config is set.
+    const configNotesDir = (app.config as { NOTES_DIR?: string } | undefined)
+      ?.NOTES_DIR;
     const notesDir =
-      options.notesDir ?? path.resolve(process.cwd(), "notes");
+      options.notesDir
+      ?? (configNotesDir
+        ? (configNotesDir.startsWith("/")
+          ? configNotesDir
+          : path.resolve(process.cwd(), configNotesDir))
+        : path.resolve(process.cwd(), "notes"));
     // Default notesOps to the notes module's NoteService decorator
     // (signatures match exactly). Tests can pass `options.notesOps` to
     // inject a mock implementation, but the `dependencies: ["notes-module"]`
