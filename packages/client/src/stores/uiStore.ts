@@ -47,6 +47,8 @@ interface UIState {
   setRightPanelWidth: SetState<number>;
   setGraphHeight: SetState<number | null>;
   setMobileMenuOpen: SetState<boolean>;
+  /** Set the top-level view. Subscribed-to by `useUrlSync` so navigation
+   *  to `all` / `graph` / `tags` writes a matching `/view/...` URL. */
   setView: SetState<MainView>;
   setEditing: SetState<boolean>;
   setEditContent: SetState<string | null>;
@@ -61,9 +63,11 @@ interface UIState {
   setShowAccessRequests: SetState<boolean>;
   setShowAccountSettings: SetState<boolean>;
   setShowNoteHistory: SetState<boolean>;
-  /** Open or focus a tab for `path`. Appends if absent; idempotent. */
+  /** Open or focus a tab for `path`. Appends if absent; idempotent.
+   *  Subscribed-to by `useUrlSync` — every call surfaces in the URL. */
   openTab: (path: string) => void;
-  /** Close the tab for `path`. Returns the next path to activate (or null). */
+  /** Close the tab for `path`. Returns the next path to activate (or null).
+   *  Subscribed-to by `useUrlSync` — every call surfaces in the URL. */
   closeTab: (path: string) => string | null;
 
   // Compound actions
