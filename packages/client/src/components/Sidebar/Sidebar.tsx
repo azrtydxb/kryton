@@ -374,8 +374,10 @@ export function Sidebar({
       {/* Scrollable middle region — wraps nav + sections + plugin slots so
           the brand row and AgentsFooter stay pinned while plugin-added
           panels can overflow into a vertical scrollbar (visible only when
-          content actually exceeds the viewport). */}
+          content actually exceeds the viewport). The data attribute opts
+          into the themed scrollbar styles in tokens.css. */}
       <div
+        data-kryton-sidebar-scroll
         style={{
           flex: 1,
           minHeight: 0,
