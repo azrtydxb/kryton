@@ -32,7 +32,14 @@ export interface NotePreviewReactProps {
   getCodeFenceRenderer?: (
     lang: string,
   ) =>
-    | { component: React.ComponentType<{ content: string; notePath: string }> }
+    | {
+        component: React.ComponentType<{
+          content: string;
+          notePath: string;
+          range?: { startLine: number; endLine: number };
+          source?: string;
+        }>;
+      }
     | undefined;
   /**
    * Called by the component to fetch embedded note content.
@@ -402,8 +409,16 @@ export const NotePreviewReact = React.forwardRef<
     return function CodeBlock({
       className: cls,
       children,
+      node,
       ...props
-    }: React.HTMLAttributes<HTMLElement>) {
+    }: React.HTMLAttributes<HTMLElement> & {
+      node?: {
+        position?: {
+          start: { line: number };
+          end: { line: number };
+        };
+      };
+    }) {
       const match = cls?.match(/language-(\w+)/);
       const language = match?.[1];
 
@@ -412,8 +427,28 @@ export const NotePreviewReact = React.forwardRef<
         if (renderer) {
           const pluginContent = String(children).replace(/\n$/, "");
           const RendererComponent = renderer.component;
+
+          // hast positions are 1-based, inclusive. The plugin API exposes
+          // 0-based, inclusive ranges. Compute both range + raw source
+          // when position data is available.
+          let range: { startLine: number; endLine: number } | undefined;
+          let source: string | undefined;
+          const pos = node?.position;
+          if (pos) {
+            const startLine = pos.start.line - 1;
+            const endLine = pos.end.line - 1;
+            range = { startLine, endLine };
+            const noteLines = transformedContent.split("\n");
+            source = noteLines.slice(startLine, endLine + 1).join("\n");
+          }
+
           return (
-            <RendererComponent content={pluginContent} notePath={notePath} />
+            <RendererComponent
+              content={pluginContent}
+              notePath={notePath}
+              range={range}
+              source={source}
+            />
           );
         }
       }
@@ -424,7 +459,7 @@ export const NotePreviewReact = React.forwardRef<
         </code>
       );
     };
-  }, [getCodeFenceRenderer, notePath]);
+  }, [getCodeFenceRenderer, notePath, transformedContent]);
 
   const remarkPlugins = useMemo(
     () => [

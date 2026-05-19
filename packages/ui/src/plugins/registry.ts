@@ -133,7 +133,7 @@ export class PluginSlotRegistry {
   registerCodeFenceRenderer(
     pluginId: string,
     language: string,
-    component: ComponentType<{ content: string; notePath: string }>
+    component: ComponentType<import("./types").CodeFenceRendererProps>
   ): void {
     this.codeFenceRenderers.set(language, { language, pluginId, component });
     this.notify();

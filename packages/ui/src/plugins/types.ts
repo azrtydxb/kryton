@@ -88,10 +88,39 @@ export interface NoteActionRegistration {
   onClick: (notePath: string) => void;
 }
 
+/**
+ * A code fence's line range within the parsed note source.
+ * 0-based, inclusive of both endpoints. `endLine` is the line containing
+ * the closing fence (```), `startLine` the line with the opening fence.
+ */
+export interface CodeFenceRange {
+  startLine: number;
+  endLine: number;
+}
+
+export interface CodeFenceRendererProps {
+  /** The fence body (without the surrounding ``` lines). */
+  content: string;
+  /** Path of the host note. May be empty when no path is known. */
+  notePath: string;
+  /**
+   * Range of the entire fence (including opening + closing ``` lines)
+   * in the parsed note source. Undefined when source position data is
+   * not available (e.g. when the renderer is invoked outside the markdown
+   * pipeline).
+   */
+  range?: CodeFenceRange;
+  /**
+   * Full original fence block including the surrounding ``` markers.
+   * Undefined when source position data is not available.
+   */
+  source?: string;
+}
+
 export interface CodeFenceRendererRegistration {
   language: string;
   pluginId: string;
-  component: ComponentType<{ content: string; notePath: string }>;
+  component: ComponentType<CodeFenceRendererProps>;
 }
 
 export interface CommandRegistration {
@@ -144,7 +173,7 @@ export interface ClientPluginAPI {
   markdown: {
     registerCodeFenceRenderer(
       language: string,
-      component: ComponentType<{ content: string; notePath: string }>
+      component: ComponentType<CodeFenceRendererProps>
     ): void;
     registerPostProcessor(fn: (html: string) => string): void;
   };

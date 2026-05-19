@@ -28,7 +28,14 @@ interface EditModeViewProps {
   previewRef: React.MutableRefObject<HTMLDivElement | null>;
   /** Ref exposed to parent for outline jump and other imperative needs. */
   editorRef?: React.MutableRefObject<EditorHandle | null>;
-  getCodeFenceRenderer?: (language: string) => { component: ComponentType<{ content: string; notePath: string }> } | undefined;
+  getCodeFenceRenderer?: (language: string) => {
+    component: ComponentType<{
+      content: string;
+      notePath: string;
+      range?: { startLine: number; endLine: number };
+      source?: string;
+    }>;
+  } | undefined;
   /** retained for parent API compatibility; auto-save handles persistence. */
   onSave?: () => void;
   onAutoSave: () => Promise<void>;

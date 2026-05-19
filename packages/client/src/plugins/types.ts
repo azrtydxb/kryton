@@ -54,10 +54,22 @@ export interface NoteActionRegistration {
   onClick: (notePath: string) => void;
 }
 
+export interface CodeFenceRange {
+  startLine: number;
+  endLine: number;
+}
+
+export interface CodeFenceRendererProps {
+  content: string;
+  notePath: string;
+  range?: CodeFenceRange;
+  source?: string;
+}
+
 export interface CodeFenceRendererRegistration {
   language: string;
   pluginId: string;
-  component: ComponentType<{ content: string; notePath: string }>;
+  component: ComponentType<CodeFenceRendererProps>;
 }
 
 export interface CommandRegistration {
@@ -108,7 +120,7 @@ export interface ClientPluginAPI {
   markdown: {
     registerCodeFenceRenderer(
       language: string,
-      component: ComponentType<{ content: string; notePath: string }>
+      component: ComponentType<CodeFenceRendererProps>
     ): void;
     registerPostProcessor(fn: (html: string) => string): void;
   };

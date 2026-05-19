@@ -16,7 +16,14 @@ interface PreviewProps {
   modifiedAt?: string;
   /** Open a backlink note. When provided, the inline backlinks tail is clickable. */
   onNoteSelect?: (path: string) => void;
-  getCodeFenceRenderer?: (language: string) => { component: React.ComponentType<{ content: string; notePath: string }> } | undefined;
+  getCodeFenceRenderer?: (language: string) => {
+    component: React.ComponentType<{
+      content: string;
+      notePath: string;
+      range?: { startLine: number; endLine: number };
+      source?: string;
+    }>;
+  } | undefined;
   /** Current embed depth — kept for API compat; NotePreviewReact manages depth internally */
   embedDepth?: number;
   /** Set of note paths in the current embed chain — kept for API compat */

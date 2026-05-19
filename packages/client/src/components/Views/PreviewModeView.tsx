@@ -22,7 +22,14 @@ interface PreviewModeViewProps {
   onTabClose?: (path: string) => void;
   onLinkClick: (name: string) => void;
   onCreateNote: (name: string) => void;
-  getCodeFenceRenderer?: (language: string) => { component: ComponentType<{ content: string; notePath: string }> } | undefined;
+  getCodeFenceRenderer?: (language: string) => {
+    component: ComponentType<{
+      content: string;
+      notePath: string;
+      range?: { startLine: number; endLine: number };
+      source?: string;
+    }>;
+  } | undefined;
 }
 
 export function PreviewModeView({
