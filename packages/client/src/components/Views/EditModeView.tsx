@@ -1,4 +1,4 @@
-import { ComponentType, useRef, useState, useEffect, useMemo, useSyncExternalStore } from 'react';
+import { ComponentType, useRef, useState, useEffect, useMemo } from 'react';
 import { useDebouncedCallback } from 'use-debounce';
 import type { RemoteCursorDecoration } from '@azrtydxb/ui';
 import { FileNode } from '../../lib/api';
@@ -80,20 +80,26 @@ export function EditModeView({
   }, [user]);
   const { ytext, awareness, status: yjsStatus, publishCursor } = useYjsDocument(yjsPath, identity);
 
-  // Subscribe to remote awareness states via useSyncExternalStore so the
-  // component re-renders exactly when peers join, leave, move cursors,
-  // or republish identity. Snapshot returns a referentially stable tuple
-  // keyed on the awareness clock + state count to avoid React's
-  // "snapshot changed on every render" warning.
-  const remoteStates = useSyncExternalStore(
-    (cb) => {
-      if (!awareness) return () => {};
-      awareness.on('update', cb);
-      return () => awareness.off('update', cb);
-    },
-    () => awareness?.getStates() ?? null,
-    () => null,
-  );
+  // Subscribe to remote awareness updates. y-protocols mutates its internal
+  // state Map in place, so useSyncExternalStore returning getStates()
+  // directly would see the same reference every tick and never re-render.
+  // Drive recomputation off an integer version that ticks on every
+  // 'update', then derive a fresh snapshot Map from the live awareness.
+  const [awarenessVersion, setAwarenessVersion] = useState(0);
+  useEffect(() => {
+    if (!awareness) return;
+    const onUpdate = () => setAwarenessVersion((v) => v + 1);
+    awareness.on('update', onUpdate);
+    return () => awareness.off('update', onUpdate);
+  }, [awareness]);
+  const remoteStates = useMemo(() => {
+    if (!awareness) return null;
+    // Snapshot into a fresh Map so downstream memos that key on the
+    // reference can detect changes; the version bump above guarantees
+    // this memo re-runs on every awareness update.
+    return new Map(awareness.getStates());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [awareness, awarenessVersion]);
 
   const localClientId = awareness?.clientID ?? -1;
   const remoteCursors = useMemo<ReadonlyArray<RemoteCursorDecoration>>(() => {
