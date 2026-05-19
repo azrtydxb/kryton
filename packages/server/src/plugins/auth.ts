@@ -1,6 +1,6 @@
 import fp from "fastify-plugin";
 import type { FastifyRequest } from "fastify";
-import { eq } from "drizzle-orm";
+import { count, eq } from "drizzle-orm";
 import { fromNodeHeaders } from "better-auth/node";
 import { createAuth, type Auth } from "../modules/identity/auth-config.js";
 import { AuthError, ForbiddenError } from "../lib/errors.js";
@@ -206,13 +206,22 @@ export const authPlugin = fp(async (app) => {
     url: "/api/auth/config",
     schema: { hide: true },
     handler: async () => {
-      const rows = await app.db.query.settings.findMany({
-        where: eq(settings.key, "registration_mode"),
-      });
+      const [rows, userCountRow] = await Promise.all([
+        app.db.query.settings.findMany({
+          where: eq(settings.key, "registration_mode"),
+        }),
+        app.db.select({ c: count() }).from(user),
+      ]);
       const row = rows.find((r) => r.userId === GLOBAL_USER_ID) ?? rows[0];
       const registrationMode = (row?.value as string | undefined) ?? "open";
+      const userCount = Number(userCountRow[0]?.c ?? 0);
       return {
         registrationMode,
+        // The backend bypasses invite-code enforcement for the very first
+        // user (auto-admin bootstrap). Surface this so the login page can
+        // hide the invite-code input on a fresh deployment without a
+        // separate probe.
+        firstUser: userCount === 0,
         // OAuth + SMTP are not wired in this build. Surfaced here so the
         // login page can hide the relevant buttons cleanly instead of probing
         // and getting a 404.

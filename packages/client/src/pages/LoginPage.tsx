@@ -132,6 +132,10 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [registrationMode, setRegistrationMode] = useState<string>('open');
+  // True when no users exist yet — the backend bypasses invite-code
+  // enforcement for the bootstrap admin, so the UI hides the invite
+  // input to match. Stays false once any user is registered.
+  const [firstUser, setFirstUser] = useState(false);
 
   // 2FA state
   const [twoFactorRequired, setTwoFactorRequired] = useState(false);
@@ -157,8 +161,9 @@ export default function LoginPage() {
   const [forgotSent, setForgotSent] = useState(false);
 
   useEffect(() => {
-    authApi.config().then((cfg: { registrationMode: string; googleEnabled?: boolean; githubEnabled?: boolean; smtpEnabled?: boolean }) => {
+    authApi.config().then((cfg: { registrationMode: string; firstUser?: boolean; googleEnabled?: boolean; githubEnabled?: boolean; smtpEnabled?: boolean }) => {
       setRegistrationMode(cfg.registrationMode);
+      setFirstUser(cfg.firstUser ?? false);
       setGoogleEnabled(cfg.googleEnabled ?? false);
       setGithubEnabled(cfg.githubEnabled ?? false);
       setSmtpEnabled(cfg.smtpEnabled ?? false);
@@ -228,7 +233,7 @@ export default function LoginPage() {
         regEmail,
         regPassword,
         regName,
-        registrationMode === 'invite-only' ? inviteCode : undefined,
+        registrationMode === 'invite-only' && !firstUser ? inviteCode : undefined,
       );
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Registration failed');
@@ -238,11 +243,11 @@ export default function LoginPage() {
   };
 
   const handleOAuthGoogle = () => {
-    loginWithGoogle(registrationMode === 'invite-only' ? inviteCode : undefined);
+    loginWithGoogle(registrationMode === 'invite-only' && !firstUser ? inviteCode : undefined);
   };
 
   const handleOAuthGithub = () => {
-    loginWithGithub(registrationMode === 'invite-only' ? inviteCode : undefined);
+    loginWithGithub(registrationMode === 'invite-only' && !firstUser ? inviteCode : undefined);
   };
 
   const handleForgotPassword = async (e: FormEvent) => {
@@ -531,7 +536,7 @@ export default function LoginPage() {
               <Field label="name" type="text" required value={regName} onChange={setRegName} placeholder="your name" />
               <Field label="email" type="email" required value={regEmail} onChange={setRegEmail} placeholder="you@example.com" />
               <Field label="password" type="password" required value={regPassword} onChange={setRegPassword} placeholder="create a password" />
-              {registrationMode === 'invite-only' && (
+              {registrationMode === 'invite-only' && !firstUser && (
                 <Field label="invite code" type="text" required value={inviteCode} onChange={setInviteCode} placeholder="enter your invite code" />
               )}
               <PrimaryButton disabled={loading}>

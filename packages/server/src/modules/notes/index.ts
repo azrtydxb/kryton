@@ -1,6 +1,7 @@
 import * as path from "node:path";
 import type { FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
+import { inArray } from "drizzle-orm";
 import { backfillFolders } from "./services/backfill/folders-backfill.js";
 import { backfillSearchIndex } from "./services/backfill/search-index-backfill.js";
 import { backfillTags } from "./services/backfill/tags-backfill.js";
@@ -9,6 +10,7 @@ import { NoteService } from "./services/note.service.js";
 import { TrashApi } from "./services/trash.service.js";
 import { FoldersApi } from "./services/folders.service.js";
 import { getUserNotesDir } from "./services/user-notes-dir.service.js";
+import { user as userTable } from "../../db/schema/auth.js";
 import {
   notesRenameRoutes,
   notesRoutes,
@@ -167,11 +169,29 @@ const notesModuleImpl: FastifyPluginAsync = async (app) => {
       } catch {
         return;
       }
-      for (const entry of entries) {
-        if (!entry.isDirectory()) continue;
-        if (entry.name.startsWith(".")) continue;
+      // Filter directory names against the User table BEFORE backfilling.
+      // Stray dirs (old test runs, manual `rm` on the User row leaving the
+      // notes dir orphaned) would otherwise trigger FK-violation spam in
+      // SearchIndex because backfill inserts rows referencing a userId
+      // that no longer exists.
+      const candidateIds = entries
+        .filter((e) => e.isDirectory() && !e.name.startsWith("."))
+        .map((e) => e.name);
+      if (candidateIds.length === 0) return;
+      const knownUsers = app.db
+        ? await app.db.query.user.findMany({
+            where: inArray(userTable.id, candidateIds),
+            columns: { id: true },
+          })
+        : [];
+      const knownSet = new Set(knownUsers.map((u) => u.id));
+      for (const id of candidateIds) {
+        if (!knownSet.has(id)) {
+          app.log.debug({ orphanDir: id }, "skipping warm-start backfill for orphan notes dir");
+          continue;
+        }
         // Schedule but don't block onReady — backfill+reconcile can be slow.
-        void ensureBackfilled(entry.name);
+        void ensureBackfilled(id);
       }
     } catch (err) {
       app.log.warn({ err }, "warm-start watchers failed");
