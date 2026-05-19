@@ -3,6 +3,8 @@ import { asc, eq } from "drizzle-orm";
 import type { Db } from "../../../db/client.js";
 import { yjsDocument, yjsUpdate } from "../../../db/schema/collab.js";
 import type { NoteService } from "../../notes/services/note.service.js";
+import type { VaultEventOrigin } from "../../vault-events/types.js";
+import type { YServerOrigin } from "./yjs.handler.js";
 
 /**
  * Resolves the per-user notes directory for a given userId. Injected so
@@ -74,14 +76,42 @@ export class YjsPersistence {
    * indexes fresh. `.md` is the source of truth; Y snapshots are an
    * editing-session cache.
    *
+   * The flush is the single chokepoint for vault-event emission when a
+   * doc is live. The caller passes `lastEditOrigin` (set by
+   * `applyServerEdit` / `applyDiskUpdate`); we translate it into the
+   * `VaultEventOrigin` shape that `writeNote` already emits with, and
+   * pass `bypassCollabRouting` so writeNote doesn't recurse back into
+   * `applyServerEdit` — that would re-replace the text we just wrote
+   * and broadcast a stale update.
+   *
    * No-op when persistence was constructed without disk-flush deps
    * (legacy tests that exercise the DB layer in isolation).
    */
-  async flushToDisk(docId: string, userId: string, doc: Y.Doc): Promise<void> {
+  async flushToDisk(
+    docId: string,
+    userId: string,
+    doc: Y.Doc,
+    lastEditOrigin: YServerOrigin | null,
+  ): Promise<void> {
     if (!this.noteService || !this.resolveNotesDir) return;
     const content = doc.getText("content").toString();
     const notesDir = await this.resolveNotesDir(userId);
-    await this.noteService.writeNote(notesDir, docId, content, userId);
+    let origin: VaultEventOrigin | undefined;
+    if (lastEditOrigin && lastEditOrigin.kind === "agent") {
+      origin = {
+        clientId: lastEditOrigin.clientId,
+        agentId: lastEditOrigin.agentId,
+        agentName: lastEditOrigin.agentName,
+      };
+    } else if (lastEditOrigin && lastEditOrigin.kind === "disk") {
+      // External disk edit propagated through Y. The on-disk file is
+      // already the canonical content; writing it back is the simplest
+      // way to also re-emit indexes + the vault event. No attribution.
+      origin = { clientId: null, agentId: null, agentName: null };
+    }
+    await this.noteService.writeNote(notesDir, docId, content, userId, origin, {
+      bypassCollabRouting: true,
+    });
   }
 
   /**

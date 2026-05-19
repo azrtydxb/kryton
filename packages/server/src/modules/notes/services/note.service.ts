@@ -174,14 +174,40 @@ export class NoteService {
     return { path: notePath, content, title, modifiedAt: stat.mtime };
   }
 
-  /** Write a note to disk and update search/graph indexes. */
+  /**
+   * Write a note to disk and update search/graph indexes.
+   *
+   * Y-routing invariant: if `app.collab?.hasLiveDoc(notePath, userId)`
+   * returns true, the write is routed INTO the live Y.Doc instead of
+   * touching disk directly. The Y flush pipeline is then the single
+   * chokepoint for disk persistence, search/graph indexing, and
+   * `vaultEvents.emit(note.updated)`. This keeps server-initiated edits
+   * (MCP `update_note`, etc.) and human typing on the same merge path
+   * so neither side clobbers the other.
+   *
+   * The flush itself calls writeNote with `opts.bypassCollabRouting`
+   * set so it doesn't recurse back into Y.
+   */
   async writeNote(
     notesDir: string,
     notePath: string,
     content: string,
     userId: string,
     origin?: VaultEventOrigin,
+    opts?: { bypassCollabRouting?: boolean },
   ): Promise<void> {
+    if (!opts?.bypassCollabRouting) {
+      const collab = this.app.collab;
+      if (collab && collab.hasLiveDoc(notePath, userId)) {
+        await collab.applyServerEdit(
+          notePath,
+          userId,
+          origin ?? { clientId: null, agentId: null, agentName: null },
+          content,
+        );
+        return;
+      }
+    }
     const fullPath = path.join(notesDir, notePath);
     ensureWithinBase(fullPath, notesDir);
 

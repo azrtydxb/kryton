@@ -8,6 +8,7 @@ import * as decoding from "lib0/decoding";
 import { yjsParamsSchema, yjsQuerySchema } from "../schemas/yjs.schemas.js";
 import type { YjsPersistence } from "./persistence.js";
 import { extractWsToken } from "../../../lib/ws-auth.js";
+import type { VaultEventOrigin } from "../../vault-events/types.js";
 
 // Yjs message type constants
 const MSG_SYNC = 0;
@@ -22,6 +23,29 @@ const MSG_AWARENESS = 1;
  * the seed reliably.
  */
 const ORIGIN_SEED: unique symbol = Symbol("yjs-seed");
+
+/**
+ * Discriminated origin tags for server-driven Y transactions. Both
+ * `applyServerEdit` (MCP/HTTP write while a doc is live) and
+ * `applyDiskUpdate` (external `.md` change picked up by the watcher) tag
+ * their transactions so the flush pipeline can propagate the right
+ * `VaultEventOrigin` downstream into `noteService.writeNote`.
+ *
+ * Invariant: if `collab.hasLiveDoc(path, userId)` returns true,
+ * `noteService.writeNote` MUST route through `applyServerEdit` and MUST
+ * NOT touch disk directly. The Y flush is the single chokepoint for both
+ * disk persistence AND vault-event emission for that path.
+ */
+export interface YAgentOrigin {
+  kind: "agent";
+  agentId: string | null;
+  agentName: string | null;
+  clientId: string | null;
+}
+export interface YDiskOrigin {
+  kind: "disk";
+}
+export type YServerOrigin = YAgentOrigin | YDiskOrigin;
 
 // Persistence debounce defaults (per spec §5)
 const DEBOUNCE_IDLE_MS = 2_000;
@@ -47,6 +71,13 @@ interface DocEntry {
   // Persistence in-flight flag (writes are out-of-band)
   flushing: Promise<void> | null;
   evictTimer: NodeJS.Timeout | null;
+  /**
+   * Origin of the most recent edit to land in this doc. Read by the
+   * flush pipeline so the resulting `noteService.writeNote` carries the
+   * right `VaultEventOrigin` (agentId/agentName for server-routed AI
+   * edits, null for disk-watcher edits, null for plain client typing).
+   */
+  lastEditOrigin: YServerOrigin | null;
 }
 
 export interface YjsRegistry {
@@ -54,10 +85,57 @@ export interface YjsRegistry {
   broadcast(docId: string, msg: Uint8Array): void;
   /** Flush all dirty docs to persistence. Used on graceful shutdown. */
   flushAll(): Promise<void>;
+  /**
+   * True iff a live in-memory Y.Doc exists for `(docId, userId)`. The
+   * notes service consults this on every write to decide whether to
+   * route the content into Y (broadcasts to all peers, eventual flush
+   * writes disk) or take the direct-to-disk path.
+   */
+  hasLiveDoc(docId: string, userId: string): boolean;
+  /**
+   * Apply a server-initiated content replace to a live Y.Doc. The Y
+   * `doc.on("update")` listener handles broadcast + scheduling the
+   * flush; the flush handles disk + DB snapshot + vault event emission.
+   * No-op if the doc isn't live for that user.
+   */
+  applyServerEdit(
+    docId: string,
+    userId: string,
+    origin: VaultEventOrigin,
+    newContent: string,
+  ): Promise<void>;
+  /**
+   * Apply an external `.md` change picked up by the disk watcher to a
+   * live Y.Doc. Replaces the entire Y.Text content; concurrent unsaved
+   * client edits will be merged by CRDT but practically lost on a full
+   * text replace — same race any open-editor + file-watcher setup has.
+   */
+  applyDiskUpdate(docId: string, userId: string, diskContent: string): Promise<void>;
+  /**
+   * Lifecycle hooks driven by ensureDoc / eviction so the disk-watcher
+   * module can start/stop per-user chokidar instances on demand instead
+   * of watching every notes dir from cold start.
+   */
+  setLifecycleHandlers(handlers: {
+    onUserActive?: (userId: string, notesDir: string) => void;
+    onUserIdle?: (userId: string) => void;
+  }): void;
 }
 
 export interface RegisterYjsOptions {
   persistence: YjsPersistence;
+  /**
+   * Resolves the on-disk notes directory for a user. Surfaced on the
+   * registry so lifecycle hook consumers (disk watcher) can compute
+   * paths without re-importing the notes module.
+   */
+  resolveNotesDir?: (userId: string) => Promise<string>;
+}
+
+function isYServerOrigin(o: unknown): o is YServerOrigin {
+  if (typeof o !== "object" || o === null) return false;
+  const kind = (o as { kind?: unknown }).kind;
+  return kind === "agent" || kind === "disk";
 }
 
 function makeSyncUpdateMsg(update: Uint8Array): Uint8Array {
@@ -76,8 +154,42 @@ export function registerYjsRoutes(
   app: FastifyInstance,
   opts: RegisterYjsOptions,
 ): YjsRegistry {
-  const { persistence } = opts;
+  const { persistence, resolveNotesDir } = opts;
   const docs = new Map<string, DocEntry>();
+  /** Per-user live-doc reference count for lifecycle hooks. */
+  const userDocCounts = new Map<string, number>();
+  let lifecycle: {
+    onUserActive?: (userId: string, notesDir: string) => void;
+    onUserIdle?: (userId: string) => void;
+  } = {};
+
+  const incUserCount = async (userId: string): Promise<void> => {
+    const prev = userDocCounts.get(userId) ?? 0;
+    userDocCounts.set(userId, prev + 1);
+    if (prev === 0 && lifecycle.onUserActive && resolveNotesDir) {
+      try {
+        const dir = await resolveNotesDir(userId);
+        lifecycle.onUserActive(userId, dir);
+      } catch (err) {
+        app.log.warn({ err, userId }, "disk-watcher onUserActive failed");
+      }
+    }
+  };
+  const decUserCount = (userId: string): void => {
+    const prev = userDocCounts.get(userId) ?? 0;
+    if (prev <= 1) {
+      userDocCounts.delete(userId);
+      if (lifecycle.onUserIdle) {
+        try {
+          lifecycle.onUserIdle(userId);
+        } catch (err) {
+          app.log.warn({ err, userId }, "disk-watcher onUserIdle failed");
+        }
+      }
+    } else {
+      userDocCounts.set(userId, prev - 1);
+    }
+  };
   /**
    * In-flight ensureDoc calls. Without this, two clients connecting to
    * the same docId at roughly the same moment both miss the `docs.get`
@@ -124,9 +236,15 @@ export function registerYjsRoutes(
     // stale snapshot that gets caught up on the next flush. If we did
     // it in reverse and the disk write failed, the system of record
     // would silently lag behind the DB cache.
+    // Snapshot the origin at flush time so multiple back-to-back edits
+    // don't lose attribution for the earlier one. The flush is the
+    // single chokepoint for downstream vault-event emission per the
+    // Phase 1.5 invariant.
+    const flushOrigin = entry.lastEditOrigin;
+    entry.lastEditOrigin = null;
     const p = (async (): Promise<void> => {
       try {
-        await persistence.flushToDisk(entry.docId, entry.userId, entry.doc);
+        await persistence.flushToDisk(entry.docId, entry.userId, entry.doc, flushOrigin);
       } catch (e) {
         app.log.warn({ err: e, docId: entry.docId }, "yjs flushToDisk failed");
         entry.dirty = true;
@@ -244,10 +362,21 @@ export function registerYjsRoutes(
         maxTimer: null,
         flushing: null,
         evictTimer: null,
+        lastEditOrigin: null,
       };
       docs.set(docId, entry);
+      await incUserCount(auth.userId);
 
       doc.on("update", (update: Uint8Array, origin: unknown) => {
+        // Track the most recent edit origin so the flush knows which
+        // `VaultEventOrigin` to emit downstream. Client-driven edits
+        // arrive with origin = the WebSocket; server-driven edits
+        // arrive with one of YAgentOrigin | YDiskOrigin.
+        if (isYServerOrigin(origin)) {
+          entry.lastEditOrigin = origin;
+        } else {
+          entry.lastEditOrigin = null;
+        }
         // Append to update log out-of-band.
         void persistence
           .appendYjsUpdate(docId, update, auth.agentId)
@@ -361,6 +490,7 @@ export function registerYjsRoutes(
         entry.evictTimer = setTimeout(() => {
           if (entry.clients.size === 0) {
             docs.delete(docId);
+            decUserCount(entry.userId);
           }
         }, EVICT_GRACE_MS);
       }
@@ -443,6 +573,39 @@ export function registerYjsRoutes(
         tasks.push(doFlush(entry));
       }
       await Promise.allSettled(tasks);
+    },
+    hasLiveDoc(docId, userId) {
+      const entry = docs.get(docId);
+      return entry !== undefined && entry.userId === userId;
+    },
+    async applyServerEdit(docId, userId, origin, newContent) {
+      const entry = docs.get(docId);
+      if (!entry || entry.userId !== userId) return;
+      const yOrigin: YAgentOrigin = {
+        kind: "agent",
+        agentId: origin.agentId,
+        agentName: origin.agentName,
+        clientId: origin.clientId,
+      };
+      const ytext = entry.doc.getText("content");
+      entry.doc.transact(() => {
+        ytext.delete(0, ytext.length);
+        ytext.insert(0, newContent);
+      }, yOrigin);
+    },
+    async applyDiskUpdate(docId, userId, diskContent) {
+      const entry = docs.get(docId);
+      if (!entry || entry.userId !== userId) return;
+      const ytext = entry.doc.getText("content");
+      if (ytext.toString() === diskContent) return;
+      const yOrigin: YDiskOrigin = { kind: "disk" };
+      entry.doc.transact(() => {
+        ytext.delete(0, ytext.length);
+        ytext.insert(0, diskContent);
+      }, yOrigin);
+    },
+    setLifecycleHandlers(handlers) {
+      lifecycle = handlers;
     },
   };
 
