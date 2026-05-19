@@ -22,6 +22,7 @@ import { identityModule } from "./modules/identity/index.js";
 import { notesModule } from "./modules/notes/index.js";
 import { knowledgeModule } from "./modules/knowledge/index.js";
 import { collabModule } from "./modules/collab/index.js";
+import { vaultEventsModule } from "./modules/vault-events/index.js";
 import { agentsModule } from "./modules/agents/index.js";
 import { pluginsModule } from "./modules/plugins/index.js";
 import { tunnelModule } from "./modules/tunnel/index.js";
@@ -82,6 +83,9 @@ export async function buildApp({
   await app.register(platformModule);
   await app.register(identityModule);
   await app.register(knowledgeModule);
+  // vault-events must register before notes so `app.vaultEvents` is
+  // available to the notes/folders services when they emit on disk-write.
+  await app.register(vaultEventsModule);
   await app.register(notesModule);
   await app.register(collabModule);
   await app.register(agentsModule);

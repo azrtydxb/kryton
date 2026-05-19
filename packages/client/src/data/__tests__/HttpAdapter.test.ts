@@ -206,3 +206,286 @@ describe("HttpAdapter — currentUser", () => {
     expect(user?.email).toBe("a@b.com");
   });
 });
+
+describe("HttpAdapter — applyVaultEvent", () => {
+  function freshAdapter() {
+    return new HttpAdapter({ fetch: makeFetch([]), baseUrl: "" });
+  }
+
+  it("note.created inserts a row and fires notes/folders subscribers", () => {
+    const adapter = freshAdapter();
+    const onNotes = vi.fn();
+    const onFolders = vi.fn();
+    adapter.subscribe("notes", "*", onNotes);
+    adapter.subscribe("folders", "*", onFolders);
+
+    adapter.applyVaultEvent({
+      kind: "note.created",
+      path: "Projects/Plan.md",
+      updatedAt: "2026-05-19T00:00:00.000Z",
+      size: 4,
+      clientId: null,
+      agentId: null,
+      agentName: null,
+    });
+
+    const notes = adapter.notes.list();
+    expect(notes).toHaveLength(1);
+    expect(notes[0]?.path).toBe("Projects/Plan.md");
+    expect(notes[0]?.title).toBe("Plan");
+    expect(onNotes).toHaveBeenCalled();
+    expect(onFolders).toHaveBeenCalled();
+    expect(adapter.folders.list().some((f) => f.path === "Projects")).toBe(true);
+  });
+
+  it("note.created is idempotent — re-applying does not duplicate the row", () => {
+    const adapter = freshAdapter();
+    const ev = {
+      kind: "note.created" as const,
+      path: "Welcome.md",
+      updatedAt: "2026-05-19T00:00:00.000Z",
+      size: 4,
+      clientId: null,
+      agentId: null,
+      agentName: null,
+    };
+    adapter.applyVaultEvent(ev);
+    adapter.applyVaultEvent(ev);
+    adapter.applyVaultEvent({ ...ev, kind: "note.updated" });
+    expect(adapter.notes.list()).toHaveLength(1);
+  });
+
+  it("note.updated bumps modifiedAt without duplicating", () => {
+    const adapter = freshAdapter();
+    adapter.applyVaultEvent({
+      kind: "note.created",
+      path: "a.md",
+      updatedAt: "2026-05-19T00:00:00.000Z",
+      size: 1,
+      clientId: null,
+      agentId: null,
+      agentName: null,
+    });
+    adapter.applyVaultEvent({
+      kind: "note.updated",
+      path: "a.md",
+      updatedAt: "2026-05-19T01:00:00.000Z",
+      size: 9,
+      clientId: null,
+      agentId: null,
+      agentName: null,
+    });
+    const notes = adapter.notes.list();
+    expect(notes).toHaveLength(1);
+    expect(notes[0]?.modifiedAt).toBe(new Date("2026-05-19T01:00:00.000Z").getTime());
+  });
+
+  it("note.deleted removes the row; second delete is a no-op", () => {
+    const adapter = freshAdapter();
+    adapter.applyVaultEvent({
+      kind: "note.created",
+      path: "a.md",
+      updatedAt: "2026-05-19T00:00:00.000Z",
+      size: 1,
+      clientId: null,
+      agentId: null,
+      agentName: null,
+    });
+    const onNotes = vi.fn();
+    adapter.subscribe("notes", "*", onNotes);
+    adapter.applyVaultEvent({
+      kind: "note.deleted",
+      path: "a.md",
+      clientId: null,
+      agentId: null,
+      agentName: null,
+    });
+    expect(adapter.notes.list()).toHaveLength(0);
+    expect(onNotes).toHaveBeenCalledTimes(1);
+    adapter.applyVaultEvent({
+      kind: "note.deleted",
+      path: "a.md",
+      clientId: null,
+      agentId: null,
+      agentName: null,
+    });
+    expect(onNotes).toHaveBeenCalledTimes(1);
+  });
+
+  it("note.renamed rewrites path + id in place", () => {
+    const adapter = freshAdapter();
+    adapter.applyVaultEvent({
+      kind: "note.created",
+      path: "old.md",
+      updatedAt: "2026-05-19T00:00:00.000Z",
+      size: 1,
+      clientId: null,
+      agentId: null,
+      agentName: null,
+    });
+    adapter.applyVaultEvent({
+      kind: "note.renamed",
+      from: "old.md",
+      to: "new.md",
+      updatedAt: "2026-05-19T01:00:00.000Z",
+      size: 1,
+      clientId: null,
+      agentId: null,
+      agentName: null,
+    });
+    expect(adapter.notes.findByPath("old.md")).toBeNull();
+    expect(adapter.notes.findByPath("new.md")?.title).toBe("new");
+  });
+
+  it("note.moved into a new folder materialises that folder", () => {
+    const adapter = freshAdapter();
+    adapter.applyVaultEvent({
+      kind: "note.created",
+      path: "a.md",
+      updatedAt: "2026-05-19T00:00:00.000Z",
+      size: 1,
+      clientId: null,
+      agentId: null,
+      agentName: null,
+    });
+    adapter.applyVaultEvent({
+      kind: "note.moved",
+      from: "a.md",
+      to: "Projects/a.md",
+      updatedAt: "2026-05-19T01:00:00.000Z",
+      size: 1,
+      clientId: null,
+      agentId: null,
+      agentName: null,
+    });
+    expect(adapter.notes.findByPath("Projects/a.md")).not.toBeNull();
+    expect(adapter.folders.list().some((f) => f.path === "Projects")).toBe(true);
+  });
+
+  it("folder.created and folder.deleted patch the folder list (idempotent)", () => {
+    const adapter = freshAdapter();
+    adapter.applyVaultEvent({
+      kind: "folder.created",
+      path: "f",
+      clientId: null,
+      agentId: null,
+      agentName: null,
+    });
+    adapter.applyVaultEvent({
+      kind: "folder.created",
+      path: "f",
+      clientId: null,
+      agentId: null,
+      agentName: null,
+    });
+    expect(adapter.folders.list().filter((f) => f.path === "f")).toHaveLength(1);
+
+    adapter.applyVaultEvent({
+      kind: "folder.deleted",
+      path: "f",
+      clientId: null,
+      agentId: null,
+      agentName: null,
+    });
+    expect(adapter.folders.list().some((f) => f.path === "f")).toBe(false);
+  });
+
+  it("folder.deleted cascades to notes under the prefix", () => {
+    const adapter = freshAdapter();
+    adapter.applyVaultEvent({
+      kind: "note.created",
+      path: "f/a.md",
+      updatedAt: "2026-05-19T00:00:00.000Z",
+      size: 1,
+      clientId: null,
+      agentId: null,
+      agentName: null,
+    });
+    adapter.applyVaultEvent({
+      kind: "note.created",
+      path: "f/b.md",
+      updatedAt: "2026-05-19T00:00:00.000Z",
+      size: 1,
+      clientId: null,
+      agentId: null,
+      agentName: null,
+    });
+    adapter.applyVaultEvent({
+      kind: "note.created",
+      path: "other.md",
+      updatedAt: "2026-05-19T00:00:00.000Z",
+      size: 1,
+      clientId: null,
+      agentId: null,
+      agentName: null,
+    });
+    adapter.applyVaultEvent({
+      kind: "folder.deleted",
+      path: "f",
+      clientId: null,
+      agentId: null,
+      agentName: null,
+    });
+    expect(adapter.notes.list().map((n) => n.path)).toEqual(["other.md"]);
+  });
+
+  it("folder.renamed remaps notes and child folders", () => {
+    const adapter = freshAdapter();
+    adapter.applyVaultEvent({
+      kind: "folder.created",
+      path: "Old",
+      clientId: null,
+      agentId: null,
+      agentName: null,
+    });
+    adapter.applyVaultEvent({
+      kind: "folder.created",
+      path: "Old/Sub",
+      clientId: null,
+      agentId: null,
+      agentName: null,
+    });
+    adapter.applyVaultEvent({
+      kind: "note.created",
+      path: "Old/Sub/a.md",
+      updatedAt: "2026-05-19T00:00:00.000Z",
+      size: 1,
+      clientId: null,
+      agentId: null,
+      agentName: null,
+    });
+    adapter.applyVaultEvent({
+      kind: "folder.renamed",
+      from: "Old",
+      to: "New",
+      clientId: null,
+      agentId: null,
+      agentName: null,
+    });
+    const folderPaths = adapter.folders.list().map((f) => f.path).sort();
+    expect(folderPaths).toContain("New");
+    expect(folderPaths).toContain("New/Sub");
+    expect(folderPaths).not.toContain("Old");
+    expect(adapter.notes.findByPath("New/Sub/a.md")).not.toBeNull();
+    expect(adapter.notes.findByPath("Old/Sub/a.md")).toBeNull();
+  });
+
+  it("clientId is sent as X-Kryton-Client-Id on mutating requests", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      text: async () => "{}",
+      json: async () => ({ path: "a.md" }),
+    })) as unknown as typeof fetch;
+    const adapter = new HttpAdapter({
+      fetch: fetchMock,
+      baseUrl: "",
+      clientId: "tab-xyz",
+    });
+    await adapter.notes.create({ path: "a.md", title: "A", content: "x" });
+    const call = (fetchMock as unknown as { mock: { calls: unknown[][] } }).mock.calls[0];
+    const init = call[1] as { headers: Record<string, string> };
+    expect(init.headers["X-Kryton-Client-Id"]).toBe("tab-xyz");
+  });
+});

@@ -7,6 +7,7 @@ import * as encoding from "lib0/encoding";
 import * as decoding from "lib0/decoding";
 import { yjsParamsSchema, yjsQuerySchema } from "../schemas/yjs.schemas.js";
 import type { YjsPersistence } from "./persistence.js";
+import { extractWsToken } from "../../../lib/ws-auth.js";
 
 // Yjs message type constants
 const MSG_SYNC = 0;
@@ -315,22 +316,6 @@ export function registerYjsRoutes(
     });
   };
 
-  // Extract bearer token from Sec-WebSocket-Protocol. Query-string tokens
-  // are no longer accepted because they leak via access logs, browser
-  // history, and proxies. Convention: a "kryton-token" marker followed
-  // by the token entry. Anything else (bare subprotocols, missing
-  // marker, marker without a following entry) returns null so the
-  // request falls through to cookie/session auth.
-  const extractToken = (req: FastifyRequest): string | null => {
-    const proto = req.headers["sec-websocket-protocol"];
-    if (typeof proto !== "string" || proto.length === 0) return null;
-    const parts = proto.split(",").map((s) => s.trim());
-    const marker = parts.indexOf("kryton-token");
-    if (marker === -1) return null;
-    const candidate = parts[marker + 1];
-    return candidate && candidate.length > 0 ? candidate : null;
-  };
-
   app.route({
     method: "GET",
     url: "/ws/yjs/:docId",
@@ -345,7 +330,7 @@ export function registerYjsRoutes(
       // Resolve auth before the WS upgrade. Two paths:
       //   1. Bearer-style agent token via query string / WS protocol.
       //   2. Existing session/cookie or API key header (via standard auth).
-      const token = extractToken(req);
+      const token = extractWsToken(req);
       if (token) {
         const result = await app.auth.authenticateWsToken(token);
         if (result) {

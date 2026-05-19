@@ -10,6 +10,7 @@ import {
 } from "../schemas/folders.schemas.js";
 import { wildcardPathParamsSchema } from "../schemas/notes.schemas.js";
 import { decodePathParam } from "../../../lib/pathUtils.js";
+import { originFromRequest } from "../../vault-events/index.js";
 
 export interface FoldersRoutesDeps {
   ensureBackfilled: (userId: string) => Promise<void>;
@@ -50,7 +51,11 @@ export function foldersRoutes(deps: FoldersRoutesDeps): FastifyPluginAsync {
         const ctx = await app.auth.requireAuth(req);
         app.auth.requireWriteScope(ctx);
         const folderPath = req.body.path ?? req.body.name!;
-        const { path } = await app.folders.create(ctx.user.id, folderPath);
+        const { path } = await app.folders.create(
+          ctx.user.id,
+          folderPath,
+          originFromRequest(req, ctx),
+        );
         reply.status(201);
         return { path, message: "Folder created" };
       },
@@ -75,7 +80,7 @@ export function foldersRoutes(deps: FoldersRoutesDeps): FastifyPluginAsync {
         app.auth.requireWriteScope(ctx);
         const folderPath = decodePathParam(req.params["*"]);
         if (!folderPath) throw new ValidationError("Path is required");
-        await app.folders.delete(ctx.user.id, folderPath);
+        await app.folders.delete(ctx.user.id, folderPath, originFromRequest(req, ctx));
         return { message: "Folder deleted" };
       },
     );
@@ -115,7 +120,12 @@ export function foldersRenameRoutes(deps: FoldersRoutesDeps): FastifyPluginAsync
         const oldPath = decodePathParam(req.params["*"]);
         if (!oldPath) throw new ValidationError("Path is required");
         const { newPath } = req.body;
-        const result = await app.folders.rename(ctx.user.id, oldPath, newPath);
+        const result = await app.folders.rename(
+          ctx.user.id,
+          oldPath,
+          newPath,
+          originFromRequest(req, ctx),
+        );
         return { oldPath: result.oldPath, newPath: result.newPath, message: "Folder renamed" };
       },
     );

@@ -7,6 +7,7 @@ import { saveHistorySnapshot } from "./history.service.js";
 import { trashItem } from "../../../db/schema/notes.js";
 import { noteShare } from "../../../db/schema/sharing.js";
 import { NotFoundError } from "../../../lib/errors.js";
+import type { VaultEventOrigin } from "../../vault-events/types.js";
 
 function isEnoent(err: unknown): boolean {
   return (
@@ -141,6 +142,7 @@ export class NoteService {
     notePath: string,
     content: string,
     userId: string,
+    origin?: VaultEventOrigin,
   ): Promise<void> {
     const fullPath = path.join(notesDir, notePath);
     ensureWithinBase(fullPath, notesDir);
@@ -148,12 +150,15 @@ export class NoteService {
     const dir = path.dirname(fullPath);
     await fs.mkdir(dir, { recursive: true });
 
-    // Save existing content as a history snapshot before overwriting
+    // Save existing content as a history snapshot before overwriting.
+    // Tracking `existed` here lets us emit `note.created` vs `note.updated`
+    // afterwards without a second `stat` round-trip.
+    let existed = true;
     try {
       const existing = await fs.readFile(fullPath, "utf-8");
       await saveHistorySnapshot(notesDir, notePath, existing);
     } catch {
-      // New file — no history to save
+      existed = false;
     }
 
     await fs.writeFile(fullPath, content, "utf-8");
@@ -165,10 +170,38 @@ export class NoteService {
         knowledge.updateGraph(notePath, content, userId),
       ]);
     }
+
+    const events = this.app.vaultEvents;
+    if (events) {
+      let updatedAt: string;
+      let size: number;
+      try {
+        const stat = await fs.stat(fullPath);
+        updatedAt = stat.mtime.toISOString();
+        size = stat.size;
+      } catch {
+        updatedAt = new Date().toISOString();
+        size = Buffer.byteLength(content, "utf-8");
+      }
+      events.emit(userId, {
+        kind: existed ? "note.updated" : "note.created",
+        path: notePath,
+        updatedAt,
+        size,
+        clientId: origin?.clientId ?? null,
+        agentId: origin?.agentId ?? null,
+        agentName: origin?.agentName ?? null,
+      });
+    }
   }
 
   /** Move a note to trash (soft delete) and clean up indexes. */
-  async deleteNote(notesDir: string, notePath: string, userId: string): Promise<void> {
+  async deleteNote(
+    notesDir: string,
+    notePath: string,
+    userId: string,
+    origin?: VaultEventOrigin,
+  ): Promise<void> {
     const fullPath = path.join(notesDir, notePath);
     ensureWithinBase(fullPath, notesDir);
 
@@ -193,6 +226,14 @@ export class NoteService {
           eq(noteShare.isFolder, false),
         ),
       );
+
+    this.app.vaultEvents?.emit(userId, {
+      kind: "note.deleted",
+      path: notePath,
+      clientId: origin?.clientId ?? null,
+      agentId: origin?.agentId ?? null,
+      agentName: origin?.agentName ?? null,
+    });
   }
 
   /** Rename/move a note on disk and update all references. */
@@ -201,6 +242,7 @@ export class NoteService {
     oldPath: string,
     newPath: string,
     userId: string,
+    origin?: VaultEventOrigin,
   ): Promise<void> {
     const oldFullPath = path.join(notesDir, oldPath);
     const newFullPath = path.join(notesDir, newPath);
@@ -230,6 +272,35 @@ export class NoteService {
           eq(noteShare.isFolder, false),
         ),
       );
+
+    const events = this.app.vaultEvents;
+    if (events) {
+      let updatedAt: string;
+      let size: number;
+      try {
+        const stat = await fs.stat(newFullPath);
+        updatedAt = stat.mtime.toISOString();
+        size = stat.size;
+      } catch {
+        updatedAt = new Date().toISOString();
+        size = 0;
+      }
+      // A pure rename keeps the parent directory; a move changes it. The
+      // client treats them identically (drop from old path, insert at new)
+      // but the kind discriminator lets a notification surface either
+      // "renamed" or "moved" copy.
+      const sameDir = path.dirname(oldPath) === path.dirname(newPath);
+      events.emit(userId, {
+        kind: sameDir ? "note.renamed" : "note.moved",
+        from: oldPath,
+        to: newPath,
+        updatedAt,
+        size,
+        clientId: origin?.clientId ?? null,
+        agentId: origin?.agentId ?? null,
+        agentName: origin?.agentName ?? null,
+      });
+    }
   }
 
   /** Index all existing notes in a user's notes directory. */
