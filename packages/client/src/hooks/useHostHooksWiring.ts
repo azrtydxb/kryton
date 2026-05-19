@@ -21,8 +21,30 @@ import {
   type HostHooksNote,
 } from '@azrtydxb/ui';
 import { api, request, type NoteData, type AuthUser } from '../lib/api';
+import { setAllPrefs, type SidebarPref } from '../plugins/sidebarPrefs';
 
 const PLUGIN_KEY_RE = /^plugin:([^:]+):(.+)$/;
+const SIDEBAR_LAYOUT_KEY = 'ui:sidebarLayout';
+
+/**
+ * Pull the saved per-user sidebar layout (if any) from the platform
+ * settings endpoint and seed the in-memory pref store. Silently
+ * tolerates a missing entry / malformed JSON — those fall back to the
+ * default layout (everything on the left, registration order).
+ */
+async function hydrateSidebarLayout(): Promise<void> {
+  try {
+    const raw = await request<Record<string, string>>('/settings');
+    const entry = raw[SIDEBAR_LAYOUT_KEY];
+    if (!entry) return;
+    const parsed: unknown = JSON.parse(entry);
+    if (parsed && typeof parsed === 'object') {
+      setAllPrefs(parsed as Record<string, SidebarPref>);
+    }
+  } catch (err) {
+    console.warn('[sidebar] failed to hydrate layout:', err);
+  }
+}
 
 /**
  * Fetch the current user's saved settings and group plugin-namespaced
@@ -94,6 +116,10 @@ export function useHostHooksWiring({
         console.warn('[plugins] failed to load user settings:', err);
         if (!cancelled) setPluginSettings({});
       });
+    // Sidebar layout lives outside the plugin namespace (ui:sidebarLayout)
+    // so it has its own fetch path. Fire-and-forget — the in-memory store
+    // bumps subscribers when the data lands.
+    void hydrateSidebarLayout();
     return () => { cancelled = true; };
   }, [currentUserId]);
 

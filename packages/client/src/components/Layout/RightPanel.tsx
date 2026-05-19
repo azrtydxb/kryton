@@ -3,7 +3,7 @@ import { GraphData } from '../../lib/api';
 import { usePrefs } from '../../stores/prefsStore';
 import { PluginSlot } from '../PluginSlot/PluginSlot';
 import { usePluginSlots } from '@azrtydxb/ui';
-import { useSidebarSides, getSide } from '../../plugins/sidebarPrefs';
+import { useSidebarSides, getPref } from '../../plugins/sidebarPrefs';
 
 /**
  * RightPanel — graph rail per design handoff (prototype/app/graph.jsx).
@@ -43,7 +43,7 @@ export function RightPanel({
   useSidebarSides();
   const { sidebarPanels } = usePluginSlots();
   const hasRightPlugins = sidebarPanels.some(
-    (p) => getSide(p.pluginId) === 'right',
+    (p) => getPref(p.pluginId).side === 'right',
   );
 
   if (graphPosition === 'hidden') return null;

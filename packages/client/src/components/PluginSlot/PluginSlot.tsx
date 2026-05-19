@@ -2,7 +2,7 @@ import React from "react";
 import { usePluginSlots } from "@azrtydxb/ui";
 import { PluginErrorBoundary } from "../../plugins/PluginErrorBoundary";
 import { PluginSection } from "./PluginSection";
-import { useSidebarSides, getSide, type Side } from "../../plugins/sidebarPrefs";
+import { useSidebarSides, getPref, type Side } from "../../plugins/sidebarPrefs";
 
 interface PluginSlotProps {
   slot:
@@ -41,13 +41,25 @@ export function PluginSlot({ slot, side }: PluginSlotProps) {
   switch (slot) {
     case "sidebar": {
       const target: Side = side ?? "left";
-      items = plugins.sidebarPanels
-        .filter((p) => getSide(p.pluginId) === target)
-        .map((p) => ({
-          id: p.id,
-          pluginId: p.pluginId,
-          component: p.component,
-          title: p.title,
+      // Resolve prefs once so the sort below sees a consistent snapshot.
+      // Plugins without an explicit pref fall back to {side:'left', order:idx}
+      // — preserving the registration order as the natural default.
+      const decorated = plugins.sidebarPanels.map((p, idx) => {
+        const pref = getPref(p.pluginId);
+        // First-seen plugins anchor at their registration index so the
+        // initial order matches the no-feature baseline. Once any pref
+        // has been written, the stored order wins.
+        const order = pref.order >= 0 ? pref.order : idx;
+        return { p, side: pref.side, order, idx };
+      });
+      items = decorated
+        .filter((d) => d.side === target)
+        .sort((a, b) => a.order - b.order || a.idx - b.idx)
+        .map((d) => ({
+          id: d.p.id,
+          pluginId: d.p.pluginId,
+          component: d.p.component,
+          title: d.p.title,
         }));
       break;
     }

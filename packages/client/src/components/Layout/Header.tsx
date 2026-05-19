@@ -6,7 +6,8 @@
  *   ╭ command-palette button (320px wide, ⌘K kbd) ╮         [flex]
  *   [+ new note] [history] [theme] [settings] | [user pill]
  */
-import { MutableRefObject, useMemo } from 'react';
+import { MutableRefObject, useCallback, useMemo } from 'react';
+import { PanelsTopLeft } from 'lucide-react';
 import { UserMenu } from './UserMenu';
 import { IndexingPill } from './IndexingPill';
 import { Icons } from '../Icons';
@@ -14,6 +15,11 @@ import { usePrefs } from '../../stores/prefsStore';
 import { useUIStore } from '../../stores/uiStore';
 import { formatShortcut } from '../../lib/platform';
 import { PluginSlot } from '../PluginSlot/PluginSlot';
+import { api } from '../../lib/api';
+import {
+  getAllPrefs,
+  clearLegacyStorage,
+} from '../../plugins/sidebarPrefs';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -148,7 +154,30 @@ export function Header({
   const showNoteHistory = useUIStore((s) => s.showNoteHistory);
   const setShowNoteHistory = useUIStore((s) => s.setShowNoteHistory);
   const setShowAccountSettings = useUIStore((s) => s.setShowAccountSettings);
+  const sidebarEditMode = useUIStore((s) => s.sidebarEditMode);
+  const setSidebarEditMode = useUIStore((s) => s.setSidebarEditMode);
   const historyDisabled = !activeNotePath;
+
+  // Flush the current sidebar layout to the server when leaving edit mode.
+  // We persist under a flat per-user key so the existing /api/settings/:key
+  // endpoint can serve it; the regex was widened earlier to accept `:` in
+  // keys for exactly this kind of namespaced UI setting.
+  const handleToggleEditMode = useCallback(() => {
+    if (sidebarEditMode) {
+      const prefs = getAllPrefs();
+      api
+        .updateSetting('ui:sidebarLayout', JSON.stringify(prefs))
+        .then(() => {
+          // Drop the legacy v1 localStorage map once the server has the
+          // truth — keeps us from having two sources of layout state.
+          clearLegacyStorage();
+        })
+        .catch((err) => {
+          console.warn('[sidebar] failed to persist layout:', err);
+        });
+    }
+    setSidebarEditMode(!sidebarEditMode);
+  }, [sidebarEditMode, setSidebarEditMode]);
 
   const kbdLabel = formatShortcut(['mod', 'K']);
 
@@ -227,6 +256,14 @@ export function Header({
         ariaLabel="Settings"
       >
         <Icons.Settings size={14} />
+      </HeaderBtn>
+      <HeaderBtn
+        onClick={handleToggleEditMode}
+        active={sidebarEditMode}
+        title={sidebarEditMode ? 'Done — save layout' : 'Customize sidebar layout'}
+        ariaLabel={sidebarEditMode ? 'Done — save layout' : 'Customize sidebar layout'}
+      >
+        <PanelsTopLeft size={14} strokeWidth={1.5} />
       </HeaderBtn>
 
       {/* divider */}

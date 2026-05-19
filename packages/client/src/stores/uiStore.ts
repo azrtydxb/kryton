@@ -33,6 +33,11 @@ interface UIState {
   /** Per-note version-history dropdown — toggled by the top-bar History
    *  button when a note is active; consumed by PreviewModeView. */
   showNoteHistory: boolean;
+  /** Sidebar customisation toggle — when true, sidebar plugin panels render
+   *  as outlined cards with move-side / move-up / move-down controls. The
+   *  layout is persisted on the server when the user flips this back to
+   *  false (see Header.tsx). */
+  sidebarEditMode: boolean;
   /** Ordered list of note paths currently open in the tab strip.
    *  Opening a note adds it (if absent) and makes it active; closing a tab
    *  removes its path and falls back to the previous tab as active. */
@@ -63,6 +68,7 @@ interface UIState {
   setShowAccessRequests: SetState<boolean>;
   setShowAccountSettings: SetState<boolean>;
   setShowNoteHistory: SetState<boolean>;
+  setSidebarEditMode: SetState<boolean>;
   /** Open or focus a tab for `path`. Appends if absent; idempotent.
    *  Subscribed-to by `useUrlSync` — every call surfaces in the URL. */
   openTab: (path: string) => void;
@@ -104,6 +110,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   showAccessRequests: false,
   showAccountSettings: false,
   showNoteHistory: false,
+  sidebarEditMode: false,
   openTabs: [],
   cursorState: { line: 1, col: 1, wordCount: 0 },
 
@@ -127,6 +134,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   setShowAccessRequests: (v) => set({ showAccessRequests: resolve(v, get().showAccessRequests) }),
   setShowAccountSettings: (v) => set({ showAccountSettings: resolve(v, get().showAccountSettings) }),
   setShowNoteHistory: (v) => set({ showNoteHistory: resolve(v, get().showNoteHistory) }),
+  setSidebarEditMode: (v) => set({ sidebarEditMode: resolve(v, get().sidebarEditMode) }),
 
   openTab: (path) => {
     const tabs = get().openTabs;
@@ -165,6 +173,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     showAccessRequests: false,
     showAccountSettings: false,
     showNoteHistory: false,
+    sidebarEditMode: false,
     openTabs: [],
     cursorState: { line: 1, col: 1, wordCount: 0 },
   }),
