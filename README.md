@@ -453,3 +453,19 @@ npm test             # Run all tests
 
 Apache License 2.0 — see [LICENSE](LICENSE) for details.
 
+
+## Trademark
+
+**"Kryton"** and the Kryton logo are trademarks of Pascal Watteel. The Apache
+2.0 license grants rights to use the software, but it does **not** grant
+permission to use these trademarks. You may not use the "Kryton" name or logo
+in a way that suggests endorsement of, or affiliation with, your fork or
+derivative product. Forks distributed publicly must be renamed.
+
+## Contributing
+
+Contributions are welcome. Before your first pull request, please read and
+sign the [Contributor License Agreement](CLA.md). The CLA Assistant bot will
+prompt you on your first PR — sign by commenting:
+
+> I have read the CLA Document and I hereby sign the CLA
