@@ -41,7 +41,15 @@ const collabModuleImpl: FastifyPluginAsync = async (app) => {
   if (!app.hasDecorator("shares")) {
     app.decorate("shares", shareService);
   }
-  const persistence = new YjsPersistence(app.db);
+  // Wire the notes-module deps so the persistence layer can flush
+  // Y.Text("content") back to the canonical `.md` file on every
+  // debounced save. The notes module decorates `app` before the collab
+  // module registers (see app.ts), so both decorators are guaranteed
+  // to be present here.
+  const persistence = new YjsPersistence(app.db, {
+    noteService: app.noteService,
+    resolveNotesDir: (userId) => app.notes.getUserNotesDir(userId),
+  });
 
   let registry: YjsRegistry | null = null;
 
