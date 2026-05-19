@@ -60,7 +60,10 @@ spec:
       containers:
       - args:
           - --leader-elect
-          - --leader-election-id=kryton-operator
+          # cmd/manager/main.go hard-codes LeaderElectionID to
+          # "kryton-operator.azrtydxb.io" and does not yet expose a
+          # --leader-election-id flag. Re-add the override once main.go
+          # grows the flag.
           - --health-probe-bind-address=:8081
         image: controller:latest
         name: manager
