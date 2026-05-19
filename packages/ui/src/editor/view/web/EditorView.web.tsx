@@ -10,6 +10,7 @@ import {
   collectDecorations,
   type EditorPlugin,
   type EditorState,
+  type Transaction,
 } from "../../state";
 import { projectDom } from "./projectDom";
 import { domRangeToSelection, selectionToDomRange } from "./selection";
@@ -17,7 +18,8 @@ import { interpretBeforeInput } from "./beforeinput";
 import { normalizeClipboardData } from "./paste";
 
 export interface EditorViewProps {
-  /** Initial source text, only used on mount. */
+  /** Initial source text, only used on mount. Ignored when `controlledState`
+   *  is provided — controlled mode reads the doc from `controlledState`. */
   initialDoc?: string;
   /** Plugins contributing decorations / commands / suggestions. */
   plugins?: readonly EditorPlugin[];
@@ -26,6 +28,17 @@ export interface EditorViewProps {
   /** Called when the user clicks/taps a wikilink decoration. */
   onWikilinkClick?: (target: string) => void;
   className?: string;
+  /**
+   * Controlled mode: when both `controlledState` and `onDispatch` are
+   * provided, the view renders from `controlledState` and routes every
+   * transaction through `onDispatch` instead of applying it internally.
+   * The owner is responsible for calling `applyTransaction` (or running
+   * it through a Y.js binding) and pushing the resulting state back as
+   * the next `controlledState`. Selection / cursor / paste / IME paths
+   * still produce transactions — they just delegate the apply step.
+   */
+  controlledState?: EditorState;
+  onDispatch?: (tr: Transaction) => void;
 }
 
 const KIND_CLASS: Record<string, string> = {
@@ -46,16 +59,24 @@ const KIND_CLASS: Record<string, string> = {
 
 export function EditorView({
   initialDoc = "", plugins = [], onChange, onWikilinkClick, className,
+  controlledState, onDispatch,
 }: EditorViewProps) {
   const rootRef = React.useRef<HTMLDivElement | null>(null);
   const composingRef = React.useRef(false);
-  const [state, setStateInternal] = React.useState<EditorState>(() => createEditorState(initialDoc));
+  const [internalState, setStateInternal] = React.useState<EditorState>(() => createEditorState(initialDoc));
+  const isControlled = controlledState !== undefined && onDispatch !== undefined;
+  const state = isControlled ? controlledState : internalState;
   const stateRef = React.useRef<EditorState>(state);
   const historyRef = React.useRef(createHistory());
+  const onDispatchRef = React.useRef(onDispatch);
 
   React.useLayoutEffect(() => {
     stateRef.current = state;
   }, [state]);
+
+  React.useEffect(() => {
+    onDispatchRef.current = onDispatch;
+  }, [onDispatch]);
 
   const setState = React.useCallback((next: EditorState) => {
     stateRef.current = next;
@@ -64,8 +85,17 @@ export function EditorView({
   }, [onChange]);
 
   const dispatch = React.useCallback((tr: { ops: Operation[]; selection: Selection | null }) => {
+    const transaction = transactionFromOps(tr.ops, tr.selection ?? undefined);
+    if (onDispatchRef.current) {
+      // Controlled mode: history is the owner's responsibility (the Y.js
+      // binding's undo manager handles it). We still call the owner so the
+      // ops route through the binding before being reflected back as the
+      // next `controlledState`.
+      onDispatchRef.current(transaction);
+      return;
+    }
     historyRef.current.record(stateRef.current, tr);
-    setState(applyTransaction(stateRef.current, transactionFromOps(tr.ops, tr.selection ?? undefined)));
+    setState(applyTransaction(stateRef.current, transaction));
   }, [setState]);
 
   // After every render, replace selection in the DOM to match state.selection.
@@ -125,10 +155,16 @@ export function EditorView({
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     const meta = e.metaKey || e.ctrlKey;
     if (meta && e.key === "z" && !e.shiftKey) {
+      // In controlled mode the local history stack is unused — undo/redo
+      // belongs to the Y.js binding's UndoManager (wired in a later phase).
+      // Let the browser's default behaviour pass through rather than
+      // applying a stale local snapshot that would diverge from Y.
+      if (onDispatchRef.current) return;
       e.preventDefault();
       const undone = historyRef.current.undo(stateRef.current);
       if (undone) setState(undone);
     } else if (meta && (e.key === "Z" || (e.key === "z" && e.shiftKey))) {
+      if (onDispatchRef.current) return;
       e.preventDefault();
       const redone = historyRef.current.redo(stateRef.current);
       if (redone) setState(redone);
@@ -140,6 +176,12 @@ export function EditorView({
     const root = rootRef.current!;
     const next = domRangeToSelection(root);
     if (next.anchor !== stateRef.current.selection.anchor || next.head !== stateRef.current.selection.head) {
+      if (onDispatchRef.current) {
+        // Controlled mode: a selection-only change is a transaction with
+        // no ops; the owner threads it back via `controlledState`.
+        onDispatchRef.current(transactionFromOps([], next));
+        return;
+      }
       const updated = { ...stateRef.current, selection: next };
       stateRef.current = updated;
       onChange?.(updated);

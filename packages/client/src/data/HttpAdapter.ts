@@ -650,6 +650,16 @@ export class HttpAdapter implements KrytonDataAdapter {
     return text.toString();
   }
 
+  /**
+   * True when an in-memory Y.Doc is currently open for `noteId`. The
+   * debounced HTTP save path consults this to skip writes when the live
+   * Y session is already responsible for persistence (server-side
+   * flush).
+   */
+  hasLiveDocument(noteId: string): boolean {
+    return this._docs.has(noteId);
+  }
+
   // ---- Vault events --------------------------------------------------------
 
   /**

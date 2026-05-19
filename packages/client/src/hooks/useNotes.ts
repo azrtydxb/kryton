@@ -2,7 +2,17 @@ import { useState, useCallback, useEffect } from 'react';
 import { useDebouncedCallback } from 'use-debounce';
 import { api, FileNode, NoteData, sharedNoteApi } from '../lib/api';
 
-export function useNotes(userId?: string) {
+/**
+ * Optional predicate the caller passes to tell `updateContent` whether a
+ * given path currently has a live Y.Doc session. When true, the
+ * debounced HTTP save is suppressed — the server's Y flush handles
+ * persistence for that path. The local `activeNote.content` is still
+ * patched so any consumers reading it (preview, tab dirty indicator,
+ * etc.) see the typed text immediately.
+ */
+type IsLiveDocument = (path: string) => boolean;
+
+export function useNotes(userId?: string, isLiveDocument?: IsLiveDocument) {
   const [tree, setTree] = useState<FileNode[]>([]);
   const [activeNote, setActiveNote] = useState<NoteData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -70,10 +80,15 @@ export function useNotes(userId?: string) {
   const updateContent = useCallback((content: string) => {
     setActiveNote(prev => {
       if (!prev) return null;
-      debouncedSave(prev.path, content);
+      // When a live Y.Doc owns this path, persistence flows through the
+      // server's Y flush instead of the HTTP PUT — skip the debounced
+      // save to avoid a redundant (and racy) second write.
+      if (!isLiveDocument?.(prev.path)) {
+        debouncedSave(prev.path, content);
+      }
       return { ...prev, content };
     });
-  }, [debouncedSave]);
+  }, [debouncedSave, isLiveDocument]);
 
   const createNote = useCallback(async (path: string, content = '') => {
     try {

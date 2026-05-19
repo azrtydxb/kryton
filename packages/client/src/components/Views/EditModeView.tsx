@@ -9,6 +9,8 @@ import { Preview } from '../Preview/Preview';
 // link metadata is surfaced through EditorMeta's `N outgoing` token.
 import { Icons } from '../Icons';
 import { usePrefs } from '../../stores/prefsStore';
+import { useYjsDocument } from '../../hooks/useYjsDocument';
+import { useToastStore } from '../../stores/toastStore';
 
 type SaveStatus = 'unchanged' | 'unsaved' | 'saving' | 'saved' | 'error';
 
@@ -57,6 +59,27 @@ export function EditModeView({
   // Internal editor ref; also forwarded to parent via externalEditorRef.
   const localEditorRef = useRef<EditorHandle | null>(null);
   const editorRef = externalEditorRef ?? localEditorRef;
+
+  // Open a live Y.Doc for this note. Shared notes (tabId starts with
+  // "shared:") keep the existing HTTP path — cross-user collab over
+  // shared paths is explicitly out of scope per the design doc.
+  const isShared = activeNote.tabId?.startsWith('shared:') ?? false;
+  const yjsPath = isShared ? null : activeNote.path;
+  const { ytext, status: yjsStatus } = useYjsDocument(yjsPath);
+
+  // Surface a one-shot toast when the live-sync handshake fails so the
+  // user knows the editor has fallen back to the HTTP save path. The
+  // toast fires once per failure transition, scoped to this note.
+  const addToast = useToastStore((s) => s.addToast);
+  const lastToastedFailurePath = useRef<string | null>(null);
+  useEffect(() => {
+    if (yjsStatus === 'failed' && yjsPath && lastToastedFailurePath.current !== yjsPath) {
+      lastToastedFailurePath.current = yjsPath;
+      addToast('info', 'Live sync unavailable; edits saving normally.');
+    } else if (yjsStatus === 'connected' && lastToastedFailurePath.current === yjsPath) {
+      lastToastedFailurePath.current = null;
+    }
+  }, [yjsStatus, yjsPath, addToast]);
 
   const debouncedAutoSave = useDebouncedCallback(async () => {
     setSaveStatus('saving');
@@ -191,6 +214,7 @@ export function EditModeView({
                 content={editContent ?? activeNote.content}
                 onChange={onContentChange}
                 onCursorStateChange={onCursorStateChange}
+                ytext={yjsStatus === 'connected' ? ytext : null}
               />
             </div>
           </div>
