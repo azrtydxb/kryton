@@ -115,6 +115,8 @@ export const streamableMcpRoutes: FastifyPluginAsync = async (app) => {
     userId: string;
     rawKey: string;
     keyScope: "read-only" | "read-write";
+    agentId: string | null;
+    agentName: string | null;
   }): SessionEntry => {
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => args.sid,
@@ -132,6 +134,8 @@ export const streamableMcpRoutes: FastifyPluginAsync = async (app) => {
       userId: args.userId,
       keyScope: args.keyScope,
       rawKey: args.rawKey,
+      agentId: args.agentId,
+      agentName: args.agentName,
     });
     void mcpServer.connect(transport);
 
@@ -234,6 +238,8 @@ export const streamableMcpRoutes: FastifyPluginAsync = async (app) => {
             userId: persisted.userId,
             rawKey: auth.rawKey,
             keyScope: persisted.keyScope,
+            agentId: auth.agentId,
+            agentName: auth.agentName,
           });
           await store.touch(sid).catch(() => undefined);
           reply.hijack();
@@ -277,6 +283,8 @@ export const streamableMcpRoutes: FastifyPluginAsync = async (app) => {
         userId: auth.userId,
         keyScope: auth.scope,
         rawKey: auth.rawKey,
+        agentId: auth.agentId,
+        agentName: auth.agentName,
       });
       await mcpServer.connect(transport);
 

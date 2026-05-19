@@ -14,6 +14,7 @@ export interface CreatedApiKey {
   keyPrefix: string;
   name: string;
   scope: string;
+  agentId: string | null;
   expiresAt: Date | null;
   createdAt: Date;
 }
@@ -22,6 +23,7 @@ export interface ValidatedApiKey {
   keyId: string;
   userId: string;
   scope: string;
+  agentId: string | null;
 }
 
 export function generateApiKey(): string {
@@ -49,6 +51,7 @@ export class ApiKeyService {
     name: string,
     scope: string,
     expiresAt: Date | null,
+    agentId: string | null = null,
   ): Promise<CreatedApiKey> {
     const countRow = await this.app.db
       .select({ c: count() })
@@ -69,7 +72,7 @@ export class ApiKeyService {
 
     const [record] = await this.app.db
       .insert(apiKey)
-      .values({ userId, name, keyHash, keyPrefix, scope, expiresAt })
+      .values({ userId, name, keyHash, keyPrefix, scope, agentId, expiresAt })
       .returning();
 
     return {
@@ -78,6 +81,7 @@ export class ApiKeyService {
       keyPrefix,
       name: record.name,
       scope: record.scope,
+      agentId: record.agentId,
       expiresAt: record.expiresAt,
       createdAt: record.createdAt,
     };
@@ -91,6 +95,7 @@ export class ApiKeyService {
         name: true,
         keyPrefix: true,
         scope: true,
+        agentId: true,
         expiresAt: true,
         lastUsedAt: true,
         createdAt: true,
@@ -132,6 +137,7 @@ export class ApiKeyService {
       keyId: record.id,
       userId: record.userId,
       scope: record.scope,
+      agentId: record.agentId,
     };
   }
 }

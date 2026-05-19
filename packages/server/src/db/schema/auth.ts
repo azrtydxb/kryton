@@ -173,6 +173,12 @@ export const apiKey = pgTable(
     keyHash: text("keyHash").notNull(),
     keyPrefix: text("keyPrefix").notNull(),
     scope: text("scope").notNull().default("read-only"),
+    // Optional binding to an agent — populated when the key is minted for a
+    // specific AI/MCP integration. Vault-events use this to attribute writes
+    // ("Claude added <note>"). The FK to Agent has no ON DELETE clause via
+    // text references; clearing is handled at the application layer when the
+    // bound agent is removed (see ApiKeyService.revoke).
+    agentId: text("agentId"),
     expiresAt: timestamp("expiresAt", { withTimezone: true, mode: "date" }),
     lastUsedAt: timestamp("lastUsedAt", { withTimezone: true, mode: "date" }),
     createdAt: timestamp("createdAt", { withTimezone: true, mode: "date" })
@@ -183,6 +189,7 @@ export const apiKey = pgTable(
     uniqueIndex("ApiKey_keyHash_key").on(t.keyHash),
     index("ApiKey_userId_idx").on(t.userId),
     index("ApiKey_keyHash_idx").on(t.keyHash),
+    index("ApiKey_agentId_idx").on(t.agentId),
   ],
 );
 

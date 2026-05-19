@@ -8,6 +8,7 @@ import {
   listApiKeysResponseSchema,
 } from "../schemas/api-key.schemas.js";
 import type { ApiKeyService } from "../services/api-key.service.js";
+import { ValidationError } from "../../../lib/errors.js";
 
 interface ApiKeysRoutesDeps {
   apiKeyService: ApiKeyService;
@@ -38,12 +39,21 @@ export const apiKeysRoutes = (deps: ApiKeysRoutesDeps): FastifyPluginAsync =>
       },
       async (req, reply) => {
         const ctx = await app.auth.requireAuth(req);
-        const { name, scope, expiresAt } = req.body;
+        const { name, scope, agentId, expiresAt } = req.body;
+        if (agentId) {
+          const agent = await app.db.query.agent.findFirst({
+            where: (a, { and, eq }) => and(eq(a.id, agentId), eq(a.ownerUserId, ctx.user.id)),
+          });
+          if (!agent) {
+            throw new ValidationError("Agent not found");
+          }
+        }
         const result = await apiKeyService.create(
           ctx.user.id,
           name,
           scope,
           expiresAt ? new Date(expiresAt) : null,
+          agentId ?? null,
         );
         reply.status(201);
         return result;

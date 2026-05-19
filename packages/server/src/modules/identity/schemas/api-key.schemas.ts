@@ -7,6 +7,7 @@ export const createApiKeyBodySchema = z.object({
     .min(1, "Name is required")
     .max(100, "Name must be 100 characters or less"),
   scope: z.enum(["read-only", "read-write"]),
+  agentId: z.string().min(1).optional(),
   expiresAt: z
     .string()
     .datetime()
@@ -27,6 +28,7 @@ export const createApiKeyResponseSchema = z.object({
   keyPrefix: z.string(),
   name: z.string(),
   scope: z.string(),
+  agentId: z.string().nullable(),
   expiresAt: z.date().nullable(),
   createdAt: z.date(),
 });
@@ -36,6 +38,7 @@ export const apiKeyListItemSchema = z.object({
   name: z.string(),
   keyPrefix: z.string(),
   scope: z.string(),
+  agentId: z.string().nullable(),
   expiresAt: z.date().nullable(),
   lastUsedAt: z.date().nullable(),
   createdAt: z.date(),

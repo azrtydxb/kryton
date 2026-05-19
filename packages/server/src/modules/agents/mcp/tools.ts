@@ -2,6 +2,7 @@ import * as path from "path";
 import type { FastifyInstance } from "fastify";
 import { eq, and } from "drizzle-orm";
 import { settings } from "../../../db/schema/settings.js";
+import type { VaultEventOrigin } from "../../vault-events/types.js";
 
 const STARRED_KEY = "starred";
 
@@ -417,6 +418,7 @@ export async function executeTool(
   toolName: string,
   args: Record<string, unknown>,
   userId: string,
+  origin: VaultEventOrigin = { clientId: null, agentId: null, agentName: null },
 ): Promise<unknown> {
   switch (toolName) {
     case "list_notes":
@@ -424,13 +426,13 @@ export async function executeTool(
     case "read_note":
       return app.notes.readNote(args.path as string, userId);
     case "create_note":
-      await app.notes.writeNote(args.path as string, args.content as string, userId);
+      await app.notes.writeNote(args.path as string, args.content as string, userId, origin);
       return { success: true, path: args.path };
     case "update_note":
-      await app.notes.writeNote(args.path as string, args.content as string, userId);
+      await app.notes.writeNote(args.path as string, args.content as string, userId, origin);
       return { success: true, path: args.path };
     case "delete_note":
-      await app.notes.deleteNote(args.path as string, userId);
+      await app.notes.deleteNote(args.path as string, userId, origin);
       return { success: true, path: args.path };
     case "search":
       return app.knowledge.search(args.query as string, userId);
@@ -452,7 +454,7 @@ export async function executeTool(
       // Route through app.folders.create so the vault-events emission
       // (and path-safety check inside FoldersApi) stays consistent with
       // the REST handler.
-      const result = await app.folders.create(userId, args.path as string);
+      const result = await app.folders.create(userId, args.path as string, origin);
       return { success: true, path: result.path };
     }
     case "get_daily_note": {
@@ -484,7 +486,7 @@ export async function executeTool(
         throw new Error("Invalid template name");
       }
       const templateContent = (await app.notes.readNote(`Templates/${templateName}.md`, userId)) as { content: string };
-      await app.notes.writeNote(args.notePath as string, templateContent.content, userId);
+      await app.notes.writeNote(args.notePath as string, templateContent.content, userId, origin);
       return { success: true, path: args.notePath };
     }
     case "rename_note": {
@@ -499,7 +501,7 @@ export async function executeTool(
       const svc = new noteSvc.NoteService(app);
       const oldFull = oldPath.endsWith(".md") ? oldPath : oldPath + ".md";
       const newFull = newPath.endsWith(".md") ? newPath : newPath + ".md";
-      await svc.renameNote(userDir, oldFull, newFull, userId);
+      await svc.renameNote(userDir, oldFull, newFull, userId, origin);
       await rewriteStarred(app, userId, (p) => (p === oldFull ? newFull : p));
       return { success: true, oldPath: oldFull, newPath: newFull };
     }
@@ -513,7 +515,7 @@ export async function executeTool(
         : existing.content.endsWith("\n")
           ? "\n"
           : "\n\n";
-      await app.notes.writeNote(p, existing.content + sep + appended, userId);
+      await app.notes.writeNote(p, existing.content + sep + appended, userId, origin);
       return { success: true, path: p };
     }
     case "list_notes_by_tag": {
@@ -530,7 +532,7 @@ export async function executeTool(
       const mm = String(today.getUTCMonth() + 1).padStart(2, "0");
       const dd = String(today.getUTCDate()).padStart(2, "0");
       const dailyPath = `Daily/${yyyy}-${mm}-${dd}.md`;
-      await app.notes.writeNote(dailyPath, content, userId);
+      await app.notes.writeNote(dailyPath, content, userId, origin);
       return { success: true, path: dailyPath };
     }
     case "list_favorites": {

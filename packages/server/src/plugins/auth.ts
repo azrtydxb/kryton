@@ -96,7 +96,9 @@ export const authPlugin = fp(async (app) => {
         const ctx: AuthContext = {
           user: { id: found.id, email: found.email, name: found.name, role: found.role },
           apiKey: { id: keyData.keyId, scope: keyData.scope },
-          agentId: null,
+          // If the API key is bound to a specific agent, propagate it so
+          // downstream vault-events attribute writes correctly.
+          agentId: keyData.agentId,
         };
         request.authContext = ctx;
         return ctx;

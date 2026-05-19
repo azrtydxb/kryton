@@ -36,6 +36,13 @@
       "when": 1778749088424,
       "tag": "0004_mcp_session",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1779182438789,
+      "tag": "0005_supreme_pyro",
+      "breakpoints": true
     }
   ]
 }

@@ -43,9 +43,18 @@ export interface BuildMcpServerArgs {
   userId: string;
   keyScope: string;
   rawKey: string;
+  agentId?: string | null;
+  agentName?: string | null;
 }
 
-export function buildMcpServer({ app, userId, keyScope, rawKey }: BuildMcpServerArgs): McpServer {
+export function buildMcpServer({
+  app,
+  userId,
+  keyScope,
+  rawKey,
+  agentId = null,
+  agentName = null,
+}: BuildMcpServerArgs): McpServer {
   const server = new McpServer({ name: "Kryton", version: "4.4.0" });
 
   const port = String(app.config.PORT);
@@ -71,7 +80,11 @@ export function buildMcpServer({ app, userId, keyScope, rawKey }: BuildMcpServer
         };
       }
       try {
-        const result = await executeTool(app, toolDef.name, args, userId);
+        const result = await executeTool(app, toolDef.name, args, userId, {
+          clientId: null,
+          agentId,
+          agentName,
+        });
         return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
       } catch (err) {
         log.error(`MCP tool ${toolDef.name} error:`, err);

@@ -8,12 +8,16 @@ import { eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 import { user as userTable } from "../../../db/schema/auth.js";
+import { agent as agentTable } from "../../../db/schema/agents.js";
 
 export interface McpAuthContext {
   userId: string;
   scope: string;
   rawKey: string;
   userRole: string;
+  /** Bound agent for this API key, if any — used to attribute MCP writes. */
+  agentId: string | null;
+  agentName: string | null;
 }
 
 /**
@@ -48,10 +52,21 @@ export async function authenticateMcpRequest(
     void reply.status(403).send({ error: "Account is disabled" });
     return null;
   }
+  let agentName: string | null = null;
+  if (keyData.agentId) {
+    const a = await app.db.query.agent.findFirst({
+      where: eq(agentTable.id, keyData.agentId),
+      columns: { label: true, name: true },
+    });
+    agentName = a?.label ?? a?.name ?? null;
+  }
+
   return {
     userId: user.id,
     scope: keyData.scope,
     rawKey,
     userRole: user.role,
+    agentId: keyData.agentId,
+    agentName,
   };
 }

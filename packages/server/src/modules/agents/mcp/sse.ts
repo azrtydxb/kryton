@@ -104,6 +104,8 @@ export const sseMcpRoutes: FastifyPluginAsync = async (app) => {
         userId: auth.userId,
         keyScope: auth.scope,
         rawKey: auth.rawKey,
+        agentId: auth.agentId,
+        agentName: auth.agentName,
       });
       await mcpServer.connect(transport);
 
