@@ -443,7 +443,7 @@ function AppContent() {
           onShare={handleShare}
           onTagSelect={handleSidebarTagSelect}
         >
-          <PluginSlot slot="sidebar" />
+          <PluginSlot slot="sidebar" side="left" />
         </SidebarLayout>
 
         <main className="flex-1 flex flex-col overflow-hidden min-w-0">
