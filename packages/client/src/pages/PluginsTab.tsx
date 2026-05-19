@@ -416,9 +416,19 @@ function InstalledPlugins({ onUninstalled }: { onUninstalled: () => void }) {
   const [confirmUninstall, setConfirmUninstall] = useState<string | null>(null);
   const [settingsPlugin, setSettingsPlugin] = useState<InstalledPlugin | null>(null);
 
-  const fetchAll = useCallback(async () => {
+  /**
+   * Fetch the plugin list.
+   *
+   * `silent: true` skips the loading-skeleton toggle so the existing
+   * list stays mounted while the new data lands. That's the refetch
+   * path used by enable/disable/reload/uninstall — without it the
+   * list area gets unmounted into a skeleton + remounted, which
+   * resets the scroll container's scrollTop and bounces the user back
+   * to the top whenever they act on a plugin further down the list.
+   */
+  const fetchAll = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError('');
       const [pluginData, updateData] = await Promise.all([
         api.getAllPlugins() as Promise<InstalledPlugin[]>,
@@ -429,7 +439,7 @@ function InstalledPlugins({ onUninstalled }: { onUninstalled: () => void }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load plugins');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
@@ -446,7 +456,9 @@ function InstalledPlugins({ onUninstalled }: { onUninstalled: () => void }) {
     setActionError(prev => { const n = { ...prev }; delete n[id]; return n; });
     try {
       await fn();
-      await fetchAll();
+      // Silent refetch — the list stays mounted, so the user's scroll
+      // position is preserved across an enable/disable/reload.
+      await fetchAll(true);
     } catch (err) {
       setActionError(prev => ({
         ...prev,
@@ -467,7 +479,7 @@ function InstalledPlugins({ onUninstalled }: { onUninstalled: () => void }) {
     return (
       <div style={{ ...errorBoxStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span>{error}</span>
-        <button onClick={fetchAll} style={{ ...ghostBtn, padding: '4px 8px' }}>Retry</button>
+        <button onClick={() => fetchAll()} style={{ ...ghostBtn, padding: '4px 8px' }}>Retry</button>
       </div>
     );
   }
