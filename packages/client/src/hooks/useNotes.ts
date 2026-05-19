@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useDebouncedCallback } from 'use-debounce';
 import { api, FileNode, NoteData, sharedNoteApi } from '../lib/api';
+import { useHttpAdapter } from '../data/httpAdapterContext';
 
 /**
  * Optional predicate the caller passes to tell `updateContent` whether a
@@ -13,6 +14,7 @@ import { api, FileNode, NoteData, sharedNoteApi } from '../lib/api';
 type IsLiveDocument = (path: string) => boolean;
 
 export function useNotes(userId?: string, isLiveDocument?: IsLiveDocument) {
+  const adapter = useHttpAdapter();
   const [tree, setTree] = useState<FileNode[]>([]);
   const [activeNote, setActiveNote] = useState<NoteData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -181,6 +183,19 @@ export function useNotes(userId?: string, isLiveDocument?: IsLiveDocument) {
       cancelled = true;
     };
   }, [refreshTree, userId]);
+
+  // Live tree updates: subscribe to vault-events so the sidebar reflects
+  // create / delete / rename done in other tabs or by AI agents without a
+  // full refresh. The adapter's `applyVaultEvent` patches its flat
+  // `_notes` cache and fires the "notes" channel; we refetch the
+  // hierarchical tree on each fire since the adapter doesn't maintain one.
+  useEffect(() => {
+    if (!userId) return;
+    const unsubscribe = adapter.subscribe('notes', '*', () => {
+      void refreshTree();
+    });
+    return unsubscribe;
+  }, [adapter, refreshTree, userId]);
 
   // Set content without auto-saving (for cancel/revert)
   const setActiveNoteContent = useCallback((content: string) => {

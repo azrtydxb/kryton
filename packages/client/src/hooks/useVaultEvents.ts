@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useHttpAdapter } from "../data/httpAdapterContext";
 import type { VaultEvent } from "../data/vaultEvents.types";
 
@@ -19,20 +19,35 @@ import type { VaultEvent } from "../data/vaultEvents.types";
  */
 export function useVaultEvents(): void {
   const adapter = useHttpAdapter();
+  // The hook mounts at app load — before the user has signed in. We poll
+  // session readiness on a short interval until a user appears, then open
+  // the WS. The poll is cheap (one /api/auth/get-session per tick, cookie-
+  // cached) and stops as soon as the socket is established. This keeps the
+  // hook self-contained without coupling to the AuthProvider's loading/user
+  // state.
+  const [authTick, setAuthTick] = useState(0);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     let socket: WebSocket | null = null;
     let cancelled = false;
+    let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
     async function open(): Promise<void> {
       // Gate on a live session so we don't spam a 401 before login.
       try {
         const res = await fetch("/api/auth/get-session", { credentials: "include" });
-        if (!res.ok) return;
+        if (!res.ok) {
+          if (!cancelled) pollTimer = setTimeout(() => setAuthTick((t) => t + 1), 1500);
+          return;
+        }
         const data = (await res.json().catch(() => null)) as { user?: unknown } | null;
-        if (!data?.user) return;
+        if (!data?.user) {
+          if (!cancelled) pollTimer = setTimeout(() => setAuthTick((t) => t + 1), 1500);
+          return;
+        }
       } catch {
+        if (!cancelled) pollTimer = setTimeout(() => setAuthTick((t) => t + 1), 1500);
         return;
       }
       if (cancelled) return;
@@ -75,6 +90,7 @@ export function useVaultEvents(): void {
 
     return () => {
       cancelled = true;
+      if (pollTimer) clearTimeout(pollTimer);
       if (socket && socket.readyState !== WebSocket.CLOSED) {
         try {
           socket.close();
@@ -84,5 +100,5 @@ export function useVaultEvents(): void {
       }
       socket = null;
     };
-  }, [adapter]);
+  }, [adapter, authTick]);
 }
