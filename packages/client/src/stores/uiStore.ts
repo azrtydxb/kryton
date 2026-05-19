@@ -3,6 +3,14 @@ import { create } from 'zustand';
 // Helper type for React-style setState that accepts value or updater function
 type SetState<T> = (valueOrUpdater: T | ((prev: T) => T)) => void;
 
+/**
+ * Maximum number of simultaneously-open editor tabs. Excess opens evict
+ * the oldest (FIFO) — see openTab. Capped to keep the tab strip from
+ * overflowing the viewport without an overflow menu; bump (or remove)
+ * once a real overflow-dropdown ships.
+ */
+const MAX_OPEN_TABS = 4;
+
 /** Top-level main-pane view selector. Drives whether the editor, all-notes,
  *  or fullscreen graph is rendered between sidebar + right panel. */
 export type MainView = 'note' | 'all' | 'graph' | 'tags';
@@ -139,7 +147,15 @@ export const useUIStore = create<UIState>((set, get) => ({
   openTab: (path) => {
     const tabs = get().openTabs;
     if (tabs.includes(path)) return;
-    set({ openTabs: [...tabs, path] });
+    // Cap open tabs at MAX_OPEN_TABS — when full, evict the oldest
+    // (left-most, FIFO) so the new tab takes its slot. Prevents the
+    // tab strip from overflowing into the not-currently-rendered
+    // off-screen region where users can lose track of where they are.
+    const next = [...tabs, path];
+    if (next.length > MAX_OPEN_TABS) {
+      next.splice(0, next.length - MAX_OPEN_TABS);
+    }
+    set({ openTabs: next });
   },
   closeTab: (path) => {
     const tabs = get().openTabs;
