@@ -39,9 +39,23 @@ export interface NotePreviewReactProps {
           range?: { startLine: number; endLine: number };
           rawRange?: { startLine: number; endLine: number };
           source?: string;
+          /**
+           * True when the preview is rendered alongside an editor (Edit /
+           * Split modes), false in pure Preview mode. Plugin renderers
+           * (kanban, excalidraw, …) should hide editable controls when
+           * this is false so the user doesn't see Add card / Add column
+           * affordances they can't act on without entering edit mode.
+           */
+          interactive?: boolean;
         }>;
       }
     | undefined;
+  /**
+   * Whether the preview is interactive. Forwarded to plugin code-fence
+   * renderers via the `interactive` prop. Defaults to false (read-only)
+   * so pre-existing call sites stay safe.
+   */
+  interactive?: boolean;
   /**
    * Called by the component to fetch embedded note content.
    * Receives the note name (without extension) and should return the raw markdown.
@@ -249,6 +263,7 @@ export const NotePreviewReact = React.forwardRef<
     getCodeFenceRenderer,
     onFetchNoteContent,
     className,
+    interactive = false,
   },
   ref,
 ) {
@@ -529,6 +544,7 @@ export const NotePreviewReact = React.forwardRef<
               range={range}
               rawRange={rawRange}
               source={source}
+              interactive={interactive}
             />
           );
         }

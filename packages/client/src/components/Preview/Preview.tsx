@@ -22,12 +22,20 @@ interface PreviewProps {
       notePath: string;
       range?: { startLine: number; endLine: number };
       source?: string;
+      interactive?: boolean;
     }>;
   } | undefined;
   /** Current embed depth — kept for API compat; NotePreviewReact manages depth internally */
   embedDepth?: number;
   /** Set of note paths in the current embed chain — kept for API compat */
   embedChain?: Set<string>;
+  /**
+   * True when the preview is rendered alongside an editor (Edit / Split
+   * modes). Forwarded to plugin code-fence renderers so kanban /
+   * excalidraw / etc. can hide editable controls in pure Preview mode.
+   * Defaults to false.
+   */
+  interactive?: boolean;
 }
 
 /**
@@ -187,6 +195,7 @@ export function Preview({
   modifiedAt,
   onNoteSelect,
   getCodeFenceRenderer,
+  interactive = false,
 }: PreviewProps) {
   const existingNotes = useMemo(() => {
     if (!allNotes) return new Set<string>();
@@ -325,6 +334,7 @@ export function Preview({
           notePath={notePath}
           getCodeFenceRenderer={getCodeFenceRenderer}
           onFetchNoteContent={handleFetchNoteContent}
+          interactive={interactive}
         />
       </div>
       {/* Portal each DataviewBlock into its placeholder <div data-dataview-id>

@@ -321,6 +321,9 @@ export function EditModeView({
                 notePath={activeNote.path}
                 onNoteSelect={onNoteSelect}
                 getCodeFenceRenderer={getCodeFenceRenderer}
+                // Editing — plugin code-fence renderers (kanban,
+                // excalidraw, …) should show their editable controls.
+                interactive
               />
             </div>
           </div>
