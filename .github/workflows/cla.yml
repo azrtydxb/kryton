@@ -5,7 +5,6 @@ on:
   pull_request_target:
     types: [opened, closed, synchronize]
 
-# explicitly configure permissions, in case your GITHUB_TOKEN workflow permissions are set to read-only in repository settings
 permissions:
   actions: write
   contents: write
@@ -21,11 +20,8 @@ jobs:
         uses: contributor-assistant/github-action@v2.6.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PERSONAL_ACCESS_TOKEN: ${{ secrets.CLA_PAT }}
         with:
           path-to-signatures: 'signatures/version1/cla.json'
-          path-to-document: 'https://github.com/azrtydxb/kryton/blob/master/CLA.md'
+          path-to-document: 'https://github.com/${{ github.repository }}/blob/HEAD/CLA.md'
           branch: 'cla-signatures'
           allowlist: piwi3910,dependabot[bot],github-actions[bot]
-          remote-organization-name: azrtydxb
-          remote-repository-name: cla-signatures
