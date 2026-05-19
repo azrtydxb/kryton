@@ -7,6 +7,7 @@ import { PluginSlot } from './components/PluginSlot/PluginSlot';
 import { useUIStore } from './stores/uiStore';
 import { HttpAdapter } from './data/HttpAdapter';
 import { HttpDataProvider } from './data/HttpDataProvider';
+import { useUrlSync } from './hooks/useUrlSync';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -283,6 +284,39 @@ function AppContent() {
     setPendingTag(tag);
     setView('tags');
   }, [setView]);
+
+  // URL is the source of truth for shareable nav state. The hook listens for
+  // popstate, writes the URL on view/tab changes, and dispatches a
+  // `kryton:url-tag` CustomEvent so the local `pendingTag` state can be
+  // seeded on restore without coupling the hook to App-local state.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ tag: string | null }>).detail;
+      setPendingTag(detail?.tag ?? null);
+    };
+    window.addEventListener('kryton:url-tag', handler);
+    return () => window.removeEventListener('kryton:url-tag', handler);
+  }, []);
+
+  const notesTree = state.notes.tree;
+  const noteExists = useCallback((path: string) => {
+    if (notesTree.length === 0) return true;
+    const walk = (nodes: typeof notesTree): boolean => {
+      for (const n of nodes) {
+        if (n.type === 'file' && n.path === path) return true;
+        if (n.children && walk(n.children)) return true;
+      }
+      return false;
+    };
+    return walk(notesTree);
+  }, [notesTree]);
+
+  useUrlSync(state.notes.activeNote?.tabId ?? state.notes.activeNote?.path ?? null, {
+    openNote: state.notes.openNote,
+    openSharedNote: state.notes.openSharedNote,
+    closeActiveNote: state.notes.closeActiveNote,
+    noteExists,
+  });
 
   const {
     toggleStar,
