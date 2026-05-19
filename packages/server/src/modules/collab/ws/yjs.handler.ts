@@ -12,6 +12,16 @@ import type { YjsPersistence } from "./persistence.js";
 const MSG_SYNC = 0;
 const MSG_AWARENESS = 1;
 
+/**
+ * Transaction origin sentinel used when seeding `Y.Text("content")` from
+ * the canonical `.md` file on first open. The seed transaction runs
+ * BEFORE the `doc.on("update")` listener is bound, so the value of the
+ * origin is currently moot — but tagging it explicitly makes the intent
+ * legible and lets future listeners (Phase 1.5 disk watcher, etc.) skip
+ * the seed reliably.
+ */
+const ORIGIN_SEED: unique symbol = Symbol("yjs-seed");
+
 // Persistence debounce defaults (per spec §5)
 const DEBOUNCE_IDLE_MS = 2_000;
 const DEBOUNCE_MAX_MS = 30_000;
@@ -106,16 +116,32 @@ export function registerYjsRoutes(
         /* prior flush failure logged below */
       }
     }
-    const p = persistence
-      .saveYjsSnapshot(entry.docId, entry.userId, entry.doc)
-      .catch((e) => {
-        app.log.warn({ err: e, docId: entry.docId }, "yjs saveYjsSnapshot failed");
-        // Mark dirty again so a future change retries.
+    // Order: disk first, then DB snapshot. `.md` is the source of truth
+    // for the rest of the system (search/graph indexes, git, MCP tools,
+    // file tree). If the snapshot save fails after disk succeeds, we
+    // mark the doc dirty again and retry — the worst case is a slightly
+    // stale snapshot that gets caught up on the next flush. If we did
+    // it in reverse and the disk write failed, the system of record
+    // would silently lag behind the DB cache.
+    const p = (async (): Promise<void> => {
+      try {
+        await persistence.flushToDisk(entry.docId, entry.userId, entry.doc);
+      } catch (e) {
+        app.log.warn({ err: e, docId: entry.docId }, "yjs flushToDisk failed");
         entry.dirty = true;
-      })
-      .finally(() => {
-        entry.flushing = null;
-      });
+        // Don't attempt the snapshot if disk failed — keep them in lockstep
+        // so we don't end up with a DB snapshot that's newer than disk.
+        return;
+      }
+      try {
+        await persistence.saveYjsSnapshot(entry.docId, entry.userId, entry.doc);
+      } catch (e) {
+        app.log.warn({ err: e, docId: entry.docId }, "yjs saveYjsSnapshot failed");
+        entry.dirty = true;
+      }
+    })().finally(() => {
+      entry.flushing = null;
+    });
     entry.flushing = p;
     await p;
   };
@@ -172,7 +198,39 @@ export function registerYjsRoutes(
     if (inflight) return inflight;
 
     const buildPromise = (async (): Promise<DocEntry> => {
-      const doc = (await persistence.loadYjsDoc(docId, auth.userId)) ?? new Y.Doc();
+      const loaded = await persistence.loadYjsDoc(docId, auth.userId);
+      let doc: Y.Doc;
+      if (loaded) {
+        // A DB snapshot exists — it's the authoritative session state.
+        // Do NOT reseed from disk: any in-session edits that haven't
+        // hit disk yet would be lost.
+        doc = loaded;
+      } else {
+        doc = new Y.Doc();
+        // Seed `Y.Text("content")` from the canonical `.md` file. The
+        // seed transaction runs BEFORE the `doc.on("update")` listener
+        // is bound below, so the seeding update is NOT recorded as an
+        // inbound delta (no appendYjsUpdate, no broadcast, no flush
+        // schedule). If the file is missing (note never written yet),
+        // start with an empty doc — first edit will create it on flush.
+        try {
+          const note = await app.notes.readNote(docId, auth.userId);
+          if (note.content.length > 0) {
+            doc.transact(() => {
+              doc.getText("content").insert(0, note.content);
+            }, ORIGIN_SEED);
+          }
+        } catch (err) {
+          // Tolerate "not found" — empty new note is a valid state.
+          // Anything else (permission, corrupt disk) propagates and the
+          // caller's onConnection error handler closes the socket.
+          const code = (err as { code?: unknown; statusCode?: unknown })?.code;
+          const status = (err as { statusCode?: unknown })?.statusCode;
+          if (code !== "ENOENT" && status !== 404) {
+            throw err;
+          }
+        }
+      }
       const awareness = new awarenessProtocol.Awareness(doc);
       const entry: DocEntry = {
         docId,

@@ -2,9 +2,28 @@ import * as Y from "yjs";
 import { asc, eq } from "drizzle-orm";
 import type { Db } from "../../../db/client.js";
 import { yjsDocument, yjsUpdate } from "../../../db/schema/collab.js";
+import type { NoteService } from "../../notes/services/note.service.js";
+
+/**
+ * Resolves the per-user notes directory for a given userId. Injected so
+ * the persistence layer doesn't have to know about the notes module's
+ * internal layout helpers.
+ */
+export type NotesDirResolver = (userId: string) => Promise<string>;
+
+export interface YjsPersistenceDeps {
+  noteService: NoteService;
+  resolveNotesDir: NotesDirResolver;
+}
 
 export class YjsPersistence {
-  constructor(private readonly db: Db) {}
+  private readonly noteService: NoteService | null;
+  private readonly resolveNotesDir: NotesDirResolver | null;
+
+  constructor(private readonly db: Db, deps?: YjsPersistenceDeps) {
+    this.noteService = deps?.noteService ?? null;
+    this.resolveNotesDir = deps?.resolveNotesDir ?? null;
+  }
 
   /**
    * Load a Yjs document from the database. Applies the stored snapshot
@@ -47,6 +66,22 @@ export class YjsPersistence {
         });
       await tx.delete(yjsUpdate).where(eq(yjsUpdate.docId, docId));
     });
+  }
+
+  /**
+   * Write the current Y.Text("content") to the canonical `.md` file on
+   * disk via `noteService.writeNote`, which keeps the search/graph
+   * indexes fresh. `.md` is the source of truth; Y snapshots are an
+   * editing-session cache.
+   *
+   * No-op when persistence was constructed without disk-flush deps
+   * (legacy tests that exercise the DB layer in isolation).
+   */
+  async flushToDisk(docId: string, userId: string, doc: Y.Doc): Promise<void> {
+    if (!this.noteService || !this.resolveNotesDir) return;
+    const content = doc.getText("content").toString();
+    const notesDir = await this.resolveNotesDir(userId);
+    await this.noteService.writeNote(notesDir, docId, content, userId);
   }
 
   /**
