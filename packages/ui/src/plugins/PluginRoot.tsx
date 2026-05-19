@@ -300,6 +300,21 @@ function buildContextApi(pluginId: string): ClientPluginAPI["context"] {
       );
       return v;
     },
+    setPluginSetting: async (key: string, value: unknown) => {
+      const settingKey = `plugin:${pluginId}:${key}`;
+      const r = await fetch(`/api/settings/${encodeURIComponent(settingKey)}`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: JSON.stringify(value) }),
+      });
+      if (!r.ok) throw new Error(`setPluginSetting failed: ${r.status}`);
+      window.dispatchEvent(
+        new CustomEvent("kryton:plugin-settings-changed", {
+          detail: { pluginId, key, value },
+        }),
+      );
+    },
   };
 }
 

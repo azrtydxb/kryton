@@ -41,6 +41,7 @@ function makeApi(): ClientPluginAPI {
       useCurrentNote: () => null,
       useTheme: () => "dark",
       usePluginSettings: () => null,
+      setPluginSetting: vi.fn(async () => {}),
     },
     api: { fetch: vi.fn() as unknown as ClientPluginAPI["api"]["fetch"] },
     notes: {

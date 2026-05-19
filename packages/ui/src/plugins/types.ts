@@ -228,6 +228,7 @@ export interface ClientPluginAPI {
     useCurrentNote(): { path: string; content: string } | null;
     useTheme(): "light" | "dark";
     usePluginSettings(key: string): unknown;
+    setPluginSetting(key: string, value: unknown): Promise<void>;
   };
   api: {
     fetch(path: string, options?: RequestInit): Promise<Response>;

@@ -71,7 +71,11 @@ export const settingsRoutes: FastifyPluginAsync = async (app) => {
       const user = await app.auth.requireUser(req);
       const key = req.params.key;
 
-      if (!/^[a-zA-Z0-9_.-]{1,100}$/.test(key)) {
+      // Allow ':' so namespaced keys like "plugin:<pluginId>:<key>" pass.
+      // The server-side PluginAPI factory already uses this convention
+      // (see plugins/services/api-factory.ts), so the user-facing PUT
+      // must accept it to keep the two paths consistent.
+      if (!/^[a-zA-Z0-9_.:-]{1,128}$/.test(key)) {
         throw new ValidationError("Invalid setting key format");
       }
 

@@ -269,10 +269,27 @@ function buildContextApi(pluginId: string): ClientPluginAPI["context"] {
       const [v, setV] = R.useState<unknown>(read);
       R.useEffect(
         () => subscribeHostHooks(() => setV(read())),
-         
+
         [],
       );
       return v;
+    },
+    setPluginSetting: async (key: string, value: unknown) => {
+      const settingKey = `plugin:${pluginId}:${key}`;
+      const r = await fetch(`/api/settings/${encodeURIComponent(settingKey)}`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: JSON.stringify(value) }),
+      });
+      if (!r.ok) throw new Error(`setPluginSetting failed: ${r.status}`);
+      // Live-sync so usePluginSettings observers re-render without a
+      // round-trip back through the platform fetch.
+      window.dispatchEvent(
+        new CustomEvent("kryton:plugin-settings-changed", {
+          detail: { pluginId, key, value },
+        }),
+      );
     },
   };
 }
