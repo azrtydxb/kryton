@@ -1,4 +1,12 @@
-import { PluginSlotRegistry } from "@azrtydxb/ui";
+import {
+  PluginSlotRegistry,
+  registerEditorPlugin,
+  getActiveEditorState,
+  dispatchToActiveEditor,
+  subscribeEditorTransactions,
+  setEditorOption,
+  getHostHooks,
+} from "@azrtydxb/ui";
 import { ClientPluginAPI, ClientPluginModule, ActivePluginInfo } from "./types";
 import { request } from "../lib/api";
 
@@ -203,6 +211,15 @@ export class ClientPluginManager {
           });
         },
       },
+      notes: buildNotesApi(),
+      storage: buildStorageApi(pluginId),
+      editor: {
+        registerPlugin: (plugin) => registerEditorPlugin(plugin),
+        getActiveState: () => getActiveEditorState(),
+        dispatch: (tr) => dispatchToActiveEditor(tr),
+        onTransaction: (cb) => subscribeEditorTransactions(cb),
+        setOption: (name, value) => setEditorOption(name, value),
+      },
       notify: {
         info: (msg) => console.log(`[plugin:${pluginId}]`, msg),
         success: (msg) => console.log(`[plugin:${pluginId}]`, msg),
@@ -210,4 +227,96 @@ export class ClientPluginManager {
       },
     };
   }
+}
+
+// ── api.notes / api.storage wrappers (delegate to /api/plugin-builtin/*) ──
+
+async function builtinFetch(path: string, options?: RequestInit): Promise<Response> {
+  const r = await fetch(`/api/plugin-builtin${path}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options?.headers,
+    },
+    credentials: "include",
+  });
+  return r;
+}
+
+function buildNotesApi(): ClientPluginAPI["notes"] {
+  return {
+    list: async (folder?: string) => {
+      const qs = folder ? `?folder=${encodeURIComponent(folder)}` : "";
+      const r = await builtinFetch(`/notes/list${qs}`);
+      if (!r.ok) throw new Error(`notes.list failed: ${r.status}`);
+      return await r.json();
+    },
+    get: async (path: string) => {
+      const r = await builtinFetch(`/notes/get?path=${encodeURIComponent(path)}`);
+      if (!r.ok) throw new Error(`notes.get failed: ${r.status}`);
+      return await r.json();
+    },
+    getContent: async (path: string) => {
+      const n = await (async () => {
+        const r = await builtinFetch(`/notes/get?path=${encodeURIComponent(path)}`);
+        if (!r.ok) throw new Error(`notes.getContent failed: ${r.status}`);
+        return await r.json();
+      })();
+      return (n as { content: string }).content;
+    },
+    create: async (path: string, content: string) => {
+      const r = await builtinFetch(`/notes/create`, { method: "POST", body: JSON.stringify({ path, content }) });
+      if (!r.ok) throw new Error(`notes.create failed: ${r.status}`);
+    },
+    update: async (path: string, content: string) => {
+      const r = await builtinFetch(`/notes/update`, { method: "POST", body: JSON.stringify({ path, content }) });
+      if (!r.ok) throw new Error(`notes.update failed: ${r.status}`);
+    },
+    delete: async (path: string) => {
+      const r = await builtinFetch(`/notes/delete?path=${encodeURIComponent(path)}`, { method: "DELETE" });
+      if (!r.ok) throw new Error(`notes.delete failed: ${r.status}`);
+    },
+    openByPath: async (path: string) => {
+      const r = await builtinFetch(`/notes/openByPath`, { method: "POST", body: JSON.stringify({ path }) });
+      if (!r.ok) throw new Error(`notes.openByPath failed: ${r.status}`);
+    },
+    replaceFenceAtRange: async (path, range, newSource) => {
+      const r = await builtinFetch(`/notes/replaceFenceAtRange`, {
+        method: "POST",
+        body: JSON.stringify({ path, range, newSource }),
+      });
+      if (!r.ok) throw new Error(`notes.replaceFenceAtRange failed: ${r.status}`);
+    },
+    saveCurrent: async () => {
+      const hooks = getHostHooks();
+      if (!hooks.saveCurrent) throw new Error("No active editor to save");
+      return await hooks.saveCurrent();
+    },
+  };
+}
+
+function buildStorageApi(pluginId: string): ClientPluginAPI["storage"] {
+  const headers = { "X-Kryton-Plugin-Id": pluginId };
+  return {
+    get: async (key: string) => {
+      const r = await builtinFetch(`/storage/get?key=${encodeURIComponent(key)}`, { headers });
+      if (!r.ok) throw new Error(`storage.get failed: ${r.status}`);
+      const body = await r.json();
+      return body?.value ?? null;
+    },
+    set: async (key: string, value: unknown) => {
+      const r = await builtinFetch(`/storage/set`, { method: "POST", headers, body: JSON.stringify({ key, value }) });
+      if (!r.ok) throw new Error(`storage.set failed: ${r.status}`);
+    },
+    delete: async (key: string) => {
+      const r = await builtinFetch(`/storage/delete?key=${encodeURIComponent(key)}`, { method: "DELETE", headers });
+      if (!r.ok) throw new Error(`storage.delete failed: ${r.status}`);
+    },
+    list: async (prefix?: string) => {
+      const qs = prefix ? `?prefix=${encodeURIComponent(prefix)}` : "";
+      const r = await builtinFetch(`/storage/list${qs}`, { headers });
+      if (!r.ok) throw new Error(`storage.list failed: ${r.status}`);
+      return await r.json();
+    },
+  };
 }

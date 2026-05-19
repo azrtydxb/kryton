@@ -34,7 +34,9 @@ export function detectTriggerOnInsert(
   const afterWs = prev === " " || prev === "\t";
 
   if (ch === "/" && (atLineStart || afterWs)) {
-    const from = caretBefore + 1; // position after the "/" itself
+    // `from` is where the query text starts (after the "/"). The trigger
+    // char itself is replaced by applySuggestion (one-char width for slash).
+    const from = caretBefore + 1;
     return { kind: "slash", from, caret: from, query: "" };
   }
   if (ch === "#" && (atLineStart || afterWs)) {
@@ -42,7 +44,8 @@ export function detectTriggerOnInsert(
     return { kind: "tag", from, caret: from, query: "" };
   }
   if (ch === "[" && prev === "[") {
-    const from = caretBefore + 1; // position after the second "["
+    // Two-char trigger ("[["); query starts after both brackets.
+    const from = caretBefore + 1;
     return { kind: "wikilink", from, caret: from, query: "" };
   }
   return null;

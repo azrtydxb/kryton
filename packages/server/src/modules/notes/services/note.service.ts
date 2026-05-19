@@ -112,7 +112,16 @@ export class NoteService {
 
   /** Recursively scan a directory for .md files and return a tree structure. */
   async scanDirectory(dir: string, basePath = ""): Promise<FileTreeNode[]> {
-    const entries = await fs.readdir(dir, { withFileTypes: true });
+    let entries;
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true });
+    } catch (err) {
+      // A user with no notes yet has no on-disk directory. Treat as empty
+      // instead of surfacing ENOENT — every plugin that lists notes would
+      // otherwise 500 on first login.
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
+      throw err;
+    }
     const nodes: FileTreeNode[] = [];
 
     const sorted = entries.sort((a, b) => {

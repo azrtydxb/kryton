@@ -1,7 +1,33 @@
 import { ComponentType } from "react";
-import type { EditorPlugin } from "@azrtydxb/ui";
+import type {
+  EditorPlugin,
+  EditorState,
+  Transaction as EditorTransaction,
+  EditorOptionValue,
+} from "@azrtydxb/ui";
 
 export type { EditorPlugin };
+
+// Note shape returned by api.notes.get
+export interface PluginNote {
+  path: string;
+  content: string;
+  title: string;
+  modifiedAt: string;
+}
+
+export interface PluginNoteEntry {
+  name: string;
+  path: string;
+  type: "file" | "directory";
+  children?: PluginNoteEntry[];
+}
+
+export interface PluginStorageEntry {
+  key: string;
+  value: unknown;
+  userId: string | null;
+}
 
 // --- UI Slot Types ---
 
@@ -140,6 +166,34 @@ export interface ClientPluginAPI {
   };
   api: {
     fetch(path: string, options?: RequestInit): Promise<Response>;
+  };
+  notes: {
+    list(folder?: string): Promise<PluginNoteEntry[]>;
+    get(path: string): Promise<PluginNote>;
+    getContent(path: string): Promise<string>;
+    create(path: string, content: string): Promise<void>;
+    update(path: string, content: string): Promise<void>;
+    delete(path: string): Promise<void>;
+    openByPath(path: string): Promise<void>;
+    replaceFenceAtRange(
+      path: string,
+      range: { startLine: number; endLine: number },
+      newSource: string
+    ): Promise<void>;
+    saveCurrent(): Promise<{ path: string; savedAt: string }>;
+  };
+  storage: {
+    get(key: string): Promise<unknown>;
+    set(key: string, value: unknown): Promise<void>;
+    delete(key: string): Promise<void>;
+    list(prefix?: string): Promise<PluginStorageEntry[]>;
+  };
+  editor: {
+    registerPlugin(plugin: EditorPlugin): () => void;
+    getActiveState(): EditorState | null;
+    dispatch(tr: EditorTransaction): void;
+    onTransaction(cb: (tr: EditorTransaction, state: EditorState) => void): () => void;
+    setOption(name: string, value: EditorOptionValue): void;
   };
   notify: {
     info(message: string): void;
