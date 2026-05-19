@@ -37,6 +37,7 @@ export interface NotePreviewReactProps {
           content: string;
           notePath: string;
           range?: { startLine: number; endLine: number };
+          rawRange?: { startLine: number; endLine: number };
           source?: string;
         }>;
       }
@@ -321,6 +322,58 @@ export const NotePreviewReact = React.forwardRef<
     [content],
   );
 
+  // Index every fenced code block in the raw on-disk content. Plugins
+  // round-tripping a fence (e.g. kanban save) need raw-file line numbers
+  // so they can call api.notes.replaceFenceAtRange without re-deriving
+  // offsets from a substituted body. The index is keyed by (language,
+  // body) → ordered list of raw {startLine, endLine}; the codeComponent
+  // claims the k-th match for the k-th lookup of the same key, where k
+  // is reset on every render via a per-render cursor map.
+  const rawFenceIndex = useMemo(() => {
+    const lines = content.split("\n");
+    type Entry = { startLine: number; endLine: number };
+    const byKey = new Map<string, Entry[]>();
+    let i = 0;
+    while (i < lines.length) {
+      const m = lines[i]?.match(/^([ \t]{0,3})(`{3,}|~{3,})\s*([^\s`~]*)/);
+      if (!m) {
+        i++;
+        continue;
+      }
+      const indent = m[1] ?? "";
+      const ticks = m[2] ?? "";
+      const lang = m[3] ?? "";
+      const startLine = i;
+      let end = -1;
+      for (let j = i + 1; j < lines.length; j++) {
+        const line = lines[j] ?? "";
+        // Closing fence: same kind, same-or-greater length, same indent
+        // tolerance per CommonMark (we tolerate the same indent prefix).
+        const closeRe = new RegExp(
+          `^[ \\t]{0,3}${ticks[0] === "`" ? "`" : "~"}{${ticks.length},}\\s*$`,
+        );
+        if (closeRe.test(line)) {
+          end = j;
+          break;
+        }
+      }
+      if (end === -1) {
+        // Unterminated fence — stop scanning.
+        break;
+      }
+      const body = lines.slice(startLine + 1, end).join("\n");
+      const key = `${lang}::${body}`;
+      const list = byKey.get(key);
+      const entry: Entry = { startLine, endLine: end };
+      if (list) list.push(entry);
+      else byKey.set(key, [entry]);
+      void indent;
+      i = end + 1;
+    }
+    return byKey;
+  }, [content]);
+
+
   const transformedContent = useMemo(() => {
     return contentBody
       .replace(
@@ -405,7 +458,14 @@ export const NotePreviewReact = React.forwardRef<
     h6: makeHeading("h6"),
   };
 
-  const codeComponent = useMemo(() => {
+  // Per-render cursor for resolving identical raw fences to their
+  // i-th occurrence in declaration order. Re-created every render so
+  // ReactMarkdown's top-down walk always starts from index 0. We
+  // intentionally do NOT useMemo the codeComponent factory because the
+  // closure must capture a fresh cursor map on every render — same-
+  // content re-renders would otherwise carry stale counts.
+  const fenceCursor = new Map<string, number>();
+  const codeComponent = (() => {
     return function CodeBlock({
       className: cls,
       children,
@@ -442,11 +502,32 @@ export const NotePreviewReact = React.forwardRef<
             source = noteLines.slice(startLine, endLine + 1).join("\n");
           }
 
+          // Resolve the raw-file range by matching (language, body) in
+          // the on-disk content. Round-trip plugins (kanban, excalidraw,
+          // mermaid…) need this to call api.notes.replaceFenceAtRange
+          // without re-deriving offsets after frontmatter stripping +
+          // wikilink-embed substitution. Identical fences resolve to the
+          // i-th occurrence in declaration order via a per-render cursor.
+          let rawRange:
+            | { startLine: number; endLine: number }
+            | undefined;
+          const key = `${language}::${pluginContent}`;
+          const candidates = rawFenceIndex.get(key);
+          if (candidates && candidates.length > 0) {
+            const consumed = fenceCursor.get(key) ?? 0;
+            const pick = candidates[consumed];
+            if (pick) {
+              rawRange = pick;
+              fenceCursor.set(key, consumed + 1);
+            }
+          }
+
           return (
             <RendererComponent
               content={pluginContent}
               notePath={notePath}
               range={range}
+              rawRange={rawRange}
               source={source}
             />
           );
@@ -459,7 +540,7 @@ export const NotePreviewReact = React.forwardRef<
         </code>
       );
     };
-  }, [getCodeFenceRenderer, notePath, transformedContent]);
+  })();
 
   const remarkPlugins = useMemo(
     () => [

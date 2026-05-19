@@ -123,11 +123,26 @@ export interface CodeFenceRendererProps {
   notePath: string;
   /**
    * Range of the entire fence (including opening + closing ``` lines)
-   * in the parsed note source. Undefined when source position data is
-   * not available (e.g. when the renderer is invoked outside the markdown
-   * pipeline).
+   * in the PARSED note source — i.e. after frontmatter stripping and
+   * wikilink-embed substitution. Undefined when source position data is
+   * not available (e.g. when the renderer is invoked outside the
+   * markdown pipeline).
+   *
+   * Plugins that round-trip a fence to disk (kanban, excalidraw, …)
+   * should prefer `rawRange` so they can pass the line numbers straight
+   * to `api.notes.replaceFenceAtRange`.
    */
   range?: CodeFenceRange;
+  /**
+   * Range of the entire fence (including opening + closing ``` lines)
+   * in the RAW on-disk content — i.e. the same coordinate space as the
+   * string returned by `api.notes.get(path).content`. Suitable for use
+   * with `api.notes.replaceFenceAtRange` without any further adjustment.
+   * Undefined when the renderer is invoked outside the markdown pipeline
+   * or when the fence can't be located in the raw source (e.g. the body
+   * has been transformed by a remark plugin).
+   */
+  rawRange?: CodeFenceRange;
   /**
    * Full original fence block including the surrounding ``` markers.
    * Undefined when source position data is not available.
