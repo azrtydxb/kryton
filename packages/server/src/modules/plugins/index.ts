@@ -13,6 +13,8 @@ import { PluginWebSocket } from "./services/plugin-websocket.js";
 import { PluginStorageService } from "./services/storage.service.js";
 import { PluginRegistryService } from "./services/registry.service.js";
 import { pluginsRoutes } from "./routes/plugins.routes.js";
+import { builtinNotesRoutes } from "./routes/builtin-notes.routes.js";
+import { builtinStorageRoutes } from "./routes/builtin-storage.routes.js";
 import type { NotesOps } from "./services/types.js";
 
 declare module "fastify" {
@@ -182,6 +184,19 @@ const pluginsModuleImpl = (options: PluginsModuleOptions = {}): FastifyPluginAsy
     await app.register(
       pluginsRoutes({ pluginManager: manager, registry, pluginsDir }),
       { prefix: "/api/plugins" },
+    );
+
+    // Built-in client-plugin APIs (notes + storage). These are surfaced to
+    // *client* plugins via the `api.notes` / `api.storage` namespaces built
+    // in PluginRoot.tsx. They mirror the server-side `api.notes` / `api.storage`
+    // but are scoped to the calling user's session (no `userId` arg).
+    await app.register(
+      builtinNotesRoutes({ notesDir, notesOps, eventBus }),
+      { prefix: "/api/plugin-builtin/notes" },
+    );
+    await app.register(
+      builtinStorageRoutes({ storage }),
+      { prefix: "/api/plugin-builtin/storage" },
     );
 
     // ── Static plugin assets ───────────────────────────────────────────
