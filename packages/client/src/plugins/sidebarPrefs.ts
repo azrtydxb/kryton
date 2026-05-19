@@ -143,6 +143,46 @@ export function moveDown(pluginId: string): void {
   if (swapOrder(map, pluginId, +1)) bump();
 }
 
+/**
+ * Reorder using an explicit display-order context.
+ *
+ * Plugins without an explicit pref share the same default order (because
+ * `defaultOrder` returns `max + 1` which collides when there's no max).
+ * That makes neighbour-based swap ambiguous — every fresh sibling looks
+ * like the same slot. The fix: the caller (PluginSlot) knows the full
+ * rendered order; we materialize every id in that list with a
+ * deterministic per-position order, then perform the swap against the
+ * now-unambiguous map.
+ *
+ * Side is implied by the caller — orderedIds must already be filtered to
+ * the side the user is reordering on.
+ */
+export function reorderWithDisplayOrder(
+  pluginId: string,
+  orderedIds: readonly string[],
+  delta: -1 | 1,
+  side: Side,
+): void {
+  const map = load();
+  const myIdx = orderedIds.indexOf(pluginId);
+  if (myIdx === -1) return;
+  const target = myIdx + delta;
+  if (target < 0 || target >= orderedIds.length) return;
+  // Materialize: every id in the displayed order gets an explicit
+  // (side, position-as-order) entry so swap is unambiguous and survives
+  // round-trips through the server.
+  orderedIds.forEach((id, i) => {
+    map[id] = { side, order: i };
+  });
+  // Now swap.
+  const a = map[pluginId];
+  const b = map[orderedIds[target]];
+  const tmpOrder = a.order;
+  map[pluginId] = { side: a.side, order: b.order };
+  map[orderedIds[target]] = { side: b.side, order: tmpOrder };
+  bump();
+}
+
 export function subscribe(cb: () => void): () => void {
   listeners.add(cb);
   return () => {

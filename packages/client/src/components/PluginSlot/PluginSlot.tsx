@@ -97,15 +97,22 @@ export function PluginSlot({ slot, side }: PluginSlotProps) {
 
   if (slot === "sidebar") {
     const target: Side = side ?? "left";
+    const orderedIds = items.map((it) => it.pluginId);
     return (
       <>
-        {items.map((item) => (
+        {items.map((item, idx) => (
           <PluginErrorBoundary
             key={item.id}
             pluginId={item.pluginId}
             pluginName={item.title || item.pluginId}
           >
-            <PluginSection pluginId={item.pluginId} side={target}>
+            <PluginSection
+              pluginId={item.pluginId}
+              side={target}
+              index={idx}
+              total={items.length}
+              orderedIds={orderedIds}
+            >
               <item.component />
             </PluginSection>
           </PluginErrorBoundary>

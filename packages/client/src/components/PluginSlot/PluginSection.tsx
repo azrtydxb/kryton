@@ -2,9 +2,7 @@ import React, { useCallback, useState } from 'react';
 import {
   getPref,
   setSide,
-  moveUp,
-  moveDown,
-  getAllPrefs,
+  reorderWithDisplayOrder,
   type Side,
 } from '../../plugins/sidebarPrefs';
 import { useUIStore } from '../../stores/uiStore';
@@ -12,6 +10,16 @@ import { useUIStore } from '../../stores/uiStore';
 interface PluginSectionProps {
   pluginId: string;
   side: Side;
+  /** 0-based index of this plugin within the rendered list on `side`. */
+  index: number;
+  /** total number of plugins rendered on `side`. */
+  total: number;
+  /**
+   * Ordered list of plugin ids currently rendered on this side, in the
+   * same order they appear in the DOM. Required for unambiguous swap
+   * even when sibling plugins have no explicit pref entry yet.
+   */
+  orderedIds: readonly string[];
   children: React.ReactNode;
 }
 
@@ -28,7 +36,7 @@ interface PluginSectionProps {
  *    move-down). The card brightens on hover so the user can see which
  *    panel they're about to act on.
  */
-export function PluginSection({ pluginId, side, children }: PluginSectionProps) {
+export function PluginSection({ pluginId, side, index, total, orderedIds, children }: PluginSectionProps) {
   const editMode = useUIStore((s) => s.sidebarEditMode);
   const [hovered, setHovered] = useState(false);
 
@@ -38,14 +46,12 @@ export function PluginSection({ pluginId, side, children }: PluginSectionProps) 
   const moveSideTitle =
     goingTo === 'right' ? 'Move to right sidebar' : 'Move to left sidebar';
 
-  // up/down are disabled at the boundary of the current side's stack.
-  const allPrefs = getAllPrefs();
-  const sameSide = Object.entries(allPrefs)
-    .filter(([, p]) => p.side === side)
-    .sort((a, b) => a[1].order - b[1].order);
-  const myIdx = sameSide.findIndex(([id]) => id === pluginId);
-  const atTop = myIdx <= 0;
-  const atBottom = myIdx === -1 || myIdx >= sameSide.length - 1;
+  // Boundary detection comes from the PluginSlot's rendered list — it has
+  // the authoritative ordering. Previously we tried to derive it from
+  // getAllPrefs() but plugins that have never been moved aren't in the
+  // prefs map at all, so every Move up/down was wrongly disabled.
+  const atTop = index <= 0;
+  const atBottom = index >= total - 1;
 
   const handleMoveSide = useCallback(
     (e: React.MouseEvent) => {
@@ -61,18 +67,18 @@ export function PluginSection({ pluginId, side, children }: PluginSectionProps) 
     (e: React.MouseEvent) => {
       e.stopPropagation();
       e.preventDefault();
-      moveUp(pluginId);
+      reorderWithDisplayOrder(pluginId, orderedIds, -1, side);
     },
-    [pluginId],
+    [pluginId, orderedIds, side],
   );
 
   const handleMoveDown = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
       e.preventDefault();
-      moveDown(pluginId);
+      reorderWithDisplayOrder(pluginId, orderedIds, +1, side);
     },
-    [pluginId],
+    [pluginId, orderedIds, side],
   );
 
   if (!editMode) {

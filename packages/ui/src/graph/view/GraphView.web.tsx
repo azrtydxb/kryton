@@ -48,6 +48,10 @@ export function GraphView({
   // selection re-centres once, but subsequent user pan/wheel isn't fought
   // by the follower every frame.
   const centredOnRef = React.useRef<string | null>(null);
+  // Track the canvas dimensions of the last centred frame. When the right
+  // rail resizes (e.g. plugins move in or out), we re-anchor the active
+  // node to the new viewport centre so the focused selection doesn't drift.
+  const lastSizeRef = React.useRef<{ w: number; h: number }>({ w: 0, h: 0 });
   const { viewport, bind, setViewport } = useViewport();
   // viewportRef mirrors the React state; the render loop and camera-follow
   // read/write through the ref so the effect doesn't need `viewport` in its
@@ -181,7 +185,20 @@ export function GraphView({
           // could never drag the viewport because the next frame would snap
           // it back. centredOnRef remembers which active we last centred on;
           // we only re-centre when it changes.
-          if (activeId && centredOnRef.current !== activeId) {
+          //
+          // ALSO re-centre when the canvas dimensions change (e.g. the right
+          // rail shrinks because plugins were moved into it) — otherwise the
+          // active node would visually drift off-centre into the smaller
+          // viewport. lastSizeRef tracks the last w×h we centred against;
+          // any difference triggers a recompute against the new center
+          // without resetting centredOnRef (so manual pan still wins for
+          // subsequent steady-state frames).
+          const sizeChanged =
+            lastSizeRef.current.w !== w || lastSizeRef.current.h !== h;
+          const needsCenter =
+            activeId && (centredOnRef.current !== activeId || sizeChanged);
+
+          if (needsCenter) {
             const pos = layout.getPosition(activeId);
             if (pos) {
               const v = viewportRef.current;
@@ -193,6 +210,7 @@ export function GraphView({
           } else if (!activeId) {
             centredOnRef.current = null;
           }
+          lastSizeRef.current = { w, h };
           const tiers = computeLocalTiers(graphData, activeId, layoutMode);
           const tierFor = (id: string): "primary" | "secondary" | "hidden" => {
             if (!tiers) return "primary"; // global mode: everything is primary
