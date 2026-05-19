@@ -53,6 +53,13 @@ export interface EditorToolbarProps {
   viewMode?: ViewMode;
   onViewModeChange?: (mode: ViewMode) => void;
   className?: string;
+  /**
+   * Slot for plugin-contributed toolbar buttons. Renders inline after
+   * the built-in formatting groups (and a separator), keeping plugin
+   * actions visually grouped with the editor's own actions instead of
+   * stranded in a separate bar that's visible in non-edit views.
+   */
+  pluginButtons?: React.ReactNode;
 }
 
 /** Delay before the custom tooltip appears, in ms. Native `title` defaults
@@ -167,6 +174,7 @@ export function EditorToolbar({
   viewMode = "edit",
   onViewModeChange,
   className,
+  pluginButtons,
 }: EditorToolbarProps) {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -246,6 +254,17 @@ export function EditorToolbar({
       <ToolbarButton icon={Quote} title="Blockquote" onClick={() => onCommand("blockquote")} />
       <ToolbarButton icon={Minus} title="Horizontal rule" onClick={() => onCommand("hr")} />
       <ToolbarButton icon={Table} title="Insert table" onClick={() => onCommand("table")} />
+
+      {/* Plugin-contributed toolbar buttons — inline alongside the
+          built-in actions so they appear in the same surface and only
+          when the editor is mounted (the host renders this toolbar
+          conditional on layout === 'edit' | 'split'). */}
+      {pluginButtons && (
+        <>
+          <ToolbarSep />
+          {pluginButtons}
+        </>
+      )}
 
       {/* View mode toggle */}
       {onViewModeChange && (

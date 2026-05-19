@@ -2,6 +2,7 @@ import { useCallback, type RefObject } from 'react';
 import { EditorToolbar as UiEditorToolbar } from '@azrtydxb/ui';
 import { api } from '../../lib/api';
 import type { EditorHandle } from './Editor';
+import { PluginSlot } from '../PluginSlot/PluginSlot';
 
 interface EditorToolbarProps {
   editorRef: RefObject<EditorHandle | null>;
@@ -63,6 +64,7 @@ export function EditorToolbar({ editorRef }: EditorToolbarProps) {
     <UiEditorToolbar
       onCommand={handleCommand}
       onUploadImage={handleUploadImage}
+      pluginButtons={<PluginSlot slot="editor-toolbar" />}
     />
   );
 }

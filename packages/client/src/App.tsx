@@ -447,9 +447,10 @@ function AppContent() {
         </SidebarLayout>
 
         <main className="flex-1 flex flex-col overflow-hidden min-w-0">
-          <div className="hidden md:block">
-            <PluginSlot slot="editor-toolbar" />
-          </div>
+          {/* Plugin editor-toolbar buttons are rendered inline by the
+              editor's own toolbar (see Editor/EditorToolbar.tsx), so
+              they appear alongside the built-in H1/Bold/Table actions
+              and only when the editor is mounted (Edit/Split modes). */}
           <div className="flex-1 flex overflow-hidden min-h-0">
             {view === 'all' ? (
               <AllNotesView
