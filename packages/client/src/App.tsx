@@ -259,6 +259,8 @@ function AppContent() {
   useHostHooksWiring({
     activeNote: state.notes.activeNote,
     closeActiveNote: state.notes.closeActiveNote,
+    currentUser: state.user,
+    theme: state.themeCtx.resolvedTheme,
   });
 
   // Restore the line-number gutter as the default for the desktop / web

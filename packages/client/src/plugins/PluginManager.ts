@@ -6,6 +6,7 @@ import {
   subscribeEditorTransactions,
   setEditorOption,
   getHostHooks,
+  subscribeHostHooks,
 } from "@azrtydxb/ui";
 import { ClientPluginAPI, ClientPluginModule, ActivePluginInfo } from "./types";
 import { request } from "../lib/api";
@@ -180,24 +181,7 @@ export class ClientPluginManager {
       commands: {
         register: (command) => registry.registerCommand(pluginId, command),
       },
-      context: {
-        useCurrentUser: () => {
-          // Will be connected to AuthContext in integration
-          return null;
-        },
-        useCurrentNote: () => {
-          // Will be connected to useNotes in integration
-          return null;
-        },
-        useTheme: () => {
-          // Will be connected to useTheme in integration
-          return "dark";
-        },
-        usePluginSettings: () => {
-          // Will be connected to settings API in integration
-          return null;
-        },
-      },
+      context: buildContextApi(pluginId),
       api: {
         fetch: (path, options) => {
           const url = `/api/plugins/${pluginId}${path}`;
@@ -227,6 +211,70 @@ export class ClientPluginManager {
       },
     };
   }
+}
+
+// ── api.context — reactive bridge over the host-hooks registry ──
+//
+// Each hook reads its slice from getHostHooks() at render time and
+// subscribes via subscribeHostHooks so plugin components re-render when
+// the shell pushes new values via setHostHooks(). React is pulled from
+// window.__krytonPluginDeps so this works inside both the host bundle
+// and externally-loaded plugin bundles.
+
+function buildContextApi(pluginId: string): ClientPluginAPI["context"] {
+  function getReact(): typeof import("react") {
+    const deps = window.__krytonPluginDeps;
+    if (!deps?.React) {
+      throw new Error(
+        "api.context.* hooks require window.__krytonPluginDeps.React — " +
+          "PluginRoot must mount before plugin components render.",
+      );
+    }
+    return deps.React;
+  }
+  return {
+    useCurrentUser: () => {
+      const R = getReact();
+      const [u, setU] = R.useState(() => getHostHooks().currentUser ?? null);
+      R.useEffect(
+        () => subscribeHostHooks(() => setU(getHostHooks().currentUser ?? null)),
+        [],
+      );
+      return u;
+    },
+    useCurrentNote: () => {
+      const R = getReact();
+      const [n, setN] = R.useState(() => getHostHooks().currentNote ?? null);
+      R.useEffect(
+        () => subscribeHostHooks(() => setN(getHostHooks().currentNote ?? null)),
+        [],
+      );
+      return n;
+    },
+    useTheme: () => {
+      const R = getReact();
+      const [t, setT] = R.useState<"light" | "dark">(
+        () => getHostHooks().theme ?? "dark",
+      );
+      R.useEffect(
+        () => subscribeHostHooks(() => setT(getHostHooks().theme ?? "dark")),
+        [],
+      );
+      return t;
+    },
+    usePluginSettings: (key: string) => {
+      const R = getReact();
+      const read = () =>
+        getHostHooks().pluginSettings?.[pluginId]?.[key] ?? null;
+      const [v, setV] = R.useState<unknown>(read);
+      R.useEffect(
+        () => subscribeHostHooks(() => setV(read())),
+         
+        [],
+      );
+      return v;
+    },
+  };
 }
 
 // ── api.notes / api.storage wrappers (delegate to /api/plugin-builtin/*) ──

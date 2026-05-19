@@ -8,7 +8,11 @@ export {
   setHostHooks,
   getHostHooks,
   resetHostHooks,
+  subscribeHostHooks,
   type HostHooks,
+  type HostHooksUser,
+  type HostHooksNote,
+  type HostHooksListener,
 } from "./host-hooks";
 export {
   setEditorOption,

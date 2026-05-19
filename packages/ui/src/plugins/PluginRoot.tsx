@@ -14,7 +14,7 @@ import {
   registerEditorPlugin,
   subscribeEditorTransactions,
 } from "./editor-registry";
-import { getHostHooks } from "./host-hooks";
+import { getHostHooks, subscribeHostHooks } from "./host-hooks";
 import { setEditorOption } from "./editor-options";
 import type { ActivePluginInfo, ClientPluginAPI, ClientPluginModule } from "./types";
 
@@ -252,6 +252,57 @@ function buildStorageApi(pluginId: string): ClientPluginAPI["storage"] {
   };
 }
 
+function buildContextApi(pluginId: string): ClientPluginAPI["context"] {
+  return {
+    useCurrentUser: () => {
+      const deps = window.__krytonPluginDeps;
+      const R = deps?.React ?? React;
+      const [u, setU] = R.useState(() => getHostHooks().currentUser ?? null);
+      R.useEffect(
+        () => subscribeHostHooks(() => setU(getHostHooks().currentUser ?? null)),
+        [],
+      );
+      return u;
+    },
+    useCurrentNote: () => {
+      const deps = window.__krytonPluginDeps;
+      const R = deps?.React ?? React;
+      const [n, setN] = R.useState(() => getHostHooks().currentNote ?? null);
+      R.useEffect(
+        () => subscribeHostHooks(() => setN(getHostHooks().currentNote ?? null)),
+        [],
+      );
+      return n;
+    },
+    useTheme: () => {
+      const deps = window.__krytonPluginDeps;
+      const R = deps?.React ?? React;
+      const [t, setT] = R.useState<"light" | "dark">(
+        () => getHostHooks().theme ?? "dark",
+      );
+      R.useEffect(
+        () => subscribeHostHooks(() => setT(getHostHooks().theme ?? "dark")),
+        [],
+      );
+      return t;
+    },
+    usePluginSettings: (key: string) => {
+      const deps = window.__krytonPluginDeps;
+      const R = deps?.React ?? React;
+      const read = () =>
+        getHostHooks().pluginSettings?.[pluginId]?.[key] ?? null;
+      const [v, setV] = R.useState<unknown>(read);
+      R.useEffect(
+        () => subscribeHostHooks(() => setV(read())),
+        // key/pluginId are stable for the lifetime of the hook caller.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [],
+      );
+      return v;
+    },
+  };
+}
+
 function buildEditorApi(): ClientPluginAPI["editor"] {
   return {
     registerPlugin: (plugin) => registerEditorPlugin(plugin),
@@ -295,12 +346,7 @@ export function buildClientApi(
     commands: {
       register: (command) => registry.registerCommand(pluginId, command),
     },
-    context: {
-      useCurrentUser: () => null,
-      useCurrentNote: () => null,
-      useTheme: () => "dark",
-      usePluginSettings: (_key) => null,
-    },
+    context: buildContextApi(pluginId),
     api: {
       fetch: (path, options) => {
         const url = `/api/plugins/${pluginId}${path}`;
