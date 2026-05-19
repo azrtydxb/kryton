@@ -111,14 +111,24 @@ export function PluginSection({ pluginId, side, index, total, orderedIds, childr
       }}
     >
       {children}
+      {/* Floating control pill — solid background + 1px border + soft
+          shadow so the controls visually sit ABOVE any plugin chrome
+          underneath (refresh icons, headers, etc.). z-index keeps it on
+          top during paint ordering as well. */}
       <div
         style={{
           position: 'absolute',
-          top: 6,
-          right: 6,
+          top: 4,
+          right: 4,
           display: 'inline-flex',
-          gap: 2,
-          zIndex: 2,
+          alignItems: 'center',
+          gap: 0,
+          padding: 2,
+          background: 'var(--bg-1)',
+          border: '1px solid var(--line)',
+          borderRadius: 6,
+          boxShadow: '0 1px 4px rgba(0, 0, 0, 0.25)',
+          zIndex: 3,
         }}
       >
         <CardBtn
@@ -164,24 +174,26 @@ function CardBtn({
       aria-label={title}
       disabled={disabled}
       style={{
-        width: 14,
-        height: 14,
+        width: 22,
+        height: 22,
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        borderRadius: 3,
+        borderRadius: 4,
         background: 'transparent',
         border: 'none',
         color: 'var(--fg-2)',
-        opacity: disabled ? 0.5 : 1,
+        opacity: disabled ? 0.4 : 1,
         cursor: disabled ? 'not-allowed' : 'pointer',
         padding: 0,
         transition: 'color 120ms, background 120ms',
       }}
       onMouseEnter={(e) => {
         if (disabled) return;
-        e.currentTarget.style.color = 'var(--fg)';
-        e.currentTarget.style.background = 'var(--bg-hover)';
+        // Accent-tinted hover so the action is clearly clickable, not
+        // just hoverable — matches the host's button hover language.
+        e.currentTarget.style.color = 'var(--accent)';
+        e.currentTarget.style.background = 'var(--accent-soft, var(--bg-hover))';
       }}
       onMouseLeave={(e) => {
         if (disabled) return;
@@ -195,8 +207,8 @@ function CardBtn({
 }
 
 function ChevSvg({ glyph }: { glyph: Glyph }) {
-  // 14×14 button, 10×10 glyph centred — matches the visual density of the
-  // surrounding HeaderBtn icons (14px lucide-flavoured strokes).
+  // 22×22 button, 14×14 glyph centred — matches the topbar HeaderBtn
+  // density (14px lucide-flavoured strokes).
   const points = {
     'chev-right': '6 3 11 8 6 13',
     'chev-left': '10 3 5 8 10 13',
@@ -205,8 +217,8 @@ function ChevSvg({ glyph }: { glyph: Glyph }) {
   }[glyph];
   return (
     <svg
-      width="10"
-      height="10"
+      width="14"
+      height="14"
       viewBox="0 0 16 16"
       fill="none"
       stroke="currentColor"
