@@ -5,6 +5,8 @@ import { ShareService } from "./services/share.service.js";
 import { YjsPersistence } from "./ws/persistence.js";
 import { sharesRoutes, accessRequestsRoutes } from "./routes/shares.routes.js";
 import { registerYjsRoutes, type YjsRegistry } from "./ws/yjs.handler.js";
+import { DiskWatcherManager } from "./disk-watcher.js";
+import type { VaultEventOrigin } from "../vault-events/types.js";
 
 export interface CollabApi {
   getDoc(docId: string): Y.Doc | null;
@@ -14,6 +16,19 @@ export interface CollabApi {
     notePath: string,
     viewerUserId: string,
   ): Promise<{ canRead: boolean; canWrite: boolean }>;
+  /** True iff a live Y.Doc exists for `(docId, userId)`. */
+  hasLiveDoc(docId: string, userId: string): boolean;
+  /**
+   * Route a server-initiated content write into the live Y.Doc rather
+   * than touching disk directly. See `note.service.ts` writeNote for
+   * the invariant.
+   */
+  applyServerEdit(
+    docId: string,
+    userId: string,
+    origin: VaultEventOrigin,
+    content: string,
+  ): Promise<void>;
 }
 
 declare module "fastify" {
@@ -60,11 +75,26 @@ const collabModuleImpl: FastifyPluginAsync = async (app) => {
   // Register WS route in an encapsulated child plugin so the websocket
   // route handler can be attached.
   await app.register(async (childApp) => {
-    registry = registerYjsRoutes(childApp, { persistence });
+    registry = registerYjsRoutes(childApp, {
+      persistence,
+      resolveNotesDir: (userId) => app.notes.getUserNotesDir(userId),
+    });
   });
 
   if (!registry) throw new Error("yjs registry failed to initialise");
   const yjs = registry as YjsRegistry;
+
+  // Per-user disk watcher. Started on the first Y.Doc opened by a user,
+  // stopped on last eviction — avoids watching notes dirs for users who
+  // aren't actively editing.
+  const diskWatcher = new DiskWatcherManager({
+    log: app.log,
+    registry: yjs,
+  });
+  yjs.setLifecycleHandlers({
+    onUserActive: (userId, notesDir) => diskWatcher.start(userId, notesDir),
+    onUserIdle: (userId) => void diskWatcher.stop(userId),
+  });
 
   const collabApi: CollabApi = {
     getDoc(docId) {
@@ -76,12 +106,19 @@ const collabModuleImpl: FastifyPluginAsync = async (app) => {
     hasAccess(ownerUserId, notePath, viewerUserId) {
       return shareService.hasAccess(ownerUserId, notePath, viewerUserId);
     },
+    hasLiveDoc(docId, userId) {
+      return yjs.hasLiveDoc(docId, userId);
+    },
+    applyServerEdit(docId, userId, origin, content) {
+      return yjs.applyServerEdit(docId, userId, origin, content);
+    },
   };
   app.decorate("collab", collabApi);
 
   // Graceful shutdown: flush all dirty docs.
   app.addHook("onClose", async () => {
     await yjs.flushAll();
+    await diskWatcher.stopAll();
   });
 };
 
