@@ -6,13 +6,22 @@ One command turns "I have a Kryton server" into "Claude Code, Cursor, Codex, Cla
 
 ## Quick start
 
+Kryton is self-hosted — you need the URL of **your** Kryton server. Pass it in or let the installer prompt for it:
+
 ```bash
+# Interactive — prompts for the server URL, then email + password
 npx -y @azrtydxb/kryton-init
+
+# Or pass the server explicitly
+npx -y @azrtydxb/kryton-init --server https://kryton.example.com
+
+# Or set it via env var
+KRYTON_SERVER=https://kryton.example.com npx -y @azrtydxb/kryton-init
 ```
 
-That's the whole thing. It will:
+The installer will:
 
-1. Probe the server (defaults to `https://kryton.ai`; pass `--server <url>` for self-hosted).
+1. Prompt for the server URL (or use `--server` / `KRYTON_SERVER`), then probe `<server>/api/health`.
 2. Prompt for email + password, sign in via the public auth endpoint.
 3. Mint an API key named `kryton-init: <hostname>` with `read-write` scope.
 4. Detect every supported AI agent host installed on this machine.
@@ -20,7 +29,7 @@ That's the whole thing. It will:
 6. Write the MCP entry into each chosen host's config file (preserving everything else in it).
 7. Print a per-host post-install hint (which app needs a restart, where to toggle the server on, etc.).
 
-Run it again any time to re-wire after installing a new host, or change servers.
+Run it again any time to re-wire after installing a new host, or to point at a different server. Prior state is remembered so the URL prompt defaults to your last-used server.
 
 ## Commands
 
@@ -36,10 +45,10 @@ Run it again any time to re-wire after installing a new host, or change servers.
 
 | Flag                       | Applies to                | Meaning                                                                 |
 | -------------------------- | ------------------------- | ----------------------------------------------------------------------- |
-| `--server <url>`           | `install`                 | Kryton server base URL. Also reads `KRYTON_SERVER` env var.             |
+| `--server <url>`           | `install`                 | Kryton server base URL (required). Also reads `KRYTON_SERVER`. If neither is set and there's no prior state, you'll be prompted. |
 | `--hosts <a,b,c>`          | `install`, `uninstall`    | Restrict to a comma-separated subset (host names below).                |
 | `--dry-run`                | `install`, `uninstall`    | Print the plan; write nothing.                                          |
-| `--yes` / `-y`             | `install`, `uninstall`    | Non-interactive: accept defaults; on uninstall, force-remove even if a config has drifted from the recorded hash. |
+| `--yes` / `-y`             | `install`, `uninstall`    | Non-interactive: skip all prompts. Requires `--server`/`KRYTON_SERVER`/prior state and a previously-minted key to reuse; otherwise it errors out. |
 | `--host <name>`            | `mcp`                     | Print just that one host's MCP snippet shape.                           |
 
 ## Supported hosts
@@ -91,13 +100,13 @@ It contains the server URL, the API-key id + prefix + full plaintext key (file i
 
 ## Examples
 
-Self-hosted, all detected hosts:
+Interactive, all detected hosts:
 
 ```bash
 npx -y @azrtydxb/kryton-init --server https://kryton.example.com
 ```
 
-Just Claude Code, scripted:
+Just Claude Code, scripted (after at least one prior interactive install has minted a key):
 
 ```bash
 npx -y @azrtydxb/kryton-init install \
@@ -109,7 +118,9 @@ npx -y @azrtydxb/kryton-init install \
 Preview what _would_ change, then bail:
 
 ```bash
-npx -y @azrtydxb/kryton-init install --dry-run
+npx -y @azrtydxb/kryton-init install \
+  --server https://kryton.example.com \
+  --dry-run
 ```
 
 Print the snippet you'd paste into a host this tool doesn't yet auto-support:

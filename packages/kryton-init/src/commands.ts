@@ -36,7 +36,9 @@ export interface SharedOpts {
   host?: string;
 }
 
-const DEFAULT_SERVER = "https://kryton.ai";
+// Kryton is self-hosted; there is no canonical public server. The
+// installer requires a URL via flag, env var, prior state, or interactive
+// prompt — never falls back to a hardcoded default that wouldn't resolve.
 
 function parseHostFilter(list: string | undefined): string[] | null {
   if (!list) return null;
@@ -138,11 +140,18 @@ export async function cmdInstall(opts: SharedOpts): Promise<number> {
 
 async function resolveServer(opts: SharedOpts, last?: string): Promise<string> {
   if (opts.server) return trimTrailingSlash(opts.server);
-  if (opts.yes) return trimTrailingSlash(last ?? DEFAULT_SERVER);
+  if (opts.yes) {
+    if (!last) {
+      throw new Error(
+        "Server URL required: pass --server <url> or set KRYTON_SERVER (no prior install state to reuse in --yes mode).",
+      );
+    }
+    return trimTrailingSlash(last);
+  }
   const ans = await input({
-    message: "Kryton server URL",
-    default: last ?? DEFAULT_SERVER,
-    validate: (v) => /^https?:\/\//.test(v) || "must start with http:// or https://",
+    message: "Kryton server URL (e.g. https://kryton.example.com)",
+    default: last,
+    validate: (v) => /^https?:\/\/.+/.test(v) || "must be a full http(s):// URL",
   });
   return trimTrailingSlash(ans);
 }
