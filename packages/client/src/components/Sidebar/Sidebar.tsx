@@ -371,8 +371,23 @@ export function Sidebar({
         )}
       </div>
 
+      {/* Scrollable middle region — wraps nav + sections + plugin slots so
+          the brand row and AgentsFooter stay pinned while plugin-added
+          panels can overflow into a vertical scrollbar (visible only when
+          content actually exceeds the viewport). */}
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          scrollbarGutter: 'stable',
+        }}
+      >
       {/* 2. Primary nav (per prototype/app/sidebar.jsx) */}
-      <div style={{ padding: '0 8px 8px', display: 'flex', flexDirection: 'column', gap: 1 }}>
+      <div style={{ padding: '0 8px 8px', display: 'flex', flexDirection: 'column', gap: 1, flexShrink: 0 }}>
         <NavRow
           icon={<Icons.Inbox size={14} />}
           label="All notes"
@@ -404,8 +419,9 @@ export function Sidebar({
       {/* 3. Divider */}
       <div style={{ height: 1, background: 'var(--line)', margin: '4px 12px' }} />
 
-      {/* 4. Sections */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+      {/* 4. Sections — flow naturally inside the scroll wrapper so plugin
+          panels below can take the rest. Each subsection sizes itself. */}
+      <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
         {/* Favorites */}
         <div style={{ padding: '4px 4px 0' }}>
           <SectionHeader
@@ -457,7 +473,7 @@ export function Sidebar({
           />
         </div>
         {filesOpen && (
-          <div style={{ flex: 1, overflow: 'hidden', minHeight: 80, padding: '0 4px' }}>
+          <div style={{ minHeight: 80, padding: '0 4px' }}>
             <FileTree
               tree={tree}
               activeNotePath={activeNotePath}
@@ -545,10 +561,13 @@ export function Sidebar({
         </div>
       </div>
 
-      {/* plugin slot — sits between sections and the agents footer */}
+      {/* plugin slot — sits between sections and the agents footer.
+          Inside the scroll wrapper so plugin panels participate in the
+          shared scroll area; AgentsFooter remains pinned outside. */}
       {beforeFooter}
+      </div>
 
-      {/* 5. AgentsFooter (28px) */}
+      {/* 5. AgentsFooter (28px) — pinned outside scroll region. */}
       <AgentsFooter />
     </div>
   );
