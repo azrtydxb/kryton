@@ -15,6 +15,7 @@
 import { useEffect, type ReactNode } from "react";
 import { KrytonDataProvider } from "@azrtydxb/ui";
 import { HttpAdapter } from "./HttpAdapter";
+import { HttpAdapterContext } from "./httpAdapterContext";
 
 interface HttpDataProviderProps {
   adapter: HttpAdapter;
@@ -67,5 +68,9 @@ export function HttpDataProvider({ adapter, children }: HttpDataProviderProps) {
     };
   }, [adapter]);
 
-  return <KrytonDataProvider adapter={adapter}>{children}</KrytonDataProvider>;
+  return (
+    <HttpAdapterContext.Provider value={adapter}>
+      <KrytonDataProvider adapter={adapter}>{children}</KrytonDataProvider>
+    </HttpAdapterContext.Provider>
+  );
 }

@@ -28,6 +28,7 @@ import * as syncProtocol from "y-protocols/sync";
 import * as awarenessProtocol from "y-protocols/awareness";
 import * as encoding from "lib0/encoding";
 import * as decoding from "lib0/decoding";
+import type { VaultEvent } from "./vaultEvents.types";
 
 // Yjs WS message type constants (must match server: yjs.handler.ts).
 const MSG_SYNC = 0;
@@ -82,6 +83,12 @@ function settingsToMap(obj: Record<string, string>): Map<string, string> {
   return new Map(Object.entries(obj));
 }
 
+/** "" for top-level, otherwise the parent folder path. */
+function folderParentOf(folderPath: string): string | null {
+  const idx = folderPath.lastIndexOf("/");
+  return idx === -1 ? null : folderPath.slice(0, idx);
+}
+
 // ---- HttpAdapter -----------------------------------------------------------
 
 export interface HttpAdapterOptions {
@@ -89,6 +96,13 @@ export interface HttpAdapterOptions {
   fetch?: typeof globalThis.fetch;
   /** Base URL, e.g. "" for same-origin or "http://localhost:3000" for dev proxy. */
   baseUrl: string;
+  /**
+   * Stable per-session client id stamped on every mutating HTTP request
+   * (`X-Kryton-Client-Id`) and on the `/ws/vault` query string. The
+   * server uses it to suppress echo of an event back to its originator.
+   * Tests pass a fixed value; production wires a sessionStorage uuid.
+   */
+  clientId?: string;
 }
 
 export class HttpAdapter implements KrytonDataAdapter {
@@ -120,9 +134,12 @@ export class HttpAdapter implements KrytonDataAdapter {
   private _sockets: Map<string, WebSocket> = new Map();
   private _awareness: Map<string, awarenessProtocol.Awareness> = new Map();
 
+  readonly clientId: string;
+
   constructor(opts: HttpAdapterOptions) {
     this._fetch = opts.fetch ?? globalThis.fetch.bind(globalThis);
     this.baseUrl = opts.baseUrl;
+    this.clientId = opts.clientId ?? "";
   }
 
   // ---- subscribe / fire ----------------------------------------------------
@@ -151,6 +168,7 @@ export class HttpAdapter implements KrytonDataAdapter {
       ...init,
       headers: {
         ...(init?.body ? { "Content-Type": "application/json" } : {}),
+        ...(this.clientId ? { "X-Kryton-Client-Id": this.clientId } : {}),
         ...(init?.headers ?? {}),
       },
     });
@@ -630,6 +648,200 @@ export class HttpAdapter implements KrytonDataAdapter {
     // Assumes content is in a Y.Text named "content"
     const text = doc.getText("content");
     return text.toString();
+  }
+
+  // ---- Vault events --------------------------------------------------------
+
+  /**
+   * Apply a server-pushed `VaultEvent` to the in-memory caches and fire
+   * the relevant subscriber sets. Idempotent: re-applying the same event
+   * is a no-op (adding a path already present is a no-op; deleting a
+   * path not present is a no-op).
+   */
+  applyVaultEvent(event: VaultEvent): void {
+    switch (event.kind) {
+      case "note.created":
+      case "note.updated": {
+        const existingIdx = this._notes.findIndex((n) => n.path === event.path);
+        const next: NoteData = {
+          id: event.path,
+          path: event.path,
+          title:
+            event.path.split("/").pop()?.replace(/\.md$/, "") ?? event.path,
+          tags: existingIdx === -1 ? "[]" : this._notes[existingIdx]!.tags,
+          modifiedAt: new Date(event.updatedAt).getTime(),
+          version:
+            existingIdx === -1 ? 0 : (this._notes[existingIdx]!.version ?? 0) + 1,
+        };
+        if (existingIdx === -1) {
+          this._notes = [...this._notes, next];
+          // A newly-created note may live under a folder that the cache
+          // hasn't materialised yet (e.g. the user just created
+          // Projects/2026/X.md). Insert any missing ancestor folders so
+          // the sidebar tree renders rows for them on the next subscribe.
+          this._ensureFoldersForPath(event.path);
+        } else {
+          // Preserve the existing array identity for unchanged rows; only
+          // splice the touched index.
+          this._notes = this._notes.map((n, i) => (i === existingIdx ? next : n));
+        }
+        this.fire("notes");
+        this.fire("folders");
+        break;
+      }
+      case "note.deleted": {
+        const beforeLen = this._notes.length;
+        this._notes = this._notes.filter((n) => n.path !== event.path);
+        if (this._notes.length !== beforeLen) this.fire("notes");
+        break;
+      }
+      case "note.renamed":
+      case "note.moved": {
+        const idx = this._notes.findIndex((n) => n.path === event.from);
+        if (idx === -1) {
+          // Originator already applied the rename optimistically; the
+          // echo lands here as a no-op except for the modifiedAt bump on
+          // the destination row, if present.
+          const destIdx = this._notes.findIndex((n) => n.path === event.to);
+          if (destIdx !== -1) {
+            const cur = this._notes[destIdx]!;
+            this._notes = this._notes.map((n, i) =>
+              i === destIdx
+                ? { ...cur, modifiedAt: new Date(event.updatedAt).getTime() }
+                : n,
+            );
+            this.fire("notes");
+          }
+          break;
+        }
+        const existing = this._notes[idx]!;
+        const renamed: NoteData = {
+          ...existing,
+          id: event.to,
+          path: event.to,
+          title:
+            event.to.split("/").pop()?.replace(/\.md$/, "") ?? event.to,
+          modifiedAt: new Date(event.updatedAt).getTime(),
+          version: (existing.version ?? 0) + 1,
+        };
+        this._notes = this._notes.map((n, i) => (i === idx ? renamed : n));
+        this._ensureFoldersForPath(event.to);
+        this.fire("notes");
+        this.fire("folders");
+        break;
+      }
+      case "folder.created": {
+        if (!this._folders.some((f) => f.path === event.path)) {
+          this._folders = [
+            ...this._folders,
+            {
+              id: event.path,
+              userId: "",
+              path: event.path,
+              parentId: folderParentOf(event.path),
+              updatedAt: Date.now(),
+              version: 0,
+            },
+          ];
+          this.fire("folders");
+        }
+        break;
+      }
+      case "folder.deleted": {
+        const folderPrefix = event.path.endsWith("/") ? event.path : event.path + "/";
+        const beforeFolders = this._folders.length;
+        const beforeNotes = this._notes.length;
+        this._folders = this._folders.filter(
+          (f) => f.path !== event.path && !f.path.startsWith(folderPrefix),
+        );
+        this._notes = this._notes.filter((n) => !n.path.startsWith(folderPrefix));
+        if (this._folders.length !== beforeFolders) this.fire("folders");
+        if (this._notes.length !== beforeNotes) this.fire("notes");
+        break;
+      }
+      case "folder.renamed": {
+        const fromPrefix = event.from.endsWith("/") ? event.from : event.from + "/";
+        const toPrefix = event.to.endsWith("/") ? event.to : event.to + "/";
+        let foldersChanged = false;
+        let notesChanged = false;
+        this._folders = this._folders.map((f) => {
+          if (f.path === event.from) {
+            foldersChanged = true;
+            return { ...f, id: event.to, path: event.to, parentId: folderParentOf(event.to) };
+          }
+          if (f.path.startsWith(fromPrefix)) {
+            foldersChanged = true;
+            const remapped = toPrefix + f.path.slice(fromPrefix.length);
+            return { ...f, id: remapped, path: remapped };
+          }
+          return f;
+        });
+        this._notes = this._notes.map((n) => {
+          if (n.path.startsWith(fromPrefix)) {
+            notesChanged = true;
+            const remapped = toPrefix + n.path.slice(fromPrefix.length);
+            return { ...n, id: remapped, path: remapped };
+          }
+          return n;
+        });
+        if (foldersChanged) this.fire("folders");
+        if (notesChanged) this.fire("notes");
+        break;
+      }
+      case "tag.added": {
+        if (!this._tags.some((t) => t.name === event.tag)) {
+          this._tags = [
+            ...this._tags,
+            {
+              id: event.tag,
+              userId: "",
+              name: event.tag,
+              color: null,
+              updatedAt: Date.now(),
+              version: this._tags.length,
+            },
+          ];
+          this.fire("tags");
+        }
+        break;
+      }
+      case "tag.removed": {
+        // Server-authoritative; the simplest idempotent take is to drop
+        // the tag if the count would reach zero. Without per-note tag
+        // tracking here we conservatively keep the tag row and let the
+        // next full refresh reconcile counts.
+        break;
+      }
+    }
+  }
+
+  /**
+   * Insert any folder rows along the path that the cache hasn't seen
+   * yet. Idempotent — existing folders are left alone.
+   */
+  private _ensureFoldersForPath(notePath: string): void {
+    const segments = notePath.split("/");
+    if (segments.length <= 1) return;
+    let cursor = "";
+    let added = false;
+    for (let i = 0; i < segments.length - 1; i++) {
+      cursor = cursor ? `${cursor}/${segments[i]}` : segments[i];
+      if (!this._folders.some((f) => f.path === cursor)) {
+        this._folders = [
+          ...this._folders,
+          {
+            id: cursor,
+            userId: "",
+            path: cursor,
+            parentId: folderParentOf(cursor),
+            updatedAt: Date.now(),
+            version: 0,
+          },
+        ];
+        added = true;
+      }
+    }
+    if (added) this.fire("folders");
   }
 
   // ---- Sync ----------------------------------------------------------------

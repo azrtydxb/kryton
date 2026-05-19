@@ -19,15 +19,41 @@ const queryClient = new QueryClient({
 const pluginRegistry = new PluginSlotRegistry();
 const pluginManager = new ClientPluginManager(pluginRegistry);
 
+/**
+ * Stable per-tab client id used to suppress the echo of a vault event
+ * back to the originating tab. sessionStorage keeps it stable across
+ * reloads of the same tab but distinct across different tabs.
+ */
+function getOrCreateClientId(): string {
+  try {
+    const KEY = "kryton.clientId";
+    const existing = window.sessionStorage.getItem(KEY);
+    if (existing) return existing;
+    const generated =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `c-${Math.random().toString(36).slice(2)}-${Date.now().toString(36)}`;
+    window.sessionStorage.setItem(KEY, generated);
+    return generated;
+  } catch {
+    // sessionStorage unavailable (SSR, locked-down embedded webview);
+    // fall back to a fresh id so requests still carry a stable header
+    // for the lifetime of this module.
+    return `c-${Math.random().toString(36).slice(2)}-${Date.now().toString(36)}`;
+  }
+}
+
 // Singleton HttpAdapter — implements KrytonDataAdapter for the web client.
 // Wrap the app in HttpDataProvider so @azrtydxb/ui hooks (useUiNotes, etc.)
 // can access data via useKrytonData().
 const httpAdapter = new HttpAdapter({
   baseUrl: (import.meta as unknown as { env: Record<string, string> }).env.VITE_API_BASE_URL ?? "",
+  clientId: typeof window !== "undefined" ? getOrCreateClientId() : undefined,
 });
 import { useAppState } from './hooks/useAppState';
 import { useAppCallbacks } from './hooks/useAppCallbacks';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { useVaultEvents } from './hooks/useVaultEvents';
 import { Header } from './components/Layout/Header';
 import { SidebarLayout } from './components/Layout/SidebarLayout';
 import { RightPanel } from './components/Layout/RightPanel';
@@ -216,6 +242,11 @@ function AppModals({
 }
 
 function AppContent() {
+  // Open the vault-events push channel as soon as the app renders. The
+  // hook itself gates internally on a live session so it's safe to call
+  // before the user signs in.
+  useVaultEvents();
+
   const state = useAppState(pluginManager);
   const callbacks = useAppCallbacks(state);
 
