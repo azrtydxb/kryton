@@ -47,6 +47,15 @@ QPKG_AUTHOR="${QPKG_AUTHOR:-Kryton}"
 QPKG_DESCRIPTION="${QPKG_DESCRIPTION:-Local-first notes & knowledge base with real-time collaboration.}"
 QPKG_REQUIRE_CS_VERSION="${QPKG_REQUIRE_CS_VERSION:-3.0.0}"
 
+# qbuild caps QPKG_VER at 10 characters and only accepts digits + dots.
+# Compress semver-style pre/rc suffixes (e.g. "4.6.5-pre.8" -> "4.6.5.8")
+# so the cfg field validates. The full KRYTON_VERSION is still used for
+# the artifact filename so users can tell pre-releases apart on disk.
+QPKG_NUMERIC_VERSION="$(printf '%s' "${KRYTON_VERSION}" | sed -E 's/-[a-zA-Z]+(\.|$)/./g; s/\.+$//')"
+if [ "${#QPKG_NUMERIC_VERSION}" -gt 10 ]; then
+    die "computed QPKG_VER '${QPKG_NUMERIC_VERSION}' exceeds 10 chars (qbuild limit). Source version: ${KRYTON_VERSION}"
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 TEMPLATE_DIR="${SCRIPT_DIR}/source-template"
@@ -85,7 +94,7 @@ chmod 755 "${BUILD_ROOT}/shared/kryton.sh"
 RENDERED_CFG="${BUILD_ROOT}/qpkg.cfg"
 # shellcheck disable=SC2002
 sed \
-    -e "s|{{VERSION}}|${KRYTON_VERSION}|g" \
+    -e "s|{{VERSION}}|${QPKG_NUMERIC_VERSION}|g" \
     -e "s|{{AUTHOR}}|${QPKG_AUTHOR}|g" \
     -e "s|{{DESCRIPTION}}|${QPKG_DESCRIPTION}|g" \
     -e "s|{{REQUIRE_VERSION}}|${QPKG_REQUIRE_CS_VERSION}|g" \
@@ -99,7 +108,7 @@ sed \
 
 # Sanity-check the rendered cfg.
 grep -q "^QPKG_NAME=\"kryton\"" "${RENDERED_CFG}" || die "rendered qpkg.cfg missing QPKG_NAME"
-grep -q "^QPKG_VER=\"${KRYTON_VERSION}\"" "${RENDERED_CFG}" || die "rendered qpkg.cfg has wrong QPKG_VER"
+grep -q "^QPKG_VER=\"${QPKG_NUMERIC_VERSION}\"" "${RENDERED_CFG}" || die "rendered qpkg.cfg has wrong QPKG_VER"
 grep -q "^QPKG_PLATFORM=\"${KRYTON_PLATFORM}\"" "${RENDERED_CFG}" || die "rendered qpkg.cfg missing QPKG_PLATFORM"
 
 # ---------- 4. Substitute image into docker-compose.yml ------------------------
@@ -220,7 +229,7 @@ find "${BUILD_ROOT}" -exec touch -h -d "2020-01-01T00:00:00Z" {} + 2>/dev/null \
     cd "${BUILD_ROOT}"
     "${QBUILD}" \
         --root "${BUILD_ROOT}" \
-        --build-version "${KRYTON_VERSION}" \
+        --build-version "${QPKG_NUMERIC_VERSION}" \
         --build-arch "${PLATFORM_LOWER}" \
         --build-dir "${BUILD_OUT}" \
         --quiet
