@@ -1,8 +1,8 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="logos/kryton_banner_dark.png" />
-    <source media="(prefers-color-scheme: light)" srcset="logos/kryton_banner_dark.png" />
-    <img src="logos/kryton_banner_dark.png" alt="Kryton" width="600" style="border-radius: 12px; background-color: #0d1117; padding: 20px;" />
+    <source media="(prefers-color-scheme: dark)" srcset="logos/kryton_logo.svg" />
+    <source media="(prefers-color-scheme: light)" srcset="logos/kryton_logo.svg" />
+    <img src="logos/kryton_logo.svg" alt="Kryton" width="600" />
   </picture>
 </p>
 
@@ -25,6 +25,12 @@
 </p>
 
 ---
+
+## Recent UI improvements
+
+- **Editor tabs** — open notes stack into a tab strip with a soft cap of 4 simultaneous tabs; oldest is evicted FIFO when you open a fifth.
+- **Customizable sidebar** — move plugin panels between the left/right rails and reorder them up/down. Layout persists per user.
+- **Inline plugin settings** — every plugin's configuration renders directly beneath its card in the admin panel, no separate dialog.
 
 ## Why Kryton?
 
@@ -128,7 +134,7 @@ See [API Keys & MCP docs](docs/API-ACCESS.md) for the full reference.
 ## Features
 
 ### Editor & Notes
-- **Markdown Editor** — CodeMirror 6 with syntax highlighting, formatting toolbar, and Vim mode
+- **Markdown Editor** — in-house editor with syntax highlighting, formatting toolbar, slash commands, and a host-provided suggestion popup (no external CodeMirror/Monaco dependency)
 - **Live Preview** — rendered markdown with wiki-links, frontmatter display, and code fences
 - **Auto-save** — 2-second debounce saves automatically while editing
 - **Wiki-style Linking** — `[[double brackets]]` with autocomplete and broken link detection
@@ -188,9 +194,9 @@ See [API Keys & MCP docs](docs/API-ACCESS.md) for the full reference.
 </p>
 
 ### Plugin Ecosystem
-12 plugins available via [kryton-plugins](https://github.com/azrtydxb/kryton-plugins):
+24 official plugins covering kanban, mermaid, excalidraw, git backup, calendar journal, flashcards, slash commands, theme presets, and more. Browse the full catalogue at [azrtydxb/kryton-plugins](https://github.com/azrtydxb/kryton-plugins).
 
-Slash Commands, Pomodoro Timer, Reading List, Writing Metrics, Excalidraw, Kanban Board, Mass Upload, Publish/Export, Flashcards, Presentation Mode, Calendar Journal, RSS Reader
+Vim keybindings are no longer maintained as a built-in or shipped plugin.
 
 Plugin APIs are automatically exposed as MCP tools — install a plugin and your AI agent can use it immediately.
 
@@ -204,7 +210,7 @@ Plugin APIs are automatically exposed as MCP tools — install a plugin and your
 | Backend | Fastify 5, Drizzle ORM, TypeScript 5.9 |
 | Database | Postgres 16 with `pgvector` and `tsvector` |
 | Mobile | Expo SDK 55, React Native (online-only against the server API) |
-| Editor | CodeMirror 6 with Vim mode |
+| Editor | In-house markdown editor with plugin-extensible suggestions and commands |
 | Graph | D3.js force-directed |
 | Auth | better-auth (sessions, OAuth, passkeys, 2FA) |
 | AI Integration | MCP SDK (Model Context Protocol) |
@@ -378,8 +384,8 @@ AI agents are first-class database entities with short-lived tokens and optional
 │  ┌─────────┬──────────────┬────────────┐                     │
 │  │ Sidebar │  Preview/    │ Graph +    │                     │
 │  │ (files, │  Editor      │ Outline    │                     │
-│  │  tags,  │  (CodeMirror │ (D3.js)    │                     │
-│  │  trash, │   + Vim)     │            │                     │
+│  │  tags,  │  (in-house   │ (D3.js)    │                     │
+│  │  trash, │   markdown)  │            │                     │
 │  │  favs)  │              │            │                     │
 │  └─────────┴──────────────┴────────────┘                     │
 └──────────────────────┬───────────────────────────────────────┘
@@ -390,7 +396,7 @@ AI agents are first-class database entities with short-lived tokens and optional
 │  ├── Notes, Search, Graph, Tags, Trash, History               │
 │  ├── Sharing & Access Requests                                │
 │  ├── Yjs WebSocket (/ws/yjs/:docId) for live collab           │
-│  ├── MCP Server (AI agent access — 14 tools + plugin tools)   │
+│  ├── MCP Server (AI agent access — 33 tools + plugin tools)   │
 │  ├── Plugin system (server + client)                          │
 │  └── Swagger API Docs                                         │
 ├─────────────────┬────────────────────────────────────────────┤

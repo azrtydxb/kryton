@@ -2,6 +2,33 @@
 
 ## Unreleased
 
+### Added (2026-05-20)
+- **Editor tabs** — open notes now stack into a tab strip with a soft cap of 4 simultaneous tabs; oldest tab is evicted FIFO when a fifth is opened.
+- **Customizable sidebar** — users can move plugin panels between the left and right rails, reorder them up/down, and the layout persists per user.
+- **Inline plugin settings** — per-plugin configuration now renders directly beneath each plugin card in the admin panel.
+- **`registerTopbarAction` plugin slot** — always-visible header action buttons for plugins (mass-upload migrated to this slot).
+- **`api.notes.*`, `api.storage.*`, `api.editor.*` client plugin namespaces** — first-class APIs for note CRUD, per-plugin KV storage, and editor cursor/selection/transactions; documented in [`docs/PLUGINS.md`](docs/PLUGINS.md).
+- **`api.notes.saveCurrent` + `api.ui.closePane`** — host-driven save and pane-close hooks for plugins (used by vim-mode `:w` / `:q`).
+- **`api.editor.setOption('lineNumbers', …)`** — toggle the editor gutter from a plugin; line numbers default to on.
+- **`interactive` code-fence renderer prop** — fence renderers now receive an `interactive: boolean` flag (kanban uses it to switch between editable and read-only modes inside Preview vs Split).
+- **`rawRange` on code-fence renderer props** — fence renderers receive the raw on-disk range, suitable for direct round-trip via `api.notes.replaceFenceAtRange`.
+- **Built-in suggestion popup** — host-rendered suggestion UI consumed by slash-commands; supports `$cursor` placement marker and per-trigger "consume trigger char" semantics.
+- **Reactive `api.context.*` hooks + `setPluginSetting`** — plugin settings can now be read reactively and written from within a plugin.
+- **Real-time presence** — awareness cursors and AI agent pills in the collaborative editor; live tree updates fed by a per-user `/ws/vault` event channel.
+- **7 new plugins** — excalidraw, kanban, publish, flashcards, presentation, calendar-journal, rss-reader (plus slash-commands, pomodoro, reading-list, metrics, mass-upload from earlier in the cycle).
+
+### Changed (2026-05-20)
+- **Plugin sidebar panels** — uniform section headers across the seven sidebar panels; checklist, tag-wrangler, recent-files, and theme-settings cleaned up.
+- **Plugin editor-toolbar buttons** — render inline with built-in toolbar actions.
+- **kanban** — real interactive drag/drop board with fence round-tripping (was a placeholder).
+- **excalidraw** — backed by `@excalidraw/excalidraw` with SVG preview cache (was a stub).
+- **vim-mode** — re-implemented natively against the in-house editor (no CodeMirror/vim dep) — then dropped from the registry entirely (see Removed).
+- **slash-commands** — ported to the host's built-in suggestion UI; drops its DIY popup.
+- **theme-settings** — named presets + explicit dark mode toggle; settings persisted via `setPluginSetting`.
+
+### Removed (2026-05-20)
+- **vim-mode plugin** — removed from the registry. No longer maintained as a built-in or as a shipped plugin.
+
 ### CLI
 - **`@azrtydxb/kryton-init`** — new npm package. One-shot installer that detects every supported AI agent host on the machine (Claude Code, Cursor, Claude Desktop, Codex, OpenCode, Cline, Continue, KiloCode, RooCode) and wires Kryton as an MCP server. Mints an API key via the existing `/api/api-keys` endpoint; idempotent; supports `install` / `uninstall` / `status` / `detect` / `mcp` subcommands and `--dry-run`.
 - **`@azrtydxb/kryton-mcp`** — new npm package. stdio MCP shim that forwards JSON-RPC frames from stdio-only hosts to Kryton's HTTP MCP endpoint (`POST /api/mcp` + `GET /api/mcp` SSE), preserving the `mcp-session-id` round-trip and bearer auth.
