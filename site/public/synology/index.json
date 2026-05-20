@@ -2,15 +2,15 @@
   "packages": [
     {
       "package": "kryton",
-      "version": "1.4.2",
+      "version": "4.6.5-pre.9",
       "dname": "Kryton",
       "desc": "Local-first notes & knowledge base with real-time collaboration.",
       "price": 0,
       "download_count": 0,
       "recent_download_count": 0,
-      "link": "https://github.com/azrtydxb/kryton/releases/download/v1.4.2/kryton_1.4.2_x86_64.spk",
-      "size": 0,
-      "md5": "",
+      "link": "https://github.com/azrtydxb/kryton/releases/download/v4.6.5-pre.9/kryton_4.6.5-pre.9_armv8.spk",
+      "size": 51200,
+      "md5": "e0c76aa3c7861d9f2175f2a72492b801",
       "thumbnail": [
         "https://kryton.ai/assets/nas/icons/kryton-72.png",
         "https://kryton.ai/assets/nas/icons/kryton-120.png"
@@ -29,47 +29,7 @@
       "maintainer_url": "https://kryton.app",
       "distributor": "Kryton",
       "distributor_url": "https://kryton.app",
-      "changelog": "https://github.com/azrtydxb/kryton/releases/tag/v1.4.2",
-      "thirdparty": true,
-      "category": 0,
-      "subcategory": 0,
-      "type": 0,
-      "silent_install": false,
-      "silent_uninstall": false,
-      "silent_upgrade": false,
-      "beta": false,
-      "arch": "x86_64"
-    },
-    {
-      "package": "kryton",
-      "version": "1.4.2",
-      "dname": "Kryton",
-      "desc": "Local-first notes & knowledge base with real-time collaboration.",
-      "price": 0,
-      "download_count": 0,
-      "recent_download_count": 0,
-      "link": "https://github.com/azrtydxb/kryton/releases/download/v1.4.2/kryton_1.4.2_armv8.spk",
-      "size": 0,
-      "md5": "",
-      "thumbnail": [
-        "https://kryton.ai/assets/nas/icons/kryton-72.png",
-        "https://kryton.ai/assets/nas/icons/kryton-120.png"
-      ],
-      "snapshot": [
-        "https://kryton.ai/assets/nas/screenshots/editor.png"
-      ],
-      "qinst": false,
-      "qupgrade": false,
-      "qstart": false,
-      "depsers": "ContainerManager",
-      "deppkgs": "ContainerManager",
-      "conflictpkgs": "",
-      "start": true,
-      "maintainer": "Kryton",
-      "maintainer_url": "https://kryton.app",
-      "distributor": "Kryton",
-      "distributor_url": "https://kryton.app",
-      "changelog": "https://github.com/azrtydxb/kryton/releases/tag/v1.4.2",
+      "changelog": "https://github.com/azrtydxb/kryton/releases/tag/v4.6.5-pre.9",
       "thirdparty": true,
       "category": 0,
       "subcategory": 0,
@@ -79,7 +39,49 @@
       "silent_upgrade": false,
       "beta": false,
       "arch": "armv8"
+    },
+    {
+      "package": "kryton",
+      "version": "4.6.5-pre.9",
+      "dname": "Kryton",
+      "desc": "Local-first notes & knowledge base with real-time collaboration.",
+      "price": 0,
+      "download_count": 0,
+      "recent_download_count": 0,
+      "link": "https://github.com/azrtydxb/kryton/releases/download/v4.6.5-pre.9/kryton_4.6.5-pre.9_x86_64.spk",
+      "size": 51200,
+      "md5": "774e5fbdad69aab8fd4ef79bedf87875",
+      "thumbnail": [
+        "https://kryton.ai/assets/nas/icons/kryton-72.png",
+        "https://kryton.ai/assets/nas/icons/kryton-120.png"
+      ],
+      "snapshot": [
+        "https://kryton.ai/assets/nas/screenshots/editor.png"
+      ],
+      "qinst": false,
+      "qupgrade": false,
+      "qstart": false,
+      "depsers": "ContainerManager",
+      "deppkgs": "ContainerManager",
+      "conflictpkgs": "",
+      "start": true,
+      "maintainer": "Kryton",
+      "maintainer_url": "https://kryton.app",
+      "distributor": "Kryton",
+      "distributor_url": "https://kryton.app",
+      "changelog": "https://github.com/azrtydxb/kryton/releases/tag/v4.6.5-pre.9",
+      "thirdparty": true,
+      "category": 0,
+      "subcategory": 0,
+      "type": 0,
+      "silent_install": false,
+      "silent_uninstall": false,
+      "silent_upgrade": false,
+      "beta": false,
+      "arch": "x86_64"
     }
   ],
-  "keyrings": []
+  "keyrings": [
+    "-----BEGIN PGP PUBLIC KEY BLOCK-----\n\nmQINBGoNn5EBEADWdr7NxvNFscCrDh2wd5NofpC0DjpGbWE3bOsYulVo867Noe9F\nya+Ae4PeQUZhEouu3eespJL0AjCCdFlC4bfReziZzMOEgatXj2SPa0KSZ8Po2t8L\nPwMs9x35LScLwT7hxNJu8SxB06pF5NeTZtFoQ6GPhe8AqNPXrJtD4s85aC5V6X6v\nlIUjuk5fNY9OKFjrgzPf1lAbAfJw2JsaqXkjo5h4OQPGOV9QuWLWragfz8oksJ/d\ngg5aW4at6z7F9ZIfL2eXVLXKMnh1P5Kxqt3uEePsEOM+Eqxv1pXC8esuSUOcgd4+\nuA3oIIoSoEtAAIrjHNY7Ui5pdVi7hF934j8yss0zvo9MgPVCpJqor+x20vHDAhoK\nWr6qm3l5ySdBppryjm5xkQIJDgPVinZUy48ZnZAiaAvRQyuAOQFD+zgQrW6cWmR3\niJ5g+zi5ZV1uPDsquMfZ7Ieq7oj0zrSRmMr/ZUXd20xV62RVu+SFYUwmKfcEByWQ\nZZwpUizFvWL6SDlGx6+ZHAV9DILudhj5lOGE+7IQESEeKBGIgd8J68k5BTaU/b6I\nyiE8esq3uYjTt08AUCG9H4htGiXP49zdZkmZIOBKhHxyl3r5zYA7MGUzo7//lkZT\nVD5WvfK9+3LvODCx/W/0LnJSUatDqYzfZ8li9inIV95CwzDtJfw1wjZWrwARAQAB\ntCZLcnl0b24gUGFja2FnaW5nIDxwYWNrYWdpbmdAa3J5dG9uLmFpPokCbQQTAQgA\nVxYhBPIt6hb0yYLxJRZX1IzoVecLxuWWBQJqDZ+RGxSAAAAAAAQADm1hbnUyLDIu\nNSsxLjEyLDAsMwIbAwULCQgHAgIiAgYVCgkICwIEFgIDAQIeBwIXgAAKCRCM6FXn\nC8bllrZWEADKjxoKrlqrIJ4Us3rtKvVdiT72brFk8LjsFgP0GsghLozhIQiFMJQi\nNyWXfwKfvFl0pwOFVUoNT2Wkcm7EU0XMsZzLmrHH+AhWRwp0fjdtP3Ox0I8ian9U\n7A49vxhwYc9jUOoQXPAXFdpqgxBQGoR+0rK9ZGTfO1+aDvS32CwXVmbrj6+kAM+V\nS0gQ6um31/jex+TQ8jk6pQl1ucmyG2j+a9yXUSnuwgrjtRIVOYKT/eIP7zFqjroA\n9RTomVvprb20oxYHLdPjckFm2z/R1nqAp0ef3O+sx8sH5A8cMrmGeyatug685C2K\nrxapl1U7gDJzcoJjqilLnlD63RZ7rhrBw0ylTMQCdoQk9pvhcA4ctU1IM+8koFZy\nrNr/Twyg+4Aj7A8kmxNCW2saQer5IbwgIepEbA0EUOBltlXd9kGcfq6bbDlZbWUl\nELHUaRYZPxmYQNqdCwH5AMjDwFtPgGHpdbBEl5f968dQW7k7Q86Ps0684Q+fLcny\nqLlocFulIYUKCBbDSFD2YIQ/qfImoeg6ylu9IPTRIzDikA377FkJigik79/DgrQs\n18neU5e9+/L/I3655ZWKYeLDr1SB5TmdCSlxeKJ/T9rZjRfw5fns44RBxTdyOkQ1\nrIXA90thxG/kL7fYYPo0ra1ONmOwqv1TqtidlT9BgEmxmexRNOa77w==\n=K6MA\n-----END PGP PUBLIC KEY BLOCK-----\n"
+  ]
 }
