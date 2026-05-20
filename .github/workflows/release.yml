@@ -1061,9 +1061,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: kryton-qpkg-${{ matrix.platform }}
-          path: |
-            ${{ runner.temp }}/qpkg/*.qpkg
-            ${{ runner.temp }}/qpkg/*.qpkg.codesigning
+          # Single glob (not multi-line) so upload-artifact@v4 places the
+          # files at the artifact root. With a multi-line `path:` and
+          # ${{ runner.temp }} containing a deep absolute prefix on this
+          # self-hosted runner, v4 computed the common ancestor too high
+          # and preserved the full /__w/_temp/qpkg/ path inside the
+          # artifact — the downstream `--clobber` upload then missed them.
+          path: ${{ runner.temp }}/qpkg/*.qpkg*
           if-no-files-found: error
           retention-days: 90
 
