@@ -1,102 +1,96 @@
 ---
 title: Install Kryton on Synology
-description: Add Kryton's package source to DSM Package Center and install in a few clicks — Container Manager auto-installs if missing.
+description: Run Kryton on a Synology NAS using Container Manager + the bundled docker-compose stack.
 ---
 
-import { Aside } from "@astrojs/starlight/components";
+import AnnotatedImage from "../../../../components/AnnotatedImage.astro";
 
-Kryton publishes a signed Synology package and a self-hosted source feed. Once you add the source to Package Center, new releases appear as standard "Update" prompts — no manual `docker compose` commands, no SSH.
-
-This is the recommended path on a Synology NAS. If you'd rather drive Docker yourself, see [Install with Docker](/kryton/start/install/docker/).
+Synology DSM ships **Container Manager** (DSM 7.2+) — that is all you need to run Kryton on a NAS. Same `docker-compose.prod.yml` as a desktop install, just driven from the DSM UI.
 
 ## Prerequisites
 
-- DSM 7.2 or newer
-- Container Manager — Package Center will auto-install it if missing
-- A free TCP port on the NAS (default `3000`)
-- At least one shared folder with write access (Kryton creates `kryton/{notes,data,postgres}` under it)
+- DSM 7.2 or later
+- **Container Manager** installed (Package Center → Container Manager)
+- A few GB free on a volume you can write to
+- SSH or File Station access so you can drop a folder onto the NAS
 
-<Aside type="caution">
-DSM versions earlier than 7.2 ship "Docker" rather than "Container Manager" and are **not** supported in v1.
-</Aside>
+## 1. Pull the repo onto the NAS
 
-## Step 1 — Add the Kryton package source
+Over SSH (recommended), as a user with home directories enabled:
 
-1. Open **Package Center**
-2. Click the cog icon → **Settings** → **Package Sources** tab
-3. Click **Add**
-4. Paste the source URL:
+```bash
+cd /volume1/docker
+git clone https://github.com/azrtydxb/kryton.git
+cd kryton
+cp .env.example .env
+```
 
-   ```text
-   https://azrtydxb.github.io/kryton/synology/index.json
-   ```
+No SSH? Download the repo as a zip from GitHub, unzip on your computer, then drop the folder into a shared folder (e.g. `docker/kryton`) via File Station.
 
-5. Click **OK** and close Settings
+## 2. Set the auth secret
 
-The Kryton SPK is **GPG-signed**, and our public key is shipped inside the feed itself. DSM verifies the signature automatically — you will **not** see an "untrusted publisher" prompt.
+Edit `.env` (File Station → text editor works fine). Set:
 
-## Step 2 — Install Kryton
+```env
+BETTER_AUTH_SECRET=<paste any random 32-char hex here>
+```
 
-1. Switch to the **Community** tab in Package Center
-2. Search for `Kryton`
-3. Click **Install**
+Generate one on your laptop with `openssl rand -hex 32` if you do not already have one.
 
-## Step 3 — Run the install wizard
+## 3. Bring it up in Container Manager
 
-The wizard asks for:
+Container Manager → **Project** → **Create** → **Create docker-compose.yml**.
 
-- **Data volume** — where Kryton stores notes, the database, and uploads (e.g. `/volume1`)
-- **Host port** — defaults to `3000`. Change it if another service already uses 3000.
-- **Admin email** — the address of the first (admin) account
-- **Admin password** — minimum 12 characters
-- **EULA** — read and accept to continue
+- **Project name:** `kryton`
+- **Path:** point at the `kryton/` folder you cloned
+- **Source:** *Use existing docker-compose.yml* → pick `docker-compose.prod.yml`
+- Click **Next**, accept the env (Container Manager reads `.env` automatically), then **Done**.
 
-Click **Done** to start the install.
+Container Manager pulls the images, runs the stack, and shows logs as it boots.
 
-## Step 4 — Container Manager auto-install
+## 4. Open Kryton
 
-If Container Manager is not already installed, Package Center installs it as a dependency before Kryton itself. Pulling Container Manager and then the Kryton container image both happen during this step — the process can take a while on a slower NAS or connection. Leave the dialog open until it reports success.
+Default port is **3000**. Open `http://<nas-ip>:3000` in any browser on your LAN. Register the first user — that account becomes admin.
 
-## Step 5 — Open Kryton
+<AnnotatedImage
+  src="/kryton/screenshots/login-annotated.png"
+  alt="Kryton login screen"
+  markers={[
+    { x: 50, y: 26, label: "Click REGISTER on the first visit. The first account is admin." },
+  ]}
+/>
 
-A **Kryton** tile appears in the DSM main menu. Click it (or open `http://<your-nas-ip>:3000/` from any machine on the LAN) and sign in with the admin email and password you set in Step 3.
+## Reverse proxy + HTTPS (optional but recommended)
+
+DSM has a built-in reverse proxy with Let\u2019s Encrypt:
+
+1. Control Panel → **Login Portal** → **Advanced** → **Reverse Proxy** → **Create**.
+2. Source: `kryton.<yourdomain>` (HTTPS, port 443). Destination: `localhost`, port `3000`.
+3. WebSocket headers: enable Custom header → `WebSocket` (so the Yjs collaboration channel works).
+4. Control Panel → **Security** → **Certificate** → **Add** → Let\u2019s Encrypt for the same hostname → assign it to the reverse-proxy rule.
+
+Don\u2019t want to expose a port at all? Use [Kryton Connect](/kryton/start/connect/) — your NAS dials out to `tunnel.kryton.ai`, no router config required.
 
 ## Updates
 
-Package Center polls our feed roughly every 24 hours. When a new Kryton release is published, an **Update** button appears on the Kryton entry in the Community tab. Click it — DSM downloads the new SPK, verifies the GPG signature, and rolls the container forward. Your data on disk is preserved.
+In Container Manager → Project `kryton` → **Action** → **Build** with the **Pull image** option ticked, then **Start**. The migration runner brings the database forward on boot.
 
-## Uninstall
-
-1. Open **Package Center** → Kryton → **Uninstall**
-2. DSM asks **Keep data?** — the default is **Yes**.
-
-Kryton's persistent state lives at:
-
-```text
-<your chosen volume>/kryton/notes
-<your chosen volume>/kryton/data
-<your chosen volume>/kryton/postgres
-```
-
-If you answered **No** to "Keep data?", DSM removes those directories during uninstall. If you answered **Yes**, you can delete them manually later from File Station.
-
-## Troubleshooting
-
-- **"This package is not supported on your DSM version"** — you are on DSM &lt; 7.2. Upgrade DSM, then retry. v1 does not support older DSMs.
-- **Container Manager fails to install** — almost always a disk-space issue on the system volume. Free space and retry.
-- **"Port 3000 is in use"** — either change the host port in the wizard, or stop the service that already holds 3000 (often a reverse proxy or another container) and reinstall.
-- **Kryton tile is missing from the main menu** — open Package Center, confirm Kryton shows as **Running**. If it shows **Stopped**, click **Run**.
-
-## Verifying the signature
-
-DSM verifies the GPG signature against the public key embedded in our feed (`keyrings` array of `index.json`). If you want to verify the key out of band:
-
-- Fingerprint: `F22D EA16 F4C9 82F1 2516  57D4 8CE8 55E7 0BC6 E596`
-
-The public key is published at `https://azrtydxb.github.io/kryton/synology/index.json` under `keyrings`. You can extract it and compare its fingerprint with the value above using:
+Or over SSH:
 
 ```bash
-gpg --show-keys <(curl -s https://azrtydxb.github.io/kryton/synology/index.json | jq -r '.keyrings[0]')
+cd /volume1/docker/kryton
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
 ```
 
-A mismatch means **do not install** — open an issue on the [Kryton repo](https://github.com/azrtydxb/kryton).
+## Where data lives
+
+- `./notes/` inside the project folder — your markdown notes, one folder per user.
+- A Docker volume managed by the Postgres service — accounts, shares, search index.
+
+Back both up alongside your usual Synology snapshot routine.
+
+## Next steps
+
+- Wire your AI to it → [Connect your AI](/kryton/start/connect-ai/).
+- Or skip the reverse-proxy work entirely → [Kryton Connect](/kryton/start/connect/).

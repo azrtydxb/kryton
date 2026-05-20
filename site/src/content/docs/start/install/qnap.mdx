@@ -1,108 +1,95 @@
 ---
 title: Install Kryton on QNAP
-description: Add Kryton's App Repository to QTS App Center and install in a few clicks — Container Station auto-installs if missing.
+description: Run Kryton on a QNAP NAS using Container Station + the bundled docker-compose stack.
 ---
 
-import { Aside } from "@astrojs/starlight/components";
+import AnnotatedImage from "../../../../components/AnnotatedImage.astro";
 
-Kryton publishes a signed QPKG and a self-hosted App Repository feed. Once you add the repository to App Center, new releases appear as standard update prompts — no manual `docker compose` commands, no SSH.
-
-This is the recommended path on a QNAP NAS. If you'd rather drive Docker yourself, see [Install with Docker](/kryton/start/install/docker/).
+QNAP QTS ships **Container Station** — Docker + Docker Compose with a GUI. The Kryton install is the same `docker-compose.prod.yml` as anywhere else, just driven from the Container Station UI.
 
 ## Prerequisites
 
-- QTS 5.0 or newer
-- Container Station 3.0.0 or newer — App Center will auto-install it if missing
-- A free TCP port on the NAS (default `3000`)
+- QTS 5.x (or QuTS hero h5.x) with **Container Station** installed from App Center
+- A few GB free on a shared folder you can write to
+- SSH or File Station access
 
-<Aside type="caution">
-QTS versions earlier than 5.0 are **not** supported in v1.
-</Aside>
+## 1. Pull the repo onto the NAS
 
-## Step 1 — Add the Kryton App Repository
+Over SSH (recommended), as `admin` or another sudo-enabled user:
 
-1. Open **App Center**
-2. Click the cog icon → **App Repository** tab
-3. Click **Add**
-4. Fill in the form:
+```bash
+cd /share/Container
+git clone https://github.com/azrtydxb/kryton.git
+cd kryton
+cp .env.example .env
+```
 
-   - **Name:** `Kryton`
-   - **URL:**
+No SSH? Grab the repo as a zip from GitHub, unzip on your computer, and drop the folder into a shared folder (e.g. `Container/kryton`) via File Station.
 
-     ```text
-     https://azrtydxb.github.io/kryton/qnap/packages.xml
-     ```
+## 2. Set the auth secret
 
-5. Click **Add** to save
+Edit `.env` (File Station can open it, or use `vi` over SSH). Set:
 
-## Step 2 — Install Kryton
+```env
+BETTER_AUTH_SECRET=<paste any random 32-char hex here>
+```
 
-1. In App Center's left sidebar, click the new **Kryton** repository entry
-2. Search for `Kryton`
-3. Click **Install**
+Generate one on your laptop with `openssl rand -hex 32`.
 
-<Aside type="note">
-The Kryton QPKG is signed with a **self-signed certificate** (we are not a publicly listed QNAP vendor). On first install, App Center surfaces the certificate fingerprint and asks you to confirm. This is expected and one-time.
+## 3. Bring it up in Container Station
 
-Confirm the displayed fingerprint matches the one published in the [Verifying the certificate](#verifying-the-certificate) section below before approving.
-</Aside>
+Container Station → **Applications** → **Create** → **Create Application**.
 
-## Step 3 — Container Station auto-install
+- **Name:** `kryton`
+- Paste the contents of `docker-compose.prod.yml` into the **YAML** field (or load it from disk if your Container Station version supports that).
+- Container Station will resolve `${VAR}` references against the `.env` file in the working directory.
+- Click **Validate YAML**, then **Create**.
 
-If Container Station is not already installed (or is older than 3.0.0), App Center installs/upgrades it as a dependency before Kryton itself. Both downloads run during this step — leave the dialog open until it reports success.
+Container Station pulls the images, starts the stack, and surfaces logs and status under **Containers**.
 
-## Step 4 — Open Kryton
+## 4. Open Kryton
 
-A **Kryton** tile appears on the App Center landing page. Click it (or open `http://<your-nas-ip>:3000/` from any machine on the LAN) and register the first user — the first account automatically becomes the admin.
+Default port is **3000**. Open `http://<nas-ip>:3000` from any browser on your LAN. Register the first user — that account becomes admin.
 
-## Configuration
+<AnnotatedImage
+  src="/kryton/screenshots/login-annotated.png"
+  alt="Kryton login screen"
+  markers={[
+    { x: 50, y: 26, label: "Click REGISTER on the first visit. The first account is admin." },
+  ]}
+/>
 
-QPKG installs do not use a multi-step wizard. The default data volume is auto-detected from the QPKG `package_routines` hooks (typically `/share/<your default volume>/Kryton/`), and the default port is `3000`.
+## Reverse proxy + HTTPS (optional but recommended)
 
-To review or change these later:
+QTS has a built-in reverse proxy:
 
-- **App Center** → **Kryton** → **Settings**
+1. Control Panel → **Application Servers** → **Web Server** → **Reverse Proxy** → **Add Rule**.
+2. Source: `kryton.<yourdomain>` over HTTPS port 443. Destination: `localhost` port 3000.
+3. Tick **WebSocket Support** so the Yjs collaboration channel works.
+4. Control Panel → **Security** → **SSL Certificate** → request a Let\u2019s Encrypt certificate for the same hostname.
 
-You'll find the chosen volume and host-port mapping there.
+Don\u2019t want to mess with port forwarding at all? Use [Kryton Connect](/kryton/start/connect/) — your NAS dials out to `tunnel.kryton.ai` and you get an HTTPS URL without touching the router.
 
 ## Updates
 
-App Center polls our repository on its normal schedule. When a new Kryton release is published, an **Update** button appears on the Kryton entry. Click it — QTS downloads the new QPKG, verifies the signature against the same trusted certificate, and rolls the container forward. Your data on disk is preserved.
+Container Station → Application `kryton` → ⋮ menu → **Recreate** with the **Pull image** option ticked. The migration runner brings the database forward on boot.
 
-## Uninstall
-
-1. Open **App Center** → **Kryton** → **Uninstall**
-
-Per QPKG convention, App Center **does not delete user data** on uninstall. If you want a clean removal, manually remove the data directories afterwards:
-
-```text
-/share/<volume>/Kryton/notes
-/share/<volume>/Kryton/data
-/share/<volume>/Kryton/postgres
-```
-
-## Troubleshooting
-
-- **"This QPKG is not supported on your QTS version"** — you are on QTS &lt; 5.0. Upgrade QTS, then retry. v1 does not support older QTS.
-- **"Container Station is required"** — let App Center install it for you, or install it manually from App Center first.
-- **Certificate fingerprint mismatch** — do **not** approve. Remove the repository (App Center → cog → App Repository → select Kryton → **Remove**), re-add it from this guide, and retry. If the mismatch persists, open an issue on the [Kryton repo](https://github.com/azrtydxb/kryton).
-- **"Port 3000 is in use"** — stop the service that holds 3000, or change the port mapping under **App Center** → **Kryton** → **Settings**.
-- **Kryton tile is missing** — open App Center, confirm Kryton shows as **Started**. If it shows **Stopped**, click **Start**.
-
-## Verifying the certificate
-
-The Kryton QPKG is signed with a self-signed X.509 code-signing certificate (`CN=Kryton Packaging`). App Center surfaces the fingerprint on first install. The expected fingerprint is:
-
-- SHA-256 fingerprint: `7F:42:16:28:42:38:50:D8:72:00:2F:C7:9B:6E:B8:8D:45:8F:8C:88:34:31:4D:D3:27:F3:B0:96:8D:D4:7A:CE`
-
-To verify out of band, download the `.codesigning` companion file from the [GitHub release](https://github.com/azrtydxb/kryton/releases) and inspect the embedded certificate:
+Or over SSH:
 
 ```bash
-# Extract the signer certificate from the CMS signature
-openssl pkcs7 -inform DER -in kryton_<version>_<arch>.qpkg.codesigning -print_certs -out kryton-cert.pem
-
-# Show its SHA-256 fingerprint
-openssl x509 -fingerprint -sha256 -noout -in kryton-cert.pem
+cd /share/Container/kryton
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
 ```
 
-A mismatch means **do not approve** the install — open an issue on the Kryton repo.
+## Where data lives
+
+- `./notes/` inside the project folder — your markdown notes, one folder per user.
+- A Docker volume managed by the Postgres service — accounts, shares, search index.
+
+Include both in your usual Hybrid Backup Sync (HBS) job.
+
+## Next steps
+
+- Wire your AI to it → [Connect your AI](/kryton/start/connect-ai/).
+- Or skip the reverse-proxy work entirely → [Kryton Connect](/kryton/start/connect/).
