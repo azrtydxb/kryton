@@ -1,0 +1,89 @@
+#!/bin/sh
+# Kryton QPKG lifecycle hooks. QTS shell is busybox ash — keep this POSIX.
+# Functions called by QDK/App Center at install / uninstall / upgrade time.
+#
+# Reference: QDK template_package_routines from QDK 2.5.0.
+
+PKG_PRE_REMOVE="{ pkg_pre_uninstall; }"
+PKG_MAIN_REMOVE="{ pkg_uninstall; }"
+
+# ---------------------------------------------------------------------------
+# pkg_init — set variables only, no side effects.
+# Called early by qinstall.sh; QPKG_DIR, QPKG_NAME, SYS_QPKG_INSTALL_PATH
+# are already exported by the time we get here.
+# ---------------------------------------------------------------------------
+pkg_init(){
+    : "${QPKG_DATA_ROOT:=$(/sbin/getcfg SHARE_DEF defVolMP -f /etc/config/def_share.info 2>/dev/null)}"
+    : "${QPKG_DATA_ROOT:=/share/CACHEDEV1_DATA}"
+    QPKG_DATA_DIR="${QPKG_DATA_ROOT}/Kryton"
+    KRYTON_UID=1001
+    KRYTON_GID=1001
+    return 0
+}
+
+# ---------------------------------------------------------------------------
+# pkg_pre_install — refuse install if Container Station is missing.
+# ---------------------------------------------------------------------------
+pkg_pre_install(){
+    if ! /sbin/getcfg ContainerStation Version -f /etc/config/qpkg.conf >/dev/null 2>&1; then
+        # Try the alternate name a few QTS builds use.
+        if ! /sbin/getcfg container-station Version -f /etc/config/qpkg.conf >/dev/null 2>&1; then
+            echo "Kryton requires Container Station. Install Container Station from the App Center first, then retry." >&2
+            return 1
+        fi
+    fi
+    return 0
+}
+
+# ---------------------------------------------------------------------------
+# pkg_post_install — provision data dirs and seed .env.
+# ---------------------------------------------------------------------------
+pkg_post_install(){
+    pkg_init
+
+    mkdir -p "${QPKG_DATA_DIR}/notes" \
+             "${QPKG_DATA_DIR}/data" \
+             "${QPKG_DATA_DIR}/postgres" \
+             "${QPKG_DIR}/logs"
+
+    chown -R "${KRYTON_UID}:${KRYTON_GID}" "${QPKG_DATA_DIR}" 2>/dev/null || true
+    chmod 750 "${QPKG_DATA_DIR}"
+
+    # Render .env from template if not already present (preserves operator edits on upgrade).
+    if [ ! -f "${QPKG_DIR}/.env" ]; then
+        cp "${QPKG_DIR}/.env.template" "${QPKG_DIR}/.env"
+        # Generate random secrets on first install. /dev/urandom is present on QTS.
+        POSTGRES_PASSWORD=$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')
+        BETTER_AUTH_SECRET=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')
+        sed -i "s|__POSTGRES_PASSWORD__|${POSTGRES_PASSWORD}|" "${QPKG_DIR}/.env"
+        sed -i "s|__BETTER_AUTH_SECRET__|${BETTER_AUTH_SECRET}|" "${QPKG_DIR}/.env"
+        sed -i "s|__QPKG_DATA_DIR__|${QPKG_DATA_DIR}|" "${QPKG_DIR}/.env"
+        chmod 600 "${QPKG_DIR}/.env"
+    fi
+
+    return 0
+}
+
+# ---------------------------------------------------------------------------
+# pkg_pre_uninstall — stop service before App Center removes files.
+# ---------------------------------------------------------------------------
+pkg_pre_uninstall(){
+    if [ -x "${QPKG_DIR}/kryton.sh" ]; then
+        "${QPKG_DIR}/kryton.sh" stop || true
+    fi
+    return 0
+}
+
+# ---------------------------------------------------------------------------
+# pkg_post_uninstall — leave data dir intact. Operator can rm -rf manually.
+# QPKG contract has no built-in "keep data?" dialog like Synology SPK.
+# ---------------------------------------------------------------------------
+pkg_post_uninstall(){
+    echo "Kryton has been removed. Persistent data was preserved at ${QPKG_DATA_DIR:-/share/*/Kryton}." >&2
+    echo "Delete that directory manually if you want a clean uninstall." >&2
+    return 0
+}
+
+pkg_uninstall(){
+    pkg_post_uninstall
+}

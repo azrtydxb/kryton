@@ -1,0 +1,7 @@
+#!/bin/sh
+#
+# Synology installer — no-op stub. DSM expects this hook to exist; all real
+# work is done by preinst / postinst / preuninst / postuninst.
+
+set -e
+exit 0

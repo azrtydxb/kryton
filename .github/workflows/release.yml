@@ -741,3 +741,522 @@ jobs:
           generate_release_notes: false
           files: |
             release-assets/kryton-crds.yaml
+
+  # ===========================================================================
+  # Phase 4 — NAS package source wiring.
+  #
+  # Builds signed SPK (Synology) and QPKG (QNAP) packages, attaches them as
+  # release assets, and opens a PR that lands the rendered Synology JSON +
+  # QNAP XML feeds in site/public/. The existing pages.yml deploys those
+  # feeds via its `site/**` path filter once the PR is merged.
+  #
+  # Dependency graph (additions only — no existing job is edited):
+  #
+  #   manifest ──┬── nas-build-spk    (matrix: x86_64, armv8)  ──┐
+  #              ├── nas-build-qpkg   (matrix: X86_64, ARM_64)  ─┤
+  #              │                                                ▼
+  #              │                                       nas-upload-assets
+  #              │                                                │
+  #              │                                                ▼
+  #              ▼                                       nas-publish-feeds
+  #            release ─────────────────────────────────────────┘
+  #
+  # `release` itself is unchanged: it still creates the GitHub Release in one
+  # shot via softprops/action-gh-release. nas-upload-assets runs AFTER the
+  # release is created and uses `gh release upload --clobber` to attach the
+  # SPK/QPKG files. There is a brief window where the release is live without
+  # NAS assets — acceptable because (a) the feed PR has not been merged yet
+  # so DSM/QTS clients are not yet pointing at the new version, and (b)
+  # restructuring the existing `release` job to create-then-publish a draft
+  # is out of scope (the spec forbids editing the release job body beyond a
+  # `needs:` entry).
+  #
+  # Likewise, nas-publish-feeds is NOT added to `release.needs` because that
+  # would require restructuring `release` to publish a draft after feeds land.
+  # The spec's fallback explicitly authorises this ordering when release.yml
+  # creates the release in one shot.
+  #
+  # The pages.yml workflow watches `site/**` (see .github/workflows/pages.yml
+  # paths filter) so once the PR opened by nas-publish-feeds is merged into
+  # master, the existing Pages deploy picks up the new feeds automatically.
+  # We open a PR rather than committing directly so a human reviews the
+  # feed diff before kryton.ai serves it — and so we don't have to edit
+  # pages.yml (forbidden by the phase spec).
+  # ===========================================================================
+
+  nas-build-spk:
+    needs: [manifest]
+    runs-on: arc-azrtydxb
+    container:
+      image: node:24
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x86_64, armv8]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: ver
+        shell: bash
+        env:
+          REF: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          V="${REF#v}"
+          echo "version=${V}" >> "$GITHUB_OUTPUT"
+
+      - name: Install build tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -qq -y --no-install-recommends \
+            bash tar gzip file gnupg2 coreutils ca-certificates jq
+          which gpg tar file sha256sum md5sum jq
+
+      - name: Detect signing secret availability
+        id: secrets
+        shell: bash
+        env:
+          SIGNING_KEY: ${{ secrets.SYNOLOGY_SIGNING_KEY }}
+        run: |
+          if [ -n "${SIGNING_KEY:-}" ]; then
+            echo "have_key=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "have_key=false" >> "$GITHUB_OUTPUT"
+            echo "::error::SYNOLOGY_SIGNING_KEY is not set — release-grade SPKs must be signed."
+            exit 1
+          fi
+
+      - name: Import GPG signing key
+        id: gpg
+        if: steps.secrets.outputs.have_key == 'true'
+        shell: bash
+        env:
+          SIGNING_KEY: ${{ secrets.SYNOLOGY_SIGNING_KEY }}
+          SIGNING_PASSPHRASE: ${{ secrets.SYNOLOGY_SIGNING_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          GNUPGHOME="$(mktemp -d -t kryton-gpg.XXXXXX)"
+          chmod 700 "$GNUPGHOME"
+          export GNUPGHOME
+          printf '%s' "$SIGNING_KEY" | gpg --batch --import
+          cat > "$GNUPGHOME/gpg-agent.conf" <<'EOF'
+          allow-loopback-pinentry
+          EOF
+          cat > "$GNUPGHOME/gpg.conf" <<'EOF'
+          pinentry-mode loopback
+          EOF
+          KEY_ID="$(gpg --list-secret-keys --with-colons | awk -F: '/^sec:/{print $5; exit}')"
+          echo "key_id=$KEY_ID" >> "$GITHUB_OUTPUT"
+          echo "gnupghome=$GNUPGHOME" >> "$GITHUB_OUTPUT"
+          gpgconf --launch gpg-agent
+          # Prime the gpg-agent with the passphrase via a throwaway sign.
+          echo "prime" | gpg --batch --yes --pinentry-mode loopback \
+            --passphrase "$SIGNING_PASSPHRASE" \
+            --local-user "$KEY_ID" --armor --detach-sign --output /dev/null
+
+      - name: Export public key for feed keyring (x86_64 only)
+        # The keyring is identical across arches — export once from the
+        # x86_64 job and upload as a single artifact consumed by
+        # nas-publish-feeds.
+        if: matrix.arch == 'x86_64'
+        shell: bash
+        env:
+          GNUPGHOME: ${{ steps.gpg.outputs.gnupghome }}
+          KEY_ID: ${{ steps.gpg.outputs.key_id }}
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/synology-pubkey"
+          gpg --armor --export "$KEY_ID" > "${RUNNER_TEMP}/synology-pubkey/kryton.gpg"
+          test -s "${RUNNER_TEMP}/synology-pubkey/kryton.gpg"
+
+      - name: Upload Synology public key artifact
+        if: matrix.arch == 'x86_64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: synology-pubkey
+          path: ${{ runner.temp }}/synology-pubkey/kryton.gpg
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Build SPK
+        id: build
+        shell: bash
+        env:
+          KRYTON_VERSION: ${{ steps.ver.outputs.version }}
+          KRYTON_ARCH: ${{ matrix.arch }}
+          KRYTON_IMAGE: ghcr.io/${{ github.repository }}/kryton:${{ steps.ver.outputs.version }}
+          OUT_DIR: ${{ runner.temp }}/spk
+          GPG_KEY_ID: ${{ steps.gpg.outputs.key_id }}
+          GPG_KEYRING_DIR: ${{ steps.gpg.outputs.gnupghome }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$OUT_DIR"
+          # build.sh prints size/sha256/md5 lines — capture them into the
+          # step output as a JSON-safe block.
+          LOG="$(bash packaging/synology/build.sh 2>&1 | tee /dev/stderr)"
+          SIZE=$(printf '%s\n' "$LOG" | awk '/^size:/{print $2; exit}')
+          MD5=$(printf '%s\n'  "$LOG" | awk '/^md5:/{print $2; exit}')
+          # Canonical filename produced by build.sh.
+          FILE="kryton_${KRYTON_VERSION}-0001_${KRYTON_ARCH}.spk"
+          test -s "$OUT_DIR/$FILE" || { echo "::error::expected $FILE not produced"; exit 1; }
+          echo "filename=$FILE" >> "$GITHUB_OUTPUT"
+          echo "size=$SIZE" >> "$GITHUB_OUTPUT"
+          echo "md5=$MD5" >> "$GITHUB_OUTPUT"
+
+      - name: Emit SPK metadata JSON
+        shell: bash
+        env:
+          ARCH: ${{ matrix.arch }}
+          FILENAME: ${{ steps.build.outputs.filename }}
+          SIZE: ${{ steps.build.outputs.size }}
+          MD5: ${{ steps.build.outputs.md5 }}
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/spk-meta"
+          jq -n \
+            --arg arch "$ARCH" \
+            --arg filename "$FILENAME" \
+            --argjson size "$SIZE" \
+            --arg md5 "$MD5" \
+            '{arch:$arch, filename:$filename, size:$size, md5:$md5}' \
+            > "${RUNNER_TEMP}/spk-meta/spk-meta-${ARCH}.json"
+          cat "${RUNNER_TEMP}/spk-meta/spk-meta-${ARCH}.json"
+
+      - name: Upload SPK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kryton-spk-${{ matrix.arch }}
+          path: ${{ runner.temp }}/spk/*.spk
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Upload SPK metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: spk-meta-${{ matrix.arch }}
+          path: ${{ runner.temp }}/spk-meta/spk-meta-${{ matrix.arch }}.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Scrub GPG home
+        if: always()
+        shell: bash
+        run: |
+          if [ -n "${{ steps.gpg.outputs.gnupghome }}" ]; then
+            rm -rf "${{ steps.gpg.outputs.gnupghome }}" || true
+          fi
+
+  nas-build-qpkg:
+    needs: [manifest]
+    runs-on: arc-azrtydxb
+    container:
+      image: node:24
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [X86_64, ARM_64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: ver
+        shell: bash
+        env:
+          REF: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          V="${REF#v}"
+          echo "version=${V}" >> "$GITHUB_OUTPUT"
+          # build.sh names the file kryton_<ver>_<lower>.qpkg.
+          case "${{ matrix.platform }}" in
+            X86_64) echo "arch_lower=x86_64" >> "$GITHUB_OUTPUT" ;;
+            ARM_64) echo "arch_lower=arm_64" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: Install build prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -qq -y --no-install-recommends \
+            bash tar gzip file openssl curl ca-certificates binutils imagemagick jq
+
+      - name: Stage code-signing material
+        id: sign
+        shell: bash
+        env:
+          QNAP_CODESIGN_CERT: ${{ secrets.QNAP_CODESIGN_CERT }}
+          QNAP_CODESIGN_KEY:  ${{ secrets.QNAP_CODESIGN_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${QNAP_CODESIGN_CERT:-}" ] || [ -z "${QNAP_CODESIGN_KEY:-}" ]; then
+            echo "::error::QNAP_CODESIGN_CERT / QNAP_CODESIGN_KEY are required for release-grade QPKGs"
+            exit 1
+          fi
+          install -d -m 700 "${RUNNER_TEMP}/qnap-keys"
+          printf '%s\n' "${QNAP_CODESIGN_CERT}" > "${RUNNER_TEMP}/qnap-keys/codesign.crt"
+          printf '%s\n' "${QNAP_CODESIGN_KEY}"  > "${RUNNER_TEMP}/qnap-keys/codesign.key"
+          chmod 600 "${RUNNER_TEMP}/qnap-keys/codesign.key"
+          echo "cert=${RUNNER_TEMP}/qnap-keys/codesign.crt" >> "${GITHUB_OUTPUT}"
+          echo "key=${RUNNER_TEMP}/qnap-keys/codesign.key"  >> "${GITHUB_OUTPUT}"
+
+      - name: Build QPKG
+        id: build
+        shell: bash
+        env:
+          KRYTON_VERSION: ${{ steps.ver.outputs.version }}
+          KRYTON_PLATFORM: ${{ matrix.platform }}
+          KRYTON_IMAGE: ghcr.io/${{ github.repository }}/kryton:${{ steps.ver.outputs.version }}
+          OUT_DIR: ${{ runner.temp }}/qpkg
+          QPKG_SIGNING_CERT: ${{ steps.sign.outputs.cert }}
+          QPKG_SIGNING_KEY:  ${{ steps.sign.outputs.key }}
+          ARCH_LOWER: ${{ steps.ver.outputs.arch_lower }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$OUT_DIR"
+          LOG="$(bash packaging/qnap/build.sh 2>&1 | tee /dev/stderr)"
+          SIZE=$(printf '%s\n' "$LOG" | awk -F': *' '/^size *:/{print $2; exit}' | awk '{print $1}')
+          MD5=$(printf '%s\n'  "$LOG" | awk -F': *' '/^md5 *:/{print $2; exit}' | awk '{print $1}')
+          FILE="kryton_${KRYTON_VERSION}_${ARCH_LOWER}.qpkg"
+          test -s "$OUT_DIR/$FILE" || { echo "::error::expected $FILE not produced"; exit 1; }
+          if [ -s "$OUT_DIR/${FILE}.codesigning" ]; then
+            HAS_SIG="true"
+          else
+            HAS_SIG="false"
+          fi
+          echo "filename=$FILE" >> "$GITHUB_OUTPUT"
+          echo "size=$SIZE" >> "$GITHUB_OUTPUT"
+          echo "md5=$MD5" >> "$GITHUB_OUTPUT"
+          echo "has_signature=$HAS_SIG" >> "$GITHUB_OUTPUT"
+
+      - name: Emit QPKG metadata JSON
+        shell: bash
+        env:
+          PLATFORM: ${{ matrix.platform }}
+          FILENAME: ${{ steps.build.outputs.filename }}
+          SIZE: ${{ steps.build.outputs.size }}
+          MD5: ${{ steps.build.outputs.md5 }}
+          HAS_SIG: ${{ steps.build.outputs.has_signature }}
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/qpkg-meta"
+          jq -n \
+            --arg platform "$PLATFORM" \
+            --arg filename "$FILENAME" \
+            --argjson size "$SIZE" \
+            --arg md5 "$MD5" \
+            --argjson has_signature "$HAS_SIG" \
+            '{platform:$platform, filename:$filename, size:$size, md5:$md5, has_signature:$has_signature}' \
+            > "${RUNNER_TEMP}/qpkg-meta/qpkg-meta-${PLATFORM}.json"
+          cat "${RUNNER_TEMP}/qpkg-meta/qpkg-meta-${PLATFORM}.json"
+
+      - name: Upload QPKG artifact (qpkg + .codesigning)
+        uses: actions/upload-artifact@v4
+        with:
+          name: kryton-qpkg-${{ matrix.platform }}
+          path: |
+            ${{ runner.temp }}/qpkg/*.qpkg
+            ${{ runner.temp }}/qpkg/*.qpkg.codesigning
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Upload QPKG metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: qpkg-meta-${{ matrix.platform }}
+          path: ${{ runner.temp }}/qpkg-meta/qpkg-meta-${{ matrix.platform }}.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Scrub signing key from disk
+        if: always()
+        shell: bash
+        run: |
+          if [ -d "${RUNNER_TEMP}/qnap-keys" ]; then
+            find "${RUNNER_TEMP}/qnap-keys" -type f -exec shred -u {} + 2>/dev/null || true
+            rm -rf "${RUNNER_TEMP}/qnap-keys"
+          fi
+
+  nas-upload-assets:
+    # Attach SPK/QPKG files to the GitHub Release that `release` just
+    # created. Uses `--clobber` so re-runs (workflow_dispatch with the
+    # same tag) replace existing assets cleanly. Depends on `release`
+    # because the release must exist before `gh release upload` can
+    # target it.
+    needs: [release, nas-build-spk, nas-build-qpkg]
+    runs-on: arc-azrtydxb
+    container:
+      image: node:24
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: ver
+        shell: bash
+        env:
+          REF: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          echo "version=${REF#v}" >> "$GITHUB_OUTPUT"
+          echo "tag=${REF}" >> "$GITHUB_OUTPUT"
+
+      - name: Install gh CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -qq -y --no-install-recommends \
+            curl ca-certificates gnupg
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+            | gpg --dearmor -o /usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+            > /etc/apt/sources.list.d/github-cli.list
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -qq -y --no-install-recommends gh
+
+      - name: Download SPK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: kryton-spk-*
+          path: ${{ runner.temp }}/dist
+          merge-multiple: true
+
+      - name: Download QPKG artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: kryton-qpkg-*
+          path: ${{ runner.temp }}/dist
+          merge-multiple: true
+
+      - name: List downloaded assets
+        shell: bash
+        run: ls -la "${RUNNER_TEMP}/dist"
+
+      - name: Upload assets to GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.ver.outputs.tag }}
+        run: |
+          set -euo pipefail
+          cd "${RUNNER_TEMP}/dist"
+          # Glob expands to all SPK, QPKG, and .codesigning siblings.
+          shopt -s nullglob
+          ASSETS=( *.spk *.qpkg *.qpkg.codesigning )
+          if [ "${#ASSETS[@]}" -eq 0 ]; then
+            echo "::error::no NAS assets found to upload"
+            exit 1
+          fi
+          gh release upload "$TAG" "${ASSETS[@]}" --clobber --repo "${{ github.repository }}"
+
+  nas-publish-feeds:
+    # Render Synology + QNAP feeds with real artifact metadata and open a
+    # PR that lands them in site/public/. Merging the PR triggers pages.yml
+    # via its existing `site/**` path filter. We do not commit directly to
+    # master so a human reviews the diff (and so we don't have to touch
+    # pages.yml).
+    needs: [nas-upload-assets]
+    runs-on: arc-azrtydxb
+    container:
+      image: node:24
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: ver
+        shell: bash
+        env:
+          REF: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          echo "version=${REF#v}" >> "$GITHUB_OUTPUT"
+          echo "pub_date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
+      - name: Download all NAS metadata artifacts
+        uses: actions/download-artifact@v4
+        with:
+          # Captures spk-meta-*, qpkg-meta-*, and synology-pubkey artifacts.
+          # download-artifact lays them out as one subdirectory per artifact
+          # name under the given path — exactly what collect-metadata.mjs
+          # expects.
+          pattern: '{spk-meta-*,qpkg-meta-*,synology-pubkey}'
+          path: ${{ runner.temp }}/meta
+
+      - name: Inspect downloaded metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          ls -la "${RUNNER_TEMP}/meta" || true
+          find "${RUNNER_TEMP}/meta" -type f | head -50
+
+      - name: Build renderer config
+        shell: bash
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          PUB_DATE: ${{ steps.ver.outputs.pub_date }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          node packaging/feeds/collect-metadata.mjs \
+            --version "$VERSION" \
+            --repo "$REPO" \
+            --pub-date "$PUB_DATE" \
+            --meta-dir "${RUNNER_TEMP}/meta" \
+            --out "${RUNNER_TEMP}/feed-config.json"
+          cat "${RUNNER_TEMP}/feed-config.json"
+
+      - name: Render feeds (strict)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node packaging/feeds/render.mjs \
+            --strict \
+            --config "${RUNNER_TEMP}/feed-config.json"
+
+      - name: Renderer self-test
+        shell: bash
+        run: node --test packaging/feeds/render.test.mjs
+
+      - name: Open PR with rendered feeds
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: nas-feeds/v${{ steps.ver.outputs.version }}
+          base: master
+          commit-message: |
+            feat(nas): publish NAS feeds for v${{ steps.ver.outputs.version }}
+
+            Auto-generated by release.yml → nas-publish-feeds using real
+            artifact sizes/md5/signatures from the SPK and QPKG builds.
+          title: 'feat(nas): publish NAS feeds for v${{ steps.ver.outputs.version }}'
+          body: |
+            Phase 4 of `docs/design/nas-package-stores.md`.
+
+            Renders `site/public/synology/index.json` and
+            `site/public/qnap/packages.xml` for version
+            `${{ steps.ver.outputs.version }}` using real artifact metadata
+            collected from the `nas-build-spk` and `nas-build-qpkg` jobs.
+
+            Merging this PR triggers `pages.yml` via its existing
+            `site/**` path filter, which redeploys kryton.ai with the new
+            feeds visible at:
+
+            - https://kryton.ai/synology/index.json
+            - https://kryton.ai/qnap/packages.xml
+          delete-branch: true
+          author: 'github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>'
+          committer: 'github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>'

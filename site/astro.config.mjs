@@ -18,6 +18,8 @@ export default defineConfig({
           items: [
             { label: "Overview", slug: "start" },
             { label: "Install with Docker", slug: "start/install/docker" },
+            { label: "Install on Synology", slug: "start/install/synology" },
+            { label: "Install on QNAP", slug: "start/install/qnap" },
             { label: "Connect your AI", slug: "start/connect-ai" },
             { label: "Your first notes", slug: "start/first-notes" },
             { label: "Kryton Connect (public URL)", slug: "start/connect" },

@@ -1,0 +1,24 @@
+{
+  "port-config": {
+    "protocol-file": "app.json"
+  },
+  "data-share": {
+    "shares": [
+      {
+        "name": "kryton",
+        "permission": {
+          "rw": ["kryton"],
+          "ro": []
+        }
+      }
+    ]
+  },
+  "port-reservation": [
+    {
+      "service-name": "kryton-web",
+      "default-port": 3000,
+      "protocol": "tcp",
+      "user-configurable": true
+    }
+  ]
+}

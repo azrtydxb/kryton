@@ -1,0 +1,102 @@
+---
+title: Install Kryton on Synology
+description: Add Kryton's package source to DSM Package Center and install in a few clicks — Container Manager auto-installs if missing.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+Kryton publishes a signed Synology package and a self-hosted source feed. Once you add the source to Package Center, new releases appear as standard "Update" prompts — no manual `docker compose` commands, no SSH.
+
+This is the recommended path on a Synology NAS. If you'd rather drive Docker yourself, see [Install with Docker](/kryton/start/install/docker/).
+
+## Prerequisites
+
+- DSM 7.2 or newer
+- Container Manager — Package Center will auto-install it if missing
+- A free TCP port on the NAS (default `3000`)
+- At least one shared folder with write access (Kryton creates `kryton/{notes,data,postgres}` under it)
+
+<Aside type="caution">
+DSM versions earlier than 7.2 ship "Docker" rather than "Container Manager" and are **not** supported in v1.
+</Aside>
+
+## Step 1 — Add the Kryton package source
+
+1. Open **Package Center**
+2. Click the cog icon → **Settings** → **Package Sources** tab
+3. Click **Add**
+4. Paste the source URL:
+
+   ```text
+   https://kryton.ai/synology/index.json
+   ```
+
+5. Click **OK** and close Settings
+
+The Kryton SPK is **GPG-signed**, and our public key is shipped inside the feed itself. DSM verifies the signature automatically — you will **not** see an "untrusted publisher" prompt.
+
+## Step 2 — Install Kryton
+
+1. Switch to the **Community** tab in Package Center
+2. Search for `Kryton`
+3. Click **Install**
+
+## Step 3 — Run the install wizard
+
+The wizard asks for:
+
+- **Data volume** — where Kryton stores notes, the database, and uploads (e.g. `/volume1`)
+- **Host port** — defaults to `3000`. Change it if another service already uses 3000.
+- **Admin email** — the address of the first (admin) account
+- **Admin password** — minimum 12 characters
+- **EULA** — read and accept to continue
+
+Click **Done** to start the install.
+
+## Step 4 — Container Manager auto-install
+
+If Container Manager is not already installed, Package Center installs it as a dependency before Kryton itself. Pulling Container Manager and then the Kryton container image both happen during this step — the process can take a while on a slower NAS or connection. Leave the dialog open until it reports success.
+
+## Step 5 — Open Kryton
+
+A **Kryton** tile appears in the DSM main menu. Click it (or open `http://<your-nas-ip>:3000/` from any machine on the LAN) and sign in with the admin email and password you set in Step 3.
+
+## Updates
+
+Package Center polls our feed roughly every 24 hours. When a new Kryton release is published, an **Update** button appears on the Kryton entry in the Community tab. Click it — DSM downloads the new SPK, verifies the GPG signature, and rolls the container forward. Your data on disk is preserved.
+
+## Uninstall
+
+1. Open **Package Center** → Kryton → **Uninstall**
+2. DSM asks **Keep data?** — the default is **Yes**.
+
+Kryton's persistent state lives at:
+
+```text
+<your chosen volume>/kryton/notes
+<your chosen volume>/kryton/data
+<your chosen volume>/kryton/postgres
+```
+
+If you answered **No** to "Keep data?", DSM removes those directories during uninstall. If you answered **Yes**, you can delete them manually later from File Station.
+
+## Troubleshooting
+
+- **"This package is not supported on your DSM version"** — you are on DSM &lt; 7.2. Upgrade DSM, then retry. v1 does not support older DSMs.
+- **Container Manager fails to install** — almost always a disk-space issue on the system volume. Free space and retry.
+- **"Port 3000 is in use"** — either change the host port in the wizard, or stop the service that already holds 3000 (often a reverse proxy or another container) and reinstall.
+- **Kryton tile is missing from the main menu** — open Package Center, confirm Kryton shows as **Running**. If it shows **Stopped**, click **Run**.
+
+## Verifying the signature
+
+DSM verifies the GPG signature against the public key embedded in our feed (`keyrings` array of `index.json`). If you want to verify the key out of band:
+
+- Fingerprint: `<TO BE FILLED ON FIRST RELEASE>`
+
+The public key is published at `https://kryton.ai/synology/index.json` under `keyrings`. You can extract it and compare its fingerprint with the value above using:
+
+```bash
+gpg --show-keys <(curl -s https://kryton.ai/synology/index.json | jq -r '.keyrings[0]')
+```
+
+A mismatch means **do not install** — open an issue on the [Kryton repo](https://github.com/azrtydxb/kryton).

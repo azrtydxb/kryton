@@ -1,0 +1,20 @@
+#!/bin/sh
+#
+# Synology preuninst — stop the compose stack cleanly before files vanish.
+
+set -e
+
+PKG_DIR="${SYNOPKG_PKGDEST:-/var/packages/kryton/target}"
+DOCKER_BIN="/usr/local/bin/docker"
+
+if [ ! -x "$DOCKER_BIN" ] && command -v docker >/dev/null 2>&1; then
+  DOCKER_BIN="$(command -v docker)"
+fi
+
+if [ -d "$PKG_DIR" ] && [ -x "$DOCKER_BIN" ]; then
+  cd "$PKG_DIR"
+  # Best-effort — never fail uninstall just because the stack is already down.
+  "$DOCKER_BIN" compose down >/dev/null 2>&1 || true
+fi
+
+exit 0

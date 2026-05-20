@@ -1,0 +1,10 @@
+{
+  "defaults": {
+    "run-as": "package"
+  },
+  "username": "kryton",
+  "groupname": "kryton",
+  "join-groups": [
+    "docker"
+  ]
+}

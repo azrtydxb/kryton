@@ -1,0 +1,104 @@
+---
+title: Install Kryton on QNAP
+description: Add Kryton's App Repository to QTS App Center and install in a few clicks — Container Station auto-installs if missing.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+Kryton publishes a signed QPKG and a self-hosted App Repository feed. Once you add the repository to App Center, new releases appear as standard update prompts — no manual `docker compose` commands, no SSH.
+
+This is the recommended path on a QNAP NAS. If you'd rather drive Docker yourself, see [Install with Docker](/kryton/start/install/docker/).
+
+## Prerequisites
+
+- QTS 5.0 or newer
+- Container Station 3.0.0 or newer — App Center will auto-install it if missing
+- A free TCP port on the NAS (default `3000`)
+
+<Aside type="caution">
+QTS versions earlier than 5.0 are **not** supported in v1.
+</Aside>
+
+## Step 1 — Add the Kryton App Repository
+
+1. Open **App Center**
+2. Click the cog icon → **App Repository** tab
+3. Click **Add**
+4. Fill in the form:
+
+   - **Name:** `Kryton`
+   - **URL:**
+
+     ```text
+     https://kryton.ai/qnap/packages.xml
+     ```
+
+5. Click **Add** to save
+
+## Step 2 — Install Kryton
+
+1. In App Center's left sidebar, click the new **Kryton** repository entry
+2. Search for `Kryton`
+3. Click **Install**
+
+<Aside type="note">
+The Kryton QPKG is signed with a **self-signed certificate** (we are not a publicly listed QNAP vendor). On first install, App Center surfaces the certificate fingerprint and asks you to confirm. This is expected and one-time.
+
+Confirm the displayed fingerprint matches the one published in the [Verifying the certificate](#verifying-the-certificate) section below before approving.
+</Aside>
+
+## Step 3 — Container Station auto-install
+
+If Container Station is not already installed (or is older than 3.0.0), App Center installs/upgrades it as a dependency before Kryton itself. Both downloads run during this step — leave the dialog open until it reports success.
+
+## Step 4 — Open Kryton
+
+A **Kryton** tile appears on the App Center landing page. Click it (or open `http://<your-nas-ip>:3000/` from any machine on the LAN) and register the first user — the first account automatically becomes the admin.
+
+## Configuration
+
+QPKG installs do not use a multi-step wizard. The default data volume is auto-detected from the QPKG `package_routines` hooks (typically `/share/<your default volume>/Kryton/`), and the default port is `3000`.
+
+To review or change these later:
+
+- **App Center** → **Kryton** → **Settings**
+
+You'll find the chosen volume and host-port mapping there.
+
+## Updates
+
+App Center polls our repository on its normal schedule. When a new Kryton release is published, an **Update** button appears on the Kryton entry. Click it — QTS downloads the new QPKG, verifies the signature against the same trusted certificate, and rolls the container forward. Your data on disk is preserved.
+
+## Uninstall
+
+1. Open **App Center** → **Kryton** → **Uninstall**
+
+Per QPKG convention, App Center **does not delete user data** on uninstall. If you want a clean removal, manually remove the data directories afterwards:
+
+```text
+/share/<volume>/Kryton/notes
+/share/<volume>/Kryton/data
+/share/<volume>/Kryton/postgres
+```
+
+## Troubleshooting
+
+- **"This QPKG is not supported on your QTS version"** — you are on QTS &lt; 5.0. Upgrade QTS, then retry. v1 does not support older QTS.
+- **"Container Station is required"** — let App Center install it for you, or install it manually from App Center first.
+- **Certificate fingerprint mismatch** — do **not** approve. Remove the repository (App Center → cog → App Repository → select Kryton → **Remove**), re-add it from this guide, and retry. If the mismatch persists, open an issue on the [Kryton repo](https://github.com/azrtydxb/kryton).
+- **"Port 3000 is in use"** — stop the service that holds 3000, or change the port mapping under **App Center** → **Kryton** → **Settings**.
+- **Kryton tile is missing** — open App Center, confirm Kryton shows as **Started**. If it shows **Stopped**, click **Start**.
+
+## Verifying the certificate
+
+The Kryton QPKG is signed with a self-signed X.509 code-signing certificate (`CN=Kryton Packaging`). App Center surfaces the fingerprint on first install. The expected fingerprint is:
+
+- SHA-256 fingerprint: `<TO BE FILLED ON FIRST RELEASE>`
+
+To verify out of band, download the `.codesigning` companion file from the [GitHub release](https://github.com/azrtydxb/kryton/releases) and inspect it:
+
+```bash
+openssl x509 -fingerprint -sha256 -noout -in kryton_<version>_<arch>.qpkg.codesigning
+```
+
+A mismatch means **do not approve** the install — open an issue on the Kryton repo.

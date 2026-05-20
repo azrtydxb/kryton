@@ -1,0 +1,51 @@
+# Kryton on QNAP — managed by App Center via packaging/qnap/source-template/shared/kryton.sh.
+# Mirrors docker-compose.prod.yml with QNAP-specific bind mounts.
+# Do not edit on the NAS; reinstall the QPKG instead.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      - POSTGRES_USER=kryton
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      - POSTGRES_DB=kryton
+    volumes:
+      - ${QPKG_DATA_DIR:?Set QPKG_DATA_DIR}/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "kryton", "-d", "kryton"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - kryton
+
+  kryton:
+    image: ${KRYTON_IMAGE}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${QPKG_HOST_PORT:-3000}:3000"
+    volumes:
+      - ${QPKG_DATA_DIR}/notes:/notes
+      - ${QPKG_DATA_DIR}/data:/data
+    environment:
+      - POSTGRES_URL=postgres://kryton:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/kryton
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET}
+      - APP_URL=${APP_URL:-http://localhost:3000}
+      - BETTER_AUTH_URL=${BETTER_AUTH_URL:-http://localhost:3000}
+      - NOTES_DIR=/notes
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - kryton
+
+networks:
+  kryton:
+    driver: bridge

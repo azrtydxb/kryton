@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plugins>
+  <cachechk>1779235200</cachechk>
+  <item>
+    <name>Kryton</name>
+    <internalName>kryton</internalName>
+    <category>Productivity</category>
+    <type>QPKG</type>
+    <changeLog>https://github.com/azrtydxb/kryton/releases/tag/v1.4.2</changeLog>
+    <version>1.4.2</version>
+    <description>Local-first notes &amp; knowledge base with real-time collaboration.</description>
+    <maintainer>Kryton</maintainer>
+    <developer>Kryton</developer>
+    <forumLink>https://github.com/azrtydxb/kryton/discussions</forumLink>
+    <publishedDate>2026-05-20</publishedDate>
+    <icon80>https://kryton.ai/assets/nas/icons/kryton-80.png</icon80>
+    <icon100>https://kryton.ai/assets/nas/icons/kryton-100.png</icon100>
+    <language>English</language>
+    <fwVersion>5.0.0</fwVersion>
+    <tutorialLink>https://kryton.ai/docs/install/qnap</tutorialLink>
+    <bannerImg>https://kryton.ai/assets/nas/screenshots/banner.png</bannerImg>
+    <snapshot>https://kryton.ai/assets/nas/screenshots/editor.png</snapshot>
+    <platform>
+      <platformID>X86_64</platformID>
+      <location>https://github.com/azrtydxb/kryton/releases/download/v1.4.2/kryton_1.4.2_x86_64.qpkg</location>
+    </platform>
+    <platform>
+      <platformID>ARM_64</platformID>
+      <location>https://github.com/azrtydxb/kryton/releases/download/v1.4.2/kryton_1.4.2_arm_64.qpkg</location>
+    </platform>
+  </item>
+</plugins>

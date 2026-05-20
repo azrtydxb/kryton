@@ -1,0 +1,24 @@
+#!/bin/sh
+#
+# Synology postuninst — optionally remove the persistent data directory.
+# wizard_remove_data is set by the uninstall wizard (upgrade_uifile / DSM
+# uninstall dialog). Default: keep data.
+
+set -e
+
+if [ "${wizard_remove_data:-false}" = "true" ] && [ -n "${wizard_data_path:-}" ]; then
+  # Defensive guard: never rm -rf a path that looks suspicious.
+  case "$wizard_data_path" in
+    /|/bin*|/etc*|/usr*|/var*|/volume[0-9]|/root*|/home*)
+      echo "WARN: refusing to remove suspicious data path: $wizard_data_path" >&2
+      ;;
+    /volume*/*)
+      rm -rf -- "$wizard_data_path" || true
+      ;;
+    *)
+      echo "WARN: data path not on a /volume*; leaving in place: $wizard_data_path" >&2
+      ;;
+  esac
+fi
+
+exit 0

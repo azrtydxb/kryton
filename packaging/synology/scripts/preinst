@@ -1,0 +1,86 @@
+#!/bin/sh
+#
+# Synology preinst — validate prerequisites and user wizard inputs.
+# Wizard answers arrive as `wizard_*` env vars (DSM contract).
+#
+# Exit non-zero to abort installation; DSM surfaces stderr to the user.
+
+set -e
+
+# 1. Container Manager must be installed and its docker socket reachable.
+DOCKER_BIN="/usr/local/bin/docker"
+DOCKER_SOCK="/var/run/docker.sock"
+
+if [ ! -x "$DOCKER_BIN" ] && ! command -v docker >/dev/null 2>&1; then
+  echo "ERROR: Container Manager is required. Install it from Package Center first." >&2
+  exit 1
+fi
+
+if [ ! -S "$DOCKER_SOCK" ]; then
+  echo "ERROR: docker socket not found at $DOCKER_SOCK. Is Container Manager running?" >&2
+  exit 1
+fi
+
+# 2. Validate wizard inputs.
+: "${wizard_data_path:?ERROR: wizard_data_path not set}"
+: "${wizard_host_port:?ERROR: wizard_host_port not set}"
+: "${wizard_admin_email:?ERROR: wizard_admin_email not set}"
+: "${wizard_admin_password:?ERROR: wizard_admin_password not set}"
+
+# Port: integer in [1024, 65535] and not already in use.
+case "$wizard_host_port" in
+  ''|*[!0-9]*)
+    echo "ERROR: port must be an integer (got: $wizard_host_port)" >&2
+    exit 1
+    ;;
+esac
+if [ "$wizard_host_port" -lt 1024 ] || [ "$wizard_host_port" -gt 65535 ]; then
+  echo "ERROR: port out of range 1024-65535 (got: $wizard_host_port)" >&2
+  exit 1
+fi
+if command -v ss >/dev/null 2>&1; then
+  if ss -lnt "sport = :$wizard_host_port" 2>/dev/null | grep -q LISTEN; then
+    echo "ERROR: port $wizard_host_port is already in use." >&2
+    exit 1
+  fi
+elif command -v netstat >/dev/null 2>&1; then
+  if netstat -lnt 2>/dev/null | awk '{print $4}' | grep -Eq "[:.]${wizard_host_port}\$"; then
+    echo "ERROR: port $wizard_host_port is already in use." >&2
+    exit 1
+  fi
+fi
+
+# Data path: parent dir must exist and be writable.
+parent_dir="$(dirname "$wizard_data_path")"
+if [ ! -d "$parent_dir" ]; then
+  echo "ERROR: data path parent does not exist: $parent_dir" >&2
+  exit 1
+fi
+if [ ! -w "$parent_dir" ]; then
+  echo "ERROR: data path parent not writable: $parent_dir" >&2
+  exit 1
+fi
+
+# Email: basic shape check (anything@anything.anything).
+case "$wizard_admin_email" in
+  *@*.*) ;;
+  *)
+    echo "ERROR: admin email looks invalid: $wizard_admin_email" >&2
+    exit 1
+    ;;
+esac
+
+# Password length already enforced by wizard schema; double-check here.
+pwlen="$(printf %s "$wizard_admin_password" | wc -c | tr -d ' ')"
+if [ "$pwlen" -lt 12 ]; then
+  echo "ERROR: admin password must be at least 12 characters." >&2
+  exit 1
+fi
+
+# EULA must be accepted.
+if [ "${wizard_accept_eula:-false}" != "true" ]; then
+  echo "ERROR: you must accept the EULA to install Kryton." >&2
+  exit 1
+fi
+
+exit 0

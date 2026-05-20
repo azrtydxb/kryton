@@ -1,0 +1,68 @@
+#!/bin/sh
+#
+# DSM lifecycle hook for the Kryton package.
+# Invoked by Package Center / synopkg as:
+#   start-stop-status start | stop | status | log
+#
+# Phase 2 of docs/design/nas-package-stores.md.
+
+set -e
+
+PKG_DIR="${SYNOPKG_PKGDEST:-/var/packages/kryton/target}"
+LOG_FILE="/tmp/kryton-start.log"
+DOCKER_BIN="/usr/local/bin/docker"
+
+# Container Manager bundles its own docker; fall back to PATH if absent.
+if [ ! -x "$DOCKER_BIN" ]; then
+  if command -v docker >/dev/null 2>&1; then
+    DOCKER_BIN="$(command -v docker)"
+  else
+    echo "ERROR: docker binary not found. Install Container Manager from Package Center." >&2
+    exit 1
+  fi
+fi
+
+cd_pkg() {
+  if [ ! -d "$PKG_DIR" ]; then
+    echo "ERROR: package target dir not found: $PKG_DIR" >&2
+    exit 1
+  fi
+  cd "$PKG_DIR"
+}
+
+case "$1" in
+  start)
+    cd_pkg
+    if ! "$DOCKER_BIN" compose up -d >>"$LOG_FILE" 2>&1; then
+      echo "ERROR: docker compose up failed. See $LOG_FILE for details." >&2
+      exit 1
+    fi
+    exit 0
+    ;;
+  stop)
+    cd_pkg
+    # NOTE: deliberately no `-v` — user data volumes are preserved across
+    # stop/start. Uninstall handles volume removal via postuninst.
+    "$DOCKER_BIN" compose down >>"$LOG_FILE" 2>&1 || true
+    exit 0
+    ;;
+  status)
+    cd_pkg
+    # `docker compose ps --status running` outputs one line per running
+    # service. Anything → running (exit 0); empty → stopped (DSM exit 3).
+    out="$("$DOCKER_BIN" compose ps --status running 2>/dev/null | sed -n '2,$p' || true)"
+    if [ -n "$out" ]; then
+      exit 0
+    else
+      exit 3
+    fi
+    ;;
+  log)
+    echo "$LOG_FILE"
+    exit 0
+    ;;
+  *)
+    echo "usage: $0 {start|stop|status|log}" >&2
+    exit 1
+    ;;
+esac

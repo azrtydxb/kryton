@@ -1,0 +1,85 @@
+{
+  "packages": [
+    {
+      "package": "kryton",
+      "version": "1.4.2",
+      "dname": "Kryton",
+      "desc": "Local-first notes & knowledge base with real-time collaboration.",
+      "price": 0,
+      "download_count": 0,
+      "recent_download_count": 0,
+      "link": "https://github.com/azrtydxb/kryton/releases/download/v1.4.2/kryton_1.4.2_x86_64.spk",
+      "size": 0,
+      "md5": "",
+      "thumbnail": [
+        "https://kryton.ai/assets/nas/icons/kryton-72.png",
+        "https://kryton.ai/assets/nas/icons/kryton-120.png"
+      ],
+      "snapshot": [
+        "https://kryton.ai/assets/nas/screenshots/editor.png"
+      ],
+      "qinst": false,
+      "qupgrade": false,
+      "qstart": false,
+      "depsers": "ContainerManager",
+      "deppkgs": "ContainerManager",
+      "conflictpkgs": "",
+      "start": true,
+      "maintainer": "Kryton",
+      "maintainer_url": "https://kryton.app",
+      "distributor": "Kryton",
+      "distributor_url": "https://kryton.app",
+      "changelog": "https://github.com/azrtydxb/kryton/releases/tag/v1.4.2",
+      "thirdparty": true,
+      "category": 0,
+      "subcategory": 0,
+      "type": 0,
+      "silent_install": false,
+      "silent_uninstall": false,
+      "silent_upgrade": false,
+      "beta": false,
+      "arch": "x86_64"
+    },
+    {
+      "package": "kryton",
+      "version": "1.4.2",
+      "dname": "Kryton",
+      "desc": "Local-first notes & knowledge base with real-time collaboration.",
+      "price": 0,
+      "download_count": 0,
+      "recent_download_count": 0,
+      "link": "https://github.com/azrtydxb/kryton/releases/download/v1.4.2/kryton_1.4.2_armv8.spk",
+      "size": 0,
+      "md5": "",
+      "thumbnail": [
+        "https://kryton.ai/assets/nas/icons/kryton-72.png",
+        "https://kryton.ai/assets/nas/icons/kryton-120.png"
+      ],
+      "snapshot": [
+        "https://kryton.ai/assets/nas/screenshots/editor.png"
+      ],
+      "qinst": false,
+      "qupgrade": false,
+      "qstart": false,
+      "depsers": "ContainerManager",
+      "deppkgs": "ContainerManager",
+      "conflictpkgs": "",
+      "start": true,
+      "maintainer": "Kryton",
+      "maintainer_url": "https://kryton.app",
+      "distributor": "Kryton",
+      "distributor_url": "https://kryton.app",
+      "changelog": "https://github.com/azrtydxb/kryton/releases/tag/v1.4.2",
+      "thirdparty": true,
+      "category": 0,
+      "subcategory": 0,
+      "type": 0,
+      "silent_install": false,
+      "silent_uninstall": false,
+      "silent_upgrade": false,
+      "beta": false,
+      "arch": "armv8"
+    }
+  ],
+  "keyrings": []
+}

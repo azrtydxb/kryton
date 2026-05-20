@@ -1,0 +1,34 @@
+[
+  {
+    "step_title": "Kryton — Upgrade",
+    "items": [
+      {
+        "type": "textfield",
+        "desc": "Your existing data directory will be preserved (read-only reminder).",
+        "subitems": [
+          {
+            "key": "wizard_data_path",
+            "desc": "Data path (read-only)",
+            "defaultValue": "/volume1/kryton",
+            "editable": false
+          }
+        ]
+      },
+      {
+        "type": "singleselect",
+        "desc": "Keep notes, attachments, and database when uninstalling later?",
+        "subitems": [
+          {
+            "key": "wizard_keep_data_on_uninstall",
+            "desc": "Keep data on uninstall",
+            "displayItems": [
+              { "key": "true",  "desc": "Yes — keep data (recommended)" },
+              { "key": "false", "desc": "No — remove all data on uninstall" }
+            ],
+            "defaultValue": "true"
+          }
+        ]
+      }
+    ]
+  }
+]
