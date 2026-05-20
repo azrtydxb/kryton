@@ -71,6 +71,29 @@ Kryton ships with a production-ready MCP server at `/api/mcp`. No sidecar, no pr
 
 ### Connect Your AI Agent
 
+#### One-shot install (recommended)
+
+```sh
+npx @azrtydxb/kryton-init
+```
+
+That single command:
+
+1. Asks for your Kryton server URL (defaults to `https://kryton.ai`)
+2. Signs you in and mints an API key
+3. Detects every supported AI tool on your machine
+4. Writes the correct MCP config to each one (HTTP for hosts that support it, stdio shim via `@azrtydxb/kryton-mcp` for the rest)
+
+It's idempotent — re-running replaces previous Kryton entries instead of duplicating them, and backs up any config it touches.
+
+**Supported hosts:** Claude Code, Cursor, Claude Desktop, Codex, OpenCode, Cline, Continue, KiloCode, RooCode (macOS + Linux).
+
+Other commands: `uninstall` removes Kryton from every host, `status` shows which hosts are wired, `detect` previews without writing. Full reference in **[docs/CLI.md](docs/CLI.md)**.
+
+#### Manual wiring (escape hatch)
+
+If you'd rather edit the config yourself:
+
 **1. Create an API key** in Kryton: Account Settings > API Keys > Create (read-write scope)
 
 **2. Configure your agent:**
