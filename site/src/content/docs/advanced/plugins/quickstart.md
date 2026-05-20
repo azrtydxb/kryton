@@ -35,7 +35,10 @@ npm install --save-dev esbuild typescript
 ## 3. Client entry
 
 ```ts title="client/index.ts"
-import type { ClientPluginAPI } from '@azrtydxb/kryton-plugins-types/client';
+// Plugin types aren't published as an npm package — develop your plugin
+// inside a clone of the kryton-plugins repo (under plugins/<id>/), where
+// a relative import resolves to the shared types file.
+import type { ClientPluginAPI } from '../../../types/client';
 
 const { React } = window.__krytonPluginDeps;
 const { createElement: h } = React;

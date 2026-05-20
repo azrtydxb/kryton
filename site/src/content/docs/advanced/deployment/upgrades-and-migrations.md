@@ -21,10 +21,10 @@ If step 3 fails, the server exits non-zero. Postgres is left at the last success
 
 ```bash
 curl -fsS https://kryton.example.com/api/version
-# {"version":"4.6.0","commit":"a1b2c3d","node":"24.x"}
+# {"version":"4.6.5-pre.5","commit":"abcd123","major":4}
 ```
 
-The CI release pipeline stamps `version` and `commit` into the image at build time. `node` is the Node runtime version inside the container.
+The CI release pipeline stamps `version` and `commit` into the image at build time. `major` is the parsed major-version integer that clients (notably the mobile app) use to enforce compatibility.
 
 Clients call this endpoint on every reload and compare the response against the version they were built for. A version mismatch surfaces a soft "reload to upgrade" banner — no force-disconnect, no data loss.
 

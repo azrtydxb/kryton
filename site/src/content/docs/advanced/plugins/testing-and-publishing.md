@@ -65,13 +65,13 @@ For component tests, [`@testing-library/react`](https://testing-library.com/docs
 
 ## Manifest validation
 
-Before publishing, validate the manifest against the schema the host uses at load time:
+Before publishing, validate the registry entry (which includes the manifest reference) against the schema the host uses at load time:
 
 ```bash
-node scripts/validate-manifest.mjs plugins/my-plugin/manifest.json
+npm run validate
 ```
 
-(The registry's CI runs this for you on every PR.)
+This runs `node scripts/validate-registry.js`, which checks every plugin's manifest, registry entry, and that the build artefacts exist. The registry CI runs the same script on every PR.
 
 Required fields: `id`, `name`, `version`, `description`, `author`, `minKrytonVersion`. Optional: `tags[]`, `icon`, `client`, `server`. The `id` must be globally unique within the registry and follow `^[a-z][a-z0-9-]{1,40}$`.
 

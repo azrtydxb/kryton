@@ -154,7 +154,7 @@ The MCP server operates in stateless mode (no server-side session state). The be
 
 ## Auditing
 
-The admin panel exposes a "Recent activity" view that lists every API-key-authenticated request: timestamp, key id, route, status code. Use it to confirm an agent is doing what it says it's doing, or to spot a misbehaving script.
+Each API key tracks its `lastUsedAt` timestamp — visible from Account Settings > API Keys. For deeper auditing (per-request route + status), put the reverse proxy in front of Kryton in access-log mode and grep by the `Authorization` header prefix or by user id. A built-in request-log view in the admin panel is on the roadmap but not shipped yet.
 
 ## See also
 

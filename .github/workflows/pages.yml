@@ -6,9 +6,9 @@ on:
     paths:
       - 'site/**'
       - 'docs/**'
-      - 'packages/server/openapi.json'
+      - 'packages/server/openapi.snapshot.json'
       - 'packages/server/src/modules/agents/mcp/tools.ts'
-      - 'packages/server/src/plugins/types.ts'
+      - 'packages/server/src/modules/plugins/services/types.ts'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -18,6 +18,12 @@ concurrency:
 
 permissions:
   contents: read
+
+env:
+  # Forces actions still shipping Node 20 (configure-pages@v5,
+  # upload-pages-artifact@v3) to run on Node 24, ahead of GitHub's
+  # 2026-06-02 default switch.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
   build:
