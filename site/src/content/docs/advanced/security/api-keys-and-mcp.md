@@ -1,163 +1,130 @@
 ---
 title: API keys and MCP
-description: The full API-key model — minting, scopes, rate limits, secret-scanning prefix, revocation, and the MCP endpoint.
+description: How Kryton API keys work — minting, scopes, hashing — and how MCP clients authenticate over Streamable HTTP.
 ---
 
-Kryton supports programmatic access via API keys and a built-in MCP (Model Context Protocol) server. AI agents like Claude Code, Cursor, and custom scripts read and write your notes through this surface.
+Kryton exposes a single API-key model used by every programmatic caller:
+shell scripts hitting the REST API, MCP clients like Claude Desktop, and
+agent integrations. Keys are minted from the web UI, never recoverable
+after creation, and scoped read-only or read-write.
 
-## Minting a key
+## The key itself
 
-1. Log in to Kryton in your browser.
-2. Click your avatar (top-right) → **Account Settings**.
-3. Go to the **API Keys** tab.
-4. Click **Create API Key**.
-5. Fill in:
-   - **Name** — a label (e.g. "Claude Code", "Backup script").
-   - **Scope** — `read-only` or `read-write`.
-   - **Expires** — 30 days, 90 days, 1 year, or never.
-6. Click **Create Key**.
-7. **Copy the key immediately** — it's shown once and cannot be retrieved later.
+Implemented in
+`packages/server/src/modules/identity/services/api-key.service.ts`.
 
-The key format is `kryton_a1b2c3d4e5f6...` (70 characters: the `kryton_` prefix plus 64 hex characters of 256-bit entropy).
+- Prefix: `kryton_` (constant `KEY_PREFIX`).
+- Entropy: 32 random bytes = 256 bits, hex-encoded — so a full key looks
+  like `kryton_` + 64 hex chars = 71 characters total.
+- Storage: only the SHA-256 hash is persisted in the `apiKey.keyHash`
+  column. The plaintext is returned exactly once at creation and never
+  again.
+- A short prefix (`kryton_` + first 8 hex chars) is stored separately
+  in `apiKey.keyPrefix` so the UI can show "ends in …" without holding
+  the secret.
+- Per-user cap: 10 keys (`MAX_KEYS_PER_USER`).
+- Optional `expiresAt` — keys past their expiry are rejected during
+  validation.
+- Optional `agentId` — when bound, edits made by this key are attributed
+  to that agent in vault events and Yjs presence.
+
+## Minting and revocation
+
+Routes are mounted under `/api/api-keys` in
+`packages/server/src/modules/identity/routes/api-keys.routes.ts`. **All
+three endpoints require a browser session** (the `requireSession` guard
+rejects calls authenticated with another API key):
+
+| Method | Path                | Purpose                       |
+|--------|---------------------|-------------------------------|
+| POST   | `/api/api-keys`     | Create a key — returns the plaintext once |
+| GET    | `/api/api-keys`     | List the caller's keys (no secrets) |
+| DELETE | `/api/api-keys/:id` | Revoke a key by id            |
+
+In the UI: **Account Settings → API Keys**.
 
 ## Scopes
 
-| Scope | Capabilities |
-|---|---|
-| `read-only` | List notes, read content, search, view tags / graph / backlinks, list folders / templates / favorites. |
-| `read-write` | Everything above, plus create / update / delete notes, create folders, manage shares, mint / revoke favorites, restore from trash, empty trash. |
+The `scope` enum is `read-only` or `read-write`
+(`identity/schemas/api-key.schemas.ts`).
 
-Admin operations (user management, invites, registration settings, plugin install) are **never** accessible via API keys. They require a session and the `admin` role.
+- `read-only` keys can call any REST endpoint that doesn't require
+  session auth and that hasn't been marked write-scope.
+- `read-write` keys additionally pass the `requireWriteScope` guard,
+  which is enforced inside MCP tools (`build-server.ts`) and on every
+  REST mutation.
 
-Write tools — `create_note`, `update_note`, `append_to_note`, `rename_note`, `delete_note`, `create_folder`, `create_note_from_template`, `write_daily_note`, `add_favorite`, `remove_favorite`, `restore_from_trash`, `empty_trash`, `rename_folder`, `delete_folder`, `share_note`, `unshare_note` — require a `read-write` scoped key.
+Admin-only endpoints (user management, settings, invites) require a
+browser session and **are not reachable via API key** —
+`requireSession` rejects API-key bearers outright
+(`packages/server/src/plugins/auth.ts`).
 
-## Per-user isolation
+## Validation and `lastUsedAt`
 
-An API key inherits the permissions of the user that minted it. Notes outside the user's tree are invisible, even with the right path; shared notes appear with the same shape they do in the UI. Keys cannot escalate privilege.
+`ApiKeyService.validate` hashes the incoming key, looks up the row,
+rejects expired keys, and fires a non-awaited `lastUsedAt` update. The
+field is visible in the UI key list and in `GET /api/api-keys`.
 
-If the user is disabled or deleted, every key they own is invalidated atomically.
+Kryton does not record an audit trail of individual API-key requests —
+`lastUsedAt` is the only built-in visibility into key activity.
 
-## Rate limits
+## Rate limiting
 
-| Auth method | Limit | Keyed by |
-|---|---|---|
-| Session (browser) | 100 requests / 15 min | IP address |
-| API key (bearer) | 300 requests / 15 min | API key id |
+Global rate limit applies to every request including API-key calls.
+Defaults from `config/env.ts`:
 
-Each API key has its own independent bucket. Hitting the limit returns `429 Too Many Requests` with a `Retry-After` header.
+- `RATE_LIMIT_MAX` — `1000` requests
+- `RATE_LIMIT_WINDOW` — `1 minute`
 
-The Helm chart's `env.config.RATE_LIMIT_MAX` and `RATE_LIMIT_WINDOW` tune the global window (the per-key 300 figure is on top of this, by key id).
+Wired in `packages/server/src/plugins/rate-limit.ts`. The identity routes
+(login, signup, password reset) apply a stricter `10 / minute` preset.
 
-## Storage and secret scanning
+## MCP endpoint
 
-- Keys are stored as **SHA-256 hashes**. The raw secret is never persisted.
-- The `kryton_` prefix lets secret scanners (GitHub, GitLab, custom CI) detect leaks. If you accidentally commit a key, GitHub will notify Kryton's owner via the [secret scanning partner program](https://docs.github.com/en/code-security/secret-scanning) once registered.
-- The minted secret is shown once at creation. Lose it and you have to mint a new one.
+Mounted at `/api/mcp` in
+`packages/server/src/modules/agents/index.ts` — Streamable HTTP and SSE
+share the prefix.
 
-## Revoking a key
+- Transport: **Streamable HTTP** per the 2025-03-26 spec
+  (`mcp/streamable.ts`). The legacy SSE transport (`GET /sse`,
+  `POST /messages`) is also mounted under `/api/mcp` for older clients.
+- Auth: `Authorization: Bearer kryton_…` — see
+  `mcp/auth.ts → authenticateMcpRequest`. Sessions, OAuth, and the
+  Better Auth catch-all are not accepted here.
+- Sessions are **per-bearer** and stateful. Each `initialize` call mints
+  an `Mcp-Session-Id`; the per-user cap is 10 concurrent sessions
+  (`MAX_SESSIONS_PER_USER`) and the idle reaper closes anything quiet
+  for 30 minutes (`IDLE_TIMEOUT_MS`).
+- Sessions survive server restarts: every session is persisted to the
+  `McpSession` table and rehydrated transparently when the bearer
+  reconnects with the same `Mcp-Session-Id`.
 
-In **Account Settings → API Keys**, click the trash icon next to any row and confirm. The key is invalidated immediately — the next request bearing it gets `401 Unauthorized`.
-
-Programmatic revocation:
-
-```bash
-curl -X DELETE \
-  -H "Authorization: Bearer kryton_owner_session_or_key" \
-  https://kryton.example.com/api/api-keys/<key-id>
-```
-
-Only the user that owns the key (or an admin via session) can revoke it.
-
-## Using the REST API
-
-```bash
-curl -H "Authorization: Bearer kryton_..." \
-  https://kryton.example.com/api/notes
-```
-
-| Method | Path | Scope |
-|---|---|---|
-| `GET` | `/api/notes` | read-only |
-| `GET` | `/api/notes/:path` | read-only |
-| `POST` | `/api/notes` | read-write |
-| `PUT` | `/api/notes/:path` | read-write |
-| `DELETE` | `/api/notes/:path` | read-write |
-| `GET` | `/api/search?q=…` | read-only |
-| `GET` | `/api/tags` | read-only |
-| `GET` | `/api/backlinks/:path` | read-only |
-| `GET` | `/api/graph` | read-only |
-| `GET` | `/api/folders` | read-only |
-| `POST` | `/api/folders` | read-write |
-| `GET` | `/api/daily` | read-only |
-| `GET` | `/api/templates` | read-only |
-
-Full OpenAPI reference: [REST API](/kryton/advanced/api/rest/).
-
-## MCP — Model Context Protocol
-
-Kryton ships a built-in MCP server at `/api/mcp` using the [Streamable HTTP transport](https://modelcontextprotocol.io/docs/concepts/transports). Compatible AI agents drop straight in.
-
-### Claude Code / Claude Desktop / Cursor / Codex
+### Example: connecting Claude Desktop
 
 ```json
 {
   "mcpServers": {
     "kryton": {
-      "type": "streamable-http",
-      "url": "https://kryton.example.com/api/mcp",
+      "url": "https://your-kryton-host/api/mcp",
+      "transport": "streamable-http",
       "headers": {
-        "Authorization": "Bearer kryton_your_key_here"
+        "Authorization": "Bearer kryton_..."
       }
     }
   }
 }
 ```
 
-For stdio-only hosts (Claude Desktop, Cline, Continue), the `@azrtydxb/kryton-mcp` shim bridges stdio to the HTTP endpoint:
+The set of MCP tools exposed includes the core tools defined in
+`mcp/tools.ts` plus a dynamic tool generated for every OpenAPI operation
+not already covered by a core tool. Tools tagged `read-write` refuse to
+run when the bound key is `read-only`. See
+[MCP tools](/kryton/advanced/api/mcp-tools/) for the full list.
 
-```json
-{
-  "mcpServers": {
-    "kryton": {
-      "command": "npx",
-      "args": ["-y", "@azrtydxb/kryton-mcp"],
-      "env": {
-        "KRYTON_URL": "https://kryton.example.com",
-        "KRYTON_TOKEN": "kryton_your_key_here"
-      }
-    }
-  }
-}
-```
+## Operational notes
 
-One command does all of this for every supported host automatically:
-
-```sh
-npx @azrtydxb/kryton-init
-```
-
-See the [CLI](/kryton/advanced/reference/cli/) for the full installer reference.
-
-### Available MCP tools
-
-The full list lives at [MCP tools](/kryton/advanced/api/mcp-tools/) (auto-generated). 33+ tools cover note CRUD, search, tags, the link graph, folders, templates, favorites, trash, and shares. Plugin-registered routes with OpenAPI annotations are exposed automatically — install a plugin, get extra MCP tools for free.
-
-### MCP resources
-
-| URI | Description |
-|---|---|
-| `kryton://notes` | The full note tree structure (JSON). |
-
-### Statelessness
-
-The MCP server operates in stateless mode (no server-side session state). The bearer token is the only context the server keeps about an agent connection. This is by design — restart-safe, horizontally-scalable, no resume protocol.
-
-## Auditing
-
-Each API key tracks its `lastUsedAt` timestamp — visible from Account Settings > API Keys. For deeper auditing (per-request route + status), put the reverse proxy in front of Kryton in access-log mode and grep by the `Authorization` header prefix or by user id. A built-in request-log view in the admin panel is on the roadmap but not shipped yet.
-
-## See also
-
-- [REST API](/kryton/advanced/api/rest/) — generated reference for every endpoint.
-- [MCP tools](/kryton/advanced/api/mcp-tools/) — every MCP tool with parameters.
-- [CLI](/kryton/advanced/reference/cli/) — `@azrtydxb/kryton-init` one-shot installer.
+- Treat the `kryton_` prefix as a secret-scanning marker — push it into
+  your scanner's allow-list so leaked keys get flagged.
+- Revocation is immediate: `DELETE /api/api-keys/:id` removes the row;
+  the next `validate()` call returns null.
+- Lost a key? You can't recover it — revoke the row and mint a new one.

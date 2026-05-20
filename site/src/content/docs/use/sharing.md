@@ -1,30 +1,19 @@
 ---
 title: Sharing
-description: Invite teammates to a single note or a whole folder, read-only or read-write.
+description: Invite teammates to a note or folder, choose Read or Read-Write, and respond to access requests.
 ---
 
-By default, every note you create is private to you. Sharing is per-note (or per-folder), and you stay in control.
+## Share a note or folder
 
-## Open the share dialog
+Open the share dialog from a note or folder. Enter an email address to look up the user, pick a permission, and invite.
 
-From a note, click the **Share** icon in the top right. The dialog shows:
+Two permission levels:
 
-- People who already have access, and what they can do
-- An invite field to add someone by email
+- **Read** — recipient can view the note (or folder contents).
+- **Read-Write** — recipient can also edit.
 
-## Read vs read-write
-
-Two access levels:
-
-- **Read** — they can open the note and follow links, but the editor is locked.
-- **Read-write** — they can edit, link, and tag freely. Edits sync live, the same way they do for you.
-
-Change a person's access (or revoke it) any time from the same dialog.
-
-## Sharing a folder
-
-If you give someone access to a folder, every note inside inherits that access. Move a note out of the folder and the inherited share goes with it.
+The permission shows on each entry in the share list as a `Read` / `Read-Write` button. Clicking it toggles the permission for that recipient.
 
 ## Access requests
 
-If someone with a Kryton account opens a link to a note you haven't shared with them, they can send you an **access request**. Requests show up in your notifications — accept and pick the access level in one click.
+When someone with a link tries to open a note they don't have access to, the owner sees an entry under **Access Requests**. Each request can be **Approve**d (with a chosen permission) or **Den**ied.

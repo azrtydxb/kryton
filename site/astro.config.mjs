@@ -18,7 +18,6 @@ export default defineConfig({
           items: [
             { label: "Overview", slug: "start" },
             { label: "Install with Docker", slug: "start/install/docker" },
-            { label: "Desktop helper", slug: "start/install/desktop-helper" },
             { label: "Connect your AI", slug: "start/connect-ai" },
             { label: "Your first notes", slug: "start/first-notes" },
           ],

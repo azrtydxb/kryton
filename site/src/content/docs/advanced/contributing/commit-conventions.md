@@ -1,145 +1,80 @@
 ---
 title: Commit conventions
-description: Conventional Commits, enforced by commitlint in CI. The format, the types, and good vs bad examples.
+description: Conventional Commits enforced by commitlint and a husky commit-msg hook.
 ---
 
-Kryton enforces [Conventional Commits](https://www.conventionalcommits.org/) via [`@commitlint/config-conventional`](https://github.com/conventional-changelog/commitlint). The CI gate rejects commits whose subject line doesn't match the format.
+## What is enforced
 
-## Config
+`commitlint.config.js` in the repo root is a one-liner:
 
-```js title="commitlint.config.js"
+```js
 module.exports = {
   extends: ['@commitlint/config-conventional'],
 };
 ```
 
-No customisation — the default ruleset.
+That means commits must follow [Conventional Commits 1.0](https://www.conventionalcommits.org/en/v1.0.0/) as enforced by `@commitlint/config-conventional`. The `.husky/commit-msg` hook runs `npx --no -- commitlint --edit $1` on every commit, so non-conforming messages are rejected locally.
 
 ## Format
 
 ```
 <type>(<scope>)?: <subject>
 
-<body?>
+<body>
 
-<footer?>
+<footer>
 ```
 
-- **type** — required. One of the types below.
-- **scope** — optional. The area of the codebase the change touches (`server`, `client`, `kanban`, `helm`, `operator`, …).
-- **subject** — required. Imperative present-tense, ≤ 100 chars, no period at the end, lowercase first letter.
-- **body** — optional. Why this change, not what (the diff says what). Wrap at 72 chars.
-- **footer** — optional. `BREAKING CHANGE: …`, `Closes #123`, `Refs #456`.
+Rules in effect (from `@commitlint/config-conventional`):
 
-## Types
-
-| Type | When |
+| Rule | Value |
 |---|---|
-| `feat` | A new feature visible to users. |
-| `fix` | A bug fix visible to users. |
-| `docs` | Documentation only. |
-| `style` | Whitespace, formatting, missing semicolons — no logic change. |
-| `refactor` | Code change that neither fixes a bug nor adds a feature. |
-| `perf` | A performance improvement. |
-| `test` | Adding or updating tests. |
-| `build` | Build system, dependencies, package metadata. |
-| `ci` | GitHub Actions workflows, CI plumbing. |
-| `chore` | Other maintenance that doesn't fit above (housekeeping, version bumps). |
-| `revert` | Reverts a previous commit; the body should reference it. |
+| `type-enum` | One of: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `test` |
+| `type-case` | lower-case |
+| `type-empty` | type is required |
+| `subject-empty` | subject is required |
+| `subject-full-stop` | subject must not end with `.` |
+| `subject-case` | must not be sentence-case, start-case, pascal-case, or upper-case |
+| `header-max-length` | 100 chars |
+| `body-leading-blank` | blank line between header and body (warning) |
+| `body-max-line-length` | 100 chars per line (warning) |
+| `footer-leading-blank` | blank line between body and footer (warning) |
+| `footer-max-line-length` | 100 chars per line (warning) |
 
 ## Good examples
 
 ```
-feat(kanban): drag cards between columns
-
-Drag with the mouse or the keyboard (Space to pick up, arrows to move,
-Enter to drop). Round-trips via api.notes.update.
-
-Closes #412
+feat(tabs): cap simultaneous open tabs at 4 with FIFO eviction
+fix(sidebar): correct move up/down boundaries + reorder + graph recenter on resize
+docs(README): document npx @azrtydxb/kryton-init as the recommended way to connect agents
 ```
 
-```
-fix(server): preserve session cookie across OAuth callback
-```
+All three are drawn straight from `git log`.
+
+## Bad examples
 
 ```
-docs(plugins): document the `interactive` flag on fence renderers
+Added new feature.
 ```
 
-```
-refactor(client): extract useD3Graph from the 275-line Graph effect
-```
+Fails `type-empty` (no type), `subject-case` (start-case), and `subject-full-stop` (trailing period).
 
 ```
-feat(helm)!: rename env.config.SECRET to env.secret.SECRET
-
-BREAKING CHANGE: helm values now distinguish config-map vs secret env.
-Existing installs must migrate `env.SECRET` entries under `env.secret.*`.
+FEAT: new plugin slot
 ```
 
-## Bad examples (and why)
-
-| Subject | Problem |
-|---|---|
-| `WIP` | Not a Conventional Commit. CI rejects. |
-| `fixed kanban drag` | Missing colon and type prefix; also past tense. |
-| `feat: Add a new feature.` | Subject capitalised and ends with a period. |
-| `feat(server): adds rate limiting` | Use imperative: "add", not "adds". |
-| `chore: stuff` | Subject too vague. Describe the change. |
-| `fix(client): fix bug in editor where if you type fast and then click somewhere the cursor jumps` | > 100 chars. Move detail to the body. |
-
-## Why this matters
-
-- **Changelog generation** — [`git-cliff`](https://git-cliff.org/) reads the commit history and emits a categorised changelog at release time. Bad subjects → missing or mislabelled entries.
-- **Reviewer scan** — the type prefix lets reviewers and bisectors prioritise. A wall of unprefixed subjects forces everyone to read the diff to understand the shape of a PR.
-- **Bisect** — `feat`/`fix`/`refactor` boundaries are natural bisect points.
-
-## Tooling
-
-Locally:
-
-```bash
-# After staging your changes
-git commit
-# commitlint's husky hook (if installed) checks the subject before recording
-```
-
-If the hook isn't wired (fresh clone), `npm run prepare` from the repo root installs it.
-
-## Multi-line bodies
-
-For anything non-trivial, add a body that answers "why":
+Fails `type-case` (must be lower-case).
 
 ```
-fix(server): rate-limit MCP tool calls per key, not per IP
-
-MCP agents typically connect from a single egress IP shared across many
-keys. The old IP-bucketed limit punished one user's keys for another
-user's traffic. Switch to per-key buckets to restore isolation.
-
-Refs #678
+fix: This is an extremely long subject line that wanders well past one hundred characters and therefore exceeds the configured header-max-length limit
 ```
 
-## Breaking changes
+Fails `header-max-length` (over 100 chars).
 
-Either prefix the subject with `!`:
+## Scope (optional but encouraged)
 
-```
-feat(client)!: rename note action API from `onClick` to `execute`
-```
+The repo uses scopes liberally — `server`, `client`, `plugins`, `admin`, `ui`, `sidebar`, `kryton-init`, `site`, etc. Pick the package or area touched. `git log --oneline` shows the convention in practice.
 
-…or include a `BREAKING CHANGE:` footer:
+## Pre-commit
 
-```
-feat(client): rename note action API
-
-BREAKING CHANGE: registerNoteAction now takes `execute` instead of
-`onClick`. Existing plugins must rename the field.
-```
-
-Both are accepted by commitlint; the footer form gives you room to explain.
-
-## See also
-
-- [Dev setup](/kryton/advanced/contributing/dev-setup/)
-- [Release process](/kryton/advanced/contributing/release-process/) — how the changelog is generated from these commits.
+Alongside the commit-msg check, `.husky/pre-commit` runs `lint-staged`, which executes `eslint --fix` against staged TypeScript files under `packages/client/src/` and `packages/server/src/`.

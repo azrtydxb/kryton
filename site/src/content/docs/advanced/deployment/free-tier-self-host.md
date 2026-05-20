@@ -1,49 +1,45 @@
 ---
-title: Free-tier self-host
-description: One opinionated path — Hetzner CX22 (~€4/month) + Docker Compose + Caddy + Tailscale. Step by step.
+title: Cheap self-host
+description: One opinionated path — small VPS + Docker Compose + Caddy + Tailscale, step by step.
 ---
 
-There's no truly free VPS that runs Kryton well — the semantic-search worker alone wants ~200 MB. The cheapest viable path is a **Hetzner CX22** at €4.50/month (2 vCPU, 4 GB RAM, 40 GB SSD). This walkthrough takes you from a fresh `ssh root@…` to a logged-in browser, in one opinionated sitting.
+One opinionated, end-to-end path: a small Hetzner VPS (CX22 — small VPS, ~€4/month, check current pricing) running Ubuntu 24.04, Docker Compose for Kryton + Postgres, Caddy in front for TLS, and Tailscale so you can choose between a public hostname or a private overlay.
 
-Stack:
+Anything more elaborate (Kubernetes, multi-region, HA Postgres) is documented in the [Helm](/advanced/deployment/helm/) and [Operator](/advanced/deployment/operator/) pages.
 
-- **Ubuntu 24.04** on Hetzner CX22
-- **Docker Compose** for Kryton + Postgres
-- **Caddy** for automatic HTTPS via Let's Encrypt
-- **Tailscale** if you want it private to your tailnet (optional)
+## 1. Provision the VPS
 
-## 1. Provision
+Sign up at hetzner.com, create a CX22 (or any cheap VPS — Hetzner CX22 is the reference here), pick **Ubuntu 24.04**. Add your SSH key. Note the public IPv4.
 
-Sign in to [Hetzner Cloud](https://console.hetzner.cloud/), create a project, then create a server:
+If you want a public hostname, point an `A` record at the IP. If you only want a Tailnet-private install, you can skip the DNS step entirely.
 
-- **Location**: closest to you.
-- **Image**: Ubuntu 24.04.
-- **Type**: CX22 (€4.50/mo, 2 vCPU, 4 GB RAM, 40 GB SSD).
-- **SSH keys**: upload your public key.
-- **Name**: `kryton`.
+## 2. Initial server setup
 
-Wait ~30 seconds. Hetzner emails you the IP.
-
-## 2. Initial hardening
+SSH in as `root`:
 
 ```bash
 ssh root@<server-ip>
+```
 
-# Update + install essentials
-apt update && apt upgrade -y
-apt install -y docker.io docker-compose-plugin ufw
+Then:
 
-# Firewall: only SSH + HTTP + HTTPS
-ufw default deny incoming
-ufw default allow outgoing
+```bash
+apt-get update && apt-get -y upgrade
+apt-get -y install ufw
+
+# Firewall: keep it tight. SSH + 80/443.
 ufw allow OpenSSH
 ufw allow 80/tcp
 ufw allow 443/tcp
-ufw enable
+ufw --force enable
 
-# A non-root user
+# Unattended security updates.
+apt-get -y install unattended-upgrades
+dpkg-reconfigure -f noninteractive unattended-upgrades
+
+# Create a non-root user.
 adduser --disabled-password --gecos "" kryton
-usermod -aG docker kryton
+usermod -aG sudo kryton
 mkdir -p /home/kryton/.ssh
 cp ~/.ssh/authorized_keys /home/kryton/.ssh/
 chown -R kryton:kryton /home/kryton/.ssh
@@ -51,70 +47,122 @@ chmod 700 /home/kryton/.ssh
 chmod 600 /home/kryton/.ssh/authorized_keys
 ```
 
-From here on, `ssh kryton@<server-ip>`. You shouldn't need root again.
-
-## 3. DNS
-
-Point an A record at the server. With Cloudflare, Route 53, or any DNS provider:
-
-```
-kryton.example.com.   A   <server-ip>
-```
-
-Wait for it to propagate (`dig +short kryton.example.com` should return your IP).
-
-## 4. Deploy Kryton
+Re-login as `kryton` from now on:
 
 ```bash
 ssh kryton@<server-ip>
-git clone https://github.com/azrtydxb/kryton.git
-cd kryton
+```
 
-cat > .env <<EOF
-POSTGRES_PASSWORD=$(openssl rand -hex 16)
+## 3. Install Docker
+
+```bash
+curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker $USER
+newgrp docker
+docker compose version   # sanity check
+```
+
+## 4. Install Tailscale
+
+```bash
+curl -fsSL https://tailscale.com/install.sh | sudo sh
+sudo tailscale up --ssh
+```
+
+Follow the URL printed by `tailscale up` and authenticate. After this the box has a `100.x.y.z` Tailnet address and a `<hostname>.tail-scale.ts.net` MagicDNS name.
+
+You now have a choice:
+
+- **Public**: front Kryton with a real domain + Let's Encrypt. Keep reading section 5.
+- **Tailnet-only**: skip ports 80/443 from the public firewall (you can run `ufw delete allow 80/tcp` and `ufw delete allow 443/tcp`) and use the MagicDNS hostname. See section 7.
+
+## 5. Lay out the project
+
+```bash
+mkdir -p ~/kryton/notes
+cd ~/kryton
+```
+
+Create `docker-compose.yml` — this is `docker-compose.prod.yml` from the Kryton repo, verbatim:
+
+```yaml
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      - POSTGRES_USER=kryton
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      - POSTGRES_DB=kryton
+    volumes:
+      - kryton-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "kryton", "-d", "kryton"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  kryton:
+    image: ghcr.io/azrtydxb/kryton/kryton:latest
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3100:3000"
+    volumes:
+      - ./notes:/notes
+      - kryton-data:/data
+    environment:
+      - POSTGRES_URL=postgres://kryton:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/kryton
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET}
+      - APP_URL=${APP_URL:-http://localhost:3100}
+      - BETTER_AUTH_URL=${BETTER_AUTH_URL:-http://localhost:3100}
+      - NOTES_DIR=/notes
+    restart: unless-stopped
+
+volumes:
+  kryton-data:
+  kryton-postgres:
+```
+
+The only change from the in-repo file is the port binding: `127.0.0.1:3100:3000` keeps the server off the public interface — Caddy proxies to it locally.
+
+Create `.env`:
+
+```dotenv
+POSTGRES_PASSWORD=$(openssl rand -hex 24)
 BETTER_AUTH_SECRET=$(openssl rand -hex 32)
 APP_URL=https://kryton.example.com
 BETTER_AUTH_URL=https://kryton.example.com
-EOF
-chmod 600 .env
-
-docker compose -f docker-compose.prod.yml up -d
-docker compose -f docker-compose.prod.yml logs -f kryton
 ```
 
-Kryton is now listening on `localhost:3100`. Don't open that port to the internet directly — Caddy is next.
+(Substitute the `openssl` output and your real hostname literally — `.env` is not a shell script.)
 
-## 5. Caddy for HTTPS
+Pull and start:
 
 ```bash
-# Install Caddy
-sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
-  | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
-  | sudo tee /etc/apt/sources.list.d/caddy-stable.list
-sudo apt update
-sudo apt install -y caddy
+docker compose pull
+docker compose up -d
+docker compose logs -f kryton
 ```
 
-The Caddyfile (`/etc/caddy/Caddyfile`):
+Wait for the line `Server listening at http://0.0.0.0:3000`. Migrations run on boot — failures show in the log.
+
+## 6. Front it with Caddy (public hostname path)
+
+```bash
+sudo apt-get install -y debian-keyring debian-archive-keyring apt-transport-https curl
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+sudo apt-get update && sudo apt-get install -y caddy
+```
+
+Replace `/etc/caddy/Caddyfile` with exactly:
 
 ```caddyfile
 kryton.example.com {
     encode zstd gzip
-
-    # Yjs WebSocket needs an upgrade-friendly proxy.
-    reverse_proxy localhost:3100 {
-        header_up Host {host}
-        header_up X-Real-IP {remote_host}
-        header_up X-Forwarded-For {remote_host}
-        header_up X-Forwarded-Proto {scheme}
-    }
-
-    # Reasonable defaults for file uploads (attachments).
-    request_body {
-        max_size 50MB
-    }
+    reverse_proxy 127.0.0.1:3100
 }
 ```
 
@@ -122,60 +170,56 @@ Reload:
 
 ```bash
 sudo systemctl reload caddy
+sudo journalctl -u caddy -f
 ```
 
-Caddy auto-provisions a Let's Encrypt cert on first request. Visit `https://kryton.example.com` — register the first account; that account becomes admin.
+Caddy fetches a Let's Encrypt certificate automatically. Browse to `https://kryton.example.com` — sign up the first account, then disable open registration in the admin UI.
 
-## 6. (Optional) Tailscale instead of public HTTPS
+> Before enabling passkeys for production, set
+> `WEBAUTHN_RP_ID=kryton.example.com` under the `kryton.environment:` block
+> (it defaults to `localhost`).
 
-If you'd rather not expose Kryton to the internet, run it on your tailnet:
+## 7. Tailscale-only path
+
+Skip Caddy and skip DNS. The server is already bound to `127.0.0.1:3100`. To reach it from another Tailnet device, use `tailscale serve`:
 
 ```bash
-curl -fsSL https://tailscale.com/install.sh | sh
-sudo tailscale up --advertise-tags=tag:kryton --ssh
+sudo tailscale serve --bg --https=443 http://127.0.0.1:3100
 ```
 
-Approve the device in the Tailscale admin console. The server is now reachable at `kryton` (the tailnet name) from any of your other tailnet devices.
+Tailscale provisions a cert for `<hostname>.<tailnet>.ts.net` and proxies it to the local port. Set `APP_URL` / `BETTER_AUTH_URL` to that name, then `docker compose up -d` to restart.
 
-Adjust the Caddyfile to listen on the tailnet IP and skip public TLS, or drop Caddy entirely and just port-forward `100.x.y.z:3100` over the tailnet — your call.
-
-## 7. Backups
-
-For this scale, a nightly `pg_dump` + `tar` of `notes/` is plenty. Add a cron:
+## 8. Updates
 
 ```bash
-mkdir -p /home/kryton/backups
-cat > /home/kryton/backup.sh <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
+cd ~/kryton
+docker compose pull
+docker compose up -d
+```
+
+Migrations run automatically on boot. For backup/restore steps see [Backups & restore](/advanced/deployment/backups-restore/).
+
+## 9. Backups (one-liner)
+
+A daily root cron entry. As root:
+
+```bash
+mkdir -p /var/backups/kryton
+cat >/etc/cron.daily/kryton-backup <<'SH'
+#!/bin/sh
+set -e
+ts=$(date -u +%Y%m%dT%H%M%SZ)
 cd /home/kryton/kryton
-TS=$(date +%Y%m%d-%H%M%S)
-docker compose -f docker-compose.prod.yml exec -T postgres \
-  pg_dump -U kryton --format=custom kryton > "/home/kryton/backups/db-$TS.dump"
-tar czf "/home/kryton/backups/notes-$TS.tar.gz" notes/
-find /home/kryton/backups -mtime +30 -delete
-EOF
-chmod +x /home/kryton/backup.sh
-
-(crontab -l 2>/dev/null; echo "0 3 * * * /home/kryton/backup.sh") | crontab -
+docker compose exec -T postgres pg_dump -U kryton --format=custom kryton \
+  > /var/backups/kryton/kryton-${ts}.dump
+tar czf /var/backups/kryton/notes-${ts}.tar.gz -C /home/kryton/kryton notes
+find /var/backups/kryton -mtime +30 -delete
+SH
+chmod +x /etc/cron.daily/kryton-backup
 ```
 
-`rclone` or `rsync` the `backups/` dir to S3 / B2 / a second VPS — the details are out of scope. See [Backups and restore](/kryton/advanced/deployment/backups-restore/) for the full restore drill.
+The richer story (encrypted off-server backups, restore drill) is in [Backups & restore](/advanced/deployment/backups-restore/).
 
-## 8. Upgrades
+## Cost notes
 
-```bash
-cd /home/kryton/kryton
-git pull
-docker compose -f docker-compose.prod.yml pull
-docker compose -f docker-compose.prod.yml up -d
-```
-
-Drizzle migrations run automatically on boot. See [Upgrades and migrations](/kryton/advanced/deployment/upgrades-and-migrations/).
-
-## Where next
-
-You now have a working, HTTPS-terminated Kryton instance with backups. If your team grows past one machine, or you want multiple Kryton instances on shared infra, graduate to:
-
-- [Helm chart](/kryton/advanced/deployment/helm/) for Kubernetes.
-- [Kubernetes Operator](/kryton/advanced/deployment/operator/) for declarative multi-instance + managed backups.
+The only number quoted here is "Hetzner CX22 ~€4/month" — check Hetzner's current pricing before relying on that. Other unavoidable line items: a domain (~€10–15/year for `.com`) if you want the public-hostname path. Tailscale's free tier covers everything in this guide.

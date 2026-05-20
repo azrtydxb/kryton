@@ -1,28 +1,29 @@
 ---
-title: Linking and the graph
-description: Wiki-links, the backlinks panel, and the visual graph that shows how your notes connect.
+title: Linking and graph
+description: Wiki-links, the backlinks panel, and the local vs global graph.
 ---
-
-Links are how your notes become a knowledge base instead of a pile.
-
-![Graph view](/kryton/screenshots/graph-view.png)
 
 ## Wiki-links
 
-Type `[[` and start writing the title of another note. Autocomplete shows existing notes; pressing Enter on a non-existent title creates a new note at that name. You can use a pipe to display alternate text:
+Surround a note's name with double square brackets to link to it:
 
+```markdown
+See also [[Project Goals]].
 ```
-See [[The Pragmatic Programmer|the book]] for more.
-```
+
+In preview mode, broken links — links to notes that don't exist yet — are rendered with a distinct `wiki-link-broken` class and offer to create the target on click. Embedded notes use the `![[Note]]` syntax and inline the target's content; image embeds use `![[image.png]]`.
 
 ## Backlinks
 
-Every note has a **Backlinks** panel at the bottom. It lists every other note that mentions this one — even if you forgot you'd written about it. This is the quickest way to find your own thoughts again.
+Every note has a backlinks panel showing the other notes that link to it. It updates as you add or remove `[[…]]` references elsewhere in the vault.
 
-## The graph
+## Graph
 
-Open **Graph** from the toolbar. Each dot is a note; each line is a link. Hover a dot to see its title; click to jump in. Dense clusters tend to be your real areas of interest — sparse ones are notes you might want to weave together.
+![Graph view](/kryton/screenshots/graph-view.png)
 
-## Orphans
+The graph has two modes:
 
-A note with no incoming or outgoing links shows up as **orphan** in the graph filter. Either link to it or let it go.
+- **local** — the 2-hop neighbourhood centred on the active note.
+- **global** — the whole vault, force-directed.
+
+Switch between them from the segmented `local` / `global` control on the graph panel. When no note is open, the graph forces global mode (local is meaningless without a centre). Press `⌘G` / `Ctrl+G` to toggle the graph fullscreen.

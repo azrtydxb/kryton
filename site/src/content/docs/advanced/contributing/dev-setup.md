@@ -1,104 +1,86 @@
 ---
 title: Dev setup
-description: Local development setup — clone, Postgres in Docker, dev servers, and a quick path through the auth wall.
+description: Run Kryton locally from source — prerequisites, Postgres via docker compose, env vars, and the dev servers.
 ---
 
 ## Prerequisites
 
-- **Node.js 24+** (the server depends on Node 24's native APIs; nvm or fnm is the easiest path).
-- **PostgreSQL 16+** with the `pgvector` extension. Docker is the path of least resistance.
-- **npm 10+** ships with Node 24.
+- Node.js 24 (matches the version pinned in `.github/workflows/release.yml`)
+- Docker (used to bring up Postgres 16 + `pgvector`)
+- `git`, `openssl`
 
-## Bootstrap
+The repo does not pin a Node version via `.nvmrc` or `volta`. CI containers run `node:24`, so use 24 locally to stay in sync.
 
-```bash
-# 1. Clone
-git clone https://github.com/azrtydxb/kryton.git && cd kryton
+## Clone and install
 
-# 2. Env
+```sh
+git clone https://github.com/azrtydxb/kryton.git
+cd kryton
 cp .env.example .env
-#    Edit .env — at minimum, set POSTGRES_URL and BETTER_AUTH_SECRET.
-#    Generate the secret: openssl rand -hex 32
-
-# 3. Dependencies (monorepo — installs every workspace)
 npm install
+```
 
-# 4. Postgres in Docker (with pgvector)
+Then open `.env` and set, at minimum:
+
+```sh
+POSTGRES_URL=postgres://kryton:kryton@localhost:5432/kryton
+BETTER_AUTH_SECRET=$(openssl rand -hex 32)
+```
+
+`BETTER_AUTH_SECRET` is validated at startup and must be at least 32 characters (see `packages/server/src/config/env.ts`).
+
+## Start Postgres
+
+The bundled `docker-compose.yml` runs `pgvector/pgvector:pg16` and an init script that enables the `vector` extension:
+
+```sh
 docker compose up -d postgres
+```
 
-# 5. Migrate the schema
+Postgres listens on `localhost:5432` with database `kryton`, user `kryton`, password `kryton`.
+
+## Run migrations
+
+```sh
 npm run db:migrate --workspace=packages/server
+```
 
-# 6. Start both dev servers
+## Start the dev servers
+
+```sh
 npm run dev
 ```
 
-Frontend at `http://localhost:5173`, backend at `http://localhost:3001`. The Vite dev server proxies `/api`, `/ws`, and `/health*` to the backend.
+This runs the server and client in parallel (see the `dev` script in `package.json`):
+
+- Client (Vite): http://localhost:5173
+- Server (Fastify): http://localhost:3001
+- OpenAPI UI: http://localhost:3001/docs (`OPENAPI_ENABLED` defaults to `true`)
+
+## First user
+
+There is no seed user. Register through the web UI; the server assigns the `admin` role to the user whose registration brings the user count from 0 to 1 (see `packages/server/src/modules/identity/auth-config.ts`). Subsequent registrations get the `user` role.
 
 ## Useful scripts
 
-| Command | What |
+From `package.json`:
+
+| Command | What it does |
 |---|---|
-| `npm run dev` | Frontend + backend dev servers (concurrent). |
-| `npm run build` | Production build of the whole monorepo. |
-| `npm run test` | All workspaces' tests (vitest). |
-| `npm run lint` | ESLint across every workspace. |
-| `npm run typecheck` | `tsc --noEmit` across every workspace. |
-| `npm run db:migrate --workspace=packages/server` | Apply Drizzle migrations against `POSTGRES_URL`. |
-| `npm run db:studio --workspace=packages/server` | Open Drizzle Studio against the local DB. |
-| `npm run openapi:dump --workspace=packages/server` | Emit the OpenAPI spec to `packages/server/openapi.json`. |
+| `npm run dev` | Server + client dev servers in parallel |
+| `npm run build` | Production build of server then client |
+| `npm run typecheck` | TypeScript check across server + client |
+| `npm run lint` | ESLint across server + client |
+| `npm run lint:fix` | ESLint with `--fix` |
+| `npm test` | Vitest across server + client |
+| `npm run test:server` | Server tests only |
+| `npm run test:client` | Client tests only |
+| `npm run build:shared` | Build the `packages/ui` and `packages/sdk` workspaces |
+| `npm run sync:check` | Verifies compose/helm/operator stay in lockstep |
 
-## Skipping the auth wall during dev
+## Git hooks
 
-For local feature work it's tedious to keep registering and re-authenticating. Two patterns:
+`npm install` runs `husky` via the `prepare` script. The `.husky/` directory configures:
 
-### Dev seed user
-
-A first run with `REGISTRATION_MODE=open` (the default until a first user lands) lets you register an admin via the UI in seconds. Use a memorable email (`dev@local`) and a password you'll reuse. Subsequent `npm run dev` sessions reuse the same Postgres volume, so the user persists.
-
-If you reset the DB (`docker compose down -v`), reseed the same way.
-
-### Smoke-user pattern
-
-For one-off test scripts that hit the API, mint an API key from the UI once and stash it in `.env.local`:
-
-```env
-KRYTON_TEST_TOKEN=kryton_a1b2c3...
-```
-
-Source it in your test runner. The key persists across server restarts and respects the same auth model as in production, so the test exercises the real surface.
-
-## Workspace layout
-
-| Workspace | Role |
-|---|---|
-| `packages/server` | Express + Drizzle + Yjs server. The TypeScript backend. |
-| `packages/client` | React + Vite client. The TypeScript frontend. |
-| `packages/shared` | Types and Zod schemas shared between client and server. |
-| `plugins/*` | Bundled plugins shipped with the host. |
-| `charts/kryton` | Helm chart. |
-| `operator` | Kubernetes Operator (Go). |
-| `site` | This documentation site (Astro + Starlight). |
-| `cli` | `@azrtydxb/kryton-init` + `@azrtydxb/kryton-mcp`. |
-
-## Hot reload
-
-Vite handles client hot reload. The server uses `tsx watch` and restarts on any change under `packages/server/src/`. Database connections drop and reconnect automatically — drizzle's pool is short-lived in dev.
-
-## Submitting a change
-
-1. Branch from `master` with a descriptive name (`feat/add-board-undo`, `fix/yjs-reconnect`).
-2. Make your changes. Add tests where the change affects behaviour.
-3. Run the full local gate:
-
-   ```bash
-   npm run lint && npm run typecheck && npm run test && npm run build
-   ```
-4. Commit using [Conventional Commits](/kryton/advanced/contributing/commit-conventions/).
-5. Open a PR against `master`. CI re-runs the gate plus the deployment sync check.
-
-## See also
-
-- [Commit conventions](/kryton/advanced/contributing/commit-conventions/) — what CI enforces.
-- [Release process](/kryton/advanced/contributing/release-process/) — what happens after merge.
-- [`CONTRIBUTING.md`](https://github.com/azrtydxb/kryton/blob/master/CONTRIBUTING.md) — the canonical document this page wraps.
+- `commit-msg` — runs `npx --no -- commitlint --edit $1`
+- `pre-commit` — runs `npx lint-staged` (ESLint `--fix` on staged `.ts`/`.tsx` under `packages/client` and `packages/server`)

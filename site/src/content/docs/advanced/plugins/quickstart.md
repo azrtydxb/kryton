@@ -1,53 +1,57 @@
 ---
 title: Plugin quickstart
-description: Build a "hello world" Kryton plugin in 30 lines that registers a sidebar panel.
+description: A 30-line "Hello panel" Kryton plugin — manifest plus a sidebar panel.
 ---
 
-A working hello-world in three files: a `manifest.json`, a `client/index.ts`, and a one-line build script. After that you'll know the shape of every other plugin in the registry.
+This quickstart builds a client-only plugin that adds a sidebar panel
+saying "Hello from my plugin". Develop it inside a clone of the
+[`kryton-plugins`](https://github.com/azrtydxb/kryton-plugins)
+repository — the type declarations live there, and the build / test /
+validate scripts are pre-wired.
 
-## 1. Scaffold
+## 1. Scaffold the folder
+
+From the repo root:
 
 ```bash
-mkdir -p hello-kryton/client
-cd hello-kryton
-npm init -y
-npm install --save-dev esbuild typescript
+mkdir -p plugins/hello-panel/client
 ```
 
-## 2. Manifest
+## 2. Write the manifest
 
-```json title="manifest.json"
+`plugins/hello-panel/manifest.json`:
+
+```json
 {
-  "id": "hello-kryton",
-  "name": "Hello Kryton",
+  "id": "hello-panel",
+  "name": "Hello Panel",
   "version": "0.1.0",
-  "description": "Greets you from a sidebar panel.",
+  "description": "A minimal sidebar-panel plugin.",
   "author": "you",
   "minKrytonVersion": "2.0.0",
-  "tags": ["example"],
-  "icon": "smile",
   "client": "client/index.js"
 }
 ```
 
-`id` must be lowercase, hyphen-separated, unique within the registry. `icon` is a [lucide](https://lucide.dev/icons/) icon name.
+The directory name must match `id`. The five string fields plus
+`minKrytonVersion` are all required — see
+[Overview → The manifest](/kryton/advanced/plugins/overview/#the-manifest).
 
-## 3. Client entry
+## 3. Write the client entry
 
-```ts title="client/index.ts"
-// Plugin types aren't published as an npm package — develop your plugin
-// inside a clone of the kryton-plugins repo (under plugins/<id>/), where
-// a relative import resolves to the shared types file.
+`plugins/hello-panel/client/index.ts`:
+
+```ts
 import type { ClientPluginAPI } from '../../../types/client';
 
 const { React } = window.__krytonPluginDeps;
 const { createElement: h } = React;
 
-function HelloPanel() {
+function HelloPanel(): any {
   return h(
     'div',
-    { style: { padding: 16, color: 'var(--kryton-text)' } },
-    'Hello from a Kryton plugin.',
+    { style: { padding: 12, fontSize: 13 } },
+    'Hello from my plugin',
   );
 }
 
@@ -55,61 +59,50 @@ export function activate(api: ClientPluginAPI): void {
   api.ui.registerSidebarPanel(HelloPanel, {
     id: 'hello-panel',
     title: 'Hello',
-    icon: 'smile',
+    icon: 'sparkles',
+    order: 100,
   });
 }
 
 export function deactivate(): void {
-  // Host removes the registered panel automatically.
+  // nothing to clean up
 }
 ```
 
-A few rules:
+A few things to note:
 
-- React is provided by the host on `window.__krytonPluginDeps`. **Don't import `react` directly** — your plugin and the host would fight over two copies of React, and hooks would explode.
-- All `register*` calls happen inside `activate`. Calling them at module top-level is a race against the host being ready.
-- TypeScript is convenient but optional — the host loads JS, not TS. The build step compiles.
+- The relative `'../../../types/client'` import points at
+  `kryton-plugins/types/client.d.ts` — the type-only declaration of
+  `ClientPluginAPI`. No npm package is involved.
+- `React` and `ReactDOM` arrive on `window.__krytonPluginDeps`; the
+  plugin never imports them directly.
+- The manifest points at `client/index.js`, but you write `.ts` — the
+  build step transpiles to JS.
 
-## 4. Build
-
-`esbuild` against the client entry, no bundling (the host has React already):
-
-```bash
-npx esbuild client/index.ts \
-  --bundle=false \
-  --format=esm \
-  --outfile=client/index.js \
-  --target=es2022
-```
-
-That's it — `client/index.js` now sits next to `manifest.json`, and the manifest's `"client": "client/index.js"` field points at it.
-
-## 5. Install locally
-
-Copy the directory into your running Kryton:
+## 4. Build and validate
 
 ```bash
-# Compose:
-docker cp ../hello-kryton kryton-kryton-1:/data/plugins/
-
-# Helm: kubectl cp into the kryton pod's PVC mount.
-# Bare-metal: cp -r into $NOTES_DIR/plugins/.
-
-# Then enable from the admin panel, or restart and the loader picks it up.
+npm install          # once, at the repo root
+npm run build        # esbuild bundles every plugin's ts → js
+npm run validate     # runs scripts/validate-registry.js
 ```
 
-Refresh the browser. A new icon (a lucide smile) appears in the sidebar rail. Click it — your panel renders.
+The validator checks that every plugin's manifest has the required
+fields, the `id` matches the directory name, declared entry points
+exist on disk, and that there are no duplicate ids.
 
-## What you just learned
+## 5. Try it locally
 
-- A plugin is a directory with a manifest and an entry file.
-- The host injects React via `window.__krytonPluginDeps`.
-- UI surface registration goes through `api.ui.register*`.
-- Everything is opt-in: no sidebar panel until you call `registerSidebarPanel`.
+Two options:
 
-## Where next
+- **Drop it into a running Kryton's plugins directory** and reload —
+  the manager picks up `plugins/hello-panel/`.
+- **Submit to the registry** — see
+  [Testing and publishing](/kryton/advanced/plugins/testing-and-publishing/).
 
-- [UI slots](/kryton/advanced/plugins/ui-slots/) — every other slot you can register against (statusbar, editor toolbar, topbar, settings, custom pages, note actions).
-- [Code-fence renderers](/kryton/advanced/plugins/code-fence-renderers/) — render custom UI from a markdown code fence (`\`\`\`kanban`, `\`\`\`mermaid`, …).
-- [Client API](/kryton/advanced/plugins/client-api/) — full generated reference for `api.notes`, `api.storage`, `api.editor`, etc.
-- [Testing and publishing](/kryton/advanced/plugins/testing-and-publishing/) — vitest, then PR against the registry.
+## Next steps
+
+- [UI slots](/kryton/advanced/plugins/ui-slots/) lists every place
+  you can hook into the UI besides the sidebar.
+- The full type surface is documented in the
+  [Client API reference](/kryton/advanced/plugins/client-api/).

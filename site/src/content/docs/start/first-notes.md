@@ -1,48 +1,55 @@
 ---
 title: Your first notes
-description: Write a note, link it to another, add a tag, and see your knowledge graph come to life.
+description: Write a note, link it with double brackets, add a tag, and open the graph.
 ---
 
-You're signed in. Here's a five-minute tour to feel out how Kryton thinks.
+## Create a note
 
-## Write your first note
+Press `⌘⇧N` (or `Ctrl+Shift+N` on Linux) to create a new note. The editor opens in edit mode. Changes are auto-saved through a 500 ms debounced PUT.
 
-From the sidebar, click **New note**. Give it a title — say, *Reading list* — and start typing in the editor. Kryton uses Markdown, so a line starting with `#` becomes a heading, `**bold**` becomes **bold**, and `- item` becomes a bullet.
-
-Your note auto-saves as you type. There's no save button.
-
-![A note in preview](/kryton/screenshots/note-preview.png)
+![Editing a note](/kryton/screenshots/note-preview.png)
 
 ## Link to another note
 
-Type two square brackets and start writing the name of another note:
+Type `[[` followed by the target note's name to insert a wiki-link. Clicking a wiki-link in preview navigates to that note; clicking a link to a note that doesn't exist yet offers to create it.
 
+```markdown
+See also [[Project Goals]] for the full plan.
 ```
-I want to read [[The Pragmatic Programmer]] next.
-```
 
-If that note exists, Kryton turns it into a clickable link. If it doesn't, click the link anyway — Kryton will create the new note for you, ready to write into.
-
-This is the most important habit in Kryton. Every time you mention something that deserves its own page, wrap it in `[[double brackets]]`.
+The toolbar's **Wiki link** button inserts the same syntax around your selection.
 
 ## Add a tag
 
-Anywhere in a note, type a hash followed by a word:
+Anywhere in a note, type `#` followed by the tag name:
 
-```
-#books #to-read
+```markdown
+#research #to-read
 ```
 
-That's a tag. Tags don't have to exist beforehand. Click any tag to see every note that uses it.
+Tags are aggregated under the **Tags** view in the sidebar. There's a placeholder hint in the empty state: "no tags yet — tag a note with #<name>".
 
 ## Open the graph
 
-Click the **Graph** button in the toolbar. Each note becomes a dot; each `[[link]]` becomes a line. As you write more, you'll see clusters form around topics that share links and tags.
+Press `⌘G` (or `Ctrl+G`) to toggle the graph fullscreen. The graph has two modes:
+
+- **local** — the 2-hop neighbourhood around the active note.
+- **global** — the entire vault, force-directed.
 
 ![Graph view](/kryton/screenshots/graph-view.png)
 
-## Where to next
+When no note is open, the graph forces global mode.
 
-- [The editor](/kryton/use/editor/) — formatting, slash commands, split view.
-- [Linking and the graph](/kryton/use/linking-and-graph/) — backlinks, orphans, and how to navigate.
-- [Search and tags](/kryton/use/search-and-tags/) — find anything from anywhere.
+## Shortcuts you'll use
+
+| Action | Shortcut |
+|---|---|
+| Open quick switcher | `⌘P` / `Ctrl+P` |
+| Focus search | `⌘K` / `Ctrl+K` |
+| All Notes view | `⌘N` / `Ctrl+N` |
+| New note | `⌘⇧N` / `Ctrl+Shift+N` |
+| Toggle sidebar | `⌘B` / `Ctrl+B` |
+| Toggle edit/preview | `⌘E` / `Ctrl+E` |
+| Toggle graph | `⌘G` / `Ctrl+G` |
+| Rename note | `F2` |
+| Toggle star | `⌘⇧S` / `Ctrl+Shift+S` |

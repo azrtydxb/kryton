@@ -1,89 +1,89 @@
 ---
 title: Yjs WebSocket
-description: The collaborative-editing WebSocket protocol — endpoint, authentication, framing, and compatibility expectations.
+description: The collaborative-editing WebSocket — endpoint, authentication, and framing.
 ---
 
-Kryton's real-time collaboration runs on [Yjs](https://yjs.dev/). The server exposes one WebSocket endpoint per document and speaks the standard `y-protocols` framing — anything that talks `y-websocket` on the client side will round-trip.
+Kryton's collaborative editor uses [Yjs](https://yjs.dev) over a single
+WebSocket route. The handler lives in
+`packages/server/src/modules/collab/ws/yjs.handler.ts` and is mounted on
+the main Fastify instance — no separate WS server.
 
 ## Endpoint
 
 ```
-wss://kryton.example.com/ws/yjs/:docId
+GET /ws/yjs/:docId
 ```
 
-`:docId` is the URL-encoded note path (typically `userId/path/to/note.md`). The host resolves it to the user's note storage and instantiates a `Y.Doc` keyed by that path, sharing it across every connection on the same `:docId`.
-
-There's a sibling endpoint at `wss://kryton.example.com/ws/vault` that streams per-user awareness events (live tree updates, presence pills, AI agent indicators). It uses the same auth model but is not a `y-websocket` peer — treat it as Kryton-specific until further notice.
+`:docId` is the note path within the connecting user's notes directory
+(e.g. `folder/note.md`). The handler refuses to open a doc you can't
+read — `authorizeDoc` runs `app.notes.readNote(docId, userId)` on every
+connect, so deleted or unauthorised paths immediately close with
+code 1008.
 
 ## Authentication
 
-Either of:
+Two paths, both resolved in the route's `preValidation` hook:
 
-### 1. Session cookie (browser)
+1. **`Sec-WebSocket-Protocol` bearer** — clients advertise the marker
+   `kryton-token` followed by the token as the next subprotocol entry.
+   The token is validated by `app.agents.service.validateToken`, so
+   currently this path is used by agent integrations:
 
-The browser's session cookie (`kryton.session`, set on first login) is presented automatically on the upgrade handshake. The server validates it, looks up the user, and confirms read access (or read-write if the connection issues edits) before completing the handshake.
+   ```
+   Sec-WebSocket-Protocol: kryton-token, <agent-token>
+   ```
 
-If the cookie is missing or stale, the server responds with `401 Unauthorized` on the HTTP-101 upgrade leg and the WebSocket never opens.
+   Query-string tokens are deliberately not accepted (see
+   `packages/server/src/lib/ws-auth.ts`).
 
-### 2. Bearer token via query param (programmatic)
+2. **Cookie session** — the standard better-auth session cookie.
+   Useful for the in-browser client.
 
-```
-wss://kryton.example.com/ws/yjs/<docId>?token=kryton_a1b2c3...
-```
+If neither resolves, the handshake returns `401`.
 
-The token is a standard API key (see [API keys and MCP](/kryton/advanced/security/api-keys-and-mcp/)). It needs `read-only` scope to receive document state and `read-write` scope to emit edits. The server rejects writes from `read-only` keys with a Yjs custom-message-event payload (`error: { code: "forbidden", reason: "read-only key" }`) and closes the socket.
+## Per-doc lifecycle
 
-Use a query param rather than a header because the WebSocket API in browsers doesn't allow setting arbitrary upgrade headers. Server-side clients (Node, Go, Python, …) can set `Authorization: Bearer …` directly — the server accepts either.
+- The Y.Doc is constructed on first connection. If a snapshot exists in
+  Postgres it's restored; otherwise the doc is seeded from the canonical
+  `.md` file (`Y.Text("content")`).
+- Updates from any client are appended to the per-doc update log,
+  broadcast to all other connected clients, and scheduled for a
+  debounced flush. Debounce is **2 s idle, 30 s max**
+  (`DEBOUNCE_IDLE_MS` / `DEBOUNCE_MAX_MS`).
+- On flush, the canonical `.md` file is rewritten first, then a Y.Doc
+  snapshot is saved. Disk is the source of truth.
+- The doc is evicted from memory 60 s after the last client disconnects
+  (`EVICT_GRACE_MS`).
 
 ## Protocol
 
-Standard Yjs sync protocol — see the [`y-protocols` spec](https://github.com/yjs/y-protocols). On open:
+Standard Yjs framing — varint message type prefix, then payload.
 
-1. **Client → server**: `sync-step-1` with the client's state vector.
-2. **Server → client**: `sync-step-2` with the diff from the server's state.
-3. **Server → client**: `sync-step-1` with its own state vector.
-4. **Client → server**: `sync-step-2` with whatever the server is missing.
+| Type | Constant | Payload |
+|------|----------|---------|
+| `0`  | `MSG_SYNC` | `y-protocols/sync` step 1/2/update |
+| `1`  | `MSG_AWARENESS` | `y-protocols/awareness` encoded update |
 
-After sync, both ends emit `update` messages whenever the local doc changes. The server fans updates out to every other peer on the same `:docId` and persists them to the markdown file on disk after a debounce (default ~500 ms — enough to batch a burst of keystrokes without lagging the save).
+The server sends `writeSyncStep1` immediately after the client connects,
+plus the current awareness snapshot if any. Subsequent edits and
+awareness changes are relayed to peers.
 
-Awareness frames (cursor positions, selections, presence pings) ride the same socket as `awareness` messages. They're never persisted; they're broadcast and dropped.
+The wire format matches the
+[`y-websocket`](https://github.com/yjs/y-websocket) reference server, so
+any Yjs client targeting that protocol can connect — point it at
+`ws[s]://<host>/ws/yjs/<path>` with auth attached as above.
 
-## Message size limit
+## Agent presence
 
-64 KiB per frame. The server closes the socket with code `1009 (Message Too Big)` if a peer sends more. Yjs's natural update size is in the tens of bytes per keystroke — you only hit this limit if you're trying to splice an entire MB-sized blob into the doc in one update. Don't do that; use the attachment API.
+When the server applies an agent-routed edit (`applyServerEdit`), it
+publishes a synthetic awareness entry on a stable per-agent client id so
+human collaborators see an "AI is editing" indicator. The entry clears
+4 s (`AGENT_PRESENCE_TTL_MS`) after the last edit.
 
-## Reconnection
+## Close codes used by the server
 
-Clients should reconnect with exponential backoff on close. Kryton's official client uses `y-websocket`'s built-in reconnect (1 s → 2 s → 4 s → … capped at 30 s with ±20% jitter). Sessions and tokens stay valid across reconnects; the doc state is re-sent on every fresh connection so missed updates self-heal.
-
-## Versioning
-
-The server speaks the Yjs sync protocol version current as of `yjs@13.x` (the version embedded in the server's `package.json`). The protocol has been stable for years and is forward-compatible — older clients connect to newer servers and vice versa as long as both sides ship a 13.x-compatible `y-protocols`.
-
-If Kryton ever needs to break this, the change will land on a new endpoint (e.g. `/ws/yjs2/`) and the old one will remain for a deprecation cycle.
-
-## Rate limiting
-
-Connections-per-IP are rate-limited at the proxy / ingress layer, not by the Kryton server (the server assumes the proxy already did its job). Per-user connection caps live in the server: a single user can hold up to 8 concurrent connections per doc before the server starts closing the oldest. This is a guard against runaway tabs, not a hard quota — most users sit at 1–2.
-
-## Debugging
-
-Enable verbose Yjs logging:
-
-```bash
-# Server
-LOG_LEVEL=debug
-```
-
-```js
-// Client (browser console)
-localStorage.setItem('y-websocket-debug', '*')
-```
-
-The server logs every upgrade attempt with the resolved user id, doc id, scope, and (if applicable) the rejection reason. Failed handshakes are the most common collaboration bug — start there.
-
-## See also
-
-- [Reverse proxy and TLS](/kryton/advanced/security/reverse-proxy-and-tls/) — proxy must honour the WebSocket upgrade.
-- [API keys and MCP](/kryton/advanced/security/api-keys-and-mcp/) — bearer token model.
-- [REST API](/kryton/advanced/api/rest/) — the non-real-time companion.
+| Code | Reason          | When                          |
+|------|-----------------|-------------------------------|
+| 1008 | `unauthenticated` | no valid session or token |
+| 1008 | `forbidden`     | docId outside user's vault    |
+| 1011 | `internal`      | unhandled error in onConnection |

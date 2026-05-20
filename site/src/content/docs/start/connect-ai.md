@@ -1,33 +1,31 @@
 ---
 title: Connect your AI
-description: One command wires Kryton into Claude, Cursor, Codex, and the other AI tools already on your machine.
+description: One command detects every supported AI host on your machine and wires it to your Kryton server.
 ---
 
-Once Kryton is running, you'll want your AI assistants to be able to read and write your notes. There's a single command that takes care of every tool it can find on your machine.
+Kryton publishes two npm packages under `@azrtydxb/`: `kryton-init` (one-shot installer) and `kryton-mcp` (the stdio MCP shim for hosts that don't speak HTTP MCP).
 
-## The one command
+## Quick start
 
 ```sh
 npx @azrtydxb/kryton-init
 ```
 
-That's it. `npx` ships with Node.js — if you don't have Node, grab the LTS installer from [nodejs.org](https://nodejs.org/) first.
+The installer will:
 
-## What it does
+1. Ask for your Kryton server URL (defaults to `https://kryton.ai`).
+2. Sign you in via email + password.
+3. Mint an API key named `kryton-init-<hostname>-<timestamp>`.
+4. Detect every supported AI tool on your machine.
+5. Write the appropriate MCP config to each one.
 
-When you run it, the installer will:
+It is idempotent — re-running replaces previous Kryton entries instead of duplicating them, and writes a `<path>.kryton-init.bak.<timestamp>` next to every file it modifies.
 
-1. **Ask for your Kryton server URL.** Press Enter to accept `https://kryton.ai`, or type your own (for example `http://localhost:3000` if you installed via Docker).
-2. **Sign you in.** It prompts for your email and password — the same credentials you used to register in Kryton.
-3. **Mint an API key.** A new key named `kryton-init-<your-hostname>-<timestamp>` is created on the server. You don't have to copy it anywhere.
-4. **Detect your AI tools.** It scans your machine for every supported host.
-5. **Write the right config to each.** Existing settings stay intact; previous Kryton entries are replaced cleanly (a backup is saved next to each file).
+## Supported hosts
 
-Re-running the command is safe. It updates rather than duplicates.
+macOS and Linux only.
 
-## Supported AI tools
-
-| Host | How it talks to Kryton |
+| Host | Transport |
 |---|---|
 | Claude Code | HTTP (stdio fallback) |
 | Cursor | HTTP (stdio fallback) |
@@ -39,22 +37,20 @@ Re-running the command is safe. It updates rather than duplicates.
 | KiloCode | stdio |
 | RooCode | stdio |
 
-macOS and Linux only for the first release. Windows support is coming.
-
-## Try it
-
-Open your AI tool and ask:
-
-> List my recent Kryton notes.
-
-You should see real titles from your Kryton.
-
 ## Other commands
 
 ```sh
-npx @azrtydxb/kryton-init status      # which tools are currently wired
-npx @azrtydxb/kryton-init detect      # list detected tools without changing anything
-npx @azrtydxb/kryton-init uninstall   # remove Kryton entries everywhere
+kryton-init install        # interactive setup (default action)
+kryton-init uninstall      # remove Kryton entries from every detected host
+kryton-init status         # show which hosts are wired (token hash only)
+kryton-init detect         # list detected hosts without writing anything
+kryton-init mcp [--host]   # print the MCP JSON snippet to wire manually
 ```
 
-If your favourite AI tool isn't on the list yet, run `kryton-init mcp --host claude-code` (or any other host) to print the JSON snippet you can paste into a config by hand.
+`uninstall` also revokes the minted API key on the server.
+
+For the manual JSON snippets and the full CLI reference, see [the CLI page](/kryton/advanced/reference/cli/).
+
+## Next
+
+[Your first notes](/kryton/start/first-notes/) — write something for your agent to read.

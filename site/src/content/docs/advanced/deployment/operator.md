@@ -3,370 +3,260 @@ title: Kubernetes Operator
 description: Manage Kryton instances as Kubernetes custom resources — CRD schema, example CRs, backups, snapshots, and plugin pre-install.
 ---
 
-The Kryton Operator manages Kryton instances as Kubernetes custom resources. It embeds the official Helm chart and adds lifecycle features the chart cannot express on its own:
+`kryton-operator` is a Kubernetes operator that manages `Kryton` custom resources by installing/upgrading the [kryton Helm chart](/advanced/deployment/helm/) on each reconcile, then layering three operator-only resources on top:
 
-- **Backup / restore** — scheduled `pg_dump` to S3-compatible object storage (MinIO, Garage, SeaweedFS, etc.) with retention sweeping.
-- **Plugin install** — pre-install plugins by URL with SHA-256 verification before the server pod starts.
-- **Volume snapshots** — scheduled `VolumeSnapshot` resources against the data PVC.
-- **Multi-instance** — multiple isolated Kryton instances on one cluster, declaratively.
+- A Postgres backup `CronJob` (`pg_dump` → S3-compatible object store with retention sweep).
+- A plugin-installer init-container that downloads and SHA-256-verifies user-declared plugin archives into the persistence volume before the server boots.
+- A `VolumeSnapshot` scheduler `CronJob`.
 
-- **CRD**: `kryton.azrtydxb.io/v1alpha1`, kind `Kryton`
+The helm-side install/upgrade uses `helm.sh/helm/v3/pkg/action` directly. The operator-only resources are reconciled by a controller-runtime reconciler in `operator/internal/controller/`.
+
 - **Operator image**: `ghcr.io/azrtydxb/kryton/kryton-operator`
-- **Source**: [`operator/`](https://github.com/azrtydxb/kryton/tree/master/operator)
+- **CRD bundle**: `kryton-crds.yaml`, attached to every GitHub Release.
 
-The operator is helm-based: every reconcile invokes `helm upgrade --install` against the embedded chart. Anything the chart can do, the operator can do via `spec.values` passthrough.
+## CRD
+
+| Field | Value |
+|---|---|
+| `apiVersion` | `kryton.azrtydxb.io/v1alpha1` |
+| `kind` | `Kryton` |
+| Scope | Namespaced |
+| Group / domain | `kryton.azrtydxb.io` |
+
+Defined in `operator/config/crd/bases/kryton.azrtydxb.io_krytons.yaml`.
+
+### Spec schema
+
+Parsed straight from the CRD's OpenAPI v3 schema.
+
+| Path | Type | Required | Description |
+|---|---|---|---|
+| `spec.version` | string | yes | appVersion of the kryton server image to deploy. |
+| `spec.values` | object (passthrough) | no | Values forwarded verbatim to the embedded helm chart. Schema is the chart's `values.yaml`. |
+| `spec.backup` | object | no | Postgres backup CronJob configuration. |
+| `spec.backup.schedule` | string (cron) | yes (within `backup`) | Cron expression (UTC) for `pg_dump`. |
+| `spec.backup.retention` | string | no | Retention duration (e.g. `30d`). Older objects in the target bucket are swept. |
+| `spec.backup.objectStore` | object | no | S3-compatible target. |
+| `spec.backup.objectStore.bucket` | string | yes (within `objectStore`) | Bucket name. |
+| `spec.backup.objectStore.endpoint` | string | yes (within `objectStore`) | Full URL of the S3-compatible service (e.g. `https://minio.kw.local`). |
+| `spec.backup.objectStore.region` | string | no | Optional. Some services ignore it; `mc` still wants the field. |
+| `spec.backup.objectStore.prefix` | string | no | Key prefix inside the bucket. Defaults to `<cr-name>/`. |
+| `spec.backup.objectStore.credentialsSecretRef.name` | string | yes (within `credentialsSecretRef`) | Name of a Secret with keys `OBJECT_STORE_ACCESS_KEY` and `OBJECT_STORE_SECRET_KEY`. |
+| `spec.plugins[]` | array of objects | no | Plugins to pre-install via an init-container. |
+| `spec.plugins[].name` | string | yes | Plugin file name on disk. |
+| `spec.plugins[].url` | string | yes | URL to fetch the plugin archive from. |
+| `spec.plugins[].sha256` | string (regex `^[a-fA-F0-9]{64}$`) | yes | Hex-encoded SHA-256 digest of the archive. |
+| `spec.snapshot` | object | no | VolumeSnapshot schedule for the persistence PVC. |
+| `spec.snapshot.schedule` | string (cron) | yes (within `snapshot`) | |
+| `spec.snapshot.retention` | string | no | Retention window (e.g. `7d`). |
+| `spec.snapshot.volumeSnapshotClassName` | string | no | CSI snapshot class name. |
+
+### Status
+
+The status subresource is enabled; the operator writes:
+
+| Path | Type | Description |
+|---|---|---|
+| `status.helmRevision` | integer | Helm revision applied by the last reconcile. |
+| `status.observedVersion` | string | Last appVersion successfully reconciled. |
+| `status.conditions[]` | array | Standard `{type, status, reason, message, lastTransitionTime}` conditions. |
+
+Additional unknown fields are preserved (`x-kubernetes-preserve-unknown-fields: true`).
 
 ## Install
 
-### 1. Install the CRD bundle
+### CRDs
+
+Every GitHub Release attaches a `kryton-crds.yaml` asset bundling `operator/config/crd/bases/*.yaml`:
 
 ```bash
-kubectl apply -f https://github.com/azrtydxb/kryton/releases/download/v4.6.0/kryton-crds.yaml
+kubectl apply -f https://github.com/azrtydxb/kryton/releases/download/<tag>/kryton-crds.yaml
 ```
 
-Or from a local checkout:
+### Operator
+
+The operator is built with operator-sdk's helm plugin; the install workflow uses the kustomize tree under `operator/config/`. From a checkout:
 
 ```bash
-kubectl apply -f operator/config/crd/bases/
+cd operator
+make install   # CRDs
+make deploy IMG=ghcr.io/azrtydxb/kryton/kryton-operator:<tag>
 ```
 
-### 2. Deploy the operator
+`make deploy` runs `kustomize build config/default | kubectl apply -f -` (see `operator/Makefile`). The operator pod, ServiceAccount, RBAC, and CRD are all applied from the same kustomize tree.
+
+To uninstall:
 
 ```bash
-kubectl create namespace kryton-system
-kubectl apply -n kryton-system \
-  -f https://github.com/azrtydxb/kryton/releases/download/v4.6.0/kryton-operator.yaml
+make undeploy
+make uninstall
 ```
-
-The bundle includes the operator Deployment, ServiceAccount, ClusterRole, ClusterRoleBinding, and a default `Kryton`-watching configuration scoped to all namespaces. To restrict to a single namespace, set `WATCH_NAMESPACE` on the operator Deployment.
-
-Verify:
-
-```bash
-kubectl -n kryton-system get pods
-kubectl -n kryton-system logs deploy/kryton-operator
-```
-
-## CRD schema
-
-`kryton.azrtydxb.io/v1alpha1`, kind `Kryton`, namespace-scoped. The full schema:
-
-```yaml
-apiVersion: kryton.azrtydxb.io/v1alpha1
-kind: Kryton
-metadata:
-  name: my-kryton
-  namespace: kryton
-spec:
-  version: "4.6.0"           # required — appVersion (image tag) to deploy
-  values: {}                 # passthrough to the embedded chart's values.yaml
-  backup:                    # optional
-    schedule: "0 3 * * *"    # required when backup is set
-    retention: "30d"
-    objectStore:
-      endpoint: https://minio.kw.local   # required
-      bucket: kryton-backups             # required
-      region: us-east-1                  # optional; mc still wants the field set
-      prefix: prod/                      # optional; defaults to "<cr-name>/"
-      credentialsSecretRef:
-        name: kryton-backup-creds        # Secret with OBJECT_STORE_ACCESS_KEY + _SECRET_KEY
-  plugins:                   # optional
-    - name: pomodoro
-      url: https://example.com/pomodoro.tar.gz
-      sha256: 7a3e9c2b1d8f4a5e6c7b8d9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b
-  snapshot:                  # optional
-    schedule: "0 4 * * *"
-    retention: "14d"
-    volumeSnapshotClassName: csi-snapclass
-status:
-  helmRevision: 0
-  observedVersion: ""
-  conditions: []
-```
-
-`spec.values` is a strict superset of the chart's `values.yaml` schema (enforced by the `deployment-sync-check` CI gate). Anything you put in `values.yaml` for `helm install` goes under `spec.values` here.
 
 ## Example CRs
 
-These ship under `operator/config/samples/`:
-
-- `kryton_v1alpha1_kryton_minimal.yaml`
-- `kryton_v1alpha1_kryton.yaml`
-- `kryton_v1alpha1_kryton_with_plugins.yaml`
-- `kryton_v1alpha1_kryton_multi.yaml`
+The operator ships four samples under `operator/config/samples/`.
 
 ### Minimal
 
+`kryton_v1alpha1_kryton_minimal.yaml`:
+
 ```yaml
 apiVersion: kryton.azrtydxb.io/v1alpha1
 kind: Kryton
 metadata:
-  name: kryton
-  namespace: kryton
+  name: kryton-minimal
 spec:
-  version: "4.6.0"
-  values:
-    ingress:
-      enabled: true
-      className: nginx
-      hosts:
-        - host: kryton.example.com
-          paths: [{ path: /, pathType: Prefix }]
+  version: "4.5.0"
 ```
 
-Embedded Postgres (pgvector subchart) is enabled by default.
+Boots the helm chart with all chart defaults. Bundled Postgres, ReadWriteOnce PVC, no Ingress.
 
-### With scheduled backups
+> Note on the secret: the helm chart requires `env.secret.BETTER_AUTH_SECRET`
+> to be set or the server crashloops. Either provide it via
+> `spec.values.env.secret.BETTER_AUTH_SECRET`, or — recommended — create a
+> chart `existingSecret` ahead of time and reference it.
+
+### Backup-enabled
+
+`kryton_v1alpha1_kryton.yaml`:
 
 ```yaml
 apiVersion: kryton.azrtydxb.io/v1alpha1
 kind: Kryton
 metadata:
-  name: kryton
-  namespace: kryton
+  name: kryton-sample
 spec:
-  version: "4.6.0"
+  version: "4.5.0"
   values:
     ingress:
+      enabled: false
+    postgresql:
       enabled: true
-      hosts:
-        - host: kryton.example.com
-          paths: [{ path: /, pathType: Prefix }]
   backup:
-    schedule: "0 3 * * *"            # 03:00 UTC daily
+    schedule: "0 3 * * *"
     retention: "30d"
     objectStore:
-      endpoint: https://minio.kw.local
       bucket: kryton-backups
-      prefix: prod/
+      endpoint: https://minio.kw.local
+      prefix: kryton-sample/
       credentialsSecretRef:
-        name: kryton-backup-creds    # keys: OBJECT_STORE_ACCESS_KEY, OBJECT_STORE_SECRET_KEY
+        name: kryton-backup-creds
+  plugins: []
+  snapshot:
+    schedule: "0 4 * * *"
+    retention: "7d"
 ```
 
-The operator emits a `CronJob` that runs `pg_dump` against the embedded (or external) Postgres and uploads the dump to the configured object store using `mc` (MinIO client — works with any S3-compatible service). A sweep step deletes objects older than `retention`. No Velero, no AWS dependency, no separate backup image — the CronJob runs `postgres:16` and installs `mc` at runtime.
+The `kryton-backup-creds` Secret must contain:
 
-### With pre-installed plugins
+```bash
+kubectl create secret generic kryton-backup-creds \
+  --from-literal=OBJECT_STORE_ACCESS_KEY=<access> \
+  --from-literal=OBJECT_STORE_SECRET_KEY=<secret>
+```
+
+### Plugins
+
+`kryton_v1alpha1_kryton_with_plugins.yaml`:
 
 ```yaml
 apiVersion: kryton.azrtydxb.io/v1alpha1
 kind: Kryton
 metadata:
-  name: kryton
-  namespace: kryton
+  name: kryton-with-plugins
 spec:
-  version: "4.6.0"
+  version: "4.5.0"
+  values:
+    persistence:
+      enabled: true
+      size: 10Gi
   plugins:
-    - name: pomodoro
-      url: https://github.com/azrtydxb/kryton-plugins/releases/download/v1.4.0/pomodoro.tar.gz
-      sha256: 7a3e9c2b1d8f4a5e6c7b8d9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b
-    - name: kanban
-      url: https://github.com/azrtydxb/kryton-plugins/releases/download/v2.1.0/kanban.tar.gz
-      sha256: 1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c
+    - name: example-plugin
+      url: https://example.com/plugins/example-1.2.3.tar.gz
+      sha256: "0000000000000000000000000000000000000000000000000000000000000000"
 ```
 
-The operator patches the kryton Deployment with an init-container that downloads each plugin URL, verifies the SHA-256 digest, and extracts into the persistence volume's plugin directory before the main server starts. A digest mismatch fails the init-container and the kryton pod fails to start (intentional — the server never runs untrusted plugin code).
+The sample uses an all-zeros SHA-256 — replace with the real digest of your plugin archive.
 
 ### Multi-instance
 
-```yaml
----
-apiVersion: kryton.azrtydxb.io/v1alpha1
-kind: Kryton
-metadata:
-  name: team-alpha
-  namespace: kryton
-spec:
-  version: "4.6.0"
-  values:
-    fullnameOverride: team-alpha
-    postgresql:
-      fullnameOverride: team-alpha-postgres
-    ingress:
-      enabled: true
-      hosts:
-        - host: alpha.kryton.example.com
-          paths: [{ path: /, pathType: Prefix }]
----
-apiVersion: kryton.azrtydxb.io/v1alpha1
-kind: Kryton
-metadata:
-  name: team-beta
-  namespace: kryton
-spec:
-  version: "4.6.0"
-  values:
-    fullnameOverride: team-beta
-    postgresql:
-      fullnameOverride: team-beta-postgres
-    ingress:
-      enabled: true
-      hosts:
-        - host: beta.kryton.example.com
-          paths: [{ path: /, pathType: Prefix }]
-```
+`kryton_v1alpha1_kryton_multi.yaml` puts two independent Kryton CRs in one namespace. The operator passes `fullnameOverride: <metadata.name>` to helm so releases never collide on Service or PVC names.
 
-The operator passes the CR's `metadata.name` through `fullnameOverride` so each release's resources are name-scoped. PVCs, Services, Secrets, and Postgres releases are isolated per CR. Two CRs can run different `spec.version` values side-by-side — useful for canary upgrades.
+## How each operator-only feature works
 
-## Backup and restore
+### Backup
 
-### How backups work
+(`operator/internal/controller/backup.go`)
 
-When `spec.backup` is set, the operator reconciles a `CronJob` named `<cr-name>-backup` in the CR's namespace. Each run:
+The reconciler renders a `CronJob` named `<cr-name>-backup` running the `postgres:16` image. The script:
 
-1. Resolves the Postgres DSN from the same source the server uses (embedded subchart Secret, or external Secret reference).
-2. Runs `pg_dump --format=custom --no-owner --no-acl` into a file.
-3. Uploads to `<bucket>/<prefix><database>-<timestamp>.dump` using `mc`.
-4. Sweeps objects under the prefix older than `retention` (`mc rm --recursive --older-than <retention>`).
+1. Installs `mc` (MinIO client) into the pod at runtime if not already present (curl-fetched from `dl.min.io`).
+2. Configures an `mc alias` for the configured endpoint using `OBJECT_STORE_ACCESS_KEY` / `OBJECT_STORE_SECRET_KEY` from the credentials Secret.
+3. Runs `pg_dump --format=custom --no-owner --no-acl` against the bundled Postgres, using `PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE` from the chart's `<cr-name>-postgresql` Secret.
+4. Uploads the dump under `<prefix><database>-<timestamp>.dump`.
+5. Sweeps the prefix with `mc rm --recursive --force --older-than $RETENTION`.
 
-Object-store credentials come from `spec.backup.objectStore.credentialsSecretRef`. The Secret must contain `OBJECT_STORE_ACCESS_KEY` and `OBJECT_STORE_SECRET_KEY`. Endpoint URL is always explicit (`spec.backup.objectStore.endpoint`) — point it at MinIO, Garage, SeaweedFS, or any other S3-compatible service.
+CronJob settings: `concurrencyPolicy: Forbid`, `successfulJobsHistoryLimit: 3`, `failedJobsHistoryLimit: 3`, `backoffLimit: 2`, `restartPolicy: OnFailure`.
 
-### Inspect backup history
+The image is plain `postgres:16` — there is no separate backup image to build.
 
-```bash
-kubectl -n kryton get cronjob,jobs -l app.kubernetes.io/component=backup
-kubectl -n kryton logs job/<backup-job-name>
-```
+If `spec.backup` is cleared on the CR, the controller deletes the CronJob.
 
-### Restore from a backup
+### Plugins
 
-Restoration is intentionally **not** automated by the operator — it's destructive and you should be present to verify.
+(`operator/internal/controller/plugins.go` + `kryton_extras_controller.go`)
 
-```bash
-# 1. Scale the kryton Deployment to 0 so nothing writes during restore.
-kubectl -n kryton scale deploy/<cr-name> --replicas=0
+For each `spec.plugins[]` entry the reconciler:
 
-# 2. Download the dump.
-mc alias set store https://minio.kw.local "$ACCESS_KEY" "$SECRET_KEY"
-mc cp store/kryton-backups/prod/<cr-name>-2026-05-15T03-00-00.dump ./restore.dump
+1. Fetches the Deployment named `<cr-name>` (the chart's `fullnameOverride` convention).
+2. Patches its pod template to add an init-container `plugin-installer`, image `curlimages/curl:8.10.1`.
+3. The init-container's script `curl -fsSL --retry 3` each `url`, verifies via `sha256sum -c`, and writes to `/plugins/<name>`.
+4. The init-container is patched onto the Deployment in place; the reconciler replaces any prior `plugin-installer` to stay idempotent.
 
-# 3. pg_restore against the target Postgres.
-kubectl -n kryton exec -it sts/<cr-name>-postgresql -- \
-  bash -c 'PGPASSWORD=$POSTGRES_PASSWORD pg_restore --clean --if-exists \
-    -U kryton -d kryton' < restore.dump
+The init-container mounts a volume named `plugins` at `/plugins`. **You must wire a `plugins` volume into the chart values** for the init-container's mount to resolve — the operator does not synthesise this volume on the chart for you.
 
-# 4. Scale kryton back up.
-kubectl -n kryton scale deploy/<cr-name> --replicas=1
+If `spec.plugins` is empty, the reconciler does nothing. (It does not currently clean up a previously-injected init-container when the field is cleared — track that on your end if you toggle plugins off.)
 
-# 5. Verify.
-kubectl -n kryton port-forward svc/<cr-name> 3001:80
-curl -fsS http://localhost:3001/healthz
-```
+### Snapshot
 
-For external Postgres, run `pg_restore` from any host that can reach the database.
+(`operator/internal/controller/snapshot.go`)
 
-### Snapshots
+The reconciler renders `<cr-name>-snapshot`, a `CronJob` running `bitnami/kubectl:1.31` under a ServiceAccount `<cr-name>-snapshot`. The script `kubectl apply`s a `snapshot.storage.k8s.io/v1` `VolumeSnapshot` against the chart's PVC (which the operator assumes is named `<cr-name>` — matches the chart's default naming), then sweeps older `VolumeSnapshot` objects past retention.
 
-```yaml
-spec:
-  snapshot:
-    schedule: "0 4 * * *"
-    retention: "14d"
-    volumeSnapshotClassName: csi-snapclass
-```
+Requirements:
 
-The operator emits a `VolumeSnapshot` against the kryton PVC on the schedule and sweeps older snapshots. Useful as a fast complement to `pg_dump`: snapshots cover the notes / attachments / plugins volume; `pg_dump` covers the database.
+- A CSI driver with snapshot support installed cluster-wide.
+- A `VolumeSnapshotClass` already present, named by `spec.snapshot.volumeSnapshotClassName`.
+- A ServiceAccount + RBAC `<cr-name>-snapshot` granting create/delete on `volumesnapshots`. **The operator does not currently create this ServiceAccount or its Role/RoleBinding for you** — provision it before enabling snapshots.
 
-## Plugin install flow
+If `spec.snapshot` is cleared, the controller deletes the CronJob.
 
-```
-       CR.spec.plugins[]
-              │
-              ▼
-   ┌─────────────────────────┐
-   │ Operator patches the    │
-   │ kryton Deployment       │
-   │ podSpec.initContainers  │
-   └──────────┬──────────────┘
-              │
-              ▼
-   ┌─────────────────────────┐  shared
-   │ init: download-plugins  ├─ persistence volume mount
-   │ - curl <url>            │   /data/plugins/
-   │ - sha256 check          │
-   │ - tar -xzf into mount   │
-   └──────────┬──────────────┘
-              │
-              ▼
-   ┌─────────────────────────┐
-   │ kryton server starts.   │
-   │ Plugin loader scans     │
-   │ /data/plugins/ at boot. │
-   └─────────────────────────┘
-```
+### Values passthrough and naming
 
-Notes:
+The helm-side reconciler injects two values on every install/upgrade:
 
-- The server's plugin API is unchanged. From the server's perspective, the plugins were already on disk at startup.
-- SHA-256 verification is **mandatory**. There's no skip flag — by design.
-- A failing digest fails the init-container, which fails the pod. The CR's `status.conditions[Ready]=False` with a clear reason.
-- Plugins installed via the CRD persist in the persistence volume. Removing an entry from `spec.plugins` does **not** delete the on-disk plugin; it just stops re-fetching it. To remove, exec into the pod and delete the plugin dir, or recreate the PVC.
+- `fullnameOverride: <cr-name>` — so multi-tenant deploys don't collide.
+- `postgresql.fullnameOverride: …` — so the bundled subchart picks the same prefix.
+- `image.tag: <spec.version>` — pins the server image.
 
-## Upgrade procedure
+Everything under `spec.values` is merged on top.
 
-Operator upgrades and Kryton instance upgrades are decoupled.
+## Operational reference
 
-### Upgrade the operator
+| RBAC verbs the operator uses (from `kryton_extras_controller.go`) |
+|---|
+| `kryton.azrtydxb.io/krytons`: get/list/watch + status:get/update/patch |
+| `batch/cronjobs`, `batch/jobs`: full CRUD |
+| `core/secrets`, `core/configmaps`, `core/persistentvolumeclaims`: get/list/watch/create/update/patch |
+| `apps/deployments`: get/list/watch/update/patch |
+| `snapshot.storage.k8s.io/volumesnapshots,volumesnapshotclasses`: full CRUD |
 
-```bash
-kubectl apply -n kryton-system \
-  -f https://github.com/azrtydxb/kryton/releases/download/v4.7.0/kryton-operator.yaml
-kubectl apply -f https://github.com/azrtydxb/kryton/releases/download/v4.7.0/kryton-crds.yaml
-```
-
-Always apply the new CRDs **before** the new operator Deployment. CRDs are backward-compatible within `v1alpha1` (additive fields only); breaking changes will move to `v1beta1`.
-
-### Upgrade a Kryton instance
-
-```bash
-kubectl -n kryton patch kryton my-kryton --type=merge \
-  -p '{"spec":{"version":"4.7.0"}}'
-```
-
-The operator runs `helm upgrade` against the new embedded chart version. Database migrations run automatically at server startup. Roll one CR at a time in multi-instance setups.
-
-## Troubleshooting
-
-### CR stuck in `Reconciling`
-
-```bash
-kubectl -n kryton describe kryton <name>
-kubectl -n kryton-system logs deploy/kryton-operator --tail=200
-```
-
-Most reconcile failures surface as `status.conditions[Ready].message`.
-
-### `helm release "<name>" failed`
-
-| Helm error | Fix |
-|---|---|
-| `cannot patch ... field is immutable` | Delete the resource and let the operator recreate, or roll back: `kubectl patch kryton <name> --type=merge -p '{"spec":{"version":"<prev>"}}'`. |
-| `timed out waiting for the condition` | Pod isn't going ready. `kubectl describe pod` for the probe failure. |
-| `release ... has no deployed releases` | Previous reconcile left the release in `failed`. `helm rollback <name>` or delete and re-apply the CR. |
-
-### Plugin init-container fails
-
-```bash
-kubectl -n kryton logs pod/<kryton-pod> -c download-plugins
-```
-
-`sha256 mismatch` → the URL or digest is wrong. Update the CR.
-
-### Backup CronJob never runs
-
-```bash
-kubectl -n kryton get cronjob
-kubectl -n kryton get jobs -l app.kubernetes.io/component=backup
-```
-
-Trigger manually:
-
-```bash
-kubectl -n kryton create job --from=cronjob/<cr-name>-backup test-backup-1
-kubectl -n kryton logs job/test-backup-1
-```
+| Garbage collection |
+|---|
+| Child CronJobs are owned by the parent CR (controller reference). `kubectl delete kryton <name>` deletes them. The Helm release's resources are not owned by the CR — the helm-side reconciler is responsible for them. |
 
 ## See also
 
-- [Helm chart](/kryton/advanced/deployment/helm/) — the embedded chart, for direct helm install without the operator.
-- [Backups and restore](/kryton/advanced/deployment/backups-restore/)
-- [Upgrades and migrations](/kryton/advanced/deployment/upgrades-and-migrations/)
+- [Helm chart values reference](/advanced/deployment/helm/) — all keys you can put under `spec.values`.
+- [Backups & restore](/advanced/deployment/backups-restore/) — restore drill for the operator's pg_dump artefacts.
+- [Upgrades & migrations](/advanced/deployment/upgrades-and-migrations/) — bumping `spec.version`.

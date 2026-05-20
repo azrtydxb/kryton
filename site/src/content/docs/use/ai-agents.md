@@ -1,27 +1,16 @@
 ---
 title: AI agents
-description: What your Claude, Cursor, or Codex can do once it's connected to your Kryton.
+description: What an MCP-connected agent can do with your Kryton vault.
 ---
 
-Kryton speaks **MCP** (Model Context Protocol), a standard way for AI agents to talk to apps. Once you've wired your favourite AI tool to Kryton, that tool can read and write your notes on your behalf — using your account, with your permissions.
+Once you've run `npx @azrtydxb/kryton-init` (see [Connect your AI](/kryton/start/connect-ai/)), any wired host gets a `kryton` MCP server exposing **33 tools** scoped read-only or read-write per call.
 
-In practice this means you can say things like:
+What an agent can do:
 
-- *"Pull up everything I wrote about Project Aurora last week and summarise it."*
-- *"Take these meeting notes, file them under `/work/standups`, and tag them `#standup`."*
-- *"Find any note with a TODO and turn each one into a tagged task."*
+- **Read** — `list_notes`, `read_note`, `list_folders`, `list_recent_notes`, `get_note_metadata`, `list_daily_notes`, `list_templates`, `list_tags`, `list_favorites`
+- **Write** — `create_note`, `update_note`, `append_to_note`, `delete_note`, `rename_note`, `create_folder`, `rename_folder`, `delete_folder`, `create_note_from_template`, `write_daily_note`, `get_daily_note`
+- **Search and traverse** — `search`, `list_notes_by_tag`, `get_backlinks`, `get_graph`
+- **Stars and trash** — `add_favorite`, `remove_favorite`, `list_trash`, `restore_from_trash`, `empty_trash`
+- **Sharing** — `list_shares`, `list_shares_with_me`, `share_note`, `unshare_note`
 
-The agent does the searching, reading, and writing through Kryton's API. You see the results in real time.
-
-## Get this set up
-
-You need two things:
-
-1. A running Kryton — see [Install with Docker](/kryton/start/install/docker/).
-2. The `kryton-init` command — see [Connect your AI](/kryton/start/connect-ai/).
-
-After those two steps, ask your AI agent anything that involves your notes and it'll know what to do.
-
-## Going deeper
-
-If you want to know exactly which tools your agent has, or you're building your own agent integration, head to the [MCP tools reference](/kryton/advanced/api/mcp-tools/) under Advanced.
+For setup, see [Connect your AI](/kryton/start/connect-ai/). For the full tool reference with schemas, see [MCP tools](/kryton/advanced/api/mcp-tools/).

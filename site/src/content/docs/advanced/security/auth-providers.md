@@ -1,104 +1,85 @@
 ---
 title: Auth providers
-description: Email + password, OAuth (Google, GitHub), Passkeys (WebAuthn), 2FA, and how to lock registration down.
+description: Email + password, Google and GitHub OAuth, Passkeys, TOTP 2FA, and the open / invite-only registration switch.
 ---
 
-Kryton's auth layer is [BetterAuth](https://www.better-auth.com/). The server exposes one sign-in surface that fans out to the providers you've enabled via environment variables. Every provider lands the user in the same session model; the only thing that varies is the credential.
+Kryton's auth stack is [Better Auth](https://better-auth.com) mounted at
+`/api/auth/*`. All of the methods below share that catch-all — they're
+configured server-side via environment variables and feature-flagged
+client-side based on what's present at boot.
 
 ## Email and password
 
-On by default — no env required beyond `BETTER_AUTH_SECRET`.
+Always on.
 
-Passwords are hashed with bcrypt before storage. Minimum length is 8 characters; the form rejects shorter input client-side and the server re-validates.
+- Min length 8, max 72 characters — see `emailAndPassword` in
+  `packages/server/src/modules/identity/auth-config.ts`.
+- `autoSignIn: true` — newly registered users are logged in immediately.
+- Password reset emails are sent only when `SMTP_HOST` is set; otherwise
+  the reset URL is logged at info level and the request silently succeeds.
+  Configure with `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`,
+  `SMTP_PASS`, `SMTP_FROM` (all defined in `config/env.ts`).
 
-For password reset to work, configure SMTP:
+## OAuth — Google and GitHub
 
-| Variable | Required for reset email | Example |
-|---|---|---|
-| `SMTP_HOST` | yes | `smtp.fastmail.com` |
-| `SMTP_PORT` | yes | `465` |
-| `SMTP_SECURE` | yes | `true` |
-| `SMTP_USER` | yes | `kryton@example.com` |
-| `SMTP_PASS` | yes | (app password) |
-| `SMTP_FROM` | yes | `Kryton <noreply@example.com>` |
+Each provider activates only when both its client ID and secret are set.
 
-Without SMTP, the "forgot password" link still appears in the UI but the email never arrives. Admins can manually reset a user via the admin panel.
+| Provider | Env vars |
+|----------|----------|
+| Google   | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` |
+| GitHub   | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` |
 
-## OAuth — Google
+Both are defined in `config/env.ts` and wired in
+`auth-config.ts → socialProviders`. The login page reads
+`GET /api/auth/config` and shows only the buttons for providers whose
+secrets are present.
 
-1. In the [Google Cloud Console](https://console.cloud.google.com/), create an OAuth 2.0 Client ID (Web application).
-2. Authorized redirect URI: `https://kryton.example.com/api/auth/callback/google`.
-3. Set the env on the server:
-
-```env
-GOOGLE_CLIENT_ID=1234567890-xxxxxxxxxxxxxx.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=GOCSPX-xxxxxxxxxxxxxxxxxxxxx
-APP_URL=https://kryton.example.com
-BETTER_AUTH_URL=https://kryton.example.com
-```
-
-Restart the server. A **Continue with Google** button appears on the login page.
-
-## OAuth — GitHub
-
-1. In your [GitHub Developer Settings](https://github.com/settings/developers), create a new OAuth App.
-2. Authorization callback URL: `https://kryton.example.com/api/auth/callback/github`.
-3. Set the env:
-
-```env
-GITHUB_CLIENT_ID=Iv1.xxxxxxxxxxxxxxxx
-GITHUB_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-```
-
-Either OAuth provider is optional and independent — enable one, both, or neither.
+No other OAuth providers are wired today.
 
 ## Passkeys (WebAuthn)
 
-Passkeys let users sign in with Touch ID, Windows Hello, a YubiKey, or any other FIDO2 authenticator. After an account has a password set, the user can register a passkey from **Account Settings → Security**.
+Wired via the `@better-auth/passkey` plugin. The relying-party ID comes
+from `WEBAUTHN_RP_ID` (defaults to `localhost`); for production set it to
+the public hostname (e.g. `kryton.example.com`). The relying-party origin
+is taken from `APP_URL`.
 
-Required env:
+Users enroll passkeys from **Account Settings → Security** (rendered by
+`packages/client/src/components/Security/PasskeyManager.tsx`). Registration
+and authentication flow through the Better Auth catch-all.
 
-```env
-WEBAUTHN_RP_ID=kryton.example.com
-APP_URL=https://kryton.example.com
-```
+## Two-factor authentication (TOTP)
 
-`WEBAUTHN_RP_ID` must be the **hostname** (no scheme, no port) the user visits. WebAuthn binds credentials to this value — change it after passkeys are registered and they all stop working.
+Wired via Better Auth's `twoFactor` plugin. Settings (from
+`auth-config.ts`):
 
-On `localhost`, `WEBAUTHN_RP_ID=localhost` is the only allowed special case. Anything else needs HTTPS.
+- Issuer: `Kryton`
+- TOTP period: 30 s, 6 digits
+- 10 backup codes generated at enrollment
 
-## Two-factor auth
+Users opt in from **Account Settings → Security** (rendered by
+`packages/client/src/components/Security/TwoFactorManager.tsx`).
 
-TOTP-based 2FA is built in. Users enable it from **Account Settings → Security**. The flow:
+## Registration mode — open vs invite-only
 
-1. User scans a QR code with their authenticator app (Authy, 1Password, the built-in OS one, …).
-2. Confirms with a 6-digit code.
-3. Subsequent sign-ins prompt for the TOTP code after the password / OAuth step.
+The first user to register automatically becomes `admin` (the
+`databaseHooks.user.create.before` hook in `auth-config.ts`). After that,
+the `registration_mode` setting controls who can sign up:
 
-Backup codes are issued at enrolment — one-time-use, ten codes by default.
+- `open` (default) — anyone with a valid email can register.
+- `invite-only` — registration requires an `inviteCode` in the request
+  body. Invite codes are single-use and atomically claimed to avoid
+  races; admins manage them via the admin UI.
 
-To enforce 2FA org-wide (admin policy), an admin can flip the "Require 2FA" toggle in **Admin → Auth settings**. Existing users without 2FA are required to set it up on next login.
+Switch the mode from **Admin → Settings**, which calls
+`PUT /api/admin/settings/registration-mode` (see
+`packages/server/src/modules/platform/routes/admin-settings.routes.ts`).
 
-## Disabling registration
+## Sessions
 
-By default after the first user lands, registration mode is `invite-only`. Three modes exist:
-
-| Mode | Behaviour |
-|---|---|
-| `open` | Anyone with the URL can register. |
-| `invite-only` | New users need an invite code minted from **Admin → Invites**. Default after first signup. |
-| `closed` | No new sign-ups, period. Existing users keep working. |
-
-Toggle from **Admin → Auth settings**. The setting persists in the database, not in env vars.
-
-## Session cookies
-
-Sessions live in HTTP-only, `Secure`, `SameSite=Lax` cookies. The cookie name is `kryton.session`. Lifetime defaults to 30 days, rotated on every sign-in.
-
-In production (when `NODE_ENV=production`), the server emits `Secure` cookies regardless of CORS config — terminate TLS in front of Kryton or sessions won't stick. See [Reverse proxy and TLS](/kryton/advanced/security/reverse-proxy-and-tls/).
-
-## See also
-
-- [API keys and MCP](/kryton/advanced/security/api-keys-and-mcp/) — programmatic auth for agents and scripts.
-- [Reverse proxy and TLS](/kryton/advanced/security/reverse-proxy-and-tls/) — required for cookies to flow.
-- [Environment variables](/kryton/advanced/reference/env-vars/) — the full env-var reference.
+- 7-day expiry, sliding 1-day refresh — `session.expiresIn` /
+  `session.updateAge` in `auth-config.ts`.
+- Cookie cache enabled, 5-minute TTL.
+- Signing secret: `BETTER_AUTH_SECRET` (minimum 32 chars, enforced in
+  `config/env.ts`).
+- Trusted origins are `APP_URL`, `kryton://` (the desktop scheme), and
+  any extras pushed in by the tunnel module.

@@ -1,39 +1,23 @@
 ---
 title: Search and tags
-description: Find anything from anywhere with full-text search and tag-based browsing.
+description: The quick switcher, the search box, and the tag browser.
 ---
 
-## Quick search
+## Quick switcher
 
-Press `⌘K` (macOS) or `Ctrl+K` (Linux/Windows) anywhere in Kryton to open the search palette. It searches across:
+Press `⌘P` / `Ctrl+P` to open the quick switcher. The input placeholder reads `Search notes, run a command…`.
 
-- Note titles
-- Note bodies (full text)
-- Tags
-- Headings inside notes
+Keyboard:
 
-Results are ranked by relevance; arrow keys move the selection, Enter opens.
+- `↑` / `↓` — navigate results
+- `↵` — open the highlighted result
+- `⌘↵` / `Ctrl+↵` — open in split
+- `esc` — close
+
+## Search
+
+Press `⌘K` / `Ctrl+K` to focus the search input. Results query the server's search endpoint.
 
 ## Tags
 
-Tags are anything in a note that starts with `#`:
-
-```
-#meeting #2026-q2 #project-aurora
-```
-
-Tags don't have to be created beforehand — write one and it exists. As you type `#`, Kryton autocompletes against tags you've already used so you don't drift into `#meeting` vs `#meetings`.
-
-## Tag browser
-
-Open **Tags** from the left sidebar to see every tag in your workspace, sorted by how many notes use it. Click any tag to see those notes.
-
-## Combining
-
-Search supports tag filters too. In the `⌘K` palette, type:
-
-```
-#books pragmatic
-```
-
-That shows notes tagged `#books` that also contain the word *pragmatic*.
+Tag a note by writing `#name` anywhere in its body. The **Tags** view aggregates every tag across the vault; when empty, it shows the hint `no tags yet — tag a note with #<name>`. Clicking a tag opens the list of notes carrying it.

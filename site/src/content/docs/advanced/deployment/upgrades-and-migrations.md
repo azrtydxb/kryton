@@ -1,106 +1,175 @@
 ---
 title: Upgrades and migrations
-description: How Kryton handles version upgrades, the on-boot migration flow, version checks, and rollback caveats.
+description: Kryton's on-boot Drizzle migrator, the /api/version endpoint, and upgrade ordering for Compose, Helm and the operator.
 ---
 
-Kryton ships a single server image per version. The image embeds the client bundle, the server, and every Drizzle migration up to that point. Upgrading is "swap the image, restart" — no separate migration step, no maintenance window in the typical case.
+## Migration mechanism
 
-## The migration flow
+Every Kryton server boot runs Drizzle migrations against `POSTGRES_URL` before the HTTP listener opens. The Dockerfile's entrypoint is two lines:
 
-On every boot the server:
-
-1. Connects to Postgres using `POSTGRES_URL`.
-2. Inspects the `drizzle_migrations` table.
-3. Applies every migration newer than the latest applied one, in order, inside a transaction per file.
-4. Initialises the semantic-search worker (a no-op if `SEMANTIC_PROVIDER=off`).
-5. Starts the HTTP listener and the Yjs WebSocket server.
-
-If step 3 fails, the server exits non-zero. Postgres is left at the last successfully-applied migration. The pod (or Docker container) restarts and tries again — fix the underlying cause (insufficient privileges, missing extension, disk space) and the next boot picks up.
-
-## Version check
-
-```bash
-curl -fsS https://kryton.example.com/api/version
-# {"version":"4.6.5-pre.5","commit":"abcd123","major":4}
+```sh
+node scripts/migrate-prod.mjs
+exec node dist/server.js
 ```
 
-The CI release pipeline stamps `version` and `commit` into the image at build time. `major` is the parsed major-version integer that clients (notably the mobile app) use to enforce compatibility.
+`scripts/migrate-prod.mjs` opens a `pg.Pool` with `max: 1`, builds a Drizzle client, and calls Drizzle's `migrate()` against `dist/db/migrations/`. Migration failure exits the container with a non-zero status; under `restart: unless-stopped` (Compose) or a Kubernetes Deployment, it crashloops with a visible error in the logs.
 
-Clients call this endpoint on every reload and compare the response against the version they were built for. A version mismatch surfaces a soft "reload to upgrade" banner — no force-disconnect, no data loss.
+Migration files live in `packages/server/src/db/migrations/` and are baked into the image under `dist/db/migrations/`. They are SQL, applied in lexical order. The Drizzle migrator tracks applied migrations in `drizzle.__drizzle_migrations` in the target database — re-runs are safe.
 
-## Major-version compatibility
-
-Kryton uses [SemVer](https://semver.org/). The server's contract:
-
-- **Patch** (`x.y.Z`) — bug fixes only. Always forward-safe.
-- **Minor** (`x.Y.z`) — additive changes: new endpoints, new schema columns (nullable / defaulted), new env vars (with defaults), new plugin API surface. Always forward-safe.
-- **Major** (`X.y.z`) — anything else. Breaking. See the [changelog](/kryton/advanced/reference/changelog/) before upgrading. Pre-major versions (`v0.x`, `v1.x`) get a longer migration grace window with at least one minor that warns about the upcoming break.
-
-### Rollback caveats
-
-Drizzle migrations are **not** automatically reversible. The server applies forward-only. If you must roll back a major version:
-
-1. Restore the database from the most recent backup taken **before** the upgrade. See [Backups and restore](/kryton/advanced/deployment/backups-restore/).
-2. Restore the notes directory from the same backup window (file paths or content may have been rewritten by the upgrade — e.g. a wiki-link migration).
-3. Redeploy the old image.
-
-Restoring only the image without rolling the DB leaves the old server staring at a schema it doesn't understand. The server will refuse to boot.
-
-Always take a backup immediately before any major upgrade. Routine minor / patch upgrades are forward-safe and a fresh backup isn't required, but you should still have a recent one on hand.
-
-## Compose
+If you ever need to run migrations out-of-band (a one-shot Job, or against an external Postgres you've just provisioned), exec the script:
 
 ```bash
-docker compose -f docker-compose.prod.yml pull
-docker compose -f docker-compose.prod.yml up -d
-docker compose logs -f kryton   # watch migrations run
+docker run --rm \
+  -e POSTGRES_URL=postgres://… \
+  ghcr.io/azrtydxb/kryton/kryton:<tag> \
+  node scripts/migrate-prod.mjs
 ```
 
-If you pin a specific tag (recommended), bump it in `docker-compose.prod.yml` before `pull`. The `latest` tag floats.
+## `/api/version`
 
-## Helm
+The server exposes a public endpoint at `GET /api/version`:
+
+```json
+{
+  "version": "4.6.5-pre.5",
+  "commit": "abc1234",
+  "major": 4
+}
+```
+
+Defined in `packages/server/src/modules/platform/routes/version.routes.ts`; backed by `packages/server/src/lib/version.ts`, which reads `package.json` at boot and falls back to `/COMMIT_SHA` (written into the image at build time) when `git rev-parse` is unavailable.
+
+This is the canonical post-upgrade check — if `/api/version` returns the new tag and `commit` matches the image you deployed, the new build is live.
+
+## Health checks
+
+The Helm chart's templates wire two probes:
+
+- `livenessProbe: GET /healthz` — basic alive, doesn't touch the DB.
+- `readinessProbe: GET /readyz` — alive + DB reachable.
+
+Upgrade tooling should wait on `/readyz` (and `/api/version`) before declaring a rollout healthy.
+
+## Docker Compose upgrades
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+The new image's entrypoint runs migrations before serving. If the dump format of the new release is incompatible with the previous one (rare; documented per release), `docker compose up -d` is still correct — the migration runner brings the schema forward.
+
+To pin a specific release, edit the compose file's `image:` line:
+
+```yaml
+kryton:
+  image: ghcr.io/azrtydxb/kryton/kryton:v4.6.4
+```
+
+Then `docker compose up -d`.
+
+## Helm upgrades
+
+The chart's `appVersion` tracks the server release on every published version. Bumping the chart bumps `image.tag` automatically unless you override:
+
+```bash
+helm upgrade kryton oci://ghcr.io/azrtydxb/charts/kryton --version <new>
+```
+
+To pin the image tag independently of the chart version:
 
 ```bash
 helm upgrade kryton oci://ghcr.io/azrtydxb/charts/kryton \
-  --version 4.7.0 \
-  --namespace kryton \
-  --reuse-values
+  --version <chart-ver> \
+  --set image.tag=v4.6.4
 ```
 
-The chart's `version` and `appVersion` track 1:1. `--reuse-values` keeps your overrides; drop it if you're also changing values. With RWO storage the chart's strategy is `Recreate` (old pod terminates before the new one starts); under RWX it can `RollingUpdate`. Either way, the new pod must pass `/readyz` (which includes a DB check) before traffic flows.
+### Ordering across the chart
 
-## Operator
+The chart's only state-bearing resources are:
+
+- The `Deployment` (re-rolled on every upgrade).
+- The chart-managed PVC (preserved across upgrades; `helm uninstall` does **not** delete PVCs).
+- The optional bitnami/postgresql subchart's PVC (same caveat).
+
+The Deployment's `strategy.type` is `Recreate` (default). On `helm upgrade`:
+
+1. Helm patches the Deployment with the new image.
+2. The old pod is terminated.
+3. A new pod starts, runs the migrator, then serves.
+
+There is no manual ordering you need to enforce — migrations run during pod start. The brief downtime window (old pod terminating before new pod is ready) is the cost of `Recreate`. To eliminate it, configure RWX storage and switch `strategy.type` to `RollingUpdate`; otherwise leave it alone.
+
+If you're upgrading the bitnami/postgresql subchart at the same time (because `Chart.yaml`'s dependency moved), do that as a deliberate step — a subchart major bump can change StatefulSet labels and trigger Postgres rotation. The chart's `Chart.yaml` pins the subchart version explicitly (currently `16.4.5`), so upgrades only happen when you bump the parent chart version that bumped it.
+
+## Operator upgrades
+
+Two surfaces to think about: the operator image, and the per-CR `spec.version`.
+
+### Operator image
+
+The CRDs ship as a separate `kryton-crds.yaml` asset on each GitHub Release.
 
 ```bash
-# 1. Upgrade the CRDs first (additive, safe).
-kubectl apply -f https://github.com/azrtydxb/kryton/releases/download/v4.7.0/kryton-crds.yaml
+# If the release notes call out CRD changes:
+kubectl apply -f https://github.com/azrtydxb/kryton/releases/download/<new-tag>/kryton-crds.yaml
 
-# 2. Upgrade the operator Deployment.
-kubectl apply -n kryton-system \
-  -f https://github.com/azrtydxb/kryton/releases/download/v4.7.0/kryton-operator.yaml
-
-# 3. Bump each Kryton instance.
-kubectl -n kryton patch kryton my-kryton --type=merge \
-  -p '{"spec":{"version":"4.7.0"}}'
+# Then bump the operator Deployment:
+cd operator
+make deploy IMG=ghcr.io/azrtydxb/kryton/kryton-operator:<new-tag>
 ```
 
-In a multi-instance cluster, roll one CR at a time. The operator does not enforce serial rollout — that's your operational choice.
+**Order**: CRDs first if the schema changed (otherwise `kubectl apply` against the operator's CR types may reject fields), then the operator Deployment. The operator's reconciler is forwards-compatible within a CRD's stored version (`v1alpha1` at the time of writing).
 
-## Pre-release tags
+### Per-CR `spec.version`
 
-Pre-release versions are tagged `vX.Y.Z-pre.N` (e.g. `v4.7.0-pre.3`). They're built and pushed like full releases but aren't tagged `latest`. Use them for staging environments; never auto-track them into production.
+Bumping a single instance:
 
-## Troubleshooting
+```bash
+kubectl patch kryton kryton-prod --type merge \
+  -p '{"spec":{"version":"4.6.4"}}'
+```
 
-| Symptom | Likely cause | Fix |
-|---|---|---|
-| Server exits with `migration X failed` | Migration ran into a permissions / extension issue. | Read the error; usually `CREATE EXTENSION vector` or a missing role privilege. |
-| `/api/version` returns the old version after upgrade | Browser cached the bundle. | Hard reload (Ctrl-Shift-R) — service worker invalidates on version bump. |
-| New version refuses to boot, `column "foo" does not exist` | A migration was rolled back manually but the server image expects it. | Restore from backup and re-apply the upgrade. |
-| Migration is slow on first boot after a major upgrade | Backfill migration on a large table. | Let it complete; check `kubectl logs` for progress. |
+The helm-side reconciler runs an upgrade against the embedded chart with `image.tag: <spec.version>` injected. The Deployment re-rolls, the new pod runs migrations, then serves. `status.observedVersion` reflects the new value once the reconcile completes.
+
+The operator's helm reconciler uses `helm.sh/helm/v3/pkg/action` directly (not helm-operator-plugins). Failed installs/upgrades surface as conditions on `status.conditions`.
+
+## Rollback caveats
+
+**Schema migrations are forward-only.** Drizzle's migrator does not generate or apply down-migrations. If a release ships a destructive migration (column drop, type change), rolling the image back will not restore the dropped data. The release notes call this out explicitly when it happens.
+
+For Compose:
+
+```bash
+docker compose pull   # if you've already pulled the new tag
+# Edit compose file to pin previous tag, then:
+docker compose up -d
+```
+
+The previous image will start, find migrations newer than itself in `drizzle.__drizzle_migrations`, and **may** boot anyway — the Drizzle migrator does not verify that the application code understands every applied migration. The honest rollback path for a breaking release is restore-from-backup (see [Backups & restore](/advanced/deployment/backups-restore/)), not image downgrade.
+
+For Helm:
+
+```bash
+helm rollback kryton <previous-revision>
+```
+
+Same caveat — the older chart's image will run against the migrated schema. Safe for additive migrations; unsafe for destructive ones.
+
+For the operator: patch `spec.version` back to the previous value. Same caveat again.
+
+## Pre-upgrade checklist
+
+1. Take a backup (`pg_dump` + notes tarball — see [Backups & restore](/advanced/deployment/backups-restore/)).
+2. Read the [CHANGELOG](https://github.com/azrtydxb/kryton/blob/master/CHANGELOG.md) for the target release; look for the word "breaking" and any migration notes.
+3. Confirm the current version: `curl -s https://<host>/api/version`.
+4. Pin to a tag (don't track `:latest` for production upgrades).
+5. Apply the upgrade.
+6. Re-check `/api/version` and `/readyz`.
 
 ## See also
 
-- [Changelog](/kryton/advanced/reference/changelog/) — what's in each release.
-- [Backups and restore](/kryton/advanced/deployment/backups-restore/)
-- [Release process](/kryton/advanced/contributing/release-process/) — how releases get made.
+- [Docker Compose](/advanced/deployment/docker-compose/)
+- [Helm chart](/advanced/deployment/helm/)
+- [Operator](/advanced/deployment/operator/)
+- [Backups & restore](/advanced/deployment/backups-restore/)

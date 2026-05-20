@@ -1,179 +1,187 @@
 ---
 title: Backups and restore
-description: Back up and restore Kryton — Docker Compose (volume snapshot + pg_dump) and Helm/Operator (managed CronJob), with restore drills.
+description: Back up and restore Kryton — Docker Compose (pg_dump + notes tarball) and Kubernetes (operator's pg_dump CronJob and PVC snapshots).
 ---
 
-Kryton has two state stores:
-
-1. **Postgres** — users, sessions, API keys, tags, share permissions, semantic-search embeddings, plugin metadata.
-2. **The notes directory** — your markdown files, attachments, generated assets, installed plugin code.
-
-A complete backup includes both. Restoring one without the other leaves you with broken references (notes the DB doesn't know about, or DB pointers to notes that vanished).
+Kryton's state lives in two places: Postgres (notes content, vector embeddings, users, sessions, attachments metadata) and the notes directory on disk (note files). A working backup covers both at consistent points in time.
 
 ## Docker Compose
 
-### Backup
+### Postgres dump
+
+Run from the directory containing your compose file. The bundled Postgres image is reachable as the `postgres` service:
 
 ```bash
-# pg_dump of the database
-docker compose -f docker-compose.prod.yml exec -T postgres \
-  pg_dump -U kryton --format=custom kryton > "kryton-db-$(date +%F).dump"
-
-# tar of the notes dir (the bind-mounted ./notes)
-tar czf "kryton-notes-$(date +%F).tar.gz" notes/
-
-# (Optional) named data volume — plugin data + attachments
-docker run --rm -v kryton_kryton-data:/data -v "$(pwd)":/backup alpine \
-  tar czf "/backup/kryton-data-$(date +%F).tar.gz" -C /data .
+docker compose exec -T postgres \
+  pg_dump -U kryton --format=custom kryton > kryton-$(date -u +%Y%m%dT%H%M%SZ).dump
 ```
 
-Combine the three into one tarball and ship them off-host (rsync, rclone, S3 — your choice). Verify each archive's checksum at write time:
+Notes:
+
+- `--format=custom` is `pg_restore`-compatible and compresses by default.
+- The `-T` flag (`docker compose exec -T`) disables TTY allocation so the redirect captures only the dump.
+- Add `--no-owner --no-acl` if you intend to restore into a different role.
+
+### Notes directory
+
+The notes bind mount is `./notes` on the host. Tar it alongside the dump:
 
 ```bash
-sha256sum kryton-db-$(date +%F).dump \
-          kryton-notes-$(date +%F).tar.gz \
-          kryton-data-$(date +%F).tar.gz > checksums.txt
+tar czf notes-$(date -u +%Y%m%dT%H%M%SZ).tar.gz notes/
 ```
 
-Re-verify on the destination — `sha256sum -c checksums.txt`.
+### Consistency between the two
 
-### Cron-driven
+The notes filesystem and the Postgres state are not transactionally linked, but both are append-mostly. Taking the `pg_dump` first, then the `tar`, gives you a database that may reference a notes file that isn't in the archive — usually harmless on restore (the server treats missing files as not-yet-synced). Taking the `tar` first is also safe.
+
+For stronger consistency, stop the kryton service briefly:
 
 ```bash
-cat > /etc/cron.daily/kryton-backup <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-cd /home/kryton/kryton
-TS=$(date +%Y%m%d-%H%M%S)
-DEST=/var/backups/kryton
-mkdir -p "$DEST"
-docker compose -f docker-compose.prod.yml exec -T postgres \
-  pg_dump -U kryton --format=custom kryton > "$DEST/db-$TS.dump"
-tar czf "$DEST/notes-$TS.tar.gz" notes/
-find "$DEST" -mtime +30 -delete
-EOF
-chmod +x /etc/cron.daily/kryton-backup
+docker compose stop kryton
+docker compose exec -T postgres pg_dump -U kryton --format=custom kryton > kryton.dump
+tar czf notes.tar.gz notes/
+docker compose start kryton
 ```
 
-### Restore
+### Restoring Docker Compose
 
-```bash
-# 1. Stop the server (DB stays up).
-docker compose -f docker-compose.prod.yml stop kryton
+Start with an empty target stack — the database must not exist yet. From a clean directory:
 
-# 2. Restore the DB. --clean drops existing objects first.
-docker compose -f docker-compose.prod.yml exec -T postgres \
-  pg_restore -U kryton -d kryton --clean --if-exists --no-owner --no-acl \
-  < kryton-db-2026-05-15.dump
+1. Place `docker-compose.prod.yml` and your `.env`.
+2. Start **Postgres only**:
 
-# 3. Restore notes.
-rm -rf notes/
-tar xzf kryton-notes-2026-05-15.tar.gz
+   ```bash
+   docker compose up -d postgres
+   ```
 
-# 4. Bring the server back up.
-docker compose -f docker-compose.prod.yml start kryton
+3. Drop and recreate the database (`pg_restore` does not overwrite by default):
 
-# 5. Verify.
-curl -fsS http://localhost:3100/healthz
-```
+   ```bash
+   docker compose exec -T postgres dropdb -U kryton --if-exists kryton
+   docker compose exec -T postgres createdb -U kryton kryton
+   docker compose exec -T postgres psql -U kryton -d kryton -c 'CREATE EXTENSION IF NOT EXISTS vector;'
+   ```
 
-Always test the restore drill at least once against a scratch instance before you rely on it.
+4. Load the dump:
 
-## Helm / Operator
+   ```bash
+   docker compose exec -T postgres pg_restore -U kryton -d kryton --no-owner --no-acl < kryton.dump
+   ```
 
-The Helm chart itself does not provision a backup CronJob — you have two clean options:
+5. Unpack the notes archive into the host directory the compose file mounts:
 
-### Option A — the Operator (recommended)
+   ```bash
+   tar xzf notes.tar.gz   # writes ./notes/…
+   ```
 
-The Kryton Operator's `spec.backup` declares the schedule, retention, and S3-compatible target. The operator reconciles a `CronJob` that runs `pg_dump` and uploads to the bucket, sweeping objects older than the retention window. Full reference: [Operator backups](/kryton/advanced/deployment/operator/#backup-and-restore).
+6. Start kryton:
+
+   ```bash
+   docker compose up -d kryton
+   ```
+
+   The entrypoint runs `migrate-prod.mjs` again — pending migrations against the restored schema are applied automatically.
+
+> **Restore order matters**: `vector` extension before `pg_restore` (the dump
+> references vector-typed columns), then restore, then start the server so
+> migrations run cleanly against the restored schema. The bundled
+> `pgvector/pgvector:pg16` image ships the extension binaries; the `CREATE
+> EXTENSION` step turns it on.
+
+## Helm
+
+The chart does not provide a `backup.*` block in `values.yaml` — there is no Helm-level backup primitive. Three options:
+
+1. **Run the operator** (next section) — managed CronJob + S3-compatible target.
+2. **Roll your own CronJob** — a `batch/v1` CronJob in the same namespace that execs into the Postgres pod and uploads the dump somewhere durable. The operator's `internal/controller/backup.go` is a working reference implementation you can copy.
+3. **Volume snapshots** — if the Postgres PVC's StorageClass supports CSI snapshots, schedule `VolumeSnapshot` objects against `<release>-postgresql`. For the notes PVC do the same against the chart's PVC (`<release>` by default).
+
+The chart's `livenessProbe` is `/healthz` and `readinessProbe` is `/readyz` — your backup tooling can read these to gate before/after windows.
+
+## Operator (`Kryton` CR)
+
+The operator ships two relevant primitives: `spec.backup` (pg_dump → S3-compatible) and `spec.snapshot` (CSI VolumeSnapshot of the persistence PVC).
+
+### `spec.backup`
 
 ```yaml
+apiVersion: kryton.azrtydxb.io/v1alpha1
+kind: Kryton
+metadata:
+  name: kryton-prod
 spec:
+  version: "4.5.0"
   backup:
-    schedule: "0 3 * * *"
-    retention: "30d"
+    schedule: "0 3 * * *"      # 03:00 UTC daily
+    retention: "30d"            # mc --older-than syntax: 30d, 12h, …
     objectStore:
-      endpoint: https://minio.kw.local
       bucket: kryton-backups
+      endpoint: https://minio.example.com
+      region: ""                # optional; mc still reads the field
+      prefix: kryton-prod/       # defaults to <cr-name>/
       credentialsSecretRef:
         name: kryton-backup-creds
 ```
 
-### Option B — chart-only with your own CronJob
+Prerequisites:
 
-Run a separate `CronJob` that mounts the same secret as kryton (for `POSTGRES_URL`), shells out `pg_dump --format=custom`, and `mc cp`s the result to S3:
+- `kryton-backup-creds` Secret with `OBJECT_STORE_ACCESS_KEY` / `OBJECT_STORE_SECRET_KEY` keys.
+- The chart's bundled Postgres (or an external one whose credentials are in a Secret named `<cr-name>-postgresql` with keys `PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE`).
+- An S3-compatible bucket; the endpoint URL is explicit, so MinIO / Garage / SeaweedFS all work.
+
+What the operator emits (`operator/internal/controller/backup.go`):
+
+- A CronJob `<cr-name>-backup`, image `postgres:16`, with `concurrencyPolicy: Forbid`, `backoffLimit: 2`.
+- The Job script installs `mc` at runtime (curl-fetched from `dl.min.io`), runs `pg_dump --format=custom --no-owner --no-acl`, uploads to `<bucket>/<prefix><database>-<timestamp>.dump`, and sweeps `mc rm --recursive --force --older-than $RETENTION`.
+
+### `spec.snapshot`
 
 ```yaml
-apiVersion: batch/v1
-kind: CronJob
-metadata:
-  name: kryton-backup
 spec:
-  schedule: "0 3 * * *"
-  jobTemplate:
-    spec:
-      template:
-        spec:
-          restartPolicy: OnFailure
-          containers:
-            - name: dump
-              image: postgres:16
-              envFrom:
-                - secretRef: { name: kryton }
-              command:
-                - sh
-                - -c
-                - |
-                  set -e
-                  apt-get update && apt-get install -y curl
-                  curl -fsSL https://dl.min.io/client/mc/release/linux-amd64/mc -o /usr/local/bin/mc
-                  chmod +x /usr/local/bin/mc
-                  TS=$(date +%Y%m%dT%H%M%SZ)
-                  pg_dump "$POSTGRES_URL" --format=custom --no-owner --no-acl \
-                    > /tmp/kryton-$TS.dump
-                  mc alias set s3 "$OBJECT_STORE_ENDPOINT" "$ACCESS_KEY" "$SECRET_KEY"
-                  mc cp /tmp/kryton-$TS.dump s3/kryton-backups/
-                  mc rm --recursive --force --older-than 30d s3/kryton-backups/
+  snapshot:
+    schedule: "0 4 * * *"
+    retention: "7d"
+    volumeSnapshotClassName: csi-hostpath-snapclass
 ```
 
-The notes / plugins PVC is covered by the operator's `spec.snapshot` (a `VolumeSnapshot`) or by your storage class's own backup mechanism (rook-ceph snapshots, OpenEBS backups, CSI snapshotter).
+Prerequisites:
 
-### Restore
+- A CSI driver with snapshot support.
+- The named `VolumeSnapshotClass`.
+- A pre-existing ServiceAccount `<cr-name>-snapshot` with RBAC to create/delete `volumesnapshots` — **the operator does not provision this for you**.
+
+What it emits: a CronJob `<cr-name>-snapshot`, image `bitnami/kubectl:1.31`, that `kubectl apply`s a `snapshot.storage.k8s.io/v1` `VolumeSnapshot` and sweeps older ones past retention.
+
+### Restoring from an operator backup
+
+The dumps are plain `pg_dump --format=custom` files in the bucket. The restore drill mirrors the Compose flow against the in-cluster Postgres pod:
 
 ```bash
-# 1. Scale the kryton Deployment to 0.
-kubectl -n kryton scale deploy/kryton --replicas=0
-
-# 2. Pull the dump.
-mc cp s3/kryton-backups/kryton-2026-05-15T03-00-00.dump ./
-
-# 3. pg_restore into the in-cluster Postgres.
-kubectl -n kryton exec -i sts/kryton-postgresql -- \
-  bash -c 'PGPASSWORD=$POSTGRES_PASSWORD pg_restore -U kryton -d kryton \
-    --clean --if-exists --no-owner --no-acl' < kryton-2026-05-15T03-00-00.dump
-
-# 4. (If you snapshot the PVC) restore the VolumeSnapshot per your CSI driver.
-
-# 5. Scale back up.
-kubectl -n kryton scale deploy/kryton --replicas=1
-
-# 6. Verify.
-kubectl -n kryton port-forward svc/kryton 3001:80 &
-curl -fsS http://localhost:3001/healthz
+# Download the dump to a workstation, then load via a one-shot pod:
+kubectl run --rm -i --tty pg-restore --image=postgres:16 --restart=Never -- \
+  bash -c 'apt-get update && apt-get -y install postgresql-client; \
+           pg_restore -h <release>-postgresql -U kryton -d kryton --no-owner --no-acl < /tmp/kryton.dump'
 ```
 
-## Verify
+Practical workflow: kubectl-copy the dump into a temporary pod with `mc` (or `aws s3 cp` if you stored to AWS), then `pg_restore` from inside that pod. Drop + recreate the database first (same `dropdb` / `createdb` / `CREATE EXTENSION vector` sequence as the Compose path).
 
-After every restore, sanity-check:
+For PVC restore from a `VolumeSnapshot`, create a new PVC with `dataSource: <snapshot>` and re-point the chart to that PVC via `persistence.existingClaim`.
 
-- A representative user can log in.
-- The notes count matches your expectation (`GET /api/notes | jq 'length'`).
-- A search query returns results (`GET /api/search?q=…`) — confirms the in-memory MiniSearch index rebuilt from disk and the pgvector embeddings survived.
-- Tag and graph queries return results (`GET /api/tags`, `GET /api/graph`).
+## Testing a restore
 
-If any of these fail, the database and the notes directory are out of sync — restore both from the same backup window.
+Cheap drill that catches the usual breakage:
+
+1. Take a dump + notes tarball.
+2. Start a throwaway compose stack in a different directory with a different volume namespace (`docker compose -p kryton-restore up -d postgres`).
+3. Restore into it.
+4. `docker compose -p kryton-restore up -d kryton` — confirm `/api/version` answers and you can read a recent note.
+5. `docker compose -p kryton-restore down -v` to clean up.
+
+A restore that hasn't been exercised does not work.
 
 ## See also
 
-- [Operator backups](/kryton/advanced/deployment/operator/#backup-and-restore) — managed CronJobs.
-- [Upgrades and migrations](/kryton/advanced/deployment/upgrades-and-migrations/) — when to back up before bumping versions.
+- [Docker Compose](/advanced/deployment/docker-compose/)
+- [Helm chart](/advanced/deployment/helm/)
+- [Operator](/advanced/deployment/operator/)
+- [Upgrades & migrations](/advanced/deployment/upgrades-and-migrations/)

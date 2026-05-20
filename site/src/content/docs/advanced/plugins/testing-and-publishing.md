@@ -1,127 +1,116 @@
 ---
 title: Testing and publishing
-description: Vitest setup for plugins, how the existing plugins test themselves, and the registry submission process.
+description: Vitest setup for plugins, manifest validation, and the registry submission process.
 ---
 
-A plugin is just JavaScript. The host's testing stack — vitest — is the default. The registry's CI runs `vitest run` against every plugin's `__tests__/` directory on every PR.
+The [`kryton-plugins`](https://github.com/azrtydxb/kryton-plugins)
+repository is the development workspace for every official plugin and
+the staging area for community submissions. It ships with a build,
+test, and validate workflow you can lean on.
 
-## Vitest
+## Test runner
 
-Most plugins keep their model code in a plain JS file (no React, no browser globals) so it's trivial to unit-test. The kanban plugin is the example: `board-model.js` lives next to `client/index.ts`, and the same parse / serialize logic is exercised by `__tests__/board-model.test.js`.
+[vitest](https://vitest.dev) is the runner — it's declared in
+`kryton-plugins/package.json`:
 
-```js title="plugins/kanban/__tests__/board-model.test.js"
+```json
+"devDependencies": {
+  "esbuild": "^0.25.0",
+  "jsdom": "^25.0.0",
+  "typescript": "^5.9.0",
+  "vitest": "^2.1.0"
+}
+```
+
+Convention: each plugin keeps its tests inside its own
+`__tests__/` folder, alongside `manifest.json`. Examples:
+
+- `plugins/checklist/__tests__/parser.test.js`
+- `plugins/kanban/__tests__/board-model.test.js`
+- `plugins/flashcards/__tests__/srs.test.js`
+- `plugins/advanced-tables/__tests__/format.test.js`
+
+## A vitest example
+
+From `plugins/checklist/__tests__/parser.test.js`:
+
+```js
 import { describe, it, expect } from 'vitest';
-import { parseBoard, serializeBoard } from '../board-model.js';
+const { extractCheckboxes } = require('../parser.js');
 
-describe('kanban board model', () => {
-  it('round-trips an empty board', () => {
-    const md = '## Todo\n- Pick milk\n\n## Done\n- [x] Pick bread';
-    expect(serializeBoard(parseBoard(md))).toBe(md);
+describe('extractCheckboxes', () => {
+  it('returns empty for note with no checkboxes', () => {
+    expect(extractCheckboxes('plain text', 'a.md')).toEqual([]);
+  });
+  it('parses unchecked and checked items', () => {
+    const md = '- [ ] todo\n- [x] done\n  - [X] indented';
+    expect(extractCheckboxes(md, 'n.md')).toEqual([
+      { path: 'n.md', line: 1, checked: false, text: 'todo' },
+      { path: 'n.md', line: 2, checked: true, text: 'done' },
+      { path: 'n.md', line: 3, checked: true, text: 'indented' },
+    ]);
   });
 });
 ```
 
-Run it from the registry root:
+The pattern across the repo: extract pure logic (parsers, model
+transforms, formatters) into a plain module the test imports directly,
+then drive UI from that module. Don't test through the host — there's
+no host in vitest.
 
-```bash
-cd kryton-plugins
-npm install
-npm test
-```
+## Repo scripts
 
-Or scope to one plugin:
+From `kryton-plugins/package.json`:
 
-```bash
-npx vitest run plugins/kanban
-```
-
-The host repo's `vitest.config.ts` picks up `plugins/*/__tests__/**/*.test.{ts,js}` automatically.
-
-### Mocking the host API
-
-For tests that exercise the client entry, mock `window.__krytonPluginDeps` and the `api.*` namespaces:
-
-```js
-import { vi } from 'vitest';
-
-const api = {
-  ui: { registerSidebarPanel: vi.fn() },
-  notes: {
-    get: vi.fn().mockResolvedValue({ content: '## Todo\n- A' }),
-    update: vi.fn().mockResolvedValue({ ok: true }),
-  },
-  notify: { error: vi.fn() },
-};
-
-globalThis.window = { __krytonPluginDeps: { React: await import('react') } };
-
-const { activate } = await import('../client/index.ts');
-activate(api);
-
-expect(api.ui.registerSidebarPanel).toHaveBeenCalledOnce();
-```
-
-For component tests, [`@testing-library/react`](https://testing-library.com/docs/react-testing-library/intro/) layers on top of vitest cleanly.
+| Script | What it runs |
+|--------|--------------|
+| `npm run build` | `node scripts/build-plugins.js` — esbuild bundles each plugin's TypeScript to JS. |
+| `npm run validate` | `node scripts/validate-registry.js` — manifest sanity checks (see below). |
+| `npm run generate` | `node scripts/generate-registry.js` — rebuilds `registry.json` from manifests. |
+| `npm test` | `node scripts/test-plugins.js && vitest run` — per-plugin sanity tests, then the vitest suite. |
+| `npm run test:unit` | `vitest run` — just the vitest suite. |
+| `npm run test:watch` | `vitest` — watch mode for local dev. |
+| `npm run typecheck` | `tsc --noEmit`. |
+| `npm run lint` | `eslint plugins/ --ext .js`. |
 
 ## Manifest validation
 
-Before publishing, validate the registry entry (which includes the manifest reference) against the schema the host uses at load time:
+`scripts/validate-registry.js` enforces:
 
-```bash
-npm run validate
-```
+1. Each plugin folder has a parseable `manifest.json`.
+2. Required fields are present: `id`, `name`, `version`, `description`,
+   `author`, `minKrytonVersion`.
+3. `manifest.id` matches the directory name.
+4. Declared entry points (`server`, `client`) exist on disk.
+5. Settings entries are well-formed.
+6. No two plugins share an id across the repo.
 
-This runs `node scripts/validate-registry.js`, which checks every plugin's manifest, registry entry, and that the build artefacts exist. The registry CI runs the same script on every PR.
+The script exits non-zero if any check fails; CI runs it on every PR.
 
-Required fields: `id`, `name`, `version`, `description`, `author`, `minKrytonVersion`. Optional: `tags[]`, `icon`, `client`, `server`. The `id` must be globally unique within the registry and follow `^[a-z][a-z0-9-]{1,40}$`.
+## Publishing to the registry
 
-## Submitting to the registry
+`registry.json` is **auto-generated** — `generate-registry.js` reads
+every `plugins/*/manifest.json` and rewrites the file. Don't edit it
+by hand.
 
-The canonical registry lives at [github.com/azrtydxb/kryton-plugins](https://github.com/azrtydxb/kryton-plugins). To add a plugin:
+Workflow for a new community plugin:
 
-1. Fork the repo.
-2. Create `plugins/<id>/` with your `manifest.json`, `client/`, optional `server/`, and `__tests__/`.
-3. Add an entry to `registry.json`:
+1. Fork [`kryton-plugins`](https://github.com/azrtydxb/kryton-plugins).
+2. Create `plugins/<your-id>/` with the layout from the
+   [overview](/kryton/advanced/plugins/overview/#file-layout).
+3. Locally: `npm install && npm run validate && npm test && npm run build`.
+4. Run `npm run generate` so `registry.json` reflects your plugin.
+5. Open a PR. CI re-runs validate, test, and build; reviewers check the
+   plugin against the contribution guidelines in
+   `kryton-plugins/README.md`.
 
-   ```json
-   {
-     "id": "my-plugin",
-     "name": "My Plugin",
-     "version": "1.0.0",
-     "description": "What it does in one sentence.",
-     "author": "your-handle",
-     "minKrytonVersion": "2.0.0",
-     "tags": ["productivity"],
-     "icon": "smile",
-     "archiveUrl": "https://github.com/your-handle/my-plugin/releases/download/v1.0.0/my-plugin.tar.gz",
-     "sha256": "<sha256 of the archive>"
-   }
-   ```
+Once merged, your plugin shows up in every Kryton instance's Plugin
+Manager on the next registry refresh.
 
-4. `npm test` locally — every plugin's tests must pass before the registry CI accepts the PR.
-5. Open a PR. The CI runs lint + tests + manifest validation. A maintainer reviews for security and fit.
+## Local installation (no registry)
 
-## Versioning
-
-Plugins use [SemVer](https://semver.org/). The registry stores one version per plugin id — bumping `version` in `registry.json` is how users get an update.
-
-Breaking changes (renamed settings keys, removed slots, schema migrations on stored data) go in a major bump and should include a migration note in the PR description. The admin panel surfaces the version delta when an update is available.
-
-## Releasing an archive
-
-The simplest path: tag a GitHub release on your fork, upload `my-plugin.tar.gz`, copy the URL + SHA-256 into the registry entry. The archive should contain just your plugin's directory (the `tar` extracts into `/data/plugins/<id>/`).
-
-```bash
-cd plugins/my-plugin
-npm run build              # compiles TS → JS
-tar czf my-plugin.tar.gz manifest.json client/ server/ README.md
-sha256sum my-plugin.tar.gz
-```
-
-Drop the archive into a GitHub release of your fork, paste the URL + digest into the registry PR.
-
-## See also
-
-- [Plugins overview](/kryton/advanced/plugins/overview/) — what a plugin is.
-- [Quickstart](/kryton/advanced/plugins/quickstart/) — hello-world.
-- [Code-fence renderers](/kryton/advanced/plugins/code-fence-renderers/) — kanban's `__tests__/` is the reference test layout.
+For development or private plugins you don't want to publish: drop the
+folder into the running Kryton's configured plugins directory, then
+reload from the admin panel. The lifecycle is exactly the same as a
+registry install — see
+[Overview → Lifecycle](/kryton/advanced/plugins/overview/#lifecycle).

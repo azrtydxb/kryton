@@ -1,27 +1,23 @@
 ---
 title: Plugins
-description: Switch on Kanban boards, Mermaid diagrams, and other extras from the admin panel.
+description: Browse the registry, install plugins, and manage what's enabled.
 ---
 
-Plugins extend Kryton with new editor blocks, side panels, and code-fence renderers. The core stays small; you pick what to add.
+Kryton has a plugin system with two views in the **Plugins** settings tab:
 
-![A Kanban board rendered inline](/kryton/screenshots/editor.png)
+- **Installed** — what's currently installed in your vault, with controls to update or remove.
+- **Browse Registry** — the official registry, with an **Install** button per entry.
 
-## Enable a plugin
+The registry currently ships **24 plugins**, including:
 
-If you're an admin:
+- `kanban` — Kanban boards rendered from markdown
+- `mermaid-diagrams` — Mermaid diagrams in code fences
+- `dataview` — SQL-like queries over your notes
+- `excalidraw`, `mind-map`, `presentation`
+- `calendar`, `calendar-journal`, `pomodoro`, `flashcards`
+- `templater`, `slash-commands`, `tag-wrangler`, `theme-settings`
+- `advanced-tables`, `checklist`, `reading-list`, `recent-files`
+- `mass-upload`, `metrics`, `publish`, `rss-reader`, `git-backup`
+- `sample-wordcount`
 
-1. Open the **Admin** panel from the user menu.
-2. Go to **Plugins**.
-3. Toggle the plugin on. Most take effect immediately; a few prompt for a page reload.
-
-Non-admins use whatever an admin has switched on for the workspace.
-
-## Two crowd favourites
-
-- **Kanban** — Add a kanban board to any note. Drag cards between columns; the underlying note stays plain markdown so your data is portable.
-- **Mermaid** — Drop a `mermaid` code fence into a note and Kryton renders it as a live diagram (flowcharts, sequence diagrams, gantt charts, and more).
-
-## Browsing more
-
-The admin **Plugins** tab lists every plugin available, with a short description and a link to its source. Plugins are open source and live in the [`kryton-plugins`](https://github.com/azrtydxb/kryton-plugins) repository — you can write your own if you'd like.
+Installation is per-vault and per-user. To build your own plugin, see the [plugin overview](/kryton/advanced/plugins/overview/).
