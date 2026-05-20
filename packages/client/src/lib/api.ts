@@ -183,9 +183,31 @@ export async function request<T>(url: string, options?: RequestInit): Promise<T>
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || res.statusText);
+    throw new Error(extractErrorMessage(err, res.statusText));
   }
   return res.json();
+}
+
+/**
+ * Pulls a human-readable string out of whatever shape the server emitted.
+ * Handles three known shapes:
+ *  - structured: { error: { code, message, details? } }   (the canonical shape from plugins/errors.ts)
+ *  - simple:     { error: "string" }
+ *  - legacy:     { message: "string" }
+ * Falls back to the HTTP status text.
+ */
+function extractErrorMessage(body: unknown, fallback: string): string {
+  if (body && typeof body === "object") {
+    const b = body as { error?: unknown; message?: unknown };
+    if (b.error && typeof b.error === "object") {
+      const inner = b.error as { message?: unknown; code?: unknown };
+      if (typeof inner.message === "string") return inner.message;
+      if (typeof inner.code === "string") return inner.code;
+    }
+    if (typeof b.error === "string") return b.error;
+    if (typeof b.message === "string") return b.message;
+  }
+  return fallback;
 }
 
 export const api = {
@@ -287,7 +309,7 @@ export const api = {
     }).then(async (res) => {
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: res.statusText }));
-        throw new Error(err.error || res.statusText);
+        throw new Error(extractErrorMessage(err, res.statusText));
       }
       return res.json();
     });
