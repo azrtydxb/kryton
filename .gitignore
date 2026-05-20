@@ -14,8 +14,13 @@ pgdata/
 .ui-design/
 *.tsbuildinfo
 
-# Installed plugins (downloaded from registry at runtime)
+# Installed plugins (downloaded from registry at runtime, or a dev symlink
+# to a sibling kryton-plugins checkout). Trailing-slash form matches a real
+# directory; the no-slash form catches a dev-machine symlink (CI would
+# otherwise follow the dangling symlink and ENOENT on fs.mkdir at
+# modules/plugins/index.ts:109).
 packages/server/plugins/
+packages/server/plugins
 
 # Per-user notes tree + leftover SQLite files (pre-Postgres-migration)
 packages/server/data/
