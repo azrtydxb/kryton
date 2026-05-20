@@ -8,7 +8,7 @@ export default defineConfig({
   integrations: [
     starlight({
       title: "Kryton",
-      logo: { src: "./public/logo.svg", replacesTitle: false },
+      logo: { src: "./public/logo.svg", replacesTitle: true },
       favicon: "/favicon.svg",
       social: [{ icon: "github", label: "GitHub", href: "https://github.com/azrtydxb/kryton" }],
       customCss: ["./src/styles/tokens.css", "./src/styles/custom.css"],
