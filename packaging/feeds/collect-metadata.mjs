@@ -87,9 +87,11 @@ if (qnapPlatforms.length === 0) die("no qpkg-meta-* artifacts found");
 
 const spkSizes = {};
 const spkMd5 = {};
+const spkFilenames = {};
 for (const arch of synologyArchs) {
   spkSizes[arch] = spkMeta[arch].size;
   spkMd5[arch] = spkMeta[arch].md5;
+  spkFilenames[arch] = spkMeta[arch].filename;
 }
 
 // QPKG signatures appear as the sibling .codesigning file URL on the
@@ -125,6 +127,7 @@ const cfg = {
   qnapPlatforms,
   spkSizes,
   spkMd5,
+  spkFilenames,
   qpkgSigs,
   ...(synologyKeyring ? { synologyKeyring } : {}),
 };

@@ -46,7 +46,13 @@ function synologyEntry(cfg, arch) {
   obj.price = 0;
   obj.download_count = 0;
   obj.recent_download_count = 0;
-  obj.link = `${cfg.releaseAssetBaseUrl}/kryton_${cfg.version}_${arch}.spk`;
+  // Prefer the actual filename from collect-metadata (which captures the
+  // -0001 SPK package-revision suffix that build.sh emits). Fall back to
+  // a constructed name only for manual-dispatch / Phase 1 use where
+  // metadata isn't available.
+  const spkFilename =
+    cfg.spkFilenames?.[arch] ?? `kryton_${cfg.version}_${arch}.spk`;
+  obj.link = `${cfg.releaseAssetBaseUrl}/${spkFilename}`;
   obj.size = cfg.spkSizes?.[arch] ?? 0;
   obj.md5 = cfg.spkMd5?.[arch] ?? "";
   obj.thumbnail = [
