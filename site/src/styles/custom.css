@@ -84,3 +84,17 @@ header.header {
   border: 1px solid var(--kr-line);
   background: var(--kr-bg-1);
 }
+
+/* Sidebar: selected (current page) item.
+   Starlight applies a violet pill via --sl-color-bg-nav-accent / accent text;
+   in our palette text-accent IS the accent violet, so the label disappears.
+   Force dark text on the violet pill. */
+.sidebar-content a[aria-current="page"],
+nav a[aria-current="page"] {
+  color: var(--kr-accent-fg);
+  font-weight: 600;
+}
+.sidebar-content a[aria-current="page"]:hover,
+nav a[aria-current="page"]:hover {
+  color: var(--kr-accent-fg);
+}
