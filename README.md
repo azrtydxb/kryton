@@ -1,9 +1,5 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="logos/kryton_logo.svg" />
-    <source media="(prefers-color-scheme: light)" srcset="logos/kryton_logo.svg" />
-    <img src="logos/kryton_logo.svg" alt="Kryton" width="600" />
-  </picture>
+  <img src="logos/kryton_banner_dark.png" alt="Kryton" width="600" />
 </p>
 
 <p align="center">
@@ -160,7 +156,7 @@ See [API Keys & MCP docs](docs/API-ACCESS.md) for the full reference.
 ### Mobile App (React Native)
 - **Online-only client** — talks to the Kryton server over REST + WebSocket; no local database
 - **Full feature parity** — notes, search, graph, tags, settings, daily notes, templates, trash, history, sharing, admin
-- **WebView editor** — same CodeMirror experience on mobile
+- **WebView editor** — wraps the same in-house web editor inside a React Native WebView so mobile and desktop stay in lock-step
 - **Real-time collaboration** — Yjs over WebSocket for live multi-device editing
 - **Android APK** available via EAS Build
 - **Version compatibility** — enforces major-version match with server
@@ -281,7 +277,7 @@ Install on any Kubernetes cluster from the OCI registry:
 
 ```bash
 helm install kryton oci://ghcr.io/azrtydxb/charts/kryton \
-  --version 4.6.0 \
+  --version 4.6.5 \
   --namespace kryton --create-namespace \
   --set ingress.enabled=true \
   --set ingress.hosts[0].host=kryton.example.com
@@ -294,17 +290,17 @@ Full values reference, Postgres options, ExternalSecrets, and troubleshooting in
 Manage one or more Kryton instances declaratively, with scheduled backups, plugin pre-installation, and snapshots:
 
 ```bash
-kubectl apply -f https://github.com/azrtydxb/kryton/releases/download/v4.6.0/kryton-crds.yaml
+kubectl apply -f https://github.com/azrtydxb/kryton/releases/download/v4.6.5/kryton-crds.yaml
 kubectl create namespace kryton-system
 kubectl apply -n kryton-system \
-  -f https://github.com/azrtydxb/kryton/releases/download/v4.6.0/kryton-operator.yaml
+  -f https://github.com/azrtydxb/kryton/releases/download/v4.6.5/kryton-operator.yaml
 
 kubectl apply -f - <<'EOF'
 apiVersion: kryton.azrtydxb.io/v1alpha1
 kind: Kryton
 metadata: { name: kryton, namespace: kryton }
 spec:
-  version: "4.6.0"
+  version: "4.6.5"
   values:
     ingress:
       enabled: true
