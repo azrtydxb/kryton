@@ -1,23 +1,49 @@
 ---
-title: Get a public URL with Kryton Connect
-description: One paid add-on that gives your self-hosted Kryton a public address like you.my.kryton.ai — no port forwarding, no certificates, no DNS to manage.
+title: Get a public, secure URL with Kryton Connect
+description: Paid add-on that publishes your self-hosted Kryton at you.my.kryton.ai over HTTPS — without opening any ports on your router or exposing your network to the internet.
 ---
 
 Your Kryton is running on your machine. Now you want it reachable from
 your phone, from a friend, or from your AI tools running on a different
-computer. **Kryton Connect** is the one-click way to make that happen.
+computer — **without compromising the security of your home network**.
+
+**Kryton Connect** is the one-click way to make that happen.
 
 ## What you get
 
-- A public address like `you.my.kryton.ai`.
-- HTTPS already set up. No certificates to buy, install, or renew.
-- Nothing to open on your router. No port forwarding. No DNS records.
-- Works from anywhere you have internet — home, cafe, plane.
-- Your AI tools can reach Kryton over the same address.
+- **A public address** like `you.my.kryton.ai` — pick any name.
+- **HTTPS, set up for you.** No certificates to buy, install, or renew.
+  Your traffic is encrypted end-to-end out of the box.
+- **No open ports on your router.** Connect makes one *outbound*
+  connection — the same kind of connection your browser makes when you
+  visit a website. Nothing inbound; nothing for port scanners or
+  attackers on the public internet to probe.
+- **No DNS to manage.** No dynamic-DNS service, no router config.
+- **Your home network stays closed.** Only Kryton is reachable, not
+  the machine it runs on and not anything else on your LAN.
+- **Works from anywhere** you have internet — home, cafe, hotel,
+  plane.
 
 It is a paid add-on run by the kryton.ai team. Self-hosting works fine
-without it; this is the easy button if you do not want to wrestle with
-networking.
+without it; this is the easy button when you want remote access
+without becoming a part-time network administrator.
+
+## Why this is safer than port forwarding
+
+The DIY way to make a home server reachable from the internet is to
+open a port on your router and aim it at your machine. That works, but
+it means:
+
+- Your IP is on every scanner list within hours of opening the port.
+- Any bug in any software on that port becomes a way in.
+- You have to get the firewall, the reverse proxy, and the TLS
+  certificate all right and keep them all up to date.
+- A leaked password is enough to log in from anywhere in the world.
+
+Kryton Connect inverts this: your server *calls out* to a hardened
+entry point and that entry point relays only the traffic for *your*
+subdomain back. Your router never accepts an inbound connection. Your
+network stays closed.
 
 ## Set it up in four steps
 
@@ -27,27 +53,30 @@ networking.
 2. **Open Kryton.** Sign in as an admin (the first user you registered).
 3. **Paste the token.** Settings → Admin → **Tunnel** → paste into
    "Token from kryton.ai dashboard" → Save.
-4. **You are online.** The same screen shows your new address. Click
-   it to open in a new tab.
+4. **You are online.** The same screen shows your new HTTPS address.
+   Click it to open in a new tab.
 
 That is it. Bookmark the address on your phone, log in there, your
-notes follow you around.
+notes follow you around — and your router is still closed.
 
 ## Connecting AI tools to your remote Kryton
 
 Use the same one-shot installer from [Connect your AI](/kryton/start/connect-ai/),
 but when it asks for your Kryton server URL, give it your new
 `https://you.my.kryton.ai` address instead of `http://localhost:3000`.
-Claude, Cursor, Codex, Claude Desktop — all work from anywhere now.
+Claude, Cursor, Codex, Claude Desktop — all work from anywhere now,
+over the same encrypted channel.
 
 ## Turning it off
 
 The Tunnel tab has a Clear button. Press it and your instance is back
-to being local-only.
+to being local-only. Nothing else on your machine or network changes.
 
 ---
 
-Prefer to do it yourself? Anyone comfortable with a reverse proxy can
-set up a public URL using Caddy, Cloudflare Tunnel, Tailscale, or
-similar — see [Reverse proxy and TLS](/kryton/advanced/security/reverse-proxy-and-tls/)
-in the advanced section. Kryton Connect just removes that step.
+Prefer to do the networking yourself? Anyone comfortable with a
+reverse proxy can set up a public URL using Caddy, Cloudflare Tunnel,
+Tailscale, or similar — see
+[Reverse proxy and TLS](/kryton/advanced/security/reverse-proxy-and-tls/)
+in the advanced section. Kryton Connect just bundles those moving
+parts so you do not have to.
