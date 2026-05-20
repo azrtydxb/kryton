@@ -93,12 +93,16 @@ Per QPKG convention, App Center **does not delete user data** on uninstall. If y
 
 The Kryton QPKG is signed with a self-signed X.509 code-signing certificate (`CN=Kryton Packaging`). App Center surfaces the fingerprint on first install. The expected fingerprint is:
 
-- SHA-256 fingerprint: `<TO BE FILLED ON FIRST RELEASE>`
+- SHA-256 fingerprint: `7F:42:16:28:42:38:50:D8:72:00:2F:C7:9B:6E:B8:8D:45:8F:8C:88:34:31:4D:D3:27:F3:B0:96:8D:D4:7A:CE`
 
-To verify out of band, download the `.codesigning` companion file from the [GitHub release](https://github.com/azrtydxb/kryton/releases) and inspect it:
+To verify out of band, download the `.codesigning` companion file from the [GitHub release](https://github.com/azrtydxb/kryton/releases) and inspect the embedded certificate:
 
 ```bash
-openssl x509 -fingerprint -sha256 -noout -in kryton_<version>_<arch>.qpkg.codesigning
+# Extract the signer certificate from the CMS signature
+openssl pkcs7 -inform DER -in kryton_<version>_<arch>.qpkg.codesigning -print_certs -out kryton-cert.pem
+
+# Show its SHA-256 fingerprint
+openssl x509 -fingerprint -sha256 -noout -in kryton-cert.pem
 ```
 
 A mismatch means **do not approve** the install — open an issue on the Kryton repo.
