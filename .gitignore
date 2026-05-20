@@ -2,6 +2,9 @@ node_modules/
 dist/
 .env
 .env.*
+# Templates that live inside the packaging tree are tracked artifacts,
+# not real env files — keep them in git.
+!packaging/**/.env.template
 *.log
 notes/
 !packages/server/src/modules/notes/
