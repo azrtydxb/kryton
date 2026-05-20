@@ -1,67 +1,53 @@
 ---
-title: Kryton Connect (get a public URL)
-description: Optional managed reverse tunnel that gives your self-hosted Kryton a public `<subdomain>.my.kryton.ai` hostname without port forwarding or TLS certificates.
+title: Get a public URL with Kryton Connect
+description: One paid add-on that gives your self-hosted Kryton a public address like you.my.kryton.ai — no port forwarding, no certificates, no DNS to manage.
 ---
 
-**Kryton Connect** is an optional managed networking service that takes
-your self-hosted Kryton and gives it a public hostname like
-`yourname.my.kryton.ai` — no port forwarding, no DNS records, no
-certificates of your own to renew. If you want to access your notes
-off your home network or share them with collaborators, this is the
-easiest path.
+Your Kryton is running on your machine. Now you want it reachable from
+your phone, from a friend, or from your AI tools running on a different
+computer. **Kryton Connect** is the one-click way to make that happen.
 
-It is a paid service operated by kryton.ai. Self-hosting works fine
-without it; this page only matters if you want managed remote access.
+## What you get
 
-## How it works
+- A public address like `you.my.kryton.ai`.
+- HTTPS already set up. No certificates to buy, install, or renew.
+- Nothing to open on your router. No port forwarding. No DNS records.
+- Works from anywhere you have internet — home, cafe, plane.
+- Your AI tools can reach Kryton over the same address.
 
-The Kryton server already ships a tunnel client
-(`packages/server/src/modules/tunnel/`). When you configure a JWT,
-the server dials `tunnel.kryton.ai` over HTTP/2 CONNECT, runs a yamux
-session over the resulting body, and pipes each inbound stream into
-your local Fastify listener via TCP loopback. The browser sees
-`https://yourname.my.kryton.ai`; the bytes terminate inside your
-process.
+It is a paid add-on run by the kryton.ai team. Self-hosting works fine
+without it; this is the easy button if you do not want to wrestle with
+networking.
 
-No extra binary to run. No daemon to babysit. The tunnel client lives
-inside your Kryton process, restarts with it, and surfaces its state in
-the admin panel.
+## Set it up in four steps
 
-## Setup
+1. **Sign up.** Go to [kryton.ai/tunnels/dashboard](https://kryton.ai/tunnels/dashboard)
+   and create a tunnel. You will be given a token — a long string of
+   letters and numbers. Copy it.
+2. **Open Kryton.** Sign in as an admin (the first user you registered).
+3. **Paste the token.** Settings → Admin → **Tunnel** → paste into
+   "Token from kryton.ai dashboard" → Save.
+4. **You are online.** The same screen shows your new address. Click
+   it to open in a new tab.
 
-1. **Sign up at the Connect dashboard.** Open
-   [`kryton.ai/tunnels/dashboard`](https://kryton.ai/tunnels/dashboard)
-   and create a tunnel. You will be issued a JWT.
-2. **Open Kryton as an admin.** Go to Settings → Admin → **Tunnel**.
-3. **Paste the token.** The "Token from kryton.ai dashboard" field
-   accepts the JWT; click Save.
-4. **Confirm.** The status block on the same tab will show your
-   subdomain (`<subdomain>.my.kryton.ai`) and connection state. Open it
-   in a new tab to confirm.
+That is it. Bookmark the address on your phone, log in there, your
+notes follow you around.
 
-Clearing the JWT (the same tab has a clear-token control) stops the
-tunnel and your instance reverts to whatever local hostname you were
-using.
+## Connecting AI tools to your remote Kryton
 
-## Operational notes
+Use the same one-shot installer from [Connect your AI](/kryton/start/connect-ai/),
+but when it asks for your Kryton server URL, give it your new
+`https://you.my.kryton.ai` address instead of `http://localhost:3000`.
+Claude, Cursor, Codex, Claude Desktop — all work from anywhere now.
 
-- **Traffic stats** — the Tunnel tab shows requests, bytes in/out per
-  day. Backed by the `TunnelTrafficDaily` table in your Postgres.
-- **Force reconnect** — `POST /api/admin/tunnel/reconnect` (also a
-  button in the tab) triggers a reconnect without restarting the
-  server.
-- **Trusted origin** — when a tunnel is active the server
-  automatically adds `https://<subdomain>.my.kryton.ai` to better-auth
-  trusted origins; you do not need to configure CORS manually.
-- **Override the server URL** — `KRYTON_TUNNEL_SERVER_URL` and
-  `KRYTON_TUNNEL_PUBLIC_HOST` env vars exist for self-hosted tunnel
-  servers if you ever want to run one (advanced; not the supported
-  path).
+## Turning it off
 
-## Alternative: roll your own tunnel
+The Tunnel tab has a Clear button. Press it and your instance is back
+to being local-only.
 
-Kryton Connect is optional. The standard self-hosted recipe is your
-own reverse proxy in front of the Kryton container — see
-[Reverse proxy and TLS](/kryton/advanced/security/reverse-proxy-and-tls/)
-for Caddy / Nginx / Traefik examples. Tailscale, Cloudflare Tunnel,
-ngrok, and similar tools all work without any Kryton-side config.
+---
+
+Prefer to do it yourself? Anyone comfortable with a reverse proxy can
+set up a public URL using Caddy, Cloudflare Tunnel, Tailscale, or
+similar — see [Reverse proxy and TLS](/kryton/advanced/security/reverse-proxy-and-tls/)
+in the advanced section. Kryton Connect just removes that step.
