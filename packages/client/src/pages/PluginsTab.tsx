@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { CSSProperties } from 'react';
 import {
   Search, Package, Download, RefreshCw, Trash2, Settings,
-  CheckCircle, XCircle, AlertCircle, ChevronRight, ChevronDown,
+  CheckCircle, XCircle, AlertCircle,
   ToggleLeft, ToggleRight, Tag, X, Save, RotateCcw,
 } from 'lucide-react';
 import { api, RegistryPlugin, PluginUpdate } from '../lib/api';
@@ -488,10 +488,6 @@ function InstalledPlugins({ onUninstalled }: { onUninstalled: () => void }) {
     <Section title="installed plugins">
       <div style={helpText}>Manage plugins installed on this server — enable, disable, configure, or update them.</div>
 
-      {settingsPlugin && (
-        <PluginSettingsPanel plugin={settingsPlugin} onClose={() => setSettingsPlugin(null)} />
-      )}
-
       {loading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {[1, 2].map(i => (
@@ -510,6 +506,7 @@ function InstalledPlugins({ onUninstalled }: { onUninstalled: () => void }) {
             const isDisabled = plugin.state === 'disabled' || plugin.state === 'unloaded';
             const isError = plugin.state === 'error';
 
+            const settingsOpen = settingsPlugin?.id === plugin.id;
             return (
               <div key={plugin.id} style={cardStyle}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
@@ -552,9 +549,9 @@ function InstalledPlugins({ onUninstalled }: { onUninstalled: () => void }) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
                     {plugin.settings && plugin.settings.length > 0 && (
                       <PluginIconBtn
-                        onClick={() => setSettingsPlugin(plugin)}
-                        title="Plugin settings"
-                        color="var(--fg-3)"
+                        onClick={() => setSettingsPlugin(settingsOpen ? null : plugin)}
+                        title={settingsOpen ? 'Close settings' : 'Plugin settings'}
+                        color={settingsOpen ? 'var(--accent)' : 'var(--fg-3)'}
                         icon={<Settings size={14} />}
                       />
                     )}
@@ -609,6 +606,12 @@ function InstalledPlugins({ onUninstalled }: { onUninstalled: () => void }) {
                     )}
                   </div>
                 </div>
+                {settingsOpen && (
+                  <PluginSettingsPanel
+                    plugin={plugin}
+                    onClose={() => setSettingsPlugin(null)}
+                  />
+                )}
               </div>
             );
           })}
@@ -698,7 +701,6 @@ function StateLabel({ state }: { state: InstalledPlugin['state'] }) {
 
 function PluginSettingsPanel({
   plugin,
-  onClose,
 }: {
   plugin: InstalledPlugin;
   onClose: () => void;
@@ -708,7 +710,6 @@ function PluginSettingsPanel({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
-  const [expanded, setExpanded] = useState(true);
 
   const adminSettings = plugin.settings.filter(s => !s.perUser);
   const userSettings = plugin.settings.filter(s => s.perUser);
@@ -764,42 +765,27 @@ function PluginSettingsPanel({
   return (
     <div
       style={{
-        marginBottom: 14,
-        borderRadius: 6,
-        border: '1px solid var(--accent)',
-        background: 'var(--accent-soft)',
+        marginTop: 10,
+        paddingTop: 10,
+        borderTop: '1px solid var(--line)',
       }}
     >
-      <button
-        onClick={() => setExpanded(v => !v)}
+      <div
         style={{
-          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '10px 12px', background: 'transparent', border: 'none',
-          color: 'var(--accent)', cursor: 'pointer',
-          fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 500,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '0 0 8px 0',
+          color: 'var(--accent)',
+          fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 500,
+          letterSpacing: 0.4, textTransform: 'uppercase',
         }}
       >
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Settings size={14} />
-          Settings — {plugin.name}
+          <Settings size={12} />
+          Settings
         </span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span
-            role="button"
-            tabIndex={0}
-            onClick={e => { e.stopPropagation(); onClose(); }}
-            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onClose(); } }}
-            aria-label="Close settings"
-            style={{ padding: 2, display: 'inline-flex', color: 'var(--fg-3)' }}
-          >
-            <X size={13} />
-          </span>
-          {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-        </span>
-      </button>
+      </div>
 
-      {expanded && (
-        <div style={{ padding: '0 12px 12px 12px' }}>
+      <div style={{ padding: 0 }}>
           {error && <div style={errorBoxStyle}>{error}</div>}
 
           {loading ? (
@@ -846,7 +832,6 @@ function PluginSettingsPanel({
             </>
           )}
         </div>
-      )}
     </div>
   );
 }
