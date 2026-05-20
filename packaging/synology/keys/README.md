@@ -171,7 +171,7 @@ If the private key leaks, treat it as a security incident.
    compat" — that defeats the point.
 4. Cut a `vX.Y.Z-pre.N` release signed by the new key.
 5. Notify users via the release notes and the install docs at
-   `https://kryton.ai/docs/install/synology` — instruct them to remove and
+   `https://azrtydxb.github.io/kryton/docs/install/synology` — instruct them to remove and
    re-add the package source so DSM re-fetches the keyring.
 6. Audit how the leak happened. Write a post-mortem. Rotate any other
    secrets that may have been exposed through the same channel.

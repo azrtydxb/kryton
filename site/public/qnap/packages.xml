@@ -13,13 +13,13 @@
     <developer>Kryton</developer>
     <forumLink>https://github.com/azrtydxb/kryton/discussions</forumLink>
     <publishedDate>2026-05-20</publishedDate>
-    <icon80>https://kryton.ai/assets/nas/icons/kryton-80.png</icon80>
-    <icon100>https://kryton.ai/assets/nas/icons/kryton-100.png</icon100>
+    <icon80>https://azrtydxb.github.io/kryton/assets/nas/icons/kryton-80.png</icon80>
+    <icon100>https://azrtydxb.github.io/kryton/assets/nas/icons/kryton-100.png</icon100>
     <language>English</language>
     <fwVersion>5.0.0</fwVersion>
-    <tutorialLink>https://kryton.ai/docs/install/qnap</tutorialLink>
-    <bannerImg>https://kryton.ai/assets/nas/screenshots/banner.png</bannerImg>
-    <snapshot>https://kryton.ai/assets/nas/screenshots/editor.png</snapshot>
+    <tutorialLink>https://azrtydxb.github.io/kryton/docs/install/qnap</tutorialLink>
+    <bannerImg>https://azrtydxb.github.io/kryton/assets/nas/screenshots/banner.png</bannerImg>
+    <snapshot>https://azrtydxb.github.io/kryton/assets/nas/screenshots/editor.png</snapshot>
     <platform>
       <platformID>ARM_64</platformID>
       <location>https://github.com/azrtydxb/kryton/releases/download/v4.6.5-pre.10/kryton_4.6.5-pre.10_arm_64.qpkg</location>

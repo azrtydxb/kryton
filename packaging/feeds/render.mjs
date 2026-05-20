@@ -119,7 +119,7 @@ function qnapItemXml(cfg) {
     `    <icon100>${xmlEscape(cfg.iconBaseUrl)}/kryton-100.png</icon100>`,
     `    <language>English</language>`,
     `    <fwVersion>5.0.0</fwVersion>`,
-    `    <tutorialLink>https://kryton.ai/docs/install/qnap</tutorialLink>`,
+    `    <tutorialLink>https://azrtydxb.github.io/kryton/docs/install/qnap</tutorialLink>`,
     `    <bannerImg>${xmlEscape(cfg.screenshotBaseUrl)}/banner.png</bannerImg>`,
     `    <snapshot>${xmlEscape(cfg.screenshotBaseUrl)}/editor.png</snapshot>`,
     platforms,

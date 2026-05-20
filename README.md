@@ -271,7 +271,7 @@ npm run dev
 
 If you'd rather use a Postgres you already have, make sure it's 16+ and run `CREATE EXTENSION IF NOT EXISTS vector;` once against the target database, then point `POSTGRES_URL` at it.
 
-- **Synology / QNAP NAS**: see [Install on Synology](https://kryton.ai/start/install/synology) and [Install on QNAP](https://kryton.ai/start/install/qnap).
+- **Synology / QNAP NAS**: see [Install on Synology](https://azrtydxb.github.io/kryton/start/install/synology) and [Install on QNAP](https://azrtydxb.github.io/kryton/start/install/qnap).
 
 ---
 

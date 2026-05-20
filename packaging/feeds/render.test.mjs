@@ -9,8 +9,8 @@ const FIXTURE = {
   version: "1.4.2",
   publishedDate: "2026-05-20",
   changelogUrl: "https://github.com/azrtydxb/kryton/releases/tag/v1.4.2",
-  iconBaseUrl: "https://kryton.ai/assets/nas/icons",
-  screenshotBaseUrl: "https://kryton.ai/assets/nas/screenshots",
+  iconBaseUrl: "https://azrtydxb.github.io/kryton/assets/nas/icons",
+  screenshotBaseUrl: "https://azrtydxb.github.io/kryton/assets/nas/screenshots",
   releaseAssetBaseUrl:
     "https://github.com/azrtydxb/kryton/releases/download/v1.4.2",
   synologyArchs: ["x86_64", "armv8"],

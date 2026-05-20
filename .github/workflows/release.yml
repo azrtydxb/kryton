@@ -780,7 +780,7 @@ jobs:
   # paths filter) so once the PR opened by nas-publish-feeds is merged into
   # master, the existing Pages deploy picks up the new feeds automatically.
   # We open a PR rather than committing directly so a human reviews the
-  # feed diff before kryton.ai serves it — and so we don't have to edit
+  # feed diff before Pages serves it — and so we don't have to edit
   # pages.yml (forbidden by the phase spec).
   # ===========================================================================
 
@@ -1256,11 +1256,11 @@ jobs:
             collected from the `nas-build-spk` and `nas-build-qpkg` jobs.
 
             Merging this PR triggers `pages.yml` via its existing
-            `site/**` path filter, which redeploys kryton.ai with the new
+            `site/**` path filter, which redeploys the Pages site with the new
             feeds visible at:
 
-            - https://kryton.ai/synology/index.json
-            - https://kryton.ai/qnap/packages.xml
+            - https://azrtydxb.github.io/kryton/synology/index.json
+            - https://azrtydxb.github.io/kryton/qnap/packages.xml
           delete-branch: true
           author: 'github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>'
           committer: 'github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>'

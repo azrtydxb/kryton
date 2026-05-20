@@ -28,7 +28,7 @@ DSM versions earlier than 7.2 ship "Docker" rather than "Container Manager" and 
 4. Paste the source URL:
 
    ```text
-   https://kryton.ai/synology/index.json
+   https://azrtydxb.github.io/kryton/synology/index.json
    ```
 
 5. Click **OK** and close Settings
@@ -93,10 +93,10 @@ DSM verifies the GPG signature against the public key embedded in our feed (`key
 
 - Fingerprint: `F22D EA16 F4C9 82F1 2516  57D4 8CE8 55E7 0BC6 E596`
 
-The public key is published at `https://kryton.ai/synology/index.json` under `keyrings`. You can extract it and compare its fingerprint with the value above using:
+The public key is published at `https://azrtydxb.github.io/kryton/synology/index.json` under `keyrings`. You can extract it and compare its fingerprint with the value above using:
 
 ```bash
-gpg --show-keys <(curl -s https://kryton.ai/synology/index.json | jq -r '.keyrings[0]')
+gpg --show-keys <(curl -s https://azrtydxb.github.io/kryton/synology/index.json | jq -r '.keyrings[0]')
 ```
 
 A mismatch means **do not install** — open an issue on the [Kryton repo](https://github.com/azrtydxb/kryton).

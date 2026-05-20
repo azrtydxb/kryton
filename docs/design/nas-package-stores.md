@@ -50,11 +50,11 @@ one URL per NAS once; new releases appear automatically.
                                             │
                             existing Pages deploy
         ┌──────────────────────────────────────────────┐
-        │  https://kryton.ai/                          │  (docs — UNCHANGED)
-        │  https://kryton.ai/start/                    │  (docs — UNCHANGED)
-        │  https://kryton.ai/synology                  │─┐
-        │  https://kryton.ai/qnap/packages.xml         │─┤
-        │  https://kryton.ai/assets/nas/icons/*.png    │ │
+        │  https://azrtydxb.github.io/kryton/                          │  (docs — UNCHANGED)
+        │  https://azrtydxb.github.io/kryton/start/                    │  (docs — UNCHANGED)
+        │  https://azrtydxb.github.io/kryton/synology                  │─┐
+        │  https://azrtydxb.github.io/kryton/qnap/packages.xml         │─┤
+        │  https://azrtydxb.github.io/kryton/assets/nas/icons/*.png    │ │
         └──────────────────────────────────────────────┘ │
                                                          │  HTTPS GET
                           ┌──────────────────────────────┴──────────────────┐
@@ -65,7 +65,7 @@ one URL per NAS once; new releases appear automatically.
 
 Critically: there is no separate `gh-pages` branch. The existing
 `.github/workflows/pages.yml` builds `site/dist` and deploys it as the Pages
-artifact, serving the docs site at `https://kryton.ai/` (custom domain).
+artifact, serving the docs site at `https://azrtydxb.github.io/kryton/` (custom domain).
 Package-source feeds are emitted into `site/public/{synology,qnap}/` so they
 ship inside the **same** Pages artifact as the docs — docs and feeds live on
 one origin, one TLS cert, one deploy. The docs build must not strip
@@ -78,12 +78,12 @@ storage limits). Only the feed JSON/XML and icon PNGs sit on Pages.
 
 | Purpose | URL |
 | --- | --- |
-| Synology source (user adds this) | `https://kryton.ai/synology/index.json` |
-| QNAP source (user adds this) | `https://kryton.ai/qnap/packages.xml` |
-| Synology install guide | `https://kryton.ai/docs/install/synology` |
-| QNAP install guide | `https://kryton.ai/docs/install/qnap` |
+| Synology source (user adds this) | `https://azrtydxb.github.io/kryton/synology/index.json` |
+| QNAP source (user adds this) | `https://azrtydxb.github.io/kryton/qnap/packages.xml` |
+| Synology install guide | `https://azrtydxb.github.io/kryton/docs/install/synology` |
+| QNAP install guide | `https://azrtydxb.github.io/kryton/docs/install/qnap` |
 
-`kryton.ai` is the existing custom domain on the docs Pages site. The feed
+The Pages site serves at `https://azrtydxb.github.io/kryton/`. A future custom-domain switch (e.g. moving to `kryton.ai`) only changes the public host — the path layout under `site/public/` is identical. The feed
 endpoints live as additional paths under that same origin. No new DNS or
 CNAME is required.
 
@@ -114,11 +114,11 @@ client-side filters on `arch` and `firmware`.
       "size": 0,
       "md5": "<computed at release time>",
       "thumbnail": [
-        "https://kryton.ai/assets/nas/icons/kryton-72.png",
-        "https://kryton.ai/assets/nas/icons/kryton-120.png"
+        "https://azrtydxb.github.io/kryton/assets/nas/icons/kryton-72.png",
+        "https://azrtydxb.github.io/kryton/assets/nas/icons/kryton-120.png"
       ],
       "snapshot": [
-        "https://kryton.ai/assets/nas/screenshots/editor.png"
+        "https://azrtydxb.github.io/kryton/assets/nas/screenshots/editor.png"
       ],
       "qinst": false,
       "qupgrade": false,
@@ -186,13 +186,13 @@ entries are siblings under `<plugins>`.
     <developer>Kryton</developer>
     <forumLink>https://github.com/&lt;org&gt;/kryton/discussions</forumLink>
     <publishedDate>2026-05-20</publishedDate>
-    <icon80>https://kryton.ai/assets/nas/icons/kryton-80.png</icon80>
-    <icon100>https://kryton.ai/assets/nas/icons/kryton-100.png</icon100>
+    <icon80>https://azrtydxb.github.io/kryton/assets/nas/icons/kryton-80.png</icon80>
+    <icon100>https://azrtydxb.github.io/kryton/assets/nas/icons/kryton-100.png</icon100>
     <language>English</language>
     <fwVersion>5.0.0</fwVersion>
-    <tutorialLink>https://kryton.ai/docs/install/qnap</tutorialLink>
-    <bannerImg>https://kryton.ai/assets/nas/screenshots/banner.png</bannerImg>
-    <snapshot>https://kryton.ai/assets/nas/screenshots/editor.png</snapshot>
+    <tutorialLink>https://azrtydxb.github.io/kryton/docs/install/qnap</tutorialLink>
+    <bannerImg>https://azrtydxb.github.io/kryton/assets/nas/screenshots/banner.png</bannerImg>
+    <snapshot>https://azrtydxb.github.io/kryton/assets/nas/screenshots/editor.png</snapshot>
     <platform>
       <platformID>X86_64</platformID>
       <location>https://github.com/&lt;org&gt;/kryton/releases/download/v1.4.2/kryton_1.4.2_x86_64.qpkg</location>
@@ -359,16 +359,16 @@ GHCR / GitHub Releases are also HTTPS-only with TLS pinning at the CDN edge.
 
 ## Decisions (locked)
 
-1. **Hosting** — feeds served from existing `kryton.ai` Pages site as
+1. **Hosting** — feeds served from existing Pages site (`https://azrtydxb.github.io/kryton/`) as
    additional paths under `site/public/`. No separate domain, no `gh-pages`
    branch, no disruption to `https://azrtydxb.github.io/kryton/start/` /
-   `https://kryton.ai/start/`.
+   `https://azrtydxb.github.io/kryton/start/`.
 2. **DSM 7.0 / 7.1** — dropped. v1 requires DSM ≥ 7.2 (Container Manager).
 3. **Architectures** — v1 ships `x86_64` and `armv8` (Synology) plus
    `X86_64` and `ARM_64` (QNAP). Additional archs deferred.
 4. **Signing** — v1 ships signed: GPG for SPKs, X.509 code-signing for QPKGs.
 5. **Landing page** — none. Install guides live at
-   `https://kryton.ai/docs/install/synology` and `.../qnap`, written as part
+   `https://azrtydxb.github.io/kryton/docs/install/synology` and `.../qnap`, written as part
    of Phase 5.
 
 ## Phased implementation
@@ -381,16 +381,16 @@ GHCR / GitHub Releases are also HTTPS-only with TLS pinning at the CDN edge.
 Verified `site/public/` passes through unmodified to `site/dist/`. Site is
 Astro 6.3 + Starlight 0.39. The `base: "/kryton"` config in
 `astro.config.mjs` affects HTML routing only; `public/` files land at the
-custom domain root (`https://kryton.ai/<path>`). No content hashing, no
+custom domain root (`https://azrtydxb.github.io/kryton/<path>`). No content hashing, no
 extension filtering, no HTML rewriting on passthrough. Pagefind ignores
 non-HTML; sitemap output uses `sitemap-*.xml` so no collision with NAS feed
 paths.
 
 Confirmed output paths:
 
-- `site/public/synology/index.json` → `https://kryton.ai/synology/index.json`
-- `site/public/qnap/packages.xml`   → `https://kryton.ai/qnap/packages.xml`
-- `site/public/assets/nas/icons/*`  → `https://kryton.ai/assets/nas/icons/*`
+- `site/public/synology/index.json` → `https://azrtydxb.github.io/kryton/synology/index.json`
+- `site/public/qnap/packages.xml`   → `https://azrtydxb.github.io/kryton/qnap/packages.xml`
+- `site/public/assets/nas/icons/*`  → `https://azrtydxb.github.io/kryton/assets/nas/icons/*`
 
 **Phase 1 — Skeleton & feeds (no real packages yet)**
 
