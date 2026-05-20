@@ -1,6 +1,6 @@
 {
   "name": "@azrtydxb/client",
-  "version": "4.6.5-pre.8",
+  "version": "4.6.5-pre.9",
   "private": true,
   "type": "module",
   "scripts": {
@@ -14,8 +14,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@azrtydxb/sdk": "4.6.5-pre.8",
-    "@azrtydxb/ui": "4.6.5-pre.8",
+    "@azrtydxb/sdk": "4.6.5-pre.9",
+    "@azrtydxb/ui": "4.6.5-pre.9",
     "@better-auth/passkey": "^1.5.6",
     "@tanstack/react-query": "^5.95.2",
     "@types/qrcode": "^1.5.6",
