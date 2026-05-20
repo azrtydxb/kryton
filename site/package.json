@@ -1,0 +1,28 @@
+{
+  "name": "site",
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro",
+    "gen:mcp": "node scripts/gen-mcp-tools.mjs",
+    "gen:rest": "node scripts/gen-rest-reference.mjs",
+    "gen:plugin-api": "node scripts/gen-plugin-api.mjs",
+    "prebuild": "npm run gen:mcp && npm run gen:rest && npm run gen:plugin-api"
+  },
+  "dependencies": {
+    "@astrojs/starlight": "^0.39.2",
+    "@fontsource/inter": "^5.2.8",
+    "@fontsource/jetbrains-mono": "^5.2.8",
+    "astro": "^6.3.1",
+    "sharp": "^0.34.5"
+  },
+  "devDependencies": {
+    "@redocly/cli": "^1.34.0",
+    "typedoc": "^0.28.0",
+    "typedoc-plugin-markdown": "^4.4.0"
+  }
+}

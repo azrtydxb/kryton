@@ -1,0 +1,33 @@
+/* Kryton design tokens — mirrors kryton-wp/theme/kryton/theme.json + kryton/packages/client/src/styles/tokens.css */
+:root {
+  --kr-bg: oklch(0.18 0.012 280);
+  --kr-bg-1: oklch(0.205 0.014 280);
+  --kr-bg-2: oklch(0.235 0.016 282);
+  --kr-bg-3: oklch(0.27 0.018 282);
+  --kr-line: oklch(0.32 0.012 280 / 0.6);
+  --kr-line-strong: oklch(0.4 0.014 280 / 0.7);
+  --kr-fg: oklch(0.96 0.005 280);
+  --kr-fg-2: oklch(0.65 0.012 280);
+  --kr-fg-3: oklch(0.5 0.012 280);
+  --kr-accent: oklch(0.72 0.18 295);
+  --kr-accent-soft: oklch(0.72 0.18 295 / 0.18);
+  --kr-accent-fg: oklch(0.18 0.02 280);
+  --kr-link: oklch(0.78 0.16 285);
+  --kr-font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --kr-font-mono: "JetBrains Mono", "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+:root[data-theme="light"] {
+  --kr-bg: oklch(0.985 0.003 280);
+  --kr-bg-1: oklch(0.97 0.004 280);
+  --kr-bg-2: oklch(0.945 0.005 280);
+  --kr-bg-3: oklch(0.92 0.006 280);
+  --kr-line: oklch(0.86 0.008 280);
+  --kr-line-strong: oklch(0.78 0.01 280);
+  --kr-fg: oklch(0.22 0.012 280);
+  --kr-fg-2: oklch(0.4 0.012 280);
+  --kr-fg-3: oklch(0.55 0.012 280);
+  --kr-accent: oklch(0.55 0.2 295);
+  --kr-accent-soft: oklch(0.55 0.2 295 / 0.12);
+  --kr-link: oklch(0.5 0.2 285);
+}

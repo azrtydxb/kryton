@@ -1,0 +1,86 @@
+/* Override Starlight defaults to match the WP "quiet-futurism" look. */
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+
+:root {
+  --sl-font: var(--kr-font-sans);
+  --sl-font-mono: var(--kr-font-mono);
+  --sl-content-width: 50rem;
+  --sl-sidebar-width: 18rem;
+  --sl-text-h1: 2.25rem;
+  --sl-text-h2: 1.6rem;
+  --sl-text-h3: 1.25rem;
+  --sl-line-height: 1.55;
+}
+
+/* Dark (default — WP runs dark-first) */
+:root,
+:root[data-theme="dark"] {
+  --sl-color-bg: var(--kr-bg);
+  --sl-color-bg-nav: var(--kr-bg);
+  --sl-color-bg-sidebar: var(--kr-bg);
+  --sl-color-bg-inline-code: var(--kr-bg-2);
+  --sl-color-bg-accent: var(--kr-accent-soft);
+  --sl-color-hairline: var(--kr-line);
+  --sl-color-hairline-light: var(--kr-line);
+  --sl-color-hairline-shade: var(--kr-line-strong);
+  --sl-color-text: var(--kr-fg);
+  --sl-color-text-accent: var(--kr-accent);
+  --sl-color-white: var(--kr-fg);
+  --sl-color-gray-1: var(--kr-fg);
+  --sl-color-gray-2: var(--kr-fg-2);
+  --sl-color-gray-3: var(--kr-fg-3);
+  --sl-color-gray-4: var(--kr-fg-3);
+  --sl-color-gray-5: var(--kr-line-strong);
+  --sl-color-gray-6: var(--kr-bg-2);
+  --sl-color-gray-7: var(--kr-bg-1);
+  --sl-color-accent: var(--kr-accent);
+  --sl-color-accent-low: var(--kr-accent-soft);
+  --sl-color-accent-high: var(--kr-accent);
+}
+
+:root[data-theme="light"] {
+  --sl-color-bg: var(--kr-bg);
+  --sl-color-bg-nav: var(--kr-bg);
+  --sl-color-bg-sidebar: var(--kr-bg);
+  --sl-color-bg-inline-code: var(--kr-bg-2);
+  --sl-color-text: var(--kr-fg);
+  --sl-color-text-accent: var(--kr-accent);
+  --sl-color-accent: var(--kr-accent);
+  --sl-color-accent-low: var(--kr-accent-soft);
+  --sl-color-hairline: var(--kr-line);
+}
+
+a:not(.site-title):hover {
+  color: var(--kr-accent);
+}
+
+/* Tighten the header chrome */
+header.header {
+  border-bottom: 1px solid var(--kr-line);
+  background: var(--kr-bg);
+}
+
+/* Body prose */
+.sl-markdown-content {
+  font-size: 0.97rem;
+}
+.sl-markdown-content :is(h1, h2, h3) {
+  letter-spacing: -0.01em;
+}
+.sl-markdown-content code:not(pre code) {
+  background: var(--kr-bg-2);
+  border: 1px solid var(--kr-line);
+  border-radius: 4px;
+  padding: 0.1em 0.4em;
+  font-size: 0.9em;
+}
+
+/* Code blocks: more "terminal" feeling */
+.expressive-code .frame {
+  border: 1px solid var(--kr-line);
+  background: var(--kr-bg-1);
+}

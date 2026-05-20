@@ -1,0 +1,132 @@
+---
+title: CLI
+description: The Kryton CLI — @azrtydxb/kryton-init one-shot installer and @azrtydxb/kryton-mcp stdio shim.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside type="note" title="Source of truth">
+This page mirrors [`kryton/docs/CLI.md`](https://github.com/azrtydxb/kryton/blob/master/docs/CLI.md). If the two diverge, the source file in the repo wins. Future iterations may switch to a build-time `?raw` import; for now it's a curated copy.
+</Aside>
+
+One command wires your Kryton server into every AI agent host on your machine — Claude Code, Cursor, Claude Desktop, Codex, Cline, Continue, KiloCode, RooCode, OpenCode, and more.
+
+Two npm packages under `@azrtydxb/`:
+
+| Package | Role |
+|---|---|
+| [`@azrtydxb/kryton-init`](https://www.npmjs.com/package/@azrtydxb/kryton-init) | One-shot installer. Detects AI tool hosts, mints an API key, writes per-host MCP configs. |
+| [`@azrtydxb/kryton-mcp`](https://www.npmjs.com/package/@azrtydxb/kryton-mcp) | stdio MCP shim. Bridges stdio-only hosts (Claude Desktop, Cline, …) to Kryton's HTTP MCP endpoint. |
+
+## Quick start
+
+```sh
+npx @azrtydxb/kryton-init
+```
+
+The installer will:
+
+1. Ask for your Kryton server URL (defaults to `https://kryton.ai`).
+2. Sign you in via email + password (BetterAuth).
+3. Mint an API key named `kryton-init-<hostname>-<timestamp>`.
+4. Detect every supported AI tool on your machine.
+5. Write the appropriate MCP config to each one.
+
+Idempotent — re-running replaces previous Kryton entries without duplicating them. A backup of every modified config is written next to it as `<path>.kryton-init.bak.<timestamp>` (most recent kept).
+
+## Commands
+
+```sh
+kryton-init install        # interactive setup (default action)
+kryton-init uninstall      # remove Kryton entries from every detected host
+kryton-init status         # show which hosts are wired (token hash only)
+kryton-init detect         # list detected hosts without writing anything
+kryton-init mcp [--host]   # print the MCP JSON snippet to wire manually
+```
+
+Common flags:
+
+| Flag | Meaning |
+|---|---|
+| `--server <url>` | Override the server URL prompt |
+| `--dry-run` | Print the plan without touching any file |
+| `--hosts <list>` | Comma-separated subset of hosts to act on |
+
+## Supported hosts (v1)
+
+| Host | Transport |
+|---|---|
+| Claude Code | HTTP (stdio fallback) |
+| Cursor | HTTP (stdio fallback) |
+| Claude Desktop | stdio |
+| Codex | HTTP (stdio fallback) |
+| OpenCode | stdio |
+| Cline (VS Code) | stdio |
+| Continue | stdio |
+| KiloCode | stdio |
+| RooCode | stdio |
+
+macOS + Linux only. Windows support is not in v1.
+
+## How the stdio shim works
+
+Hosts that only speak stdio MCP get wired to `npx @azrtydxb/kryton-mcp` with `KRYTON_URL` + `KRYTON_TOKEN` in their env. The shim opens a stdio MCP server and transparently forwards every JSON-RPC frame to `<KRYTON_URL>/api/mcp` with `Authorization: Bearer $KRYTON_TOKEN`, preserving the `mcp-session-id` header across requests and re-emitting server→client SSE notifications back onto stdio.
+
+Set `KRYTON_DEBUG=1` to enable structured stderr logging from the shim.
+
+## Manual wiring (escape hatch)
+
+```sh
+kryton-init mcp --host claude-code
+```
+
+Prints the JSON snippet to paste into a host whose config layout the installer doesn't recognise yet.
+
+**HTTP shape** (recent Claude Code / Cursor / Codex / VS Code MCP):
+
+```json
+{
+  "mcpServers": {
+    "kryton": {
+      "type": "http",
+      "url": "https://kryton.ai/api/mcp",
+      "headers": {
+        "Authorization": "Bearer kryton_xxxx..."
+      }
+    }
+  }
+}
+```
+
+**stdio shape** (Claude Desktop, Cline, Continue, …):
+
+```json
+{
+  "mcpServers": {
+    "kryton": {
+      "command": "npx",
+      "args": ["-y", "@azrtydxb/kryton-mcp"],
+      "env": {
+        "KRYTON_URL": "https://kryton.ai",
+        "KRYTON_TOKEN": "kryton_xxxx..."
+      }
+    }
+  }
+}
+```
+
+## Uninstall
+
+```sh
+kryton-init uninstall
+```
+
+Removes the `kryton` entry from every host config touched by `install`, restores the most recent backup if a host's file has been edited by hand since the install, and revokes the minted API key on the server (`DELETE /api/api-keys/<id>`).
+
+## State file
+
+The installer stores state at `~/.config/kryton-init/state.json` (`chmod 0600`). It records the server URL, the API key id + prefix (never the full secret after first write), the list of wired host configs, and a pre-write SHA-256 hash of each one so `uninstall` can detect hand-edits.
+
+## Release
+
+Both packages publish independently to npm under `@azrtydxb/`. Tag the monorepo with `cli-v<semver>` (e.g. `cli-v0.1.0`) — the [`cli-publish`](https://github.com/azrtydxb/kryton/blob/master/.github/workflows/cli-publish.yml) workflow builds and tests both packages, then publishes them in order (`kryton-mcp` first so the shim is on the registry by the time `kryton-init` recommends it).

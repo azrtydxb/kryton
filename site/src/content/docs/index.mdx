@@ -1,0 +1,46 @@
+---
+title: Kryton
+description: A shared brain for people and AI. Self-hosted knowledge base with built-in MCP server, wiki-linking, graph visualization, and real-time collaborative editing.
+template: splash
+hero:
+  tagline: A shared brain for people and AI.
+  image:
+    file: ../../assets/logo-hero.svg
+  actions:
+    - text: Get started
+      link: /kryton/start/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/azrtydxb/kryton
+      icon: external
+      variant: minimal
+---
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+Self-hosted knowledge base for humans and AI agents — same notes, same graph, same API.
+
+## Three paths in
+
+<CardGrid>
+  <LinkCard
+    title="Get started"
+    description="Install Kryton, sign in, write your first notes. Connect Claude, Cursor, or any MCP client with a single command."
+    href="/kryton/start/"
+  />
+  <LinkCard
+    title="Use"
+    description="The day-to-day: editor, wiki-links, graph view, search, sharing, mobile, plugins. Walkthroughs of every feature in plain language."
+    href="/kryton/use/"
+  />
+  <LinkCard
+    title="Advanced"
+    description="Self-host on a free tier, run on Kubernetes, build plugins, hit the REST + MCP APIs, contribute back. Every flag, every option."
+    href="/kryton/advanced/"
+  />
+</CardGrid>
+
+---
+
+**AI agent?** Jump straight to [the MCP tool reference](/kryton/advanced/api/mcp-tools/) or [Connect your AI](/kryton/start/connect-ai/).
