@@ -20,6 +20,7 @@ export default defineConfig({
             { label: "Install with Docker", slug: "start/install/docker" },
             { label: "Connect your AI", slug: "start/connect-ai" },
             { label: "Your first notes", slug: "start/first-notes" },
+            { label: "Kryton Connect (public URL)", slug: "start/connect" },
           ],
         },
         {

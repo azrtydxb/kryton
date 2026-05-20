@@ -8,3 +8,4 @@ Kryton is a self-hosted markdown knowledge base with a built-in MCP server for A
 - [Install with Docker](/kryton/start/install/docker/) — bring the server up locally with `docker compose`.
 - [Connect your AI](/kryton/start/connect-ai/) — one command wires every supported AI host to your server.
 - [Your first notes](/kryton/start/first-notes/) — write, link, tag, and open the graph.
+- [Kryton Connect](/kryton/start/connect/) — optional managed tunnel that gives your instance a public `<you>.my.kryton.ai` URL.
