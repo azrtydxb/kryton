@@ -3,6 +3,8 @@ title: Get a public, secure URL with Kryton Connect
 description: Paid add-on that publishes your self-hosted Kryton at you.my.kryton.ai over HTTPS — without opening any ports on your router or exposing your network to the internet.
 ---
 
+import AnnotatedImage from "../../../components/AnnotatedImage.astro";
+
 Your Kryton is running on your machine. Now you want it reachable from
 your phone, from a friend, or from your AI tools running on a different
 computer — **without compromising the security of your home network**.
@@ -51,8 +53,19 @@ network stays closed.
    and create a tunnel. You will be given a token — a long string of
    letters and numbers. Copy it.
 2. **Open Kryton.** Sign in as an admin (the first user you registered).
-3. **Paste the token.** Settings → Admin → **Tunnel** → paste into
+3. **Paste the token.** User menu → Admin Panel → **Tunnel** → paste into
    "Token from kryton.ai dashboard" → Save.
+
+<AnnotatedImage
+  src="/kryton/screenshots/admin-tunnel.png"
+  alt="Admin Panel Tunnel tab showing the token paste area and status block"
+  markers={[
+    { x: 50, y: 28, label: "Status — shows your subdomain and connection state once a token is set." },
+    { x: 50, y: 50, label: "Paste your token from the kryton.ai dashboard here, then Save." },
+    { x: 50, y: 75, label: "Traffic — requests and bytes in/out per day, once you are live." },
+  ]}
+/>
+
 4. **You are online.** The same screen shows your new HTTPS address.
    Click it to open in a new tab.
 

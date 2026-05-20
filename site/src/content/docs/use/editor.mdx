@@ -1,0 +1,40 @@
+---
+title: Editor
+description: Toolbar, split view, the four-tab strip, and auto-save.
+---
+
+import AnnotatedImage from "../../../components/AnnotatedImage.astro";
+
+The editor is an in-house markdown editor with a formatting toolbar and a live preview. Everything writes plain `.md` files in your notes directory.
+
+<AnnotatedImage
+  src="/kryton/screenshots/editor-toolbar.png"
+  alt="Kryton editor in split mode showing a note open with toolbar and preview"
+  markers={[
+    { x: 36, y: 7, label: "Tab strip. Open notes stack here. Capped at 4 — opening a fifth closes the oldest." },
+    { x: 78, y: 7, label: "Mode toggle: Edit / Split / Preview. Split is shown here." },
+    { x: 41, y: 14, label: "Formatting toolbar: headings, bold, italic, lists, links, tables." },
+    { x: 30, y: 50, label: "Plain markdown source — left half of split view." },
+    { x: 72, y: 50, label: "Live preview — right half, kept in sync as you type." },
+  ]}
+/>
+
+## Toolbar
+
+From left to right: undo / redo, three heading levels, bold (⌘B), italic (⌘I), strikethrough, inline code, wiki link, insert image, upload image, bullet/numbered/task lists, blockquote, horizontal rule, and insert table. Hover any button to see its keyboard shortcut.
+
+## Tabs
+
+The tab strip is capped at **4** open notes. When you open a fifth, the oldest is evicted automatically — no overflow menu to manage, no tabs slipping off-screen.
+
+## Auto-save
+
+You never click Save. Edits are persisted via a 500 ms debounced write to the server. If you and someone else are editing the same note over the live-collaboration channel, the server handles persistence instead.
+
+## Edit, split, and preview
+
+Three modes for the same note:
+
+- **Edit** — the markdown source only.
+- **Split** — source on the left, rendered preview on the right (above).
+- **Preview** — the rendered note only. Wiki-links and embedded notes (`![[note]]`) resolve here.

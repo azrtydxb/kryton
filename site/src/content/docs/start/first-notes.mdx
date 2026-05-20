@@ -1,0 +1,50 @@
+---
+title: Your first notes
+description: Write a note, link it to another, tag it, and see it appear in the graph.
+---
+
+import AnnotatedImage from "../../../components/AnnotatedImage.astro";
+
+Kryton is logged-in and empty. Time to put something in it.
+
+## 1. Make a note
+
+In the left sidebar, click the **+** next to **FILES** (or hit `⌘⇧N`). A new note opens, focused on the title.
+
+<AnnotatedImage
+  src="/kryton/screenshots/dashboard-annotated.png"
+  alt="Kryton dashboard with sidebar tree and command palette button highlighted"
+  markers={[
+    { x: 33, y: 4, label: "Command palette — search and jump anywhere (⌘K)." },
+    { x: 38, y: 4, label: "New note button (⌘⇧N)." },
+    { x: 50, y: 4, label: "Toggle light / dark theme." },
+    { x: 14, y: 24, label: "Top-level sections: All notes, Daily note, Graph view, Tags." },
+    { x: 14, y: 60, label: "Files: folders and notes. Right-click for rename, move, delete." },
+  ]}
+/>
+
+Give it a name (no need to type `.md`) and press Enter.
+
+## 2. Write some markdown
+
+Kryton is plain markdown. Headings (`#`, `##`), lists (`-`, `1.`), code (`` ` ``), bold (`**bold**`) — all standard. The toolbar above the editor inserts these for you if you would rather click than type.
+
+## 3. Link to another note
+
+Type two square brackets — `[[` — and start typing the name of another note. A picker pops up; pick one, hit Enter.
+
+If you link to a note that does not exist yet, the link still works — it is styled differently to flag it, and once you create that note the link wakes up automatically.
+
+## 4. Tag it
+
+Anywhere in the note, type `#` and a word. `#idea`, `#meeting`, `#project-alpha`. The tag becomes clickable in preview and shows up in the **Tags** view in the sidebar.
+
+## 5. Open the graph
+
+Left sidebar → **Graph**. Every note you have written so far is a dot; every wiki-link is a line. As you add more notes, the graph fills in.
+
+## What now
+
+- Browse [Use → Editor](/kryton/use/editor/) for the formatting toolbar, tabs, and split view.
+- Browse [Use → Linking and graph](/kryton/use/linking-and-graph/) for backlinks and the graph filters.
+- Wire it to your AI: [Connect your AI](/kryton/start/connect-ai/).

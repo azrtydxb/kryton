@@ -1,0 +1,65 @@
+---
+title: Install Kryton with Docker
+description: Bring Kryton up locally in two commands using the bundled docker-compose stack.
+---
+
+import AnnotatedImage from "../../../../components/AnnotatedImage.astro";
+
+Kryton ships a `docker-compose.prod.yml` that brings up a Postgres database and the Kryton server together. This is the fastest path to a running instance.
+
+## Prerequisites
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or any Docker + Docker Compose v2 setup)
+- Git
+
+That is it. No Node, no Postgres install — Docker handles both.
+
+## Steps
+
+```bash
+git clone https://github.com/azrtydxb/kryton.git
+cd kryton
+cp .env.example .env
+```
+
+Open `.env` in any editor and set:
+
+- `BETTER_AUTH_SECRET` — any random string. Generate one with `openssl rand -hex 32`.
+- Leave the other defaults alone for now; the compose file wires `POSTGRES_URL` to the bundled database automatically.
+
+Then:
+
+```bash
+docker compose -f docker-compose.prod.yml up -d
+```
+
+Open [http://localhost:3000](http://localhost:3000) and you should see the login screen.
+
+<AnnotatedImage
+  src="/kryton/screenshots/login-annotated.png"
+  alt="Kryton login screen"
+  markers={[
+    { x: 50, y: 26, label: "First time? Click REGISTER. The first account becomes the admin." },
+    { x: 50, y: 50, label: "Returning? Email + password, or…" },
+    { x: 50, y: 76, label: "…use a passkey if you set one up earlier." },
+  ]}
+/>
+
+Register the first user — they automatically get admin role. Done.
+
+## What lives where
+
+- `./notes/` — your markdown notes, one folder per user.
+- A Postgres volume (managed by Docker) — accounts, shares, search index.
+- `BETTER_AUTH_SECRET` in `.env` — keep this file out of git.
+
+## Common tweaks
+
+- **Port 3000 is taken**: edit `docker-compose.prod.yml` and change the `ports:` mapping.
+- **Stop the stack**: `docker compose -f docker-compose.prod.yml down`.
+- **See logs**: `docker compose -f docker-compose.prod.yml logs -f kryton`.
+
+## Next steps
+
+- Wire your AI tools to it → [Connect your AI](/kryton/start/connect-ai/).
+- Make it reachable from outside your machine without opening ports → [Kryton Connect](/kryton/start/connect/).

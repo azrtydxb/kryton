@@ -1,0 +1,43 @@
+---
+title: Search and tags
+description: Find notes fast with the command palette, browse by tag, navigate by keyboard.
+---
+
+import AnnotatedImage from "../../../components/AnnotatedImage.astro";
+
+## Command palette
+
+Hit `⌘K` (or `Ctrl+K`) anywhere in Kryton. The palette opens at the top of the screen.
+
+<AnnotatedImage
+  src="/kryton/screenshots/command-palette.png"
+  alt="Command palette open with search box, commands list, and notes list"
+  markers={[
+    { x: 50, y: 14, label: "Search box. Start typing — commands and notes filter live." },
+    { x: 50, y: 24, label: "Commands: new note, new folder, daily note, graph view, settings." },
+    { x: 50, y: 60, label: "Notes: every note in your vault, fuzzy-matched against the query." },
+    { x: 50, y: 92, label: "Keyboard hints: ↑↓ to navigate, ↵ to open, ⌘↵ to open in split." },
+  ]}
+/>
+
+It is the fastest way to:
+
+- Jump to a note by name
+- Run a command (new note, graph view, settings, …)
+- Open something in split view (`⌘↵`)
+
+All without leaving the keyboard.
+
+## Tags
+
+Any `#word` in a note becomes a tag. Tags are listed in the sidebar with their counts, and the Tags view (sidebar → **Tags**) shows the full alphabetised list.
+
+<AnnotatedImage
+  src="/kryton/screenshots/tags-view.png"
+  alt="Tags view listing every tag in the vault with its count"
+  markers={[
+    { x: 14, y: 18, label: "Sidebar tag list — most-used at the top." },
+    { x: 56, y: 30, label: "Main pane: every tag, sortable, click any to filter notes." },
+  ]}
+  caption="Click any tag to see the notes that use it."
+/>

@@ -1,0 +1,124 @@
+---
+/**
+ * AnnotatedImage — image with numbered hotspots and a caption legend.
+ *
+ * Usage in MDX:
+ *   <AnnotatedImage
+ *     src="/kryton/screenshots/editor.png"
+ *     alt="Editor with the formatting toolbar and tab strip highlighted"
+ *     markers={[
+ *       { x: 12, y: 6, label: "Tab strip — open notes stack here." },
+ *       { x: 38, y: 22, label: "Formatting toolbar — H1/H2, bold, italic, etc." },
+ *     ]}
+ *   />
+ *
+ * x, y are percentages from the top-left of the image (0–100).
+ */
+export interface Marker {
+  x: number;
+  y: number;
+  label: string;
+}
+
+interface Props {
+  src: string;
+  alt: string;
+  markers?: Marker[];
+  caption?: string;
+}
+
+const { src, alt, markers = [], caption } = Astro.props as Props;
+---
+
+<figure class="annotated">
+  <div class="annotated-frame">
+    <img src={src} alt={alt} loading="lazy" />
+    {markers.map((m, i) => (
+      <span
+        class="annotated-marker"
+        style={`left: ${m.x}%; top: ${m.y}%;`}
+        aria-label={`Annotation ${i + 1}: ${m.label}`}
+      >{i + 1}</span>
+    ))}
+  </div>
+  {markers.length > 0 && (
+    <ol class="annotated-legend">
+      {markers.map((m) => <li>{m.label}</li>)}
+    </ol>
+  )}
+  {caption && <figcaption>{caption}</figcaption>}
+</figure>
+
+<style>
+  .annotated {
+    margin: 1.5rem 0;
+  }
+  .annotated-frame {
+    position: relative;
+    display: inline-block;
+    border: 1px solid var(--kr-line);
+    border-radius: 8px;
+    overflow: hidden;
+    max-width: 100%;
+  }
+  .annotated-frame img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+  }
+  .annotated-marker {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 50%;
+    background: var(--kr-accent);
+    color: var(--kr-accent-fg);
+    font-family: var(--kr-font-mono);
+    font-size: 0.85rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 0 3px var(--kr-bg), 0 0 0 4px var(--kr-accent);
+    pointer-events: none;
+  }
+  .annotated-legend {
+    list-style: none;
+    padding: 0;
+    margin: 0.75rem 0 0 0;
+    counter-reset: marker;
+    display: grid;
+    gap: 0.4rem;
+  }
+  .annotated-legend li {
+    counter-increment: marker;
+    padding-left: 2.2rem;
+    position: relative;
+    font-size: 0.92rem;
+    line-height: 1.45;
+  }
+  .annotated-legend li::before {
+    content: counter(marker);
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 50%;
+    background: var(--kr-accent);
+    color: var(--kr-accent-fg);
+    font-family: var(--kr-font-mono);
+    font-size: 0.85rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  figcaption {
+    margin-top: 0.5rem;
+    font-size: 0.88rem;
+    color: var(--kr-fg-2);
+    font-style: italic;
+  }
+</style>

@@ -1,0 +1,33 @@
+---
+title: Sharing
+description: Invite other Kryton users to read or co-edit your notes.
+---
+
+import AnnotatedImage from "../../../components/AnnotatedImage.astro";
+
+Kryton notes start out private to you. To bring in a collaborator, share the note explicitly.
+
+## Sharing a note
+
+Open a note → click **Share** in the top right.
+
+<AnnotatedImage
+  src="/kryton/screenshots/share-dialog.png"
+  alt="Share dialog for the Roadmap note"
+  markers={[
+    { x: 65, y: 22, label: "Type the email of another user on this Kryton server." },
+    { x: 90, y: 22, label: "Find — looks up the user. Once selected, choose Read or Read-Write." },
+    { x: 65, y: 50, label: "Anyone the note is already shared with shows up here, with a remove button." },
+  ]}
+/>
+
+### Permissions
+
+- **Read** — the other user can open the note and follow its links, but cannot edit.
+- **Read-Write** — full edit access including over the live-collaboration channel; their edits show up in real time and they show up as a presence cursor in your editor.
+
+Folders share too: share a folder, every note inside inherits the permission.
+
+## Access requests
+
+When someone links to a note they do not have access to, they see a "Request access" button. You see the request in **Settings → Access Requests** with Approve / Deny buttons. Approving converts the request into a share with the permission you pick.

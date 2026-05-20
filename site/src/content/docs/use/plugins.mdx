@@ -1,0 +1,47 @@
+---
+title: Plugins
+description: Enable, disable, configure, and uninstall plugins from the admin panel.
+---
+
+import AnnotatedImage from "../../../components/AnnotatedImage.astro";
+
+Kryton ships with **24 official plugins** in the registry — kanban boards, Mermaid diagrams, Excalidraw, calendar, flashcards, Git backup, Pomodoro, and more. They are all opt-in.
+
+## The plugin manager
+
+**User menu → Admin Panel → Plugins**.
+
+<AnnotatedImage
+  src="/kryton/screenshots/admin-plugins.png"
+  alt="Admin Panel Plugins tab showing the list of installed plugins"
+  markers={[
+    { x: 31, y: 6, label: "Plugins tab — selected." },
+    { x: 50, y: 12, label: "Installed (active here) vs Browse Registry to find new ones." },
+    { x: 84, y: 36, label: "Plugin settings (gear) — appears when the plugin exposes options." },
+    { x: 88, y: 36, label: "Enable / Disable / Reload / Uninstall. Reload only shows for active plugins." },
+  ]}
+/>
+
+Click **Enable** to activate. The plugin loads immediately — no server restart, no page reload. Click again to disable.
+
+## Browse and install
+
+The **Browse Registry** tab lists every plugin that is published but not yet installed. Click **Install** and it appears in the Installed list, ready to enable.
+
+## Per-plugin settings
+
+Plugins that expose options get a gear icon. Click it — settings render inline directly under the plugin card, no separate dialog. Save changes apply immediately.
+
+## What is in the box
+
+A few you may want to enable on day one:
+
+- **Kanban Board** — turn a `` ```kanban `` code fence into an interactive board.
+- **Mermaid Diagrams** — render `` ```mermaid `` fences as flowcharts, sequence diagrams, etc.
+- **Excalidraw** — embed editable sketches in a note.
+- **Slash Commands** — `/h1`, `/list`, `/table` shortcuts while typing.
+- **Git Backup** — auto-commit your notes to a Git repo on a timer.
+- **Calendar** — monthly calendar widget for navigating daily notes.
+- **Pomodoro Timer** — focus timer in the status bar.
+
+Full list and source in [`azrtydxb/kryton-plugins`](https://github.com/azrtydxb/kryton-plugins).
