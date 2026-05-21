@@ -43,6 +43,13 @@
       "when": 1779182438789,
       "tag": "0005_supreme_pyro",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1779374082050,
+      "tag": "0006_brainy_jack_power",
+      "breakpoints": true
     }
   ]
 }
