@@ -37,11 +37,12 @@ on:
       - '.gitignore'
 
 # Cancel any in-progress run on the same branch when a new push lands.
-# The self-hosted runner pool is small (single 248 box, three runners),
-# and stacking two CI runs from the same PR — the second push and the
-# leftover first push — was hitting vitest worker-spawn timeouts and
-# fastify boot timeouts because the runner was CPU-starved. Cancelling
-# the older run frees the runner for the newest commit.
+# The self-hosted runner pool is finite (amd64 ARC scale set on novanas,
+# max 20 ephemeral pods), and stacking two CI runs from the same PR — the
+# second push and the leftover first push — was hitting vitest
+# worker-spawn timeouts and fastify boot timeouts because the runner was
+# CPU-starved. Cancelling the older run frees the runner for the newest
+# commit.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -51,7 +52,7 @@ env:
 
 jobs:
   typecheck:
-    runs-on: arc-azrtydxb
+    runs-on: arc-azrtydxb-amd64
     container:
       image: node:24
     steps:
@@ -70,7 +71,7 @@ jobs:
         run: chown -R 1001:1001 . || true
 
   lint:
-    runs-on: arc-azrtydxb
+    runs-on: arc-azrtydxb-amd64
     container:
       image: node:24
     steps:
@@ -91,7 +92,7 @@ jobs:
     # exercises the same workspace state the tests left behind and the
     # two share install/build:shared cost. Postgres lives here for the
     # unit-test suite.
-    runs-on: arc-azrtydxb
+    runs-on: arc-azrtydxb-amd64
     container:
       image: node:24
     services:
@@ -149,7 +150,7 @@ jobs:
     # operator/config/crd/bases/. Tolerates missing artifacts during
     # initial bring-up of the parallel workstreams that deliver them;
     # the gate activates retroactively as each surface lands.
-    runs-on: arc-azrtydxb
+    runs-on: arc-azrtydxb-amd64
     container:
       image: node:24
     steps:
@@ -165,7 +166,7 @@ jobs:
           set -euo pipefail
           apt-get update -qq
           apt-get install -y -qq --no-install-recommends curl ca-certificates
-          # arc-azrtydxb is ARM64 — pick the right arch instead of hard-coding amd64.
+          # arc-azrtydxb-amd64 is amd64, arc-azrtydxb is arm64 — pick the right arch instead of hard-coding either.
           case "$(uname -m)" in
             aarch64|arm64) ARCH=arm64 ;;
             x86_64) ARCH=amd64 ;;
@@ -210,7 +211,7 @@ jobs:
     # check is cheap and doesn't depend on the production build, only
     # on build:shared. Postgres is required because route registration
     # opens DB connections during spec extraction.
-    runs-on: arc-azrtydxb
+    runs-on: arc-azrtydxb-amd64
     container:
       image: node:24
     services:
