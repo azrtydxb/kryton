@@ -2,6 +2,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { resolve } from "node:path";
+import { publishSdk } from "./release-sdk.js";
 
 const newVersion = process.argv[2];
 if (!newVersion || !/^\d+\.\d+\.\d+(-\w+(\.\d+)?)?$/.test(newVersion)) {
@@ -74,5 +75,10 @@ exec("npm install");
 exec(`git add ${bumpedPackageFiles.join(" ")} ${sourceFiles.join(" ")} package-lock.json`);
 exec(`git commit -m "chore(release): v${newVersion}"`);
 exec(`git tag v${newVersion}`);
+
+// Publish @azrtydxb/sdk to public npm.
+const dryRun = process.argv.includes("--dry-run");
+await publishSdk({ dryRun });
+console.log(`✓ Published @azrtydxb/sdk`);
 
 console.log(`\nv${newVersion} ready. Push with: git push origin master --tags`);
