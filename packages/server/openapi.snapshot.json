@@ -3752,6 +3752,15 @@
         ]
       }
     },
+    "/api/notifications/stream": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
     "/api/plugin-builtin/notes/create": {
       "post": {
         "requestBody": {
