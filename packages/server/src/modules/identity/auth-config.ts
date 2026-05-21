@@ -16,6 +16,31 @@ const log = createLogger("auth");
 const APP_URL = process.env.APP_URL || "http://localhost:5173";
 
 /**
+ * Build the list of origins that the passkey plugin will accept.
+ *
+ * In addition to the web origin (`APP_URL`), mobile passkey ceremonies require
+ * platform-specific origins:
+ *   - iOS:     `ios:bundle-id:<MOBILE_IOS_BUNDLE_ID>`
+ *   - Android: `android:apk-key-hash:<MOBILE_ANDROID_APK_KEY_HASH>`
+ *
+ * Note: `MOBILE_ANDROID_APK_KEY_HASH` is the base64url-encoded SHA-256 of the
+ * signing *public key* — distinct from the colon-separated certificate
+ * fingerprints in `MOBILE_ANDROID_SHA256_FINGERPRINTS` (used for assetlinks.json).
+ *
+ * All mobile env vars are optional; when unset the function returns only the
+ * web origin so existing deployments are unaffected.
+ */
+export function buildPasskeyOrigins(env: NodeJS.ProcessEnv = process.env): string[] {
+  return [
+    env.APP_URL || "http://localhost:5173",
+    ...(env.MOBILE_IOS_BUNDLE_ID ? [`ios:bundle-id:${env.MOBILE_IOS_BUNDLE_ID}`] : []),
+    ...(env.MOBILE_ANDROID_APK_KEY_HASH
+      ? [`android:apk-key-hash:${env.MOBILE_ANDROID_APK_KEY_HASH}`]
+      : []),
+  ];
+}
+
+/**
  * Extra origins (beyond APP_URL) that better-auth will accept. Modules
  * that learn additional public origins at runtime — most notably the
  * tunnel module, once a JWT is configured — push them in via
@@ -119,7 +144,7 @@ export function createAuth(db: Db) {
       passkey({
         rpName: "Kryton",
         rpID: process.env.WEBAUTHN_RP_ID || "localhost",
-        origin: APP_URL,
+        origin: buildPasskeyOrigins(),
       }),
       twoFactor({
         issuer: "Kryton",
