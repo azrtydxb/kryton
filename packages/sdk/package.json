@@ -1,7 +1,8 @@
 {
   "name": "@azrtydxb/sdk",
   "version": "4.6.5-pre.10",
-  "private": true,
+  "description": "Typed TypeScript client for the Kryton REST API.",
+  "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -14,6 +15,15 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/azrtydxb/kryton.git",
+    "directory": "packages/sdk"
+  },
   "scripts": {
     "generate": "openapi-typescript ../server/openapi.snapshot.json -o src/types.gen.ts",
     "build": "npm run generate && tsc",
