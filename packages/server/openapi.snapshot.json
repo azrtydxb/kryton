@@ -548,6 +548,24 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/.well-known/apple-app-site-association": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/.well-known/assetlinks.json": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
     "/api/access-requests/": {
       "get": {
         "responses": {
