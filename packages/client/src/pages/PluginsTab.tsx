@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { CSSProperties } from 'react';
+import { useMobileEmbed } from '../hooks/useMobileEmbed';
+import '../styles/mobile-embed.css';
 import {
   Search, Package, Download, RefreshCw, Trash2, Settings,
   CheckCircle, XCircle, AlertCircle,
@@ -93,6 +95,7 @@ const subTabStyle = (active: boolean): CSSProperties => ({
 type SubView = 'browse' | 'installed';
 
 export function PluginsTab() {
+  const isMobile = useMobileEmbed();
   const [subView, setSubView] = useState<SubView>('installed');
   const [installedIds, setInstalledIds] = useState<Set<string>>(new Set());
 
@@ -105,7 +108,7 @@ export function PluginsTab() {
   useEffect(() => { refreshInstalledIds(); }, [refreshInstalledIds]);
 
   return (
-    <div style={{ color: 'var(--fg-1)' }}>
+    <div className={isMobile ? "mobile-embed" : ""} style={{ color: 'var(--fg-1)' }}>
       {/* Sub-view toggle — same mode-pill pattern as the outer tabs */}
       <div style={{ display: 'flex', gap: 2, marginBottom: 14 }}>
         <SubTabBtn active={subView === 'installed'} onClick={() => setSubView('installed')} label="Installed" />

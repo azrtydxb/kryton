@@ -1,0 +1,25 @@
+.mobile-embed {
+  /* Larger touch targets: 44pt minimum per Apple HIG. */
+  --touch-target-min: 44px;
+}
+
+.mobile-embed button,
+.mobile-embed [role="button"],
+.mobile-embed a {
+  min-height: var(--touch-target-min);
+  min-width: var(--touch-target-min);
+}
+
+.mobile-embed input,
+.mobile-embed select,
+.mobile-embed textarea {
+  font-size: 16px; /* iOS does not auto-zoom on focus for >=16px inputs. */
+  min-height: var(--touch-target-min);
+}
+
+/* Disable text selection on canvas to prevent the OS magnifier popup. */
+.mobile-embed .canvas-surface {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}

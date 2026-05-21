@@ -15,6 +15,8 @@ import { useYjsDocument } from '../../hooks/useYjsDocument';
 import { useToastStore } from '../../stores/toastStore';
 import { useAuth } from '../../hooks/useAuth';
 import { presenceColor } from '../../lib/presenceColor';
+import { useMobileEmbed } from '../../hooks/useMobileEmbed';
+import '../../styles/mobile-embed.css';
 
 type SaveStatus = 'unchanged' | 'unsaved' | 'saving' | 'saved' | 'error';
 
@@ -62,6 +64,7 @@ export function EditModeView({
   onContentChange, onCursorStateChange,
   onLinkClick, onCreateNote, onNoteSelect, onTabClose,
 }: EditModeViewProps) {
+  const isMobile = useMobileEmbed();
   const hasChanges = editContent !== originalContent;
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('unchanged');
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -240,7 +243,7 @@ export function EditModeView({
   );
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, background: 'var(--bg)' }}>
+    <div className={isMobile ? "mobile-embed" : ""} style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, background: 'var(--bg)' }}>
       {/* Tab strip + actions row (single 38px row, shared bottom border) */}
       <div style={{ display: 'flex', alignItems: 'stretch', background: 'var(--bg)', borderBottom: '1px solid var(--line)' }}>
         <div style={{ flex: 1, minWidth: 0, display: 'flex' }}>
@@ -296,7 +299,7 @@ export function EditModeView({
             flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0,
             borderRight: showPreview ? '1px solid var(--line)' : 'none',
           }}>
-            <div style={{ flex: 1, overflow: 'hidden' }}>
+            <div className="canvas-surface" style={{ flex: 1, overflow: 'hidden' }}>
               <Editor
                 key={activeNote.path}
                 ref={editorRef}
