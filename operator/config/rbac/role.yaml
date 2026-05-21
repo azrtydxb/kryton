@@ -58,6 +58,30 @@ rules:
   resources:
   - "deployments"
   - "statefulsets"
+# helm's post-apply Wait introspects rollout health by listing
+# ReplicaSets (Deployment) and ControllerRevisions (StatefulSet) in the
+# CR's namespace. Without this grant the helm upgrade succeeds but
+# Wait fails with "replicasets.apps is forbidden", Atomic rolls back,
+# and the release flaps between failed/rollback states forever.
+- verbs:
+  - get
+  - list
+  - watch
+  apiGroups:
+  - "apps"
+  resources:
+  - "replicasets"
+  - "controllerrevisions"
+# Wait also Lists Pods to confirm readiness (Deployment, StatefulSet
+# scale up + readiness probes).
+- verbs:
+  - get
+  - list
+  - watch
+  apiGroups:
+  - ""
+  resources:
+  - "pods"
 # The bitnami postgresql subchart renders a PodDisruptionBudget.
 - apiGroups:
   - "policy"
