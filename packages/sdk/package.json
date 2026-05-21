@@ -18,13 +18,15 @@
     "generate": "openapi-typescript ../server/openapi.snapshot.json -o src/types.gen.ts",
     "build": "npm run generate && tsc",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf dist src/types.gen.ts"
+    "clean": "rm -rf dist src/types.gen.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "openapi-fetch": "^0.13.0"
   },
   "devDependencies": {
     "openapi-typescript": "^7.5.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.1"
   }
 }
