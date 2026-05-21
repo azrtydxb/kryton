@@ -310,6 +310,69 @@
         ],
         "type": "object"
       },
+      "NoteEntry": {
+        "$id": "#/components/schemas/NoteEntry",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/NoteEntry"
+            },
+            "type": "array"
+          },
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "file",
+              "directory"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "path",
+          "type"
+        ],
+        "type": "object"
+      },
+      "NoteEntryInput": {
+        "$id": "#/components/schemas/NoteEntryInput",
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/NoteEntryInput"
+            },
+            "type": "array"
+          },
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "file",
+              "directory"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "path",
+          "type"
+        ],
+        "type": "object"
+      },
       "RenameNoteBody": {
         "$id": "#/components/schemas/RenameNoteBody",
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -3955,7 +4018,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/schema0"
+                    "$ref": "#/components/schemas/NoteEntry"
                   },
                   "type": "array"
                 }

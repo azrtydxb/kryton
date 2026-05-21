@@ -7,26 +7,13 @@ import { getUserNotesDir } from "../../notes/services/user-notes-dir.service.js"
 import { ValidationError } from "../../../lib/errors.js";
 import type { NotesOps } from "../services/types.js";
 import type { PluginEventBus } from "../services/event-bus.js";
+import { noteEntryListSchema } from "../schemas/index.js";
 
 export interface BuiltinNotesRoutesDeps {
   notesDir: string;
   notesOps: NotesOps;
   eventBus: PluginEventBus;
 }
-
-const noteEntrySchema: z.ZodType<{
-  name: string;
-  path: string;
-  type: "file" | "directory";
-  children?: unknown[];
-}> = z.lazy(() =>
-  z.object({
-    name: z.string(),
-    path: z.string(),
-    type: z.enum(["file", "directory"]),
-    children: z.array(noteEntrySchema).optional(),
-  }),
-) as never;
 
 const listQuerySchema = z.object({ folder: z.string().optional() });
 const pathQuerySchema = z.object({ path: z.string().min(1) });
@@ -72,7 +59,7 @@ export const builtinNotesRoutes = (
           tags: ["plugin-builtin"],
           summary: "List notes for the current user (optionally under a folder)",
           querystring: listQuerySchema,
-          response: { 200: z.array(noteEntrySchema) },
+          response: { 200: noteEntryListSchema },
         },
         preHandler: async (req) => {
           await app.auth.requireUser(req);
