@@ -25,7 +25,9 @@ export type NavState =
   | { kind: 'default' }
   | { kind: 'view'; view: Exclude<MainView, 'note'>; tag: string | null }
   | { kind: 'note'; activePath: string; tabs: string[] }
-  | { kind: 'shared'; ownerUserId: string; path: string };
+  | { kind: 'shared'; ownerUserId: string; path: string }
+  | { kind: 'canvas'; id: string }
+  | { kind: 'plugin'; name: string; notePath: string | null };
 
 /** Encode a notes-tree path for use inside the URL. Slash separators
  *  stay literal; each segment is `encodeURIComponent`d so spaces,
@@ -112,6 +114,29 @@ export function parseUrl(pathname: string, search: string): NavState {
     return { kind: 'note', activePath, tabs: tabSet };
   }
 
+  // /canvas/<encoded-id>
+  // Mirrors the /n/ encoding: folder slashes stay literal, segments are
+  // encodeURIComponent'd. The id may also arrive with %2F-encoded slashes
+  // (e.g. from a mobile host that fully-encodes the path); both forms are
+  // accepted by simply percent-decoding the whole rest segment.
+  if (cleanedPath.startsWith('canvas/')) {
+    const rest = cleanedPath.slice('canvas/'.length);
+    if (rest.length === 0) return { kind: 'default' };
+    // Decode segment by segment to handle literal slash separators, then
+    // also handle %2F (fully-encoded slashes) via a global decode pass.
+    const id = decodeNotePath(rest);
+    return { kind: 'canvas', id };
+  }
+
+  // /plugin/<name>?note=<encoded-path>
+  if (cleanedPath.startsWith('plugin/')) {
+    const name = cleanedPath.slice('plugin/'.length);
+    if (name.length === 0) return { kind: 'default' };
+    const rawNote = params.get('note');
+    const notePath = rawNote && rawNote.length > 0 ? decodeURIComponent(rawNote) : null;
+    return { kind: 'plugin', name, notePath };
+  }
+
   return { kind: 'default' };
 }
 
@@ -143,6 +168,19 @@ export function serializeNav(state: NavState): string {
       // Preserve full tab order including the active tab so the parser
       // can reconstruct exactly what the user saw.
       return `/n/${active}?tabs=${joinTabs(state.tabs)}`;
+    }
+    case 'canvas': {
+      // Mirror /n/ encoding: per-segment encodeURIComponent, literal slashes.
+      return `/canvas/${encodeNotePath(state.id)}`;
+    }
+    case 'plugin': {
+      // The note query param uses a full encodeURIComponent so slashes in
+      // the path become %2F — this keeps the note path unambiguous as a
+      // single query-string value.
+      if (state.notePath) {
+        return `/plugin/${state.name}?note=${encodeURIComponent(state.notePath)}`;
+      }
+      return `/plugin/${state.name}`;
     }
   }
 }

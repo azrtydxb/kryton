@@ -176,3 +176,70 @@ describe('useUrlSync — popstate', () => {
     expect(useUIStore.getState().view).toBe('graph');
   });
 });
+
+describe('useUrlSync — canvas routes', () => {
+  beforeEach(() => {
+    resetStores();
+    setUrl('/');
+  });
+
+  it('parses /canvas/<id> → sets view=note and calls openNote', () => {
+    setUrl('/canvas/Welcome.canvas');
+    const cb = makeCallbacks();
+    renderHook(() => useUrlSync(null, cb));
+    expect(useUIStore.getState().view).toBe('note');
+    expect(cb.openNote).toHaveBeenCalledWith('Welcome.canvas');
+  });
+
+  it('parses /canvas/<nested-path> → calls openNote with decoded id', () => {
+    setUrl('/canvas/Boards/Roadmap.canvas');
+    const cb = makeCallbacks();
+    renderHook(() => useUrlSync(null, cb));
+    expect(cb.openNote).toHaveBeenCalledWith('Boards/Roadmap.canvas');
+  });
+
+  it('calls onCanvasRoute when provided', () => {
+    setUrl('/canvas/Welcome.canvas');
+    const onCanvasRoute = vi.fn();
+    const cb = makeCallbacks({ onCanvasRoute });
+    renderHook(() => useUrlSync(null, cb));
+    expect(onCanvasRoute).toHaveBeenCalled();
+  });
+
+  it('does not crash when onCanvasRoute is not provided', () => {
+    setUrl('/canvas/Welcome.canvas');
+    const cb = makeCallbacks(); // no onCanvasRoute
+    expect(() => renderHook(() => useUrlSync(null, cb))).not.toThrow();
+  });
+});
+
+describe('useUrlSync — plugin routes', () => {
+  beforeEach(() => {
+    resetStores();
+    setUrl('/');
+  });
+
+  it('parses /plugin/<name> → sets showAdmin=true and adminInitialTab=plugins', () => {
+    setUrl('/plugin/kanban');
+    renderHook(() => useUrlSync(null, makeCallbacks()));
+    expect(useUIStore.getState().showAdmin).toBe(true);
+    expect(useUIStore.getState().adminInitialTab).toBe('plugins');
+    expect(useUIStore.getState().view).toBe('note');
+  });
+
+  it('parses /plugin/<name>?note=<path> → also calls openNote', () => {
+    setUrl('/plugin/kanban?note=Library%2FCards.md');
+    const cb = makeCallbacks();
+    renderHook(() => useUrlSync(null, cb));
+    expect(useUIStore.getState().showAdmin).toBe(true);
+    expect(useUIStore.getState().adminInitialTab).toBe('plugins');
+    expect(cb.openNote).toHaveBeenCalledWith('Library/Cards.md');
+  });
+
+  it('parses /plugin/<name> without note → does not call openNote', () => {
+    setUrl('/plugin/kanban');
+    const cb = makeCallbacks();
+    renderHook(() => useUrlSync(null, cb));
+    expect(cb.openNote).not.toHaveBeenCalled();
+  });
+});

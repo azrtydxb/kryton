@@ -176,3 +176,169 @@ describe('navEquals', () => {
     ).toBe(false);
   });
 });
+
+// ─────────────────────────── canvas routes ───────────────────────────
+
+describe('parseUrl — canvas routes', () => {
+  it('parses /canvas/<simple-path>', () => {
+    expect(parseUrl('/canvas/Welcome.canvas', '')).toEqual({
+      kind: 'canvas',
+      id: 'Welcome.canvas',
+    });
+  });
+
+  it('parses /canvas/<multi-segment-path> with literal slashes', () => {
+    expect(parseUrl('/canvas/Boards/Roadmap.canvas', '')).toEqual({
+      kind: 'canvas',
+      id: 'Boards/Roadmap.canvas',
+    });
+  });
+
+  it('parses /canvas/<multi-segment-path> with encoded slashes (%2F)', () => {
+    expect(parseUrl('/canvas/Boards%2FRoadmap.canvas', '')).toEqual({
+      kind: 'canvas',
+      id: 'Boards/Roadmap.canvas',
+    });
+  });
+
+  it('parses /canvas/<path-with-spaces>', () => {
+    expect(parseUrl('/canvas/My%20Board.canvas', '')).toEqual({
+      kind: 'canvas',
+      id: 'My Board.canvas',
+    });
+  });
+
+  it('collapses /canvas/ (no id) to default', () => {
+    expect(parseUrl('/canvas/', '')).toEqual({ kind: 'default' });
+    expect(parseUrl('/canvas', '')).toEqual({ kind: 'default' });
+  });
+});
+
+describe('serializeNav — canvas routes', () => {
+  it('serializes canvas state to /canvas/<encoded-path>', () => {
+    expect(serializeNav({ kind: 'canvas', id: 'Welcome.canvas' })).toBe(
+      '/canvas/Welcome.canvas',
+    );
+  });
+
+  it('serializes canvas state with multi-segment id (literal slashes)', () => {
+    expect(serializeNav({ kind: 'canvas', id: 'Boards/Roadmap.canvas' })).toBe(
+      '/canvas/Boards/Roadmap.canvas',
+    );
+  });
+
+  it('serializes canvas state with spaces in id', () => {
+    expect(serializeNav({ kind: 'canvas', id: 'My Board.canvas' })).toBe(
+      '/canvas/My%20Board.canvas',
+    );
+  });
+
+  it('round-trips canvas → serialize → parse', () => {
+    const cases: NavState[] = [
+      { kind: 'canvas', id: 'Welcome.canvas' },
+      { kind: 'canvas', id: 'Boards/Roadmap.canvas' },
+      { kind: 'canvas', id: 'My Boards/Team Roadmap.canvas' },
+    ];
+    for (const nav of cases) {
+      const url = serializeNav(nav);
+      const qIdx = url.indexOf('?');
+      const pathname = qIdx >= 0 ? url.slice(0, qIdx) : url;
+      const search = qIdx >= 0 ? url.slice(qIdx) : '';
+      expect(parseUrl(pathname, search)).toEqual(nav);
+    }
+  });
+});
+
+// ─────────────────────────── plugin routes ───────────────────────────
+
+describe('parseUrl — plugin routes', () => {
+  it('parses /plugin/<name> with no note query', () => {
+    expect(parseUrl('/plugin/kanban', '')).toEqual({
+      kind: 'plugin',
+      name: 'kanban',
+      notePath: null,
+    });
+  });
+
+  it('parses /plugin/<name>?note=<path>', () => {
+    expect(parseUrl('/plugin/kanban', '?note=Library/Cards.md')).toEqual({
+      kind: 'plugin',
+      name: 'kanban',
+      notePath: 'Library/Cards.md',
+    });
+  });
+
+  it('decodes the note query parameter', () => {
+    expect(parseUrl('/plugin/kanban', '?note=My%20Notes/Cards.md')).toEqual({
+      kind: 'plugin',
+      name: 'kanban',
+      notePath: 'My Notes/Cards.md',
+    });
+  });
+
+  it('collapses /plugin/ (no name) to default', () => {
+    expect(parseUrl('/plugin/', '')).toEqual({ kind: 'default' });
+    expect(parseUrl('/plugin', '')).toEqual({ kind: 'default' });
+  });
+});
+
+describe('serializeNav — plugin routes', () => {
+  it('serializes plugin state with no notePath', () => {
+    expect(serializeNav({ kind: 'plugin', name: 'kanban', notePath: null })).toBe(
+      '/plugin/kanban',
+    );
+  });
+
+  it('serializes plugin state with notePath', () => {
+    expect(
+      serializeNav({ kind: 'plugin', name: 'kanban', notePath: 'Library/Cards.md' }),
+    ).toBe('/plugin/kanban?note=Library%2FCards.md');
+  });
+
+  it('round-trips plugin → serialize → parse', () => {
+    const cases: NavState[] = [
+      { kind: 'plugin', name: 'kanban', notePath: null },
+      { kind: 'plugin', name: 'kanban', notePath: 'Library/Cards.md' },
+      { kind: 'plugin', name: 'my-plugin', notePath: 'Folder/My Note.md' },
+    ];
+    for (const nav of cases) {
+      const url = serializeNav(nav);
+      const qIdx = url.indexOf('?');
+      const pathname = qIdx >= 0 ? url.slice(0, qIdx) : url;
+      const search = qIdx >= 0 ? url.slice(qIdx) : '';
+      expect(parseUrl(pathname, search)).toEqual(nav);
+    }
+  });
+});
+
+// ─────────────── regression: existing routes still parse correctly ────────────
+
+describe('parseUrl — regression: existing routes', () => {
+  it('still parses / as default', () => {
+    expect(parseUrl('/', '')).toEqual({ kind: 'default' });
+  });
+
+  it('still parses /n/X.md as note', () => {
+    expect(parseUrl('/n/X.md', '')).toEqual({
+      kind: 'note',
+      activePath: 'X.md',
+      tabs: ['X.md'],
+    });
+  });
+
+  it('still parses /view/graph as view', () => {
+    expect(parseUrl('/view/graph', '')).toEqual({ kind: 'view', view: 'graph', tag: null });
+  });
+
+  it('still parses /view/all as view', () => {
+    expect(parseUrl('/view/all', '')).toEqual({ kind: 'view', view: 'all', tag: null });
+  });
+
+  it('still parses /view/tags with tag', () => {
+    expect(parseUrl('/view/tags', '?tag=work')).toEqual({
+      kind: 'view',
+      view: 'tags',
+      tag: 'work',
+    });
+  });
+});

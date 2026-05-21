@@ -31,6 +31,9 @@ interface UIState {
 
   // Modals
   showAdmin: boolean;
+  /** When set, AdminPage opens to this tab instead of the default 'users'.
+   *  Cleared by AdminPage after it reads the initial tab on mount. */
+  adminInitialTab: 'users' | 'invites' | 'settings' | 'plugins' | 'tunnel' | null;
   showTemplatePicker: boolean;
   pendingTemplatePath: string | null;
   showQuickSwitcher: boolean;
@@ -68,6 +71,7 @@ interface UIState {
   setOriginalContent: SetState<string | null>;
   setCursorState: SetState<{ line: number; col: number; wordCount: number }>;
   setShowAdmin: SetState<boolean>;
+  setAdminInitialTab: SetState<'users' | 'invites' | 'settings' | 'plugins' | 'tunnel' | null>;
   setShowTemplatePicker: SetState<boolean>;
   setPendingTemplatePath: SetState<string | null>;
   setShowQuickSwitcher: SetState<boolean>;
@@ -110,6 +114,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   editContent: null,
   originalContent: null,
   showAdmin: false,
+  adminInitialTab: null,
   showTemplatePicker: false,
   pendingTemplatePath: null,
   showQuickSwitcher: false,
@@ -134,6 +139,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   setOriginalContent: (v) => set({ originalContent: resolve(v, get().originalContent) }),
   setCursorState: (v) => set({ cursorState: resolve(v, get().cursorState) }),
   setShowAdmin: (v) => set({ showAdmin: resolve(v, get().showAdmin) }),
+  setAdminInitialTab: (v) => set({ adminInitialTab: resolve(v, get().adminInitialTab) }),
   setShowTemplatePicker: (v) => set({ showTemplatePicker: resolve(v, get().showTemplatePicker) }),
   setPendingTemplatePath: (v) => set({ pendingTemplatePath: resolve(v, get().pendingTemplatePath) }),
   setShowQuickSwitcher: (v) => set({ showQuickSwitcher: resolve(v, get().showQuickSwitcher) }),
@@ -181,6 +187,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     editContent: null,
     originalContent: null,
     showAdmin: false,
+    adminInitialTab: null,
     showTemplatePicker: false,
     pendingTemplatePath: null,
     showQuickSwitcher: false,

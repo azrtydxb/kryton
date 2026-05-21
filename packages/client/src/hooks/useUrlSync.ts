@@ -22,6 +22,12 @@ export interface UrlSyncCallbacks {
   /** Verify that a path still exists in the user's tree; the hook drops
    *  any URL-listed tab whose path is missing (deleted-while-away). */
   noteExists: (path: string) => boolean;
+  /** Called when a `/canvas/:id` URL is applied. The host (App.tsx) uses
+   *  this as a signal to call `enterEditMode` once the note content loads,
+   *  since `enterEditMode` needs the content string and the note fetch is
+   *  async. Optional — canvas routes work without it (note opens in
+   *  preview mode); the signal just flips to edit mode after load. */
+  onCanvasRoute?: () => void;
 }
 
 /** Snapshot of the navigation-relevant pieces of UI state. */
@@ -177,6 +183,23 @@ export function useUrlSync(activeTabId: string | null, callbacks: UrlSyncCallbac
         } else {
           cb.closeActiveNote();
         }
+        return;
+      }
+      case 'canvas': {
+        // Open the note in edit/canvas mode. `enterEditMode` needs actual
+        // content, so we fire it lazily via the `onCanvasRoute` callback
+        // which is wired in App.tsx as a useEffect watching `activeNote`.
+        ui.setView('note');
+        void cb.openNote(nav.id);
+        cb.onCanvasRoute?.();
+        return;
+      }
+      case 'plugin': {
+        // Open the admin modal pre-selected on the plugins tab.
+        ui.setView('note');
+        ui.setAdminInitialTab('plugins');
+        ui.setShowAdmin(true);
+        if (nav.notePath) void cb.openNote(nav.notePath);
         return;
       }
     }
