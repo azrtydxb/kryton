@@ -164,6 +164,41 @@ const envSchema = z.object({
     description: "Default From: address for outbound mail.",
   }),
 
+  // ---------------------------------------------------------------------------
+  // APNs (Apple Push Notification service)
+  // ---------------------------------------------------------------------------
+  APNS_KEY_ID: withMeta(z.string().optional(), {
+    secret: true,
+    userFacing: true,
+    description: "APNs token-auth key ID (10-char, from Apple Developer portal).",
+  }),
+  APNS_TEAM_ID: withMeta(z.string().optional(), {
+    secret: false,
+    userFacing: true,
+    description: "Apple Developer Team ID used for APNs token auth.",
+  }),
+  APNS_BUNDLE_ID: withMeta(z.string().optional(), {
+    secret: false,
+    userFacing: true,
+    description: "iOS app bundle identifier for APNs topic (e.g. com.kryton.mobile).",
+  }),
+  APNS_KEY_PATH: withMeta(z.string().optional(), {
+    secret: true,
+    userFacing: true,
+    description: "Filesystem path to the APNs .p8 private key file.",
+  }),
+  APNS_PRODUCTION: withMeta(
+    z
+      .string()
+      .default("false")
+      .transform((s) => s === "true"),
+    {
+      secret: false,
+      userFacing: true,
+      description: "Send APNs to production gateway (\"true\") or sandbox (\"false\").",
+    },
+  ),
+
   OPENAPI_ENABLED: withMeta(
     z
       .string()
