@@ -189,11 +189,17 @@
           "path": {
             "type": "string"
           },
+          "size": {
+            "type": "number"
+          },
           "type": {
             "enum": [
               "file",
               "folder"
             ],
+            "type": "string"
+          },
+          "updatedAt": {
             "type": "string"
           }
         },
@@ -220,11 +226,17 @@
           "path": {
             "type": "string"
           },
+          "size": {
+            "type": "number"
+          },
           "type": {
             "enum": [
               "file",
               "folder"
             ],
+            "type": "string"
+          },
+          "updatedAt": {
             "type": "string"
           }
         },
@@ -2365,6 +2377,16 @@
                   "items": {
                     "additionalProperties": false,
                     "properties": {
+                      "agentId": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
                       "createdAt": {
                         "format": "date-time",
                         "type": "string"
@@ -2409,6 +2431,7 @@
                       "name",
                       "keyPrefix",
                       "scope",
+                      "agentId",
                       "expiresAt",
                       "lastUsedAt",
                       "createdAt"
@@ -2433,6 +2456,10 @@
             "application/json": {
               "schema": {
                 "properties": {
+                  "agentId": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
                   "expiresAt": {
                     "format": "date-time",
                     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
@@ -2468,6 +2495,16 @@
                 "schema": {
                   "additionalProperties": false,
                   "properties": {
+                    "agentId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "createdAt": {
                       "format": "date-time",
                       "type": "string"
@@ -2505,6 +2542,7 @@
                     "keyPrefix",
                     "name",
                     "scope",
+                    "agentId",
                     "expiresAt",
                     "createdAt"
                   ],
@@ -3714,6 +3752,567 @@
         ]
       }
     },
+    "/api/plugin-builtin/notes/create": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "content": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path",
+                  "content"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "ok": {
+                      "enum": [
+                        true
+                      ],
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Create a note",
+        "tags": [
+          "plugin-builtin"
+        ]
+      }
+    },
+    "/api/plugin-builtin/notes/delete": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "ok": {
+                      "enum": [
+                        true
+                      ],
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Delete a note",
+        "tags": [
+          "plugin-builtin"
+        ]
+      }
+    },
+    "/api/plugin-builtin/notes/get": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "content": {
+                      "type": "string"
+                    },
+                    "modifiedAt": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        {
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "path": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "content",
+                    "title",
+                    "modifiedAt"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Read a single note",
+        "tags": [
+          "plugin-builtin"
+        ]
+      }
+    },
+    "/api/plugin-builtin/notes/list": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "folder",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/schema0"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "List notes for the current user (optionally under a folder)",
+        "tags": [
+          "plugin-builtin"
+        ]
+      }
+    },
+    "/api/plugin-builtin/notes/openByPath": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "path": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "ok": {
+                      "enum": [
+                        true
+                      ],
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Request that the client UI open a note (emits note:open)",
+        "tags": [
+          "plugin-builtin"
+        ]
+      }
+    },
+    "/api/plugin-builtin/notes/replaceFenceAtRange": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "newSource": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "range": {
+                    "properties": {
+                      "endLine": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "startLine": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "startLine",
+                      "endLine"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "path",
+                  "range",
+                  "newSource"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "ok": {
+                      "enum": [
+                        true
+                      ],
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Splice a line range in a note with new source",
+        "tags": [
+          "plugin-builtin"
+        ]
+      }
+    },
+    "/api/plugin-builtin/notes/update": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "content": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path",
+                  "content"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "ok": {
+                      "enum": [
+                        true
+                      ],
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Overwrite a note",
+        "tags": [
+          "plugin-builtin"
+        ]
+      }
+    },
+    "/api/plugin-builtin/storage/delete": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "ok": {
+                      "enum": [
+                        true
+                      ],
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Delete a storage key for the current user + plugin",
+        "tags": [
+          "plugin-builtin"
+        ]
+      }
+    },
+    "/api/plugin-builtin/storage/get": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "value": {}
+                  },
+                  "required": [
+                    "value"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Read a storage key for the current user + plugin",
+        "tags": [
+          "plugin-builtin"
+        ]
+      }
+    },
+    "/api/plugin-builtin/storage/list": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "prefix",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "key": {
+                        "type": "string"
+                      },
+                      "userId": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "value": {}
+                    },
+                    "required": [
+                      "key",
+                      "value",
+                      "userId"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "List storage entries for the current user + plugin",
+        "tags": [
+          "plugin-builtin"
+        ]
+      }
+    },
+    "/api/plugin-builtin/storage/set": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "key": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "value": {}
+                },
+                "required": [
+                  "key",
+                  "value"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "ok": {
+                      "enum": [
+                        true
+                      ],
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Write a storage key for the current user + plugin",
+        "tags": [
+          "plugin-builtin"
+        ]
+      }
+    },
     "/api/plugins/active": {
       "get": {
         "responses": {
@@ -4238,6 +4837,121 @@
         "summary": "Deactivate and remove a plugin (admin)",
         "tags": [
           "plugins"
+        ]
+      }
+    },
+    "/api/push/register": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "platform": {
+                    "enum": [
+                      "ios",
+                      "android"
+                    ],
+                    "type": "string"
+                  },
+                  "token": {
+                    "maxLength": 2048,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "platform",
+                  "token"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "platform": {
+                      "enum": [
+                        "ios",
+                        "android"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "platform"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "platform": {
+                      "enum": [
+                        "ios",
+                        "android"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "platform"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Register a push notification device token",
+        "tags": [
+          "push"
+        ]
+      }
+    },
+    "/api/push/register/{id}": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Default Response"
+          }
+        },
+        "summary": "Deregister a push notification device",
+        "tags": [
+          "push"
         ]
       }
     },

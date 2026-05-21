@@ -3,6 +3,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { ApiKeyService } from "./services/api-key.service.js";
 import { usersRoutes } from "./routes/users.routes.js";
 import { apiKeysRoutes } from "./routes/api-keys.routes.js";
+import { pushRoutes } from "./routes/push.routes.js";
 
 const identityModuleImpl: FastifyPluginAsync = async (app) => {
   const apiKeyService = new ApiKeyService(app);
@@ -13,6 +14,7 @@ const identityModuleImpl: FastifyPluginAsync = async (app) => {
 
   await app.register(usersRoutes, { prefix: "/api/users" });
   await app.register(apiKeysRoutes({ apiKeyService }), { prefix: "/api/api-keys" });
+  await app.register(pushRoutes, { prefix: "/api/push" });
 };
 
 /**
