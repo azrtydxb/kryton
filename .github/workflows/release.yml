@@ -742,6 +742,35 @@ jobs:
           files: |
             release-assets/kryton-crds.yaml
 
+  publish-sdk:
+    # Publish @azrtydxb/sdk to public npm after the GitHub Release is live.
+    # Runs on the same arc-azrtydxb runner as `release`; gates on `release`
+    # so the package version on npm aligns with the GitHub Release tag.
+    # NPM_TOKEN must be set as a repo secret (Settings → Secrets and variables
+    # → Actions → NPM_TOKEN) — a granular token scoped to @azrtydxb/sdk with
+    # publish permission from https://www.npmjs.com/settings/<user>/tokens.
+    needs: [release]
+    runs-on: arc-azrtydxb
+    container:
+      image: node:24
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+      - run: npm ci
+      - run: npm run build --workspace=packages/sdk
+      - name: Publish SDK to npm
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: node scripts/release-sdk.js
+      - if: always()
+        run: chown -R 1001:1001 . || true
+
   # ===========================================================================
   # Phase 4 — NAS package source wiring.
   #
