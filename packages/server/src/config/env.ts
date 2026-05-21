@@ -199,6 +199,20 @@ const envSchema = z.object({
     },
   ),
 
+  // ---------------------------------------------------------------------------
+  // FCM (Firebase Cloud Messaging)
+  // ---------------------------------------------------------------------------
+  FCM_SERVICE_ACCOUNT_PATH: withMeta(z.string().optional(), {
+    secret: true,
+    userFacing: true,
+    description: "Filesystem path to the Firebase service account JSON key file.",
+  }),
+  FCM_PROJECT_ID: withMeta(z.string().optional(), {
+    secret: false,
+    userFacing: true,
+    description: "Firebase project ID for FCM (e.g. my-project-12345).",
+  }),
+
   OPENAPI_ENABLED: withMeta(
     z
       .string()
