@@ -52,6 +52,33 @@ export async function buildApp({
     trustProxy: true,
   });
 
+  // Accept POST/PUT requests that have no body (or an empty body) without a
+  // Content-Type header. Fastify's default content-type parser otherwise
+  // raises FST_ERR_CTP_INVALID_MEDIA_TYPE → 415 for routes that take no
+  // input (e.g. `POST /api/daily`), and our errors plugin then surfaces
+  // that as a generic 500 to clients. Registering a catch-all parser that
+  // resolves to `null` when the body is empty is the documented fix.
+  app.addContentTypeParser("*", (_req, payload, done) => {
+    let received = false;
+    let data = "";
+    payload.on("data", (chunk) => {
+      received = true;
+      data += chunk;
+    });
+    payload.on("end", () => {
+      if (!received || data.length === 0) {
+        done(null, undefined);
+        return;
+      }
+      try {
+        done(null, JSON.parse(data));
+      } catch {
+        done(null, data);
+      }
+    });
+    payload.on("error", (err) => done(err, undefined));
+  });
+
   app.decorate("config", config);
 
   // Order matters: zod first (sets type provider), telemetry early (wraps
