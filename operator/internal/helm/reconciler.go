@@ -24,7 +24,6 @@ import (
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
-	"helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/storage/driver"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -42,10 +41,9 @@ const helmActionTimeout = 5 * time.Minute
 
 // Reconciler reconciles a Kryton CR into a helm release.
 type Reconciler struct {
-	Client    client.Client
-	ChartFS   *chartfs.ChartFS
-	chart     *chart.Chart
-	cfgGetter genericclioptions.RESTClientGetter
+	Client  client.Client
+	ChartFS *chartfs.ChartFS
+	chart   *chart.Chart
 }
 
 // SetupWithManager registers the helm reconciler against the given manager.
@@ -58,16 +56,31 @@ func SetupWithManager(mgr ctrl.Manager, cfs *chartfs.ChartFS) error {
 		return fmt.Errorf("helm: load embedded chart: %w", err)
 	}
 
-	settings := cli.New()
 	r := &Reconciler{
-		Client:    mgr.GetClient(),
-		ChartFS:   cfs,
-		chart:     chrt,
-		cfgGetter: settings.RESTClientGetter(),
+		Client:  mgr.GetClient(),
+		ChartFS: cfs,
+		chart:   chrt,
 	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha1.Kryton{}).
 		Complete(r)
+}
+
+// newGetterForCR returns a REST client getter scoped to the CR's namespace.
+// helm's `cli.New().RESTClientGetter()` reads its default namespace from the
+// pod's in-cluster config (== the operator's own namespace), and several
+// helm action paths — most importantly the post-apply wait — fall back to
+// that default instead of using the action.Configuration.KubeClient.Namespace
+// we override via cfg.Init. The symptom is helm trying to LIST replicasets
+// in the operator's namespace, where the operator's ServiceAccount has no
+// list-RBAC for that resource. Building a fresh ConfigFlags per reconcile
+// with `*flags.Namespace = kr.Namespace` forces every helm code path that
+// asks the getter for a namespace to get the right one.
+func newGetterForCR(namespace string) genericclioptions.RESTClientGetter {
+	flags := genericclioptions.NewConfigFlags(true)
+	ns := namespace
+	flags.Namespace = &ns
+	return flags
 }
 
 // Reconcile installs or upgrades the helm release for one Kryton CR.
@@ -85,7 +98,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	}
 
 	cfg := new(action.Configuration)
-	if err := cfg.Init(r.cfgGetter, kr.Namespace, "", func(format string, v ...interface{}) {
+	if err := cfg.Init(newGetterForCR(kr.Namespace), kr.Namespace, "", func(format string, v ...interface{}) {
 		logger.V(1).Info(fmt.Sprintf(format, v...))
 	}); err != nil {
 		return ctrl.Result{}, fmt.Errorf("init helm action config: %w", err)
