@@ -21,7 +21,7 @@
     "sharp": "^0.34.5"
   },
   "devDependencies": {
-    "@redocly/cli": "^1.34.0",
+    "@redocly/cli": "^2.31.3",
     "typedoc": "^0.28.0",
     "typedoc-plugin-markdown": "^4.4.0"
   }
