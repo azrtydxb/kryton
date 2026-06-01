@@ -281,7 +281,7 @@ jobs:
 
   build-amd64:
     needs: [typecheck, lint, test, e2e, build]
-    runs-on: arc-azrtydxb-publish
+    runs-on: arc-azrtydxb-amd64-publish
     permissions:
       contents: read
       packages: write
@@ -607,7 +607,7 @@ jobs:
 
   build-operator-amd64:
     needs: [typecheck, lint, test, e2e]
-    runs-on: arc-azrtydxb-publish
+    runs-on: arc-azrtydxb-amd64-publish
     permissions:
       contents: read
       packages: write
