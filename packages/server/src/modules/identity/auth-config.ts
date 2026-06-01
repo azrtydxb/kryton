@@ -174,11 +174,18 @@ export function createAuth(db: Db) {
     },
 
     session: {
-      expiresIn: 60 * 60 * 24 * 7, // 7 days
-      updateAge: 60 * 60 * 24, // 1 day
+      expiresIn: 60 * 60 * 24 * 60, // 60 days (2 months)
+      updateAge: 60 * 60 * 24, // 1 day — sliding: each use within the window extends expiry to now + expiresIn
+      // cookieCache is intentionally DISABLED. It stores the session in a short-lived
+      // signed `session_data` cookie (5 min) that the server refreshes via Set-Cookie.
+      // Browsers adopt the refresh automatically, but native mobile clients (React
+      // Native) cache the original cookies in the OkHttp cookie jar and re-send the
+      // stale `session_data`. Once it expires, better-auth's getSession returns null
+      // *before* the DB fallback (api/routes/session.ts), logging mobile users out
+      // every ~5 minutes. With cookieCache off, every request validates the
+      // `session_token` against the DB directly — stable for the full session lifetime.
       cookieCache: {
-        enabled: true,
-        maxAge: 300, // 5 minutes
+        enabled: false,
       },
     },
 
