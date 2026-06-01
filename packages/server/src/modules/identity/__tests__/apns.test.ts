@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { sendApns, type ApnsResult } from "../services/push/apns.js";
+import { sendApns, type ApnsResult, type ApnsDeps } from "../services/push/apns.js";
 
 describe("sendApns", () => {
   it("sends a notification and returns success on 200", async () => {
@@ -8,7 +8,7 @@ describe("sendApns", () => {
     };
     const res: ApnsResult = await sendApns(
       { token: "tok", title: "Hi", body: "Hello", deepLink: "kryton://x" },
-      { provider: fakeProvider as any, bundleId: "com.kryton.mobile" },
+      { provider: fakeProvider as unknown as ApnsDeps["provider"], bundleId: "com.kryton.mobile" },
     );
     expect(res).toEqual({ ok: true });
     expect(fakeProvider.send).toHaveBeenCalledOnce();
@@ -23,7 +23,7 @@ describe("sendApns", () => {
     };
     const res = await sendApns(
       { token: "tok", title: "Hi", body: "Hello" },
-      { provider: fakeProvider as any, bundleId: "com.kryton.mobile" },
+      { provider: fakeProvider as unknown as ApnsDeps["provider"], bundleId: "com.kryton.mobile" },
     );
     expect(res).toEqual({ ok: false, permanent: true, reason: "BadDeviceToken" });
   });
@@ -37,7 +37,7 @@ describe("sendApns", () => {
     };
     const res = await sendApns(
       { token: "tok", title: "Hi", body: "Hello" },
-      { provider: fakeProvider as any, bundleId: "com.kryton.mobile" },
+      { provider: fakeProvider as unknown as ApnsDeps["provider"], bundleId: "com.kryton.mobile" },
     );
     expect(res).toEqual({ ok: false, permanent: false, reason: "InternalServerError" });
   });

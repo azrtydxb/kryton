@@ -1,12 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
-import { sendFcm, type FcmResult } from "../services/push/fcm.js";
+import { sendFcm, type FcmResult, type FcmDeps } from "../services/push/fcm.js";
 
 describe("sendFcm", () => {
   it("returns ok on success", async () => {
     const messaging = { send: vi.fn().mockResolvedValue("projects/x/messages/123") };
     const res: FcmResult = await sendFcm(
       { token: "fcm-tok", title: "Hi", body: "Hello", deepLink: "kryton://x" },
-      { messaging: messaging as any },
+      { messaging: messaging as unknown as FcmDeps["messaging"] },
     );
     expect(res).toEqual({ ok: true });
   });
@@ -21,7 +21,7 @@ describe("sendFcm", () => {
     };
     const res = await sendFcm(
       { token: "fcm-tok", title: "Hi", body: "Hello" },
-      { messaging: messaging as any },
+      { messaging: messaging as unknown as FcmDeps["messaging"] },
     );
     expect(res).toEqual({
       ok: false,
@@ -38,7 +38,7 @@ describe("sendFcm", () => {
     };
     const res = await sendFcm(
       { token: "fcm-tok", title: "Hi", body: "Hello" },
-      { messaging: messaging as any },
+      { messaging: messaging as unknown as FcmDeps["messaging"] },
     );
     expect(res).toEqual({ ok: false, permanent: false, reason: "messaging/internal-error" });
   });
