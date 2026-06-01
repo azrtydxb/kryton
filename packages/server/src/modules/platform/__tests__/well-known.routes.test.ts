@@ -12,13 +12,26 @@ async function buildApp(): Promise<FastifyInstance> {
 
 describe(".well-known routes", () => {
   let app: FastifyInstance;
+  // Snapshot/restore MOBILE_* env so these tests don't leak state into others
+  // (Vitest runs files in a shared process by default).
+  let savedMobileEnv: Record<string, string | undefined> = {};
 
   beforeEach(async () => {
+    savedMobileEnv = {};
+    for (const k of Object.keys(process.env)) {
+      if (k.startsWith("MOBILE_")) savedMobileEnv[k] = process.env[k];
+    }
     app = await buildApp();
   });
 
   afterEach(async () => {
     await app.close();
+    for (const k of Object.keys(process.env)) {
+      if (k.startsWith("MOBILE_")) delete process.env[k];
+    }
+    for (const [k, v] of Object.entries(savedMobileEnv)) {
+      if (v !== undefined) process.env[k] = v;
+    }
   });
 
   // ---------------------------------------------------------------------------

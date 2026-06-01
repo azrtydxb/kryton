@@ -18,6 +18,11 @@ export const notificationsRoutes: FastifyPluginAsync = async (app) => {
     const { user } = await app.auth.requireAuth(req);
     const userId = user.id;
 
+    // Take over the response lifecycle: we stream via reply.raw and never let
+    // Fastify serialize/send a payload. Without hijack() Fastify would attempt
+    // to send a response when this handler resolves ("Reply was already sent").
+    reply.hijack();
+
     reply.raw.writeHead(200, {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache, no-transform",

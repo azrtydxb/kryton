@@ -4,7 +4,9 @@ The SDK is published to public npm on every kryton release tag.
 
 ## Automated (CI release)
 
-`scripts/release.js` invokes `publishSdk()` after pushing the tag. In CI,
+`scripts/release.js` creates the release commit and tag, then invokes
+`publishSdk()` — the git tag is pushed manually afterwards
+(`git push origin master --tags`), not before publishing. In CI,
 the `publish-sdk` job in `.github/workflows/release.yml` runs after the
 `release` job and calls `node scripts/release-sdk.js` directly. The job
 injects `NPM_TOKEN` from the repo secrets via the `NODE_AUTH_TOKEN` env var

@@ -34,7 +34,14 @@ export async function sendApns(payload: ApnsPayload, deps: ApnsDeps): Promise<Ap
   if (payload.deepLink) note.payload = { ...note.payload, deepLink: payload.deepLink };
   if (payload.eventId) note.payload = { ...note.payload, eventId: payload.eventId };
 
-  const result = await deps.provider.send(note, payload.token);
+  let result: Awaited<ReturnType<Provider["send"]>>;
+  try {
+    result = await deps.provider.send(note, payload.token);
+  } catch (err) {
+    // The APNs client can throw on transient network/TLS errors. Map to a
+    // transient failure (matching sendFcm) rather than letting it bubble up.
+    return { ok: false, permanent: false, reason: err instanceof Error ? err.message : "send_threw" };
+  }
   if (result.sent.length > 0) return { ok: true };
   const fail = result.failed[0];
   const reason = (fail?.response as { reason?: string } | undefined)?.reason ?? "Unknown";
