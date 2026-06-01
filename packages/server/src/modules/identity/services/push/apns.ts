@@ -38,7 +38,7 @@ export async function sendApns(payload: ApnsPayload, deps: ApnsDeps): Promise<Ap
   if (result.sent.length > 0) return { ok: true };
   const fail = result.failed[0];
   const reason = (fail?.response as { reason?: string } | undefined)?.reason ?? "Unknown";
-  const permanent = PERMANENT_REASONS.has(reason) || fail?.status === "410";
+  const permanent = PERMANENT_REASONS.has(reason) || fail?.status === 410;
   return { ok: false, permanent, reason };
 }
 
