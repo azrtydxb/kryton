@@ -16,6 +16,31 @@ const log = createLogger("auth");
 const APP_URL = process.env.APP_URL || "http://localhost:5173";
 
 /**
+ * Build the list of origins that the passkey plugin will accept.
+ *
+ * In addition to the web origin (`APP_URL`), mobile passkey ceremonies require
+ * platform-specific origins:
+ *   - iOS:     `ios:bundle-id:<MOBILE_IOS_BUNDLE_ID>`
+ *   - Android: `android:apk-key-hash:<MOBILE_ANDROID_APK_KEY_HASH>`
+ *
+ * Note: `MOBILE_ANDROID_APK_KEY_HASH` is the base64url-encoded SHA-256 of the
+ * signing *public key* — distinct from the colon-separated certificate
+ * fingerprints in `MOBILE_ANDROID_SHA256_FINGERPRINTS` (used for assetlinks.json).
+ *
+ * All mobile env vars are optional; when unset the function returns only the
+ * web origin so existing deployments are unaffected.
+ */
+export function buildPasskeyOrigins(env: NodeJS.ProcessEnv = process.env): string[] {
+  return [
+    env.APP_URL || "http://localhost:5173",
+    ...(env.MOBILE_IOS_BUNDLE_ID ? [`ios:bundle-id:${env.MOBILE_IOS_BUNDLE_ID}`] : []),
+    ...(env.MOBILE_ANDROID_APK_KEY_HASH
+      ? [`android:apk-key-hash:${env.MOBILE_ANDROID_APK_KEY_HASH}`]
+      : []),
+  ];
+}
+
+/**
  * Extra origins (beyond APP_URL) that better-auth will accept. Modules
  * that learn additional public origins at runtime — most notably the
  * tunnel module, once a JWT is configured — push them in via
@@ -119,7 +144,7 @@ export function createAuth(db: Db) {
       passkey({
         rpName: "Kryton",
         rpID: process.env.WEBAUTHN_RP_ID || "localhost",
-        origin: APP_URL,
+        origin: buildPasskeyOrigins(),
       }),
       twoFactor({
         issuer: "Kryton",
@@ -149,11 +174,18 @@ export function createAuth(db: Db) {
     },
 
     session: {
-      expiresIn: 60 * 60 * 24 * 7, // 7 days
-      updateAge: 60 * 60 * 24, // 1 day
+      expiresIn: 60 * 60 * 24 * 60, // 60 days (2 months)
+      updateAge: 60 * 60 * 24, // 1 day — sliding: each use within the window extends expiry to now + expiresIn
+      // cookieCache is intentionally DISABLED. It stores the session in a short-lived
+      // signed `session_data` cookie (5 min) that the server refreshes via Set-Cookie.
+      // Browsers adopt the refresh automatically, but native mobile clients (React
+      // Native) cache the original cookies in the OkHttp cookie jar and re-send the
+      // stale `session_data`. Once it expires, better-auth's getSession returns null
+      // *before* the DB fallback (api/routes/session.ts), logging mobile users out
+      // every ~5 minutes. With cookieCache off, every request validates the
+      // `session_token` against the DB directly — stable for the full session lifetime.
       cookieCache: {
-        enabled: true,
-        maxAge: 300, // 5 minutes
+        enabled: false,
       },
     },
 

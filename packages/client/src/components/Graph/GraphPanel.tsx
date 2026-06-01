@@ -4,6 +4,8 @@ import { GraphView } from '@azrtydxb/ui';
 import type { HoveredNodeInfo } from '@azrtydxb/ui';
 import { GraphData } from '../../lib/api';
 import { Icons } from '../Icons';
+import { useMobileEmbed } from '../../hooks/useMobileEmbed';
+import '../../styles/mobile-embed.css';
 
 interface GraphPanelProps {
   graphData: GraphData | null;
@@ -98,6 +100,7 @@ export function GraphPanel({
   onModeChange,
   fullscreen = false,
 }: GraphPanelProps) {
+  const isMobile = useMobileEmbed();
   // Default to global so the rail always shows the whole graph at a glance.
   // Local is the focus mode the user opts into to see "what's connected to
   // this note"; global is the right idle state.
@@ -354,10 +357,10 @@ export function GraphPanel({
 
   return (
     <>
-      <div style={containerStyle}>
+      <div style={containerStyle} className={isMobile ? "mobile-embed" : ""}>
         {renderHeader(fullscreen ? null : () => setExpanded(true))}
         {!expanded && (
-          <div ref={canvasWrapRef} className="bg-grid" style={{ flex: 1, display: 'flex', position: 'relative', overflow: 'hidden', minHeight: 0 }}>
+          <div ref={canvasWrapRef} className={`bg-grid canvas-surface`} style={{ flex: 1, display: 'flex', position: 'relative', overflow: 'hidden', minHeight: 0 }}>
             <GraphView
               graphData={graphData}
               loading={loading}
@@ -457,7 +460,7 @@ export function GraphPanel({
                   </button>
                 </div>
               </div>
-              <div ref={expandedCanvasWrapRef} className="bg-grid" style={{ flex: 1, display: 'flex', position: 'relative', minHeight: 0 }}>
+              <div ref={expandedCanvasWrapRef} className="bg-grid canvas-surface" style={{ flex: 1, display: 'flex', position: 'relative', minHeight: 0 }}>
                 <GraphView
                   graphData={graphData}
                   loading={loading}

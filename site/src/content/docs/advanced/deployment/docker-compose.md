@@ -93,6 +93,39 @@ The full list of variables the server accepts is defined in `packages/server/src
 - `OPENAPI_ENABLED=true` — `/docs` serves OpenAPI UI. Set to `false` to hide it.
 - `WEBAUTHN_RP_ID=localhost` — set this to your bare hostname (e.g. `kryton.example.com`) before enabling passkeys in production.
 
+### Mobile app integration (optional)
+
+These variables enable the mobile-client binding features (Universal Links, Android App Links, mobile passkey ceremonies). All are optional — Kryton degrades gracefully when they are unset.
+
+**iOS**
+
+| Variable | Example | Purpose |
+|---|---|---|
+| `MOBILE_IOS_TEAM_ID` | `ABCDE12345` | Apple Developer Team ID. Required for `apple-app-site-association` (Universal Links + `webcredentials`). |
+| `MOBILE_IOS_BUNDLE_ID` | `com.kryton.mobile` | iOS bundle identifier. Also used as the WebAuthn passkey origin (`ios:bundle-id:…`). |
+
+**Android**
+
+| Variable | Example | Purpose |
+|---|---|---|
+| `MOBILE_ANDROID_PACKAGE` | `com.kryton.mobile` | Android package name. Required for `assetlinks.json` (App Links + login credentials). |
+| `MOBILE_ANDROID_SHA256_FINGERPRINTS` | `AA:BB:CC:…` | Comma-separated SHA-256 **certificate** fingerprints for `assetlinks.json`. This is the hash of the signing _certificate_ — **not** the same as `MOBILE_ANDROID_APK_KEY_HASH`. |
+| `MOBILE_ANDROID_APK_KEY_HASH` | `base64url…` | Base64url-encoded SHA-256 of the signing **public key**. Used as the WebAuthn passkey origin (`android:apk-key-hash:…`). Different from the certificate fingerprint — do not mix them up. Derive with: `keytool -exportcert -alias <alias> -keystore <ks> \| openssl dgst -sha256 -binary \| openssl base64 \| tr '+/' '-_' \| tr -d '='` |
+
+**Push notifications**
+
+Push notifications require both the APNs block (for iOS) and the FCM block (for Android) to be fully configured. Either block being absent disables dispatch for that platform.
+
+| Variable | Purpose |
+|---|---|
+| `APNS_KEY_ID` | APNs token-auth key ID (10-char, from Apple Developer portal). |
+| `APNS_TEAM_ID` | Apple Developer Team ID for APNs token auth. |
+| `APNS_BUNDLE_ID` | iOS app bundle ID for the APNs topic (e.g. `com.kryton.mobile`). |
+| `APNS_KEY_PATH` | Filesystem path to the APNs `.p8` private key file. |
+| `APNS_PRODUCTION` | `true` for the production APNs gateway, `false` (default) for sandbox. |
+| `FCM_SERVICE_ACCOUNT_PATH` | Path to the Firebase service account JSON key file. |
+| `FCM_PROJECT_ID` | Firebase project ID (e.g. `my-project-12345`). |
+
 ## What runs on boot
 
 The image's entrypoint (`entrypoint.sh`) is two lines:

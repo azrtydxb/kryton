@@ -164,6 +164,84 @@ const envSchema = z.object({
     description: "Default From: address for outbound mail.",
   }),
 
+  // ---------------------------------------------------------------------------
+  // Mobile app integration (optional — degrade gracefully when unset)
+  // ---------------------------------------------------------------------------
+  MOBILE_IOS_TEAM_ID: withMeta(z.string().optional(), {
+    secret: false,
+    userFacing: true,
+    description: "Apple Developer Team ID for iOS Universal Links / WebAuthn RP (e.g. ABCDE12345).",
+  }),
+  MOBILE_IOS_BUNDLE_ID: withMeta(z.string().optional(), {
+    secret: false,
+    userFacing: true,
+    description: "iOS app bundle identifier (e.g. com.kryton.mobile). Used for Universal Links and passkey origin.",
+  }),
+  MOBILE_ANDROID_PACKAGE: withMeta(z.string().optional(), {
+    secret: false,
+    userFacing: true,
+    description: "Android app package name (e.g. com.kryton.mobile). Used for Digital Asset Links.",
+  }),
+  MOBILE_ANDROID_SHA256_FINGERPRINTS: withMeta(z.string().optional(), {
+    secret: false,
+    userFacing: true,
+    description: "Comma-separated SHA-256 certificate fingerprints for Android App Links (assetlinks.json). These are the SHA-256 hash of the signing certificate — distinct from the APK key hash used for WebAuthn.",
+  }),
+  MOBILE_ANDROID_APK_KEY_HASH: withMeta(z.string().optional(), {
+    secret: false,
+    userFacing: true,
+    description: "Base64url-encoded SHA-256 of the Android app's signing public key. Used as the WebAuthn passkey origin (android:apk-key-hash:…). Different from the certificate fingerprint used in assetlinks.json.",
+  }),
+
+  // ---------------------------------------------------------------------------
+  // APNs (Apple Push Notification service)
+  // ---------------------------------------------------------------------------
+  APNS_KEY_ID: withMeta(z.string().optional(), {
+    secret: true,
+    userFacing: true,
+    description: "APNs token-auth key ID (10-char, from Apple Developer portal).",
+  }),
+  APNS_TEAM_ID: withMeta(z.string().optional(), {
+    secret: false,
+    userFacing: true,
+    description: "Apple Developer Team ID used for APNs token auth.",
+  }),
+  APNS_BUNDLE_ID: withMeta(z.string().optional(), {
+    secret: false,
+    userFacing: true,
+    description: "iOS app bundle identifier for APNs topic (e.g. com.kryton.mobile).",
+  }),
+  APNS_KEY_PATH: withMeta(z.string().optional(), {
+    secret: true,
+    userFacing: true,
+    description: "Filesystem path to the APNs .p8 private key file.",
+  }),
+  APNS_PRODUCTION: withMeta(
+    z
+      .string()
+      .default("false")
+      .transform((s) => s === "true"),
+    {
+      secret: false,
+      userFacing: true,
+      description: "Send APNs to production gateway (\"true\") or sandbox (\"false\").",
+    },
+  ),
+
+  // ---------------------------------------------------------------------------
+  // FCM (Firebase Cloud Messaging)
+  // ---------------------------------------------------------------------------
+  FCM_SERVICE_ACCOUNT_PATH: withMeta(z.string().optional(), {
+    secret: true,
+    userFacing: true,
+    description: "Filesystem path to the Firebase service account JSON key file.",
+  }),
+  FCM_PROJECT_ID: withMeta(z.string().optional(), {
+    secret: false,
+    userFacing: true,
+    description: "Firebase project ID for FCM (e.g. my-project-12345).",
+  }),
+
   OPENAPI_ENABLED: withMeta(
     z
       .string()

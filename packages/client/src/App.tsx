@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useCallback, useState } from 'react';
+import { useMemo, useEffect, useCallback, useState, useRef } from 'react';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { AuthProvider } from './hooks/useAuth';
 import { PluginSlotRegistry, PluginProvider, usePluginSlots, setEditorOption } from '@azrtydxb/ui';
@@ -332,11 +332,26 @@ function AppContent() {
     return walk(notesTree);
   }, [notesTree]);
 
+  // `pendingCanvasEdit` is set by `onCanvasRoute` (below) to the canvas note
+  // id when a `/canvas/:id` URL is applied. Once the matching note finishes
+  // loading its content we enter edit mode and clear the pending flag.
+  const pendingCanvasEdit = useRef<string | null>(null);
+
+  const onCanvasRoute = useCallback(() => {
+    // The URL parser has already called openNote(id); record the path of
+    // the note being opened so the effect below can enter edit mode once
+    // content arrives. We read the target from the URL because activeNote
+    // is still the previous note at the time this callback fires.
+    const match = window.location.pathname.match(/^\/canvas\/(.+)$/);
+    pendingCanvasEdit.current = match ? decodeURIComponent(match[1]) : null;
+  }, []);
+
   useUrlSync(state.notes.activeNote?.tabId ?? state.notes.activeNote?.path ?? null, {
     openNote: state.notes.openNote,
     openSharedNote: state.notes.openSharedNote,
     closeActiveNote: state.notes.closeActiveNote,
     noteExists,
+    onCanvasRoute,
   });
 
   const {
@@ -360,6 +375,22 @@ function AppContent() {
     handleRightPanelResize,
     handleShare,
   } = callbacks;
+
+  // Once the pending canvas note finishes loading, enter edit mode.
+  // `pendingCanvasEdit` is set by `onCanvasRoute` above when a `/canvas/:id`
+  // URL is applied. `enterEditMode` needs activeNote.content to be non-null,
+  // so we gate on the note being loaded before calling it.
+  useEffect(() => {
+    if (!pendingCanvasEdit.current) return;
+    const { activeNote } = state.notes;
+    if (!activeNote) return;
+    if (activeNote.path !== pendingCanvasEdit.current) return;
+    pendingCanvasEdit.current = null;
+    enterEditMode();
+  // enterEditMode is a useCallback with stable identity; activeNote is the
+  // meaningful dep here.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.notes.activeNote]);
 
   useEffect(() => {
     if (!user) return;

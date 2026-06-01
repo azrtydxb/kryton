@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback, CSSProperties, FormEvent } from 'react';
+import { useState, useEffect, useCallback, CSSProperties, FormEvent, useRef } from 'react';
 import {
   X, Users, Ticket, Settings, Trash2, ShieldCheck, ShieldOff,
   UserX, UserCheck, Plus, Copy, Check, Key, Package, Globe,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { useUIStore } from '../stores/uiStore';
 import { request } from '../lib/api';
 import { PluginsTab } from './PluginsTab';
 import { TunnelTab } from './TunnelTab';
@@ -70,9 +71,30 @@ const TABS: { key: Tab; label: string; icon: typeof Users }[] = [
   { key: 'tunnel', label: 'Tunnel', icon: Globe },
 ];
 
-export default function AdminPage({ onClose }: { onClose: () => void }) {
+export default function AdminPage({
+  onClose,
+  initialTab,
+}: {
+  onClose: () => void;
+  initialTab?: Tab;
+}) {
   const { user } = useAuth();
-  const [tab, setTab] = useState<Tab>('users');
+  const adminInitialTab = useUIStore((s) => s.adminInitialTab);
+  const setAdminInitialTab = useUIStore((s) => s.setAdminInitialTab);
+  // Resolve the starting tab: explicit prop wins, then the store field
+  // (set by useUrlSync for /plugin/ routes), then the default 'users'.
+  const resolvedInitial = initialTab ?? adminInitialTab ?? 'users';
+  const [tab, setTab] = useState<Tab>(resolvedInitial as Tab);
+  // Clear the store field after consuming it so re-opening AdminPage
+  // from a normal code path doesn't re-land on the plugin tab.
+  const clearedRef = useRef(false);
+  useEffect(() => {
+    if (!clearedRef.current && adminInitialTab !== null) {
+      clearedRef.current = true;
+      setAdminInitialTab(null);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div

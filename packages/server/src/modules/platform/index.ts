@@ -5,6 +5,7 @@ import { adminUsersRoutes } from "./routes/admin-users.routes.js";
 import { adminInvitesRoutes } from "./routes/admin-invites.routes.js";
 import { adminSettingsRoutes } from "./routes/admin-settings.routes.js";
 import { settingsRoutes } from "./routes/settings.routes.js";
+import { wellKnownRoutes } from "./routes/well-known.routes.js";
 
 /**
  * Platform module — health, version, admin, settings.
@@ -14,6 +15,7 @@ import { settingsRoutes } from "./routes/settings.routes.js";
  * per-user settings under `/api/settings` to preserve the Express paths.
  */
 export const platformModule: FastifyPluginAsync = async (app) => {
+  await app.register(wellKnownRoutes);
   await app.register(versionRoutes);
   await app.register(healthRoutes);
 
