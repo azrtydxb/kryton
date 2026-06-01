@@ -42,7 +42,10 @@ export async function sendFcm(payload: FcmPayload, deps: FcmDeps): Promise<FcmRe
 }
 
 let cachedApp: admin.app.App | null = null;
-export function getDefaultMessaging(opts: { serviceAccountPath: string; projectId: string }) {
+export function getDefaultMessaging(opts: {
+  serviceAccountPath: string;
+  projectId: string;
+}): admin.messaging.Messaging {
   if (!cachedApp) {
     cachedApp = admin.initializeApp({
       credential: admin.credential.cert(opts.serviceAccountPath),
