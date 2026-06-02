@@ -1,6 +1,6 @@
 {
   "name": "@azrtydxb/ui",
-  "version": "4.6.5-pre.18",
+  "version": "4.6.5",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
