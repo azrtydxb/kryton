@@ -55,26 +55,33 @@ for (const file of packageFiles) {
   console.log(`bumped ${file} → ${newVersion}`);
 }
 
-// Workspace consumers pin `@azrtydxb/sdk` to an exact version. Now that the SDK
-// is bumped above, sync those pins to the new version so the `npm install` below
-// resolves to the local workspace SDK instead of fetching the old one.
-const sdkConsumerFiles = ["packages/client/package.json", "packages/server/package.json"].filter((f) =>
-  existsSync(resolve(f)),
+// Workspace consumers pin internal `@azrtydxb/*` packages to exact versions.
+// Now that those packages are bumped above, sync every such pin to the new
+// version so the `npm install` below resolves to the local workspace packages
+// rather than trying to fetch the old (unpublished) versions from the registry.
+const internalDepConsumers = ["packages/client/package.json", "packages/server/package.json"].filter(
+  (f) => existsSync(resolve(f)),
 );
-for (const file of sdkConsumerFiles) {
+for (const file of internalDepConsumers) {
   const path = resolve(file);
   const pkg = JSON.parse(readFileSync(path, "utf8"));
   let changed = false;
-  for (const field of ["dependencies", "devDependencies"]) {
-    if (pkg[field]?.["@azrtydxb/sdk"] && pkg[field]["@azrtydxb/sdk"] !== newVersion) {
-      pkg[field]["@azrtydxb/sdk"] = newVersion;
-      changed = true;
+  for (const field of ["dependencies", "devDependencies", "peerDependencies"]) {
+    const deps = pkg[field];
+    if (!deps) continue;
+    for (const name of Object.keys(deps)) {
+      // Only retarget exact internal pins (e.g. "4.6.5-pre.10"); leave ranges
+      // and "workspace:*" / "*" specifiers alone.
+      if (name.startsWith("@azrtydxb/") && /^\d/.test(deps[name]) && deps[name] !== newVersion) {
+        deps[name] = newVersion;
+        changed = true;
+      }
     }
   }
   if (changed) {
     writeFileSync(path, JSON.stringify(pkg, null, 2) + "\n");
     bumpedPackageFiles.push(file);
-    console.log(`synced ${file} @azrtydxb/sdk → ${newVersion}`);
+    console.log(`synced internal @azrtydxb/* deps in ${file} → ${newVersion}`);
   }
 }
 
