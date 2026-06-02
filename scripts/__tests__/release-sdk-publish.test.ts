@@ -11,7 +11,7 @@ const sdkVersion: string = JSON.parse(
 const tag = sdkVersion.includes("-") ? "next" : "latest";
 
 describe("release SDK publish step", () => {
-  it("publishes @azrtydxb/sdk with --access public and the right dist-tag", async () => {
+  it("publishes @azrtydxb/kryton-sdk with --access public and the right dist-tag", async () => {
     const calls: string[] = [];
     const fakeExec = (cmd: string) => {
       calls.push(cmd);

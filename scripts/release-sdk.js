@@ -2,7 +2,7 @@ import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
 /**
- * Publish @azrtydxb/sdk to public npm.
+ * Publish @azrtydxb/kryton-sdk to public npm.
  * Called by scripts/release.js after the tag is created.
  *
  * npm refuses to publish a prerelease version (one with a `-pre.N` suffix)

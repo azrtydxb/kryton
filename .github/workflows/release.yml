@@ -743,14 +743,14 @@ jobs:
             release-assets/kryton-crds.yaml
 
   publish-sdk:
-    # Publish @azrtydxb/sdk to public npm via npm Trusted Publishers (OIDC) —
+    # Publish @azrtydxb/kryton-sdk to public npm via npm Trusted Publishers (OIDC) —
     # the same tokenless mechanism the CLI packages use in cli-publish.yml, and
     # mirroring the azrtydxb/novamem pattern. No NPM_TOKEN secret: Node 24 ships
     # npm 11.x which does the OIDC handshake for the publish PUT, and
     # `--provenance` (publishConfig.provenance + NPM_CONFIG_PROVENANCE) attaches
     # a Sigstore attestation tying the tarball to this workflow run + commit.
     #
-    # Requires a Trusted Publisher binding on npmjs.com for @azrtydxb/sdk
+    # Requires a Trusted Publisher binding on npmjs.com for @azrtydxb/kryton-sdk
     # pointing at this repo (azrtydxb/kryton) + workflow (release.yml). Gates on
     # `release` so the npm version aligns with the GitHub Release tag.
     needs: [release]

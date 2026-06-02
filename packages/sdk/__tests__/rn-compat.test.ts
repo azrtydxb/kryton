@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { createKrytonClient } from "../src/index.js";
 
-describe("@azrtydxb/sdk React Native compatibility", () => {
+describe("@azrtydxb/kryton-sdk React Native compatibility", () => {
   it("constructs a client without touching DOM globals", () => {
     // Simulate RN: DOM globals are undefined.
     const originalDocument = (globalThis as any).document;

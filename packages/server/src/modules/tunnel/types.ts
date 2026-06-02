@@ -3,7 +3,7 @@
  *
  * Mirrors the umbrella spec's JWT claims and the 4c spec's TunnelStatus
  * discriminated union. Kept in one place so admin routes, services,
- * UI types (via @azrtydxb/sdk), and tests all agree.
+ * UI types (via @azrtydxb/kryton-sdk), and tests all agree.
  *
  * See docs/superpowers/specs/2026-05-12-kryton-tunnel-client-design.md §2.7.
  */

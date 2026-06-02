@@ -109,9 +109,9 @@ exec(`git add ${bumpedPackageFiles.join(" ")} ${sourceFiles.join(" ")} package-l
 exec(`git commit -m "chore(release): v${newVersion}"`);
 exec(`git tag v${newVersion}`);
 
-// Publish @azrtydxb/sdk to public npm.
+// Publish @azrtydxb/kryton-sdk to public npm.
 const dryRun = process.argv.includes("--dry-run");
 await publishSdk({ dryRun });
-console.log(`✓ Published @azrtydxb/sdk`);
+console.log(`✓ Published @azrtydxb/kryton-sdk`);
 
 console.log(`\nv${newVersion} ready. Push with: git push origin master --tags`);

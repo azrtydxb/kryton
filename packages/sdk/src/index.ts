@@ -7,7 +7,7 @@
  * a tiny (~3 KB) typed wrapper around `fetch`.
  *
  * Usage:
- *   import { createKrytonClient } from "@azrtydxb/sdk";
+ *   import { createKrytonClient } from "@azrtydxb/kryton-sdk";
  *   const k = createKrytonClient({ baseUrl: "http://localhost:3001" });
  *   const { data, error } = await k.GET("/api/users/search", {
  *     params: { query: { email: "alice@example.com" } },

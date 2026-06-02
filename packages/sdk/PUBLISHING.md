@@ -1,4 +1,4 @@
-# Publishing @azrtydxb/sdk
+# Publishing @azrtydxb/kryton-sdk
 
 The SDK is published to public npm on every kryton release tag.
 
