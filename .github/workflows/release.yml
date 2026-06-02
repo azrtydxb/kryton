@@ -743,18 +743,25 @@ jobs:
             release-assets/kryton-crds.yaml
 
   publish-sdk:
-    # Publish @azrtydxb/sdk to public npm after the GitHub Release is live.
-    # Runs on the same arc-azrtydxb runner as `release`; gates on `release`
-    # so the package version on npm aligns with the GitHub Release tag.
-    # NPM_TOKEN must be set as a repo secret (Settings → Secrets and variables
-    # → Actions → NPM_TOKEN) — a granular token scoped to @azrtydxb/sdk with
-    # publish permission from https://www.npmjs.com/settings/<user>/tokens.
+    # Publish @azrtydxb/sdk to public npm via npm Trusted Publishers (OIDC) —
+    # the same tokenless mechanism the CLI packages use in cli-publish.yml, and
+    # mirroring the azrtydxb/novamem pattern. No NPM_TOKEN secret: Node 24 ships
+    # npm 11.x which does the OIDC handshake for the publish PUT, and
+    # `--provenance` (publishConfig.provenance + NPM_CONFIG_PROVENANCE) attaches
+    # a Sigstore attestation tying the tarball to this workflow run + commit.
+    #
+    # Requires a Trusted Publisher binding on npmjs.com for @azrtydxb/sdk
+    # pointing at this repo (azrtydxb/kryton) + workflow (release.yml). Gates on
+    # `release` so the npm version aligns with the GitHub Release tag.
     needs: [release]
     runs-on: arc-azrtydxb
     container:
       image: node:24
     permissions:
       contents: read
+      id-token: write
+    env:
+      NPM_CONFIG_PROVENANCE: "true"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -763,10 +770,7 @@ jobs:
           registry-url: "https://registry.npmjs.org"
       - run: npm ci
       - run: npm run build --workspace=packages/sdk
-      - name: Publish SDK to npm
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Publish SDK to npm (OIDC trusted publishing)
         run: node scripts/release-sdk.js
       - if: always()
         run: chown -R 1001:1001 . || true
