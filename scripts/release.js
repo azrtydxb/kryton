@@ -34,6 +34,9 @@ const packageFiles = [
   "packages/core/package.json",
   "packages/core-react/package.json",
   "packages/ui/package.json",
+  // The SDK is published to npm by the release step below, so its version must
+  // track the release tag (otherwise it would publish a stale version).
+  "packages/sdk/package.json",
 ].filter((f) => existsSync(resolve(f)));
 
 const bumpedPackageFiles = [];
@@ -50,6 +53,29 @@ for (const file of packageFiles) {
   writeFileSync(path, JSON.stringify(pkg, null, 2) + "\n");
   bumpedPackageFiles.push(file);
   console.log(`bumped ${file} → ${newVersion}`);
+}
+
+// Workspace consumers pin `@azrtydxb/sdk` to an exact version. Now that the SDK
+// is bumped above, sync those pins to the new version so the `npm install` below
+// resolves to the local workspace SDK instead of fetching the old one.
+const sdkConsumerFiles = ["packages/client/package.json", "packages/server/package.json"].filter((f) =>
+  existsSync(resolve(f)),
+);
+for (const file of sdkConsumerFiles) {
+  const path = resolve(file);
+  const pkg = JSON.parse(readFileSync(path, "utf8"));
+  let changed = false;
+  for (const field of ["dependencies", "devDependencies"]) {
+    if (pkg[field]?.["@azrtydxb/sdk"] && pkg[field]["@azrtydxb/sdk"] !== newVersion) {
+      pkg[field]["@azrtydxb/sdk"] = newVersion;
+      changed = true;
+    }
+  }
+  if (changed) {
+    writeFileSync(path, JSON.stringify(pkg, null, 2) + "\n");
+    bumpedPackageFiles.push(file);
+    console.log(`synced ${file} @azrtydxb/sdk → ${newVersion}`);
+  }
 }
 
 const sourceConstantUpdates = [
