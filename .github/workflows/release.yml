@@ -753,10 +753,12 @@ jobs:
     # Requires a Trusted Publisher binding on npmjs.com for @azrtydxb/kryton-sdk
     # pointing at this repo (azrtydxb/kryton) + workflow (release.yml). Gates on
     # `release` so the npm version aligns with the GitHub Release tag.
+    #
+    # Runs on a GitHub-HOSTED runner (not arc-azrtydxb) — npm rejects provenance
+    # bundles generated on self-hosted runners ("Only github-hosted runners are
+    # supported when publishing with provenance"). This matches cli-publish.yml.
     needs: [release]
-    runs-on: arc-azrtydxb
-    container:
-      image: node:24
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       id-token: write
@@ -766,14 +768,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: 24
           registry-url: "https://registry.npmjs.org"
       - run: npm ci
       - run: npm run build --workspace=packages/sdk
       - name: Publish SDK to npm (OIDC trusted publishing)
         run: node scripts/release-sdk.js
-      - if: always()
-        run: chown -R 1001:1001 . || true
 
   # ===========================================================================
   # Phase 4 — NAS package source wiring.
