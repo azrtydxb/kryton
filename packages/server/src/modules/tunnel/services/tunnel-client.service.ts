@@ -1,20 +1,25 @@
 /**
- * TunnelClient — persistent yamux-over-h2 connection to the tunnel
- * server. Each inbound yamux stream is handed to the LoopbackInjector
- * which splices it to the local Fastify listener.
+ * TunnelClient — persistent yamux-over-WebSocket connection to the
+ * tunnel server. Each inbound yamux stream is handed to the
+ * LoopbackInjector which splices it to the local Fastify listener.
  *
- * See docs/superpowers/specs/2026-05-12-kryton-tunnel-client-design.md §2.
+ * The control transport is a WebSocket (HTTP/1.1 Upgrade) so it can be
+ * proxied by AWS ALB, which does not support HTTP/2 CONNECT.
+ *
+ * See docs/superpowers/specs/2026-05-12-kryton-tunnel-client-design.md §2
+ * and docs/superpowers/specs/2026-06-12-websocket-control-transport.md.
  */
 import { EventEmitter } from "node:events";
 import { randomUUID } from "node:crypto";
-import type { ClientHttp2Session, ClientHttp2Stream } from "node:http2";
+import type { Duplex } from "node:stream";
+import type { WebSocket } from "ws";
 
 import { sanityCheck } from "../utils/jwt.js";
 import type { TunnelClaims, TunnelStatus } from "../types.js";
 import {
-  h2connectTunnel,
+  wsConnectTunnel,
   TunnelHandshakeError,
-} from "../wire/h2-connect.js";
+} from "../wire/ws-connect.js";
 import { YamuxSession, type YamuxStream } from "../wire/yamux.js";
 import type { TunnelStateService } from "./tunnel-state.service.js";
 import type { LoopbackInjector } from "./loopback-injector.service.js";
@@ -48,9 +53,9 @@ type InternalState =
       sessionId: string;
       connectedAt: number;
       tokenExpiresAt: number;
-      h2: ClientHttp2Session;
+      ws: WebSocket;
       yamux: YamuxSession;
-      stream: ClientHttp2Stream;
+      stream: Duplex;
     }
   | { name: "backoff"; nextAttemptAt: number; lastError: string }
   | { name: "fatal"; reason: FatalReason; message: string }
@@ -171,12 +176,12 @@ export class TunnelClient extends EventEmitter {
         /* already gone */
       }
       try {
-        s.stream.close();
+        s.stream.destroy();
       } catch {
         /* */
       }
       try {
-        s.h2.close();
+        s.ws.close();
       } catch {
         /* */
       }
@@ -195,7 +200,7 @@ export class TunnelClient extends EventEmitter {
     while (!signal.aborted) {
       try {
         this.transition({ name: "connecting" });
-        const { session, stream, sessionID } = await h2connectTunnel({
+        const { ws, stream, sessionID } = await wsConnectTunnel({
           url: this.serverUrl,
           jwt,
           instanceID,
@@ -221,7 +226,7 @@ export class TunnelClient extends EventEmitter {
             }
           };
           yamux.once("close", done);
-          session.once("close", done);
+          ws.once("close", done);
           stream.once("close", done);
         });
 
@@ -232,7 +237,7 @@ export class TunnelClient extends EventEmitter {
           sessionId: sessionID,
           connectedAt: Math.floor(now / 1000),
           tokenExpiresAt: claims.exp,
-          h2: session,
+          ws,
           yamux,
           stream,
         });
