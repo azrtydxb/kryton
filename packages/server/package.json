@@ -47,7 +47,7 @@
     "date-fns": "^4.1.0",
     "dotenv": "^16.6.1",
     "drizzle-orm": "^0.45.2",
-    "fast-xml-parser": "^4.4.1",
+    "fast-xml-parser": "^5.8.0",
     "fastify": "^5.2.0",
     "fastify-plugin": "^5.0.1",
     "fastify-type-provider-zod": "^6.1.0",
