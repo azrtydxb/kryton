@@ -18,7 +18,13 @@ RUN npm run build
 # but Node ESM requires .js extensions. Patch all compiled .js files.
 RUN node scripts/fix-esm-imports.mjs
 
-FROM node:24-alpine
+FROM node:24-slim
+# Debian (glibc) runtime: onnxruntime-node (semantic search) ships a glibc-linked native
+# binary that can't load on Alpine/musl (no ld-linux-aarch64.so.1). libgomp1 = its OpenMP
+# runtime dependency.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends libgomp1 \
+  && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=builder /app/packages/server/dist ./dist
 COPY --from=builder /app/packages/server/package*.json ./
@@ -27,7 +33,7 @@ COPY --from=builder /app/packages/server/src/db/migrations ./dist/db/migrations
 COPY --from=builder /app/packages/server/scripts/migrate-prod.mjs ./scripts/migrate-prod.mjs
 COPY --from=builder /app/packages/client/dist ./public
 RUN npm install --omit=dev
-RUN addgroup -S app && adduser -S app -G app
+RUN groupadd -r app && useradd -r -g app -d /app app
 RUN mkdir -p /notes && chown -R app:app /app /notes
 COPY --from=builder /app/package.json /package.json
 COPY --from=builder /tmp/COMMIT_SHA /COMMIT_SHA
