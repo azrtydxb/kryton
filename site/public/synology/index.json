@@ -2,15 +2,15 @@
   "packages": [
     {
       "package": "kryton",
-      "version": "4.6.5-pre.10",
+      "version": "4.7.0-pre.2",
       "dname": "Kryton",
       "desc": "Local-first notes & knowledge base with real-time collaboration.",
       "price": 0,
       "download_count": 0,
       "recent_download_count": 0,
-      "link": "https://github.com/azrtydxb/kryton/releases/download/v4.6.5-pre.10/kryton_4.6.5-pre.10-0001_armv8.spk",
+      "link": "https://github.com/azrtydxb/kryton/releases/download/v4.7.0-pre.2/kryton_4.7.0-pre.2-0001_armv8.spk",
       "size": 51200,
-      "md5": "36a22c3a6203b994c79713850c2ea25e",
+      "md5": "155c3b435453c12f8f8b719e7f7d4241",
       "thumbnail": [
         "https://azrtydxb.github.io/kryton/assets/nas/icons/kryton-72.png",
         "https://azrtydxb.github.io/kryton/assets/nas/icons/kryton-120.png"
@@ -29,7 +29,7 @@
       "maintainer_url": "https://kryton.app",
       "distributor": "Kryton",
       "distributor_url": "https://kryton.app",
-      "changelog": "https://github.com/azrtydxb/kryton/releases/tag/v4.6.5-pre.10",
+      "changelog": "https://github.com/azrtydxb/kryton/releases/tag/v4.7.0-pre.2",
       "thirdparty": true,
       "category": 0,
       "subcategory": 0,
@@ -42,15 +42,15 @@
     },
     {
       "package": "kryton",
-      "version": "4.6.5-pre.10",
+      "version": "4.7.0-pre.2",
       "dname": "Kryton",
       "desc": "Local-first notes & knowledge base with real-time collaboration.",
       "price": 0,
       "download_count": 0,
       "recent_download_count": 0,
-      "link": "https://github.com/azrtydxb/kryton/releases/download/v4.6.5-pre.10/kryton_4.6.5-pre.10-0001_x86_64.spk",
+      "link": "https://github.com/azrtydxb/kryton/releases/download/v4.7.0-pre.2/kryton_4.7.0-pre.2-0001_x86_64.spk",
       "size": 51200,
-      "md5": "16d6ad0046bc63b7c6c30f253afb2461",
+      "md5": "99df1fe4d275fd6aca71b4e414467f6d",
       "thumbnail": [
         "https://azrtydxb.github.io/kryton/assets/nas/icons/kryton-72.png",
         "https://azrtydxb.github.io/kryton/assets/nas/icons/kryton-120.png"
@@ -69,7 +69,7 @@
       "maintainer_url": "https://kryton.app",
       "distributor": "Kryton",
       "distributor_url": "https://kryton.app",
-      "changelog": "https://github.com/azrtydxb/kryton/releases/tag/v4.6.5-pre.10",
+      "changelog": "https://github.com/azrtydxb/kryton/releases/tag/v4.7.0-pre.2",
       "thirdparty": true,
       "category": 0,
       "subcategory": 0,
