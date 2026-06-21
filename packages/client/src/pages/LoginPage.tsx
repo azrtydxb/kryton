@@ -46,18 +46,47 @@ interface FieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'onChan
   onChange: (v: string) => void;
 }
 
-function Field({ label, value, onChange, ...rest }: FieldProps) {
+function Field({ label, value, onChange, type, ...rest }: FieldProps) {
+  const [reveal, setReveal] = useState(false);
+  const isPassword = type === 'password';
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
       <span style={labelStyle}>{label}</span>
-      <input
-        {...rest}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        style={inputBaseStyle}
-        onFocus={applyFocus}
-        onBlur={applyBlur}
-      />
+      <div style={{ position: 'relative', display: 'flex' }}>
+        <input
+          {...rest}
+          type={isPassword && reveal ? 'text' : type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          style={{ ...inputBaseStyle, paddingRight: isPassword ? 38 : 12 }}
+          onFocus={applyFocus}
+          onBlur={applyBlur}
+        />
+        {isPassword && (
+          <button
+            type="button"
+            onClick={() => setReveal((v) => !v)}
+            aria-label={reveal ? 'Hide password' : 'Show password'}
+            tabIndex={-1}
+            style={{
+              position: 'absolute',
+              right: 6,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 4,
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--fg-3)',
+            }}
+          >
+            {reveal ? <Icons.EyeOff size={15} /> : <Icons.Eye size={15} />}
+          </button>
+        )}
+      </div>
     </label>
   );
 }
