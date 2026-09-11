@@ -35,7 +35,7 @@ The `release` job at the end of the workflow calls `softprops/action-gh-release@
 
 ## Mirror to the in-cluster registry
 
-The `mirror` job copies the server image, operator image, and helm chart from `ghcr.io` to the in-cluster zot at `192.168.10.123:5000` using `skopeo copy`. From there the cluster's Harbor instance (`harbor.kw.local`) serves the same tags inside the cluster network.
+The `mirror` job copies the server image, operator image, and helm chart from `ghcr.io` to the in-cluster Nexus at `192.168.10.131:5000` using `skopeo copy`. Workloads pull the same tags from `192.168.10.131` (port 443, anonymous) inside the cluster network.
 
 This is a non-blocking mirror: the GitHub Release is still cut even if `mirror` fails (the `release` job does not depend on `mirror`).
 

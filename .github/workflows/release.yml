@@ -196,7 +196,7 @@ jobs:
 
   # Multi-arch docker build/push, fan-out per arch. arm64 builds in
   # the dind sidecar natively; amd64 builds on the remote BuildKit at
-  # 192.168.10.253:1234 natively (~15× faster than QEMU). Each job
+  # on real amd64 hardware (novanas). Each job
   # pushes by digest to ghcr.io; the `manifest` job assembles the
   # final multi-arch tags. Splitting per arch lets the two builders
   # run truly concurrently instead of sequentially in one job.
@@ -252,7 +252,7 @@ jobs:
           # builder can push/pull cache layers without needing the
           # cluster CA in buildkit-container's trust store.
           cat > /tmp/buildkitd-local.toml <<'EOF'
-          [registry."192.168.10.123:5000"]
+          [registry."192.168.10.131:5000"]
             http = false
             insecure = true
           EOF
@@ -271,12 +271,12 @@ jobs:
           platforms: linux/arm64
           labels: ${{ steps.meta.outputs.labels }}
           # Buildkit cache lives in the in-cluster zot registry at
-          # 192.168.10.123:5000 — pushes/pulls over the cluster LAN
+          # 192.168.10.131:5000 — pushes/pulls over the cluster LAN
           # instead of GHA cache over the NAS uplink. mode=max stores
           # all intermediate layers (full hit rate); image-manifest=true
           # uses OCI manifest format which buildx and crane both prefer.
-          cache-from: type=registry,ref=192.168.10.123:5000/buildcache/kryton:linux-arm64
-          cache-to: type=registry,ref=192.168.10.123:5000/buildcache/kryton:linux-arm64,mode=max,image-manifest=true
+          cache-from: type=registry,ref=192.168.10.131:5000/buildcache/kryton:linux-arm64
+          cache-to: type=registry,ref=192.168.10.131:5000/buildcache/kryton:linux-arm64,mode=max,image-manifest=true
           outputs: type=image,"name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}",push-by-digest=true,name-canonical=true,push=true
 
   build-amd64:
@@ -312,21 +312,24 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest
-      - name: Set up remote amd64 builder
+      - name: Set up amd64 builder
         run: |
-          # amd64 native via the remote BuildKit on 192.168.10.253.
-          # Certs + endpoint are auto-injected into every arc-azrtydxb
-          # runner pod by the AutoscalingRunnerSet template. Remote-
-          # driver builders inherit the daemon's registry trust config;
-          # we cannot patch it from the workflow.
+          # This job already runs on arc-azrtydxb-amd64-publish, which is real
+          # amd64 hardware (novanas), so it builds locally. It previously
+          # reached out to a remote BuildKit on 192.168.10.253 — that endpoint
+          # is gone, its port closed, and the client certs the runner template
+          # injected for it were removed.
+          cat > /tmp/buildkitd.toml <<'EOF'
+          [registry."192.168.10.131:5000"]
+            insecure = true
+          [registry."docker.io"]
+            mirrors = ["192.168.10.131"]
+          EOF
           docker buildx create \
             --name remote-amd64 \
-            --driver remote \
+            --driver docker-container \
             --platform linux/amd64 \
-            --driver-opt cacert="$BUILDKIT_CLIENT_CA" \
-            --driver-opt cert="$BUILDKIT_CLIENT_CERT" \
-            --driver-opt key="$BUILDKIT_CLIENT_KEY" \
-            "$BUILDKIT_AMD64_ENDPOINT"
+            --buildkitd-config /tmp/buildkitd.toml
           docker buildx inspect --bootstrap remote-amd64
       - name: Build + push amd64 (digest only)
         id: build
@@ -339,12 +342,12 @@ jobs:
           # Cache goes to ghcr.io instead of the cluster zot. The NAS
           # buildkit-container's /etc/buildkit/buildkitd.toml does NOT
           # currently trust the cluster CA, so pushing cache layers to
-          # https://192.168.10.123:5000 fails with x509 unknown-
+          # https://192.168.10.131:5000 fails with x509 unknown-
           # authority. ghcr.io has a public CA chain that everything
           # trusts and we're already authenticated for image push.
           # TODO: when buildkit-container on the NAS gets cluster-
           # ca.crt mounted + buildkitd.toml updated, switch back to
-          # 192.168.10.123:5000/buildcache/kryton:linux-amd64 for the
+          # 192.168.10.131:5000/buildcache/kryton:linux-amd64 for the
           # LAN-speed advantage.
           cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/buildcache:linux-amd64
           cache-to: type=registry,ref=ghcr.io/${{ github.repository }}/buildcache:linux-amd64,mode=max,image-manifest=true
@@ -386,7 +389,7 @@ jobs:
         run: docker buildx imagetools inspect "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
 
   # Mirror the freshly-published multi-arch image from ghcr.io to the
-  # in-cluster zot at 192.168.10.123:5000 so harbor.kw.local shows the
+  # in-cluster Nexus at 192.168.10.131:5000 so harbor.kw.local shows the
   # latest kryton tags too. Uses `docker buildx imagetools create`,
   # which does a server-side registry-to-registry transfer (no
   # rebuild, no local pull) and preserves the multi-arch manifest
@@ -434,7 +437,7 @@ jobs:
         run: |
           set -euo pipefail
           for src in $(jq -r '.tags[]' <<< "$DOCKER_METADATA_OUTPUT_JSON"); do
-            dst="${src/ghcr.io/192.168.10.123:5000}"
+            dst="${src/ghcr.io/192.168.10.131:5000}"
             echo "Mirroring server: $src → $dst"
             docker run --rm quay.io/skopeo/stable copy --multi-arch all \
               --src-tls-verify=true --dest-tls-verify=false \
@@ -456,7 +459,7 @@ jobs:
         run: |
           set -euo pipefail
           for src in $(jq -r '.tags[]' <<< '${{ steps.meta-operator.outputs.json }}'); do
-            dst="${src/ghcr.io/192.168.10.123:5000}"
+            dst="${src/ghcr.io/192.168.10.131:5000}"
             echo "Mirroring operator: $src → $dst"
             docker run --rm quay.io/skopeo/stable copy --multi-arch all \
               --src-tls-verify=true --dest-tls-verify=false \
@@ -474,7 +477,7 @@ jobs:
           set -euo pipefail
           CHART_VER="${VERSION#v}"
           SRC="ghcr.io/${OWNER}/charts/kryton:${CHART_VER}"
-          DST="192.168.10.123:5000/${OWNER}/charts/kryton:${CHART_VER}"
+          DST="192.168.10.131:5000/${OWNER}/charts/kryton:${CHART_VER}"
           echo "Mirroring chart: $SRC → $DST"
           docker run --rm quay.io/skopeo/stable copy \
             --src-tls-verify=true --dest-tls-verify=false \
@@ -582,7 +585,7 @@ jobs:
       - name: Set up local arm64 builder
         run: |
           cat > /tmp/buildkitd-local.toml <<'EOF'
-          [registry."192.168.10.123:5000"]
+          [registry."192.168.10.131:5000"]
             http = false
             insecure = true
           EOF
@@ -601,8 +604,8 @@ jobs:
           builder: local-arm64-operator
           platforms: linux/arm64
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=192.168.10.123:5000/buildcache/kryton-operator:linux-arm64
-          cache-to: type=registry,ref=192.168.10.123:5000/buildcache/kryton-operator:linux-arm64,mode=max,image-manifest=true
+          cache-from: type=registry,ref=192.168.10.131:5000/buildcache/kryton-operator:linux-arm64
+          cache-to: type=registry,ref=192.168.10.131:5000/buildcache/kryton-operator:linux-arm64,mode=max,image-manifest=true
           outputs: type=image,"name=${{ env.REGISTRY }}/${{ env.OPERATOR_IMAGE_NAME }}",push-by-digest=true,name-canonical=true,push=true
 
   build-operator-amd64:
@@ -632,16 +635,21 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest
-      - name: Set up remote amd64 builder
+      - name: Set up amd64 builder
         run: |
+          # Local, not remote: this job runs on amd64 hardware already. The
+          # remote BuildKit on 192.168.10.253 it used to dial is gone.
+          cat > /tmp/buildkitd-operator.toml <<'EOF'
+          [registry."192.168.10.131:5000"]
+            insecure = true
+          [registry."docker.io"]
+            mirrors = ["192.168.10.131"]
+          EOF
           docker buildx create \
             --name remote-amd64-operator \
-            --driver remote \
+            --driver docker-container \
             --platform linux/amd64 \
-            --driver-opt cacert="$BUILDKIT_CLIENT_CA" \
-            --driver-opt cert="$BUILDKIT_CLIENT_CERT" \
-            --driver-opt key="$BUILDKIT_CLIENT_KEY" \
-            "$BUILDKIT_AMD64_ENDPOINT"
+            --buildkitd-config /tmp/buildkitd-operator.toml
           docker buildx inspect --bootstrap remote-amd64-operator
       - name: Build + push operator amd64 (digest only)
         id: build
