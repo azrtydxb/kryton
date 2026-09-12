@@ -320,6 +320,13 @@ jobs:
           # is gone, its port closed, and the client certs the runner template
           # injected for it were removed.
           cat > /tmp/buildkitd.toml <<'EOF'
+          # :443 as well as :5000. Nexus fronts two things: :443 is the
+          # read-only group carrying the docker.io proxy the mirror points
+          # at, :5000 the hosted repository that accepts a push. BuildKit
+          # does not inherit the host trust store, so without the :443 entry
+          # the mirror fails TLS and silently falls back to Docker Hub.
+          [registry."192.168.10.131"]
+            insecure = true
           [registry."192.168.10.131:5000"]
             insecure = true
           [registry."docker.io"]
@@ -640,6 +647,13 @@ jobs:
           # Local, not remote: this job runs on amd64 hardware already. The
           # remote BuildKit on 192.168.10.253 it used to dial is gone.
           cat > /tmp/buildkitd-operator.toml <<'EOF'
+          # :443 as well as :5000. Nexus fronts two things: :443 is the
+          # read-only group carrying the docker.io proxy the mirror points
+          # at, :5000 the hosted repository that accepts a push. BuildKit
+          # does not inherit the host trust store, so without the :443 entry
+          # the mirror fails TLS and silently falls back to Docker Hub.
+          [registry."192.168.10.131"]
+            insecure = true
           [registry."192.168.10.131:5000"]
             insecure = true
           [registry."docker.io"]
