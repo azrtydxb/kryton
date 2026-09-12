@@ -262,9 +262,19 @@ jobs:
             --platform linux/arm64 \
             --buildkitd-config /tmp/buildkitd-local.toml
           docker buildx inspect --bootstrap local-arm64
+      # Nexus needs credentials for the cache write below. The Zot registry
+      # it replaced accepted anonymous writes, so the only login here was to
+      # ghcr.io — cache-to now fails "unauthorized" without this. The amd64
+      # builds keep their cache on ghcr.io and need nothing extra.
+      - name: Log in to Nexus (build cache)
+        uses: docker/login-action@v3
+        with:
+          registry: 192.168.10.131:5000
+          username: ${{ secrets.NEXUS_USER }}
+          password: ${{ secrets.NEXUS_PASSWORD }}
       - name: Build + push arm64 (digest only)
         id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           builder: local-arm64
@@ -340,7 +350,7 @@ jobs:
           docker buildx inspect --bootstrap remote-amd64
       - name: Build + push amd64 (digest only)
         id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           builder: remote-amd64
@@ -602,9 +612,19 @@ jobs:
             --platform linux/arm64 \
             --buildkitd-config /tmp/buildkitd-local.toml
           docker buildx inspect --bootstrap local-arm64-operator
+      # Nexus needs credentials for the cache write below. The Zot registry
+      # it replaced accepted anonymous writes, so the only login here was to
+      # ghcr.io — cache-to now fails "unauthorized" without this. The amd64
+      # builds keep their cache on ghcr.io and need nothing extra.
+      - name: Log in to Nexus (build cache)
+        uses: docker/login-action@v3
+        with:
+          registry: 192.168.10.131:5000
+          username: ${{ secrets.NEXUS_USER }}
+          password: ${{ secrets.NEXUS_PASSWORD }}
       - name: Build + push operator arm64 (digest only)
         id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: operator
           file: operator/Dockerfile
@@ -667,7 +687,7 @@ jobs:
           docker buildx inspect --bootstrap remote-amd64-operator
       - name: Build + push operator amd64 (digest only)
         id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: operator
           file: operator/Dockerfile
