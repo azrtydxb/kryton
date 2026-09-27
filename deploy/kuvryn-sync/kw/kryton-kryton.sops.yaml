@@ -1,0 +1,69 @@
+apiVersion: kryton.azrtydxb.io/v1alpha1
+kind: Kryton
+metadata:
+    name: kryton
+    namespace: watteel-kryton
+    annotations:
+        kryton.azrtydxb.io/reconcile-trigger: "1779363120"
+        kryton.azrtydxb.io/sync: "1779363265"
+        sync.kuvryn.io/prune: disabled
+    labels:
+        app.kubernetes.io/managed-by: kuvryn-sync
+spec:
+    values:
+        env:
+            config:
+                APP_URL: ENC[AES256_GCM,data:RrlUQXOCRPrQj7fncWrdyAfZrhx5DH1jn8Q6NQ==,iv:0D6MH1pcBOKGl05YyQaOpeSQ/U/5B1C7WwphNqv29Fk=,tag:yLVssHbZaviP+YY1oshgkQ==,type:str]
+                BETTER_AUTH_URL: ENC[AES256_GCM,data:5O4krMz177n9H8Y3fGNhlShmK1BAxw0P0BEx/w==,iv:6D2QhhPGWbR3ihllVIaWs3iS52cPgAedC3U4yrQziYM=,tag:RoHfVz/JHixphDCMJgzLnQ==,type:str]
+                HOST: ENC[AES256_GCM,data:GHpidZI8AA==,iv:KbEsjVgxHzURbxl1G5FPCcUDLnWGuzGA0DjO2ymvQDw=,tag:ll7Mah1b4i1hpYeced/Nlg==,type:str]
+                LOG_LEVEL: ENC[AES256_GCM,data:pChrxg==,iv:ciK+8I3zvBQ+JacJGFJi+jAuZFBpbHEtIQrWVTDehXk=,tag:uQLWzbF2aoOrciUNjkD9MQ==,type:str]
+                NODE_ENV: ENC[AES256_GCM,data:Jeyna9RR1Lci2A==,iv:yCUuc0GyUnmc7ycQ/Y0RC4p5SlkRAthXew5DHg588mo=,tag:jTtkdlKmLBpwes0hGk1tlA==,type:str]
+                NOTES_DIR: ENC[AES256_GCM,data:CdcDUYiNy57+Gj8=,iv:cJtipbnQTjtZAJ3L+MfWjAR/b0qYt0D9j0bbySwcJ7Y=,tag:+K6nj0dKASViDiObSTfkMQ==,type:str]
+                OPENAPI_ENABLED: ENC[AES256_GCM,data:9Jb63yQ=,iv:GT7Jr3t+eGCPYFcZNOa+VFBEc0ett8f4flAsa7+R4lo=,tag:L6soTOpf+lDQR13zRfEpkQ==,type:str]
+                PORT: ENC[AES256_GCM,data:3qN9TQ==,iv:Db0XEDfwi+/PrNgPh/T5Jrbi3vRJCAo5O/1AdC3Hlb8=,tag:55xIx/kZAnkN7PeBN69jsw==,type:str]
+            secret:
+                BETTER_AUTH_SECRET: ENC[AES256_GCM,data:pdRrjZd4cV2cjQr1uxTdeFxSgezDjCWEOPXy03nYQ0oFX82OTKi5jcl2n0dy,iv:7A9+kx++QCmTb+LLfRFLCSQU2ovceoRhDgGhBnd2YE8=,tag:GnWzuYQA7OTQEIRDa9oHbg==,type:str]
+        ingress:
+            enabled: ENC[AES256_GCM,data:0fA0h+M=,iv:qY637QZPDDkm7XqorMHXATdnqlRyqoJrB2+15YQMsCg=,tag:wUNWg+d2ozshfauJKNAqHg==,type:bool]
+        persistence:
+            enabled: ENC[AES256_GCM,data:ObfOag==,iv:XloX5kCMTZrB+aq7RAO5QPdiXPZ4eMvDPTfndrz/Vag=,tag:b3R3zZSrcUWuV28af1V4uA==,type:bool]
+            size: ENC[AES256_GCM,data:yZyAPQ==,iv:rCojG03C+1AeHg1VUIHzZfX/pIQhRDNyEfGtKwM7Smk=,tag:JK9z0YzuoYDlDYiLkblflQ==,type:str]
+            storageClass: ENC[AES256_GCM,data:1O22N+aFKes=,iv:TfdhE15M6hfcDU6K3QV8Qf2w5pWr9PXvSduzovkfLpo=,tag:ZWsm0rS5/cRaC1YqpfBx7g==,type:str]
+        postgresql:
+            auth:
+                database: ENC[AES256_GCM,data:7Dwgi/FQ,iv:qKTp07eqgv6jaB+CNnlRYXDaHmPcuWz2srdTvUjZn0k=,tag:8VkiSzHgNdsGKqwFpny14g==,type:str]
+                password: ENC[AES256_GCM,data:d06nEZyX5inu12thjlBolCSSD7JgS8V2zcyw8/Q4TnI=,iv:d1DebmxWTiJ7w5rVtNw+nTW+eiqyj0t4ydVgoUQZR0I=,tag:/wohTG4VE4VA3yQi/gmDqw==,type:str]
+                username: ENC[AES256_GCM,data:4jrwdDno,iv:PLg20cyYg88P8Kh/0tM3xP6cmPVkblCWcd6yOwMZ/OY=,tag:7nVEHObGesB0KcCRtXv1IA==,type:str]
+            enabled: ENC[AES256_GCM,data:AEd1wA==,iv:R1nvrvqL8Oke/VcSSf/7tIwfap1WimxOSzpKUVZX6JI=,tag:tzFZ41yR9FyrcUII4YQ3uQ==,type:bool]
+            global:
+                security:
+                    allowInsecureImages: ENC[AES256_GCM,data:Vkl4FA==,iv:O8+NuvnNTbWRjZNtkPA+EG3i4vLhP+Cq+YsLSW2ryZA=,tag:xrwSkUdlXk7OBzPOqcQU8A==,type:bool]
+            image:
+                repository: ENC[AES256_GCM,data:7sx0/sD2z/XkcyqdN4BNNcw=,iv:uPWMR3xPM3YzxeMh+Jzm3oKbq3oaK/QE+C9+GbwoaRM=,tag:L0fvx03YX0zGwpjvv1NkVA==,type:str]
+                tag: ENC[AES256_GCM,data:tlereQ==,iv:b/HSi97ROVyYu2LF7zcjsDkl7uv60nLxkS61n1ONiKI=,tag:16XN5ddD6IOWoBbefpzGkg==,type:str]
+            primary:
+                containerSecurityContext:
+                    readOnlyRootFilesystem: ENC[AES256_GCM,data:v/Mekuc=,iv:h+ZM04AHIcdfRGOVCqmqTP8ck0SoTFZ8WgPtAUc6EBg=,tag:2P0Z1sfoleCXVZjN8mXdDA==,type:bool]
+                initdb:
+                    scripts:
+                        00-pgvector.sql: ENC[AES256_GCM,data:chcdPMEONMOcSN/GP9lvU+GqCKv8fspGVNMawDUtdnQBNd+mYd/X,iv:CSsk99R2OutJLlIlYMtg70MPPKvgsZbl8fPEHFXULJg=,tag:jisHPG9ZMb+MVloJI1OhKQ==,type:str]
+                persistence:
+                    enabled: ENC[AES256_GCM,data:tA1sIQ==,iv:bIxDsM93+GmpNjGcFdNCNDnA2M3elO0QyQCddoszcd0=,tag:boe1vYwLP4fwy0DF8RidKQ==,type:bool]
+                    size: ENC[AES256_GCM,data:b0682Q==,iv:YGtMA4OpUGe3Qv69L+HYXjSyMbdW4X2aqn9t+s2zTEI=,tag:g9DLgwfBOoh1G97egSbT9Q==,type:str]
+                    storageClass: ENC[AES256_GCM,data:yLPWAgK/eRM=,iv:f4rbE8QDPmuQ0n+6MSNWeZoKnYVTBZ2LY0cr97zBYtk=,tag:ArH1K8mrZWhnURDRRFIfBA==,type:str]
+    version: 4.7.0-pre.2
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSByUXZoM0kzQm5GanVaRGIv
+            MnRUMG9QSTYzbnZzZkhLdTVOMTZNQ2t6akNjCmp5YlhsS3pnMkFGbFQzUzNja1ox
+            R2JYVjY5bmtnNmNEQUVEandwNWtFLzAKLS0tIDkrSXRtZ0UrYXdwZHNCazNFVVpE
+            bGxNL281VGhiNm5kN1B2aXU5czJkQnMKhJMCfQ90e2Pa2Setz/qo+Nvp06DXEJyr
+            LeSEaLdTlT/o1ceRBeSnrnXW7o9FJX7UqnG6Lxv906qzCiRhKdOLrQ==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1wjjx8g6r0xl5q3wkd3qdpjh6c3whpzv3ed5erv8n7swlg700muxsseh7ju
+    encrypted_regex: ^(data|stringData|values)$
+    lastmodified: "2026-09-27T15:15:43Z"
+    mac: ENC[AES256_GCM,data:XCVlSNwkmy2zinA3jH1qkrW5NVt6KaIfjgzDiNZ47YulQrJ3QpWI5Dzktod6G5t7cH+K4hRekwv04vIvPyS761xsutH4LkBhE4QuJYlhXMOA3wa0AbajAQyHdlGAwBM6tDXGGaw7p7Z5j/MlRpXj71jJJkX99K0zySjSCq7CtKI=,iv:IUpP/qq/g0GZLp8rnK6z+Xc4Z21IVWAxfaE9g8f2Ld0=,tag:QB5eyytiN8uEw/yHXAeYFg==,type:str]
+    version: 3.13.3

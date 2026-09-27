@@ -1,0 +1,651 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kryton-operator-controller-manager
+  namespace: kryton-operator-system
+  labels:
+    app.kubernetes.io/managed-by: kuvryn-sync
+    app.kubernetes.io/name: kryton-operator
+    control-plane: controller-manager
+  annotations:
+    sync.kuvryn.io/prune: disabled
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kryton-operator
+      control-plane: controller-manager
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
+      labels:
+        app.kubernetes.io/name: kryton-operator
+        control-plane: controller-manager
+    spec:
+      containers:
+      - args:
+        - --leader-elect
+        - --health-probe-bind-address=:8081
+        image: ghcr.io/azrtydxb/kryton/kryton-operator:4.6.5-pre.14
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /healthz
+            port: 8081
+            scheme: HTTP
+          initialDelaySeconds: 15
+          periodSeconds: 20
+          successThreshold: 1
+          timeoutSeconds: 1
+        name: manager
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /readyz
+            port: 8081
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        resources:
+          limits:
+            cpu: 500m
+            memory: 128Mi
+          requests:
+            cpu: 10m
+            memory: 64Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccount: kryton-operator-controller-manager
+      serviceAccountName: kryton-operator-controller-manager
+      terminationGracePeriodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kryton-operator-controller-manager-metrics-service
+  namespace: kryton-operator-system
+  labels:
+    app.kubernetes.io/managed-by: kuvryn-sync
+    app.kubernetes.io/name: kryton-operator
+    control-plane: controller-manager
+  annotations:
+    sync.kuvryn.io/prune: disabled
+spec:
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - name: https
+    port: 8443
+    protocol: TCP
+    targetPort: 8443
+  selector:
+    app.kubernetes.io/name: kryton-operator
+    control-plane: controller-manager
+  sessionAffinity: None
+  type: ClusterIP
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kryton-operator-controller-manager
+  namespace: kryton-operator-system
+  labels:
+    app.kubernetes.io/managed-by: kuvryn-sync
+    app.kubernetes.io/name: kryton-operator
+  annotations:
+    sync.kuvryn.io/prune: disabled
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: kryton-operator-leader-election-role
+  namespace: kryton-operator-system
+  labels:
+    app.kubernetes.io/managed-by: kuvryn-sync
+    app.kubernetes.io/name: kryton-operator
+  annotations:
+    sync.kuvryn.io/prune: disabled
+rules:
+- apiGroups:
+  - ''
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ''
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kryton-operator-leader-election-rolebinding
+  namespace: kryton-operator-system
+  labels:
+    app.kubernetes.io/managed-by: kuvryn-sync
+    app.kubernetes.io/name: kryton-operator
+  annotations:
+    sync.kuvryn.io/prune: disabled
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: kryton-operator-leader-election-role
+subjects:
+- kind: ServiceAccount
+  name: kryton-operator-controller-manager
+  namespace: kryton-operator-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kryton-operator-kryton-admin-role
+  labels:
+    app.kubernetes.io/managed-by: kuvryn-sync
+    app.kubernetes.io/name: kryton-operator
+  annotations:
+    sync.kuvryn.io/prune: disabled
+rules:
+- apiGroups:
+  - kryton.azrtydxb.io
+  resources:
+  - krytons
+  verbs:
+  - '*'
+- apiGroups:
+  - kryton.azrtydxb.io
+  resources:
+  - krytons/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kryton-operator-kryton-editor-role
+  labels:
+    app.kubernetes.io/managed-by: kuvryn-sync
+    app.kubernetes.io/name: kryton-operator
+  annotations:
+    sync.kuvryn.io/prune: disabled
+rules:
+- apiGroups:
+  - kryton.azrtydxb.io
+  resources:
+  - krytons
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - kryton.azrtydxb.io
+  resources:
+  - krytons/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kryton-operator-kryton-viewer-role
+  labels:
+    app.kubernetes.io/managed-by: kuvryn-sync
+    app.kubernetes.io/name: kryton-operator
+  annotations:
+    sync.kuvryn.io/prune: disabled
+rules:
+- apiGroups:
+  - kryton.azrtydxb.io
+  resources:
+  - krytons
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - kryton.azrtydxb.io
+  resources:
+  - krytons/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kryton-operator-manager-role
+  annotations:
+    sync.kuvryn.io/prune: disabled
+  labels:
+    app.kubernetes.io/managed-by: kuvryn-sync
+rules:
+- apiGroups:
+  - ''
+  resources:
+  - namespaces
+  verbs:
+  - get
+- apiGroups:
+  - ''
+  resources:
+  - secrets
+  verbs:
+  - '*'
+- apiGroups:
+  - ''
+  resources:
+  - events
+  verbs:
+  - create
+- apiGroups:
+  - kryton.azrtydxb.io
+  resources:
+  - krytons
+  - krytons/status
+  - krytons/finalizers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ''
+  resources:
+  - services
+  verbs:
+  - '*'
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  - statefulsets
+  verbs:
+  - '*'
+- apiGroups:
+  - policy
+  resources:
+  - poddisruptionbudgets
+  verbs:
+  - '*'
+- apiGroups:
+  - ''
+  resources:
+  - configmaps
+  - persistentvolumeclaims
+  - serviceaccounts
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  - cronjobs
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - ingresses
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - snapshot.storage.k8s.io
+  resources:
+  - volumesnapshots
+  - volumesnapshotclasses
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - roles
+  - rolebindings
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - networkpolicies
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - apps
+  resources:
+  - replicasets
+  - controllerrevisions
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ''
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kryton-operator-metrics-auth-role
+  annotations:
+    sync.kuvryn.io/prune: disabled
+  labels:
+    app.kubernetes.io/managed-by: kuvryn-sync
+rules:
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kryton-operator-metrics-reader
+  annotations:
+    sync.kuvryn.io/prune: disabled
+  labels:
+    app.kubernetes.io/managed-by: kuvryn-sync
+rules:
+- nonResourceURLs:
+  - /metrics
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kryton-operator-manager-rolebinding
+  labels:
+    app.kubernetes.io/managed-by: kuvryn-sync
+    app.kubernetes.io/name: kryton-operator
+  annotations:
+    sync.kuvryn.io/prune: disabled
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kryton-operator-manager-role
+subjects:
+- kind: ServiceAccount
+  name: kryton-operator-controller-manager
+  namespace: kryton-operator-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kryton-operator-metrics-auth-rolebinding
+  annotations:
+    sync.kuvryn.io/prune: disabled
+  labels:
+    app.kubernetes.io/managed-by: kuvryn-sync
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kryton-operator-metrics-auth-role
+subjects:
+- kind: ServiceAccount
+  name: kryton-operator-controller-manager
+  namespace: kryton-operator-system
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: krytons.kryton.azrtydxb.io
+  annotations:
+    sync.kuvryn.io/prune: disabled
+  labels:
+    app.kubernetes.io/managed-by: kuvryn-sync
+spec:
+  conversion:
+    strategy: None
+  group: kryton.azrtydxb.io
+  names:
+    kind: Kryton
+    listKind: KrytonList
+    plural: krytons
+    singular: kryton
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Kryton is the Schema for the krytons API.
+        properties:
+          apiVersion:
+            type: string
+          kind:
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: 'KrytonSpec describes the desired state of a Kryton instance.
+
+              `values` is passed through to the embedded helm chart; the other fields
+
+              are reconciled by operator-only controllers (backup, plugins, snapshot).
+
+              '
+            properties:
+              backup:
+                description: Postgres backup CronJob configuration.
+                properties:
+                  objectStore:
+                    description: 'S3-compatible object store target (MinIO, Garage,
+                      SeaweedFS,
+
+                      or any other service that speaks the S3 protocol). No AWS-
+
+                      specific behaviour; endpoint is always explicit.
+
+                      '
+                    properties:
+                      bucket:
+                        type: string
+                      credentialsSecretRef:
+                        description: Name of a Secret with keys OBJECT_STORE_ACCESS_KEY
+                          and OBJECT_STORE_SECRET_KEY.
+                        properties:
+                          name:
+                            type: string
+                        required:
+                        - name
+                        type: object
+                      endpoint:
+                        description: Full URL of the S3-compatible service (e.g. https://minio.kw.local).
+                        type: string
+                      prefix:
+                        description: Key prefix inside the bucket. Defaults to "<cr-name>/".
+                        type: string
+                      region:
+                        description: Optional. Some implementations ignore it but
+                          mc still wants the field set.
+                        type: string
+                    required:
+                    - bucket
+                    - endpoint
+                    type: object
+                  retention:
+                    description: Retention duration (e.g. "30d"). Older objects in
+                      the target bucket are swept.
+                    type: string
+                  schedule:
+                    description: Cron expression (UTC) for pg_dump.
+                    type: string
+                required:
+                - schedule
+                type: object
+              plugins:
+                description: 'Plugins to pre-install via an init-container. Each is
+                  downloaded
+
+                  from `url`, verified against `sha256`, and dropped into the
+
+                  persistence volume''s plugins directory.
+
+                  '
+                items:
+                  properties:
+                    name:
+                      type: string
+                    sha256:
+                      description: Hex-encoded SHA-256 digest of the plugin archive.
+                      pattern: ^[a-fA-F0-9]{64}$
+                      type: string
+                    url:
+                      type: string
+                  required:
+                  - name
+                  - url
+                  - sha256
+                  type: object
+                type: array
+              snapshot:
+                description: VolumeSnapshot schedule for the persistence PVC.
+                properties:
+                  retention:
+                    type: string
+                  schedule:
+                    type: string
+                  volumeSnapshotClassName:
+                    type: string
+                required:
+                - schedule
+                type: object
+              values:
+                description: Passthrough values forwarded to the embedded helm chart.
+                type: object
+                x-kubernetes-preserve-unknown-fields: true
+              version:
+                description: appVersion of the kryton server image to deploy.
+                type: string
+            required:
+            - version
+            type: object
+          status:
+            description: KrytonStatus reflects the observed state.
+            properties:
+              conditions:
+                items:
+                  properties:
+                    lastTransitionTime:
+                      format: date-time
+                      type: string
+                    message:
+                      type: string
+                    reason:
+                      type: string
+                    status:
+                      type: string
+                    type:
+                      type: string
+                  type: object
+                type: array
+              helmRevision:
+                type: integer
+              observedVersion:
+                type: string
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

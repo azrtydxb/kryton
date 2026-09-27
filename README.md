@@ -1,4 +1,7 @@
 <p align="center">
+
+kw deployment is managed by [Kuvryn Sync](deploy/kuvryn-sync/README.md).
+
   <img src="logos/kryton_banner_dark.png" alt="Kryton" width="600" />
 </p>
 

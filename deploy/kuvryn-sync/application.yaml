@@ -1,0 +1,36 @@
+apiVersion: sync.kuvryn.io/v1alpha1
+kind: Application
+metadata:
+  name: kryton
+  namespace: watteel-kryton
+spec:
+  serviceAccountName: kuvryn-sync-deployer
+  source:
+    repositoryRef:
+      name: kryton
+    revision: master
+    path: deploy/kuvryn-sync/kw
+    render:
+      type: yaml
+  destination:
+    namespace: watteel-kryton
+  sync:
+    automatic: true
+    conflictPolicy: fail
+    prune: false
+    selfHeal: true
+  strategy:
+    type: rolling
+    failurePolicy:
+      action: rollback
+      maxAttempts: 2
+      timeout: 10m
+  health:
+    timeout: 10m
+  history:
+    limit: 10
+  deletionPolicy: Orphan
+  decryption:
+    provider: sops
+    secretRef:
+      name: kuvryn-sync-sops

@@ -127,19 +127,23 @@ docker-buildx: sync-chart ## Build and push docker image for the manager for cro
 
 .PHONY: install
 install: kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
+	@bash ../deploy/kuvryn-sync/guard-legacy.sh
 	$(KUSTOMIZE) build config/crd | kubectl apply -f -
 
 .PHONY: uninstall
 uninstall: kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config.
+	@bash ../deploy/kuvryn-sync/guard-legacy.sh
 	$(KUSTOMIZE) build config/crd | kubectl delete -f -
 
 .PHONY: deploy
 deploy: kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
+	@bash ../deploy/kuvryn-sync/guard-legacy.sh
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 
 .PHONY: undeploy
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
+	@bash ../deploy/kuvryn-sync/guard-legacy.sh
 	$(KUSTOMIZE) build config/default | kubectl delete -f -
 
 OS := $(shell uname -s | tr '[:upper:]' '[:lower:]')

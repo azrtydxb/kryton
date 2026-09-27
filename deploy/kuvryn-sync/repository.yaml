@@ -1,0 +1,11 @@
+apiVersion: sync.kuvryn.io/v1alpha1
+kind: Repository
+metadata:
+  name: kryton
+  namespace: watteel-kryton
+spec:
+  type: git
+  git:
+    url: https://github.com/azrtydxb/kryton.git
+    revision: master
+  pollInterval: 60s
