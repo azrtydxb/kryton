@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <cachechk>1779235200</cachechk>
+  <cachechk>1779321600</cachechk>
   <item>
     <name>Kryton</name>
     <internalName>kryton</internalName>
     <category>Productivity</category>
     <type>QPKG</type>
-    <changeLog>https://github.com/azrtydxb/kryton/releases/tag/v4.6.5-pre.10</changeLog>
-    <version>4.6.5-pre.10</version>
+    <changeLog>https://github.com/azrtydxb/kryton/releases/tag/v4.6.5-pre.14</changeLog>
+    <version>4.6.5-pre.14</version>
     <description>Local-first notes &amp; knowledge base with real-time collaboration.</description>
     <maintainer>Kryton</maintainer>
     <developer>Kryton</developer>
     <forumLink>https://github.com/azrtydxb/kryton/discussions</forumLink>
-    <publishedDate>2026-05-20</publishedDate>
+    <publishedDate>2026-05-21</publishedDate>
     <icon80>https://azrtydxb.github.io/kryton/assets/nas/icons/kryton-80.png</icon80>
     <icon100>https://azrtydxb.github.io/kryton/assets/nas/icons/kryton-100.png</icon100>
     <language>English</language>
@@ -22,13 +22,13 @@
     <snapshot>https://azrtydxb.github.io/kryton/assets/nas/screenshots/editor.png</snapshot>
     <platform>
       <platformID>ARM_64</platformID>
-      <location>https://github.com/azrtydxb/kryton/releases/download/v4.6.5-pre.10/kryton_4.6.5-pre.10_arm_64.qpkg</location>
-      <signature>https://github.com/azrtydxb/kryton/releases/download/v4.6.5-pre.10/kryton_4.6.5-pre.10_arm_64.qpkg.codesigning</signature>
+      <location>https://github.com/azrtydxb/kryton/releases/download/v4.6.5-pre.14/kryton_4.6.5-pre.14_arm_64.qpkg</location>
+      <signature>https://github.com/azrtydxb/kryton/releases/download/v4.6.5-pre.14/kryton_4.6.5-pre.14_arm_64.qpkg.codesigning</signature>
     </platform>
     <platform>
       <platformID>X86_64</platformID>
-      <location>https://github.com/azrtydxb/kryton/releases/download/v4.6.5-pre.10/kryton_4.6.5-pre.10_x86_64.qpkg</location>
-      <signature>https://github.com/azrtydxb/kryton/releases/download/v4.6.5-pre.10/kryton_4.6.5-pre.10_x86_64.qpkg.codesigning</signature>
+      <location>https://github.com/azrtydxb/kryton/releases/download/v4.6.5-pre.14/kryton_4.6.5-pre.14_x86_64.qpkg</location>
+      <signature>https://github.com/azrtydxb/kryton/releases/download/v4.6.5-pre.14/kryton_4.6.5-pre.14_x86_64.qpkg.codesigning</signature>
     </platform>
   </item>
 </plugins>
