@@ -97,7 +97,7 @@ jobs:
     # returns 200, then tears it down. Runs on the publish scale set
     # because we need real docker access (the default arc-azrtydxb
     # pods don't have a docker daemon socket the way `-publish` does).
-    runs-on: arc-azrtydxb-publish
+    runs-on: arc-azrtydxb
     steps:
       - uses: actions/checkout@v4
         with:
@@ -135,7 +135,7 @@ jobs:
     # Spins up a kind cluster inside the runner, installs the chart
     # from the repo, waits for the kryton Pod ready + /health 200,
     # tears down the cluster.
-    runs-on: arc-azrtydxb-publish
+    runs-on: arc-azrtydxb
     steps:
       - uses: actions/checkout@v4
         with:
@@ -184,7 +184,7 @@ jobs:
     # Same as helm-smoke but installs the CRD bundle + operator
     # Deployment first, then applies a minimal Kryton CR and waits
     # for status.conditions[Ready]=True before asserting /health.
-    runs-on: arc-azrtydxb-publish
+    runs-on: arc-azrtydxb
     steps:
       - uses: actions/checkout@v4
         with:

@@ -206,15 +206,10 @@ jobs:
   # sidestep that entirely.
   build-arm64:
     needs: [typecheck, lint, test, e2e, build]
-    # `arc-azrtydxb-publish` is identical to `arc-azrtydxb` except its
-    # pod template omits the `ghcr.io → 192.168.10.122` hostAlias. The
-    # mirror is a pull-through cache that doesn't accept writes AND
-    # serves a cluster-CA-signed cert that buildkit-container doesn't
-    # trust — both made push from inside dind fail with a TLS
-    # 'unknown authority' error on the regular arc-azrtydxb scale set.
-    # Without the hostAlias, ghcr.io resolves to its real public CDN
-    # via CoreDNS and pushes work with the standard public TLS chain.
-    runs-on: arc-azrtydxb-publish
+    # No runner aliases ghcr.io any more (the former -publish sets were
+    # merged into arc-azrtydxb), so ghcr.io resolves to its real public
+    # CDN and pushes work with the standard public TLS chain.
+    runs-on: arc-azrtydxb
     permissions:
       contents: read
       packages: write
@@ -291,7 +286,7 @@ jobs:
 
   build-amd64:
     needs: [typecheck, lint, test, e2e, build]
-    runs-on: arc-azrtydxb-amd64-publish
+    runs-on: arc-azrtydxb-amd64
     permissions:
       contents: read
       packages: write
@@ -324,7 +319,7 @@ jobs:
             type=raw,value=latest
       - name: Set up amd64 builder
         run: |
-          # This job already runs on arc-azrtydxb-amd64-publish, which is real
+          # This job already runs on arc-azrtydxb-amd64, which is real
           # amd64 hardware (novanas), so it builds locally. It previously
           # reached out to a remote BuildKit on 192.168.10.253 — that endpoint
           # is gone, its port closed, and the client certs the runner template
@@ -340,7 +335,7 @@ jobs:
           [registry."192.168.10.131:5000"]
             insecure = true
           [registry."docker.io"]
-            mirrors = ["192.168.10.131"]
+            mirrors = ["ant.azrty.com"]
           EOF
           docker buildx create \
             --name remote-amd64 \
@@ -372,7 +367,7 @@ jobs:
 
   manifest:
     needs: [build-arm64, build-amd64]
-    runs-on: arc-azrtydxb-publish
+    runs-on: arc-azrtydxb
     permissions:
       contents: read
       packages: write
@@ -419,7 +414,7 @@ jobs:
     # all three artifacts to the cluster zot, and reading the chart
     # back from ghcr races against helm-publish's push otherwise.
     needs: [manifest, manifest-operator, helm-publish]
-    runs-on: arc-azrtydxb-publish
+    runs-on: arc-azrtydxb
     permissions:
       contents: read
       packages: read
@@ -507,7 +502,7 @@ jobs:
   # by the time the chart is published.
   helm-publish:
     needs: [manifest]
-    runs-on: arc-azrtydxb-publish
+    runs-on: arc-azrtydxb
     permissions:
       contents: read
       packages: write
@@ -569,7 +564,7 @@ jobs:
   # the cluster-CA trust gap on the NAS buildkit-container).
   build-operator-arm64:
     needs: [typecheck, lint, test, e2e]
-    runs-on: arc-azrtydxb-publish
+    runs-on: arc-azrtydxb
     permissions:
       contents: read
       packages: write
@@ -637,7 +632,7 @@ jobs:
 
   build-operator-amd64:
     needs: [typecheck, lint, test, e2e]
-    runs-on: arc-azrtydxb-amd64-publish
+    runs-on: arc-azrtydxb-amd64
     permissions:
       contents: read
       packages: write
@@ -677,7 +672,7 @@ jobs:
           [registry."192.168.10.131:5000"]
             insecure = true
           [registry."docker.io"]
-            mirrors = ["192.168.10.131"]
+            mirrors = ["ant.azrty.com"]
           EOF
           docker buildx create \
             --name remote-amd64-operator \
@@ -700,7 +695,7 @@ jobs:
 
   manifest-operator:
     needs: [build-operator-arm64, build-operator-amd64]
-    runs-on: arc-azrtydxb-publish
+    runs-on: arc-azrtydxb
     permissions:
       contents: read
       packages: write
