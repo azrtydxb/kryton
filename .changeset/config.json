@@ -9,7 +9,7 @@
   "updateInternalDependencies": "patch",
   "ignore": [
     "@azrtydxb/client",
-    "@azrtydxb/sdk",
+    "@azrtydxb/kryton-sdk",
     "@azrtydxb/server",
     "@azrtydxb/ui"
   ]
