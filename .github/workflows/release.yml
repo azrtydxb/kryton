@@ -213,6 +213,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write # GitHub OIDC for the Kuvryn Ant build-cache login
     outputs:
       digest: ${{ steps.build.outputs.digest }}
     steps:
@@ -257,16 +258,16 @@ jobs:
             --platform linux/arm64 \
             --buildkitd-config /tmp/buildkitd-local.toml
           docker buildx inspect --bootstrap local-arm64
-      # Nexus needs credentials for the cache write below. The Zot registry
-      # it replaced accepted anonymous writes, so the only login here was to
-      # ghcr.io — cache-to now fails "unauthorized" without this. The amd64
-      # builds keep their cache on ghcr.io and need nothing extra.
-      - name: Log in to Nexus (build cache)
-        uses: docker/login-action@v3
+      # The arm64 build cache lives on Kuvryn Ant (oci-hosted), GitHub OIDC login.
+      # The amd64 builds keep their cache on ghcr.io and need nothing extra.
+      - name: Log in to Kuvryn Ant (build cache)
+        uses: azrtydxb/ant-setup-action@543d780ae8e4ff1fe0473a4778f18edceb995768 # v1
         with:
-          registry: 192.168.10.131:5000
-          username: ${{ secrets.NEXUS_USER }}
-          password: ${{ secrets.NEXUS_PASSWORD }}
+          docker-login: "true"
+          required: "true"
+          go: "false"
+          cargo: "false"
+          pip: "false"
       - name: Build + push arm64 (digest only)
         id: build
         uses: docker/build-push-action@v7
@@ -275,13 +276,12 @@ jobs:
           builder: local-arm64
           platforms: linux/arm64
           labels: ${{ steps.meta.outputs.labels }}
-          # Buildkit cache lives in the in-cluster zot registry at
-          # 192.168.10.131:5000 — pushes/pulls over the cluster LAN
-          # instead of GHA cache over the NAS uplink. mode=max stores
+          # Buildkit cache lives on Kuvryn Ant (ant.azrty.com/oci-hosted)
+          # instead of GHA cache; ignore-error so a cache write never fails a release. mode=max stores
           # all intermediate layers (full hit rate); image-manifest=true
           # uses OCI manifest format which buildx and crane both prefer.
-          cache-from: type=registry,ref=192.168.10.131:5000/buildcache/kryton:linux-arm64
-          cache-to: type=registry,ref=192.168.10.131:5000/buildcache/kryton:linux-arm64,mode=max,image-manifest=true
+          cache-from: type=registry,ref=ant.azrty.com/oci-hosted/buildcache/kryton:linux-arm64
+          cache-to: type=registry,ref=ant.azrty.com/oci-hosted/buildcache/kryton:linux-arm64,mode=max,image-manifest=true,ignore-error=true
           outputs: type=image,"name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}",push-by-digest=true,name-canonical=true,push=true
 
   build-amd64:
@@ -354,12 +354,12 @@ jobs:
           # Cache goes to ghcr.io instead of the cluster zot. The NAS
           # buildkit-container's /etc/buildkit/buildkitd.toml does NOT
           # currently trust the cluster CA, so pushing cache layers to
-          # https://192.168.10.131:5000 fails with x509 unknown-
+          # https://ant.azrty.com/oci-hosted fails with x509 unknown-
           # authority. ghcr.io has a public CA chain that everything
           # trusts and we're already authenticated for image push.
           # TODO: when buildkit-container on the NAS gets cluster-
           # ca.crt mounted + buildkitd.toml updated, switch back to
-          # 192.168.10.131:5000/buildcache/kryton:linux-amd64 for the
+          # ant.azrty.com/oci-hosted/buildcache/kryton:linux-amd64 for the
           # LAN-speed advantage.
           cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/buildcache:linux-amd64
           cache-to: type=registry,ref=ghcr.io/${{ github.repository }}/buildcache:linux-amd64,mode=max,image-manifest=true
@@ -401,8 +401,7 @@ jobs:
         run: docker buildx imagetools inspect "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
 
   # Mirror the freshly-published multi-arch image from ghcr.io to the
-  # in-cluster Nexus at 192.168.10.131:5000 so harbor.kw.local shows the
-  # latest kryton tags too. Uses `docker buildx imagetools create`,
+  # authoritative Kuvryn Ant (ant.azrty.com/oci-hosted); kw replicates it. Uses `docker buildx imagetools create`,
   # which does a server-side registry-to-registry transfer (no
   # rebuild, no local pull) and preserves the multi-arch manifest
   # list. Anonymous push works — same path the arm64 buildcache has
@@ -418,7 +417,15 @@ jobs:
     permissions:
       contents: read
       packages: read
+      id-token: write # GitHub OIDC for the Kuvryn Ant push
     steps:
+      - name: Kuvryn Ant token (GitHub OIDC, exported as ANT_TOKEN)
+        uses: azrtydxb/ant-setup-action@543d780ae8e4ff1fe0473a4778f18edceb995768 # v1
+        with:
+          required: "true"
+          go: "false"
+          cargo: "false"
+          pip: "false"
       - name: Log in to ghcr (source)
         uses: docker/login-action@v3
         with:
@@ -434,7 +441,7 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest
-      - name: Mirror server tags to cluster zot
+      - name: Mirror server tags to Kuvryn Ant
         # `docker buildx imagetools create` is client-side and ignores
         # the buildkitd insecure-registry config, so cross-registry
         # copies to the cluster zot (cluster-CA cert) fail with x509
@@ -449,11 +456,11 @@ jobs:
         run: |
           set -euo pipefail
           for src in $(jq -r '.tags[]' <<< "$DOCKER_METADATA_OUTPUT_JSON"); do
-            dst="${src/ghcr.io/192.168.10.131:5000}"
+            dst="${src/ghcr.io/ant.azrty.com/oci-hosted}"
             echo "Mirroring server: $src → $dst"
             docker run --rm quay.io/skopeo/stable copy --multi-arch all \
-              --src-tls-verify=true --dest-tls-verify=false \
-              --src-creds="$SRC_CREDS" \
+              --src-tls-verify=true --dest-tls-verify=true \
+              --src-creds="$SRC_CREDS" --dest-creds="ci:$ANT_TOKEN" \
               "docker://$src" "docker://$dst"
           done
       - name: Extract operator metadata
@@ -465,20 +472,20 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest
-      - name: Mirror operator tags to cluster zot
+      - name: Mirror operator tags to Kuvryn Ant
         env:
           SRC_CREDS: ${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           for src in $(jq -r '.tags[]' <<< '${{ steps.meta-operator.outputs.json }}'); do
-            dst="${src/ghcr.io/192.168.10.131:5000}"
+            dst="${src/ghcr.io/ant.azrty.com/oci-hosted}"
             echo "Mirroring operator: $src → $dst"
             docker run --rm quay.io/skopeo/stable copy --multi-arch all \
-              --src-tls-verify=true --dest-tls-verify=false \
-              --src-creds="$SRC_CREDS" \
+              --src-tls-verify=true --dest-tls-verify=true \
+              --src-creds="$SRC_CREDS" --dest-creds="ci:$ANT_TOKEN" \
               "docker://$src" "docker://$dst"
           done
-      - name: Mirror helm chart artifact to cluster zot
+      - name: Mirror helm chart artifact to Kuvryn Ant
         env:
           # Prefer the workflow_dispatch input if provided; otherwise
           # fall back to the tag that triggered the push event.
@@ -489,11 +496,11 @@ jobs:
           set -euo pipefail
           CHART_VER="${VERSION#v}"
           SRC="ghcr.io/${OWNER}/charts/kryton:${CHART_VER}"
-          DST="192.168.10.131:5000/${OWNER}/charts/kryton:${CHART_VER}"
+          DST="ant.azrty.com/oci-hosted/${OWNER}/charts/kryton:${CHART_VER}"
           echo "Mirroring chart: $SRC → $DST"
           docker run --rm quay.io/skopeo/stable copy \
-            --src-tls-verify=true --dest-tls-verify=false \
-            --src-creds="$SRC_CREDS" \
+            --src-tls-verify=true --dest-tls-verify=true \
+            --src-creds="$SRC_CREDS" --dest-creds="ci:$ANT_TOKEN" \
             "docker://$SRC" "docker://$DST"
 
   # Package + push the Helm chart as an OCI artifact to ghcr.io.
@@ -568,6 +575,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write # GitHub OIDC for the Kuvryn Ant build-cache login
     outputs:
       digest: ${{ steps.build.outputs.digest }}
     steps:
@@ -607,16 +615,16 @@ jobs:
             --platform linux/arm64 \
             --buildkitd-config /tmp/buildkitd-local.toml
           docker buildx inspect --bootstrap local-arm64-operator
-      # Nexus needs credentials for the cache write below. The Zot registry
-      # it replaced accepted anonymous writes, so the only login here was to
-      # ghcr.io — cache-to now fails "unauthorized" without this. The amd64
-      # builds keep their cache on ghcr.io and need nothing extra.
-      - name: Log in to Nexus (build cache)
-        uses: docker/login-action@v3
+      # The arm64 build cache lives on Kuvryn Ant (oci-hosted), GitHub OIDC login.
+      # The amd64 builds keep their cache on ghcr.io and need nothing extra.
+      - name: Log in to Kuvryn Ant (build cache)
+        uses: azrtydxb/ant-setup-action@543d780ae8e4ff1fe0473a4778f18edceb995768 # v1
         with:
-          registry: 192.168.10.131:5000
-          username: ${{ secrets.NEXUS_USER }}
-          password: ${{ secrets.NEXUS_PASSWORD }}
+          docker-login: "true"
+          required: "true"
+          go: "false"
+          cargo: "false"
+          pip: "false"
       - name: Build + push operator arm64 (digest only)
         id: build
         uses: docker/build-push-action@v7
@@ -626,8 +634,8 @@ jobs:
           builder: local-arm64-operator
           platforms: linux/arm64
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=192.168.10.131:5000/buildcache/kryton-operator:linux-arm64
-          cache-to: type=registry,ref=192.168.10.131:5000/buildcache/kryton-operator:linux-arm64,mode=max,image-manifest=true
+          cache-from: type=registry,ref=ant.azrty.com/oci-hosted/buildcache/kryton-operator:linux-arm64
+          cache-to: type=registry,ref=ant.azrty.com/oci-hosted/buildcache/kryton-operator:linux-arm64,mode=max,image-manifest=true,ignore-error=true
           outputs: type=image,"name=${{ env.REGISTRY }}/${{ env.OPERATOR_IMAGE_NAME }}",push-by-digest=true,name-canonical=true,push=true
 
   build-operator-amd64:
