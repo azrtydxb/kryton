@@ -42,10 +42,14 @@ env:
 jobs:
   typecheck:
     runs-on: arc-azrtydxb
+    permissions:
+      contents: read
+      id-token: write # Kuvryn Ant OIDC (azrtydxb/ant-setup-action)
     container:
       image: node:24
     steps:
       - uses: actions/checkout@v4
+      - uses: azrtydxb/ant-setup-action@7c6f1b8ca34a0a127b43040f4e16bbafdbd83791 # v1
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -58,10 +62,14 @@ jobs:
 
   lint:
     runs-on: arc-azrtydxb
+    permissions:
+      contents: read
+      id-token: write # Kuvryn Ant OIDC (azrtydxb/ant-setup-action)
     container:
       image: node:24
     steps:
       - uses: actions/checkout@v4
+      - uses: azrtydxb/ant-setup-action@7c6f1b8ca34a0a127b43040f4e16bbafdbd83791 # v1
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -73,6 +81,9 @@ jobs:
 
   test:
     runs-on: arc-azrtydxb
+    permissions:
+      contents: read
+      id-token: write # Kuvryn Ant OIDC (azrtydxb/ant-setup-action)
     container:
       image: node:24
     services:
@@ -89,6 +100,7 @@ jobs:
           --health-timeout 3s
     steps:
       - uses: actions/checkout@v4
+      - uses: azrtydxb/ant-setup-action@7c6f1b8ca34a0a127b43040f4e16bbafdbd83791 # v1
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -120,6 +132,9 @@ jobs:
 
   e2e:
     runs-on: arc-azrtydxb
+    permissions:
+      contents: read
+      id-token: write # Kuvryn Ant OIDC (azrtydxb/ant-setup-action)
     container:
       image: node:24
     services:
@@ -136,6 +151,7 @@ jobs:
           --health-timeout 3s
     steps:
       - uses: actions/checkout@v4
+      - uses: azrtydxb/ant-setup-action@7c6f1b8ca34a0a127b43040f4e16bbafdbd83791 # v1
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -172,10 +188,14 @@ jobs:
     # in parallel as siblings; their failure independently blocks the
     # docker jobs via `needs`.
     runs-on: arc-azrtydxb
+    permissions:
+      contents: read
+      id-token: write # Kuvryn Ant OIDC (azrtydxb/ant-setup-action)
     container:
       image: node:24
     steps:
       - uses: actions/checkout@v4
+      - uses: azrtydxb/ant-setup-action@7c6f1b8ca34a0a127b43040f4e16bbafdbd83791 # v1
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -290,10 +310,12 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write # Kuvryn Ant OIDC (azrtydxb/ant-setup-action)
     outputs:
       digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
+      - uses: azrtydxb/ant-setup-action@7c6f1b8ca34a0a127b43040f4e16bbafdbd83791 # v1
       - uses: actions/download-artifact@v4
         with:
           name: client-dist
@@ -644,10 +666,12 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write # Kuvryn Ant OIDC (azrtydxb/ant-setup-action)
     outputs:
       digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
+      - uses: azrtydxb/ant-setup-action@7c6f1b8ca34a0a127b43040f4e16bbafdbd83791 # v1
       - name: Sync chart into operator embed
         run: rm -rf operator/internal/chartfs/chart && mkdir -p operator/internal/chartfs/chart && cp -R charts/kryton/. operator/internal/chartfs/chart/
       - name: Log in to Container Registry

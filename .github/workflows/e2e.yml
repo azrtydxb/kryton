@@ -27,6 +27,9 @@ jobs:
     # ARC v2 scale-set on the kw cluster — see ci.yml for the same
     # migration. Single label only; chown UID is 1001 (not 1000).
     runs-on: arc-azrtydxb
+    permissions:
+      contents: read
+      id-token: write # Kuvryn Ant OIDC (azrtydxb/ant-setup-action)
     container:
       image: node:24
     services:
@@ -45,6 +48,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref }}
+      - uses: azrtydxb/ant-setup-action@7c6f1b8ca34a0a127b43040f4e16bbafdbd83791 # v1
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

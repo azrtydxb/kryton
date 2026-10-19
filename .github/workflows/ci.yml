@@ -63,10 +63,14 @@ env:
 jobs:
   typecheck:
     runs-on: arc-azrtydxb-amd64
+    permissions:
+      contents: read
+      id-token: write # Kuvryn Ant OIDC (azrtydxb/ant-setup-action)
     container:
       image: node:24
     steps:
       - uses: actions/checkout@v4
+      - uses: azrtydxb/ant-setup-action@7c6f1b8ca34a0a127b43040f4e16bbafdbd83791 # v1
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -82,10 +86,14 @@ jobs:
 
   lint:
     runs-on: arc-azrtydxb-amd64
+    permissions:
+      contents: read
+      id-token: write # Kuvryn Ant OIDC (azrtydxb/ant-setup-action)
     container:
       image: node:24
     steps:
       - uses: actions/checkout@v4
+      - uses: azrtydxb/ant-setup-action@7c6f1b8ca34a0a127b43040f4e16bbafdbd83791 # v1
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -103,10 +111,14 @@ jobs:
     # unit suite needs Postgres and lives with `test-build` in the nightly
     # integration tier (docs/ci-standard.md §Test tiers).
     runs-on: arc-azrtydxb-amd64
+    permissions:
+      contents: read
+      id-token: write # Kuvryn Ant OIDC (azrtydxb/ant-setup-action)
     container:
       image: node:24
     steps:
       - uses: actions/checkout@v4
+      - uses: azrtydxb/ant-setup-action@7c6f1b8ca34a0a127b43040f4e16bbafdbd83791 # v1
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -132,6 +144,9 @@ jobs:
     # still reports on PRs (skipped).
     if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v') }}
     runs-on: arc-azrtydxb-amd64
+    permissions:
+      contents: read
+      id-token: write # Kuvryn Ant OIDC (azrtydxb/ant-setup-action)
     container:
       image: node:24
     services:
@@ -148,6 +163,7 @@ jobs:
           --health-timeout 3s
     steps:
       - uses: actions/checkout@v4
+      - uses: azrtydxb/ant-setup-action@7c6f1b8ca34a0a127b43040f4e16bbafdbd83791 # v1
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -194,10 +210,14 @@ jobs:
     # PR path — nightly schedule, manual dispatch and v* release tags only.
     if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v') }}
     runs-on: arc-azrtydxb-amd64
+    permissions:
+      contents: read
+      id-token: write # Kuvryn Ant OIDC (azrtydxb/ant-setup-action)
     container:
       image: node:24
     steps:
       - uses: actions/checkout@v4
+      - uses: azrtydxb/ant-setup-action@7c6f1b8ca34a0a127b43040f4e16bbafdbd83791 # v1
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -259,6 +279,9 @@ jobs:
     # schedule, manual dispatch and v* release tags only.
     if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v') }}
     runs-on: arc-azrtydxb-amd64
+    permissions:
+      contents: read
+      id-token: write # Kuvryn Ant OIDC (azrtydxb/ant-setup-action)
     container:
       image: node:24
     services:
@@ -275,6 +298,7 @@ jobs:
           --health-timeout 3s
     steps:
       - uses: actions/checkout@v4
+      - uses: azrtydxb/ant-setup-action@7c6f1b8ca34a0a127b43040f4e16bbafdbd83791 # v1
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
