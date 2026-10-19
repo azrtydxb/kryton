@@ -49,7 +49,7 @@ jobs:
       image: node:24
     steps:
       - uses: actions/checkout@v4
-      - uses: azrtydxb/ant-setup-action@7c6f1b8ca34a0a127b43040f4e16bbafdbd83791 # v1
+      - uses: azrtydxb/ant-setup-action@549f7472cf26b0885441ed9f9a7fab0277545000 # v1
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -69,7 +69,7 @@ jobs:
       image: node:24
     steps:
       - uses: actions/checkout@v4
-      - uses: azrtydxb/ant-setup-action@7c6f1b8ca34a0a127b43040f4e16bbafdbd83791 # v1
+      - uses: azrtydxb/ant-setup-action@549f7472cf26b0885441ed9f9a7fab0277545000 # v1
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -100,7 +100,7 @@ jobs:
           --health-timeout 3s
     steps:
       - uses: actions/checkout@v4
-      - uses: azrtydxb/ant-setup-action@7c6f1b8ca34a0a127b43040f4e16bbafdbd83791 # v1
+      - uses: azrtydxb/ant-setup-action@549f7472cf26b0885441ed9f9a7fab0277545000 # v1
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -151,7 +151,7 @@ jobs:
           --health-timeout 3s
     steps:
       - uses: actions/checkout@v4
-      - uses: azrtydxb/ant-setup-action@7c6f1b8ca34a0a127b43040f4e16bbafdbd83791 # v1
+      - uses: azrtydxb/ant-setup-action@549f7472cf26b0885441ed9f9a7fab0277545000 # v1
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -195,7 +195,7 @@ jobs:
       image: node:24
     steps:
       - uses: actions/checkout@v4
-      - uses: azrtydxb/ant-setup-action@7c6f1b8ca34a0a127b43040f4e16bbafdbd83791 # v1
+      - uses: azrtydxb/ant-setup-action@549f7472cf26b0885441ed9f9a7fab0277545000 # v1
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -278,14 +278,17 @@ jobs:
             --platform linux/arm64 \
             --buildkitd-config /tmp/buildkitd-local.toml
           docker buildx inspect --bootstrap local-arm64
-      # The arm64 build cache lives on Kuvryn Ant (oci-hosted), GitHub OIDC login.
+      # The arm64 build cache lives on the Kuvryn Ant buildcache feed (GitHub OIDC login).
       # The amd64 builds keep their cache on ghcr.io and need nothing extra.
-      - name: Log in to Kuvryn Ant (build cache)
-        uses: azrtydxb/ant-setup-action@7c6f1b8ca34a0a127b43040f4e16bbafdbd83791 # v1
+      - id: ant-cache-1
+        uses: azrtydxb/ant-setup-action@549f7472cf26b0885441ed9f9a7fab0277545000 # v1
         with:
-          docker-login: "true"
-          required: "true"
+          build-cache: "true"
+          cache-name: kryton
+          arch-suffix: arm64
+          sccache: "false"
           go: "false"
+          npm: "false"
           cargo: "false"
           pip: "false"
       - name: Build + push arm64 (digest only)
@@ -296,12 +299,12 @@ jobs:
           builder: local-arm64
           platforms: linux/arm64
           labels: ${{ steps.meta.outputs.labels }}
-          # Buildkit cache lives on Kuvryn Ant (ant.azrty.com/oci-hosted)
+          # Buildkit cache lives on Kuvryn Ant (ant.azrty.com/buildcache)
           # instead of GHA cache; ignore-error so a cache write never fails a release. mode=max stores
           # all intermediate layers (full hit rate); image-manifest=true
           # uses OCI manifest format which buildx and crane both prefer.
-          cache-from: type=registry,ref=ant.azrty.com/oci-hosted/buildcache/kryton:linux-arm64
-          cache-to: type=registry,ref=ant.azrty.com/oci-hosted/buildcache/kryton:linux-arm64,mode=max,image-manifest=true,ignore-error=true
+          cache-from: ${{ steps.ant-cache-1.outputs.cache-from }}
+          cache-to: ${{ steps.ant-cache-1.outputs.cache-to }}
           outputs: type=image,"name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}",push-by-digest=true,name-canonical=true,push=true
 
   build-amd64:
@@ -315,7 +318,7 @@ jobs:
       digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
-      - uses: azrtydxb/ant-setup-action@7c6f1b8ca34a0a127b43040f4e16bbafdbd83791 # v1
+      - uses: azrtydxb/ant-setup-action@549f7472cf26b0885441ed9f9a7fab0277545000 # v1
       - uses: actions/download-artifact@v4
         with:
           name: client-dist
@@ -442,7 +445,7 @@ jobs:
       id-token: write # GitHub OIDC for the Kuvryn Ant push
     steps:
       - name: Kuvryn Ant token (GitHub OIDC, exported as ANT_TOKEN)
-        uses: azrtydxb/ant-setup-action@7c6f1b8ca34a0a127b43040f4e16bbafdbd83791 # v1
+        uses: azrtydxb/ant-setup-action@549f7472cf26b0885441ed9f9a7fab0277545000 # v1
         with:
           required: "true"
           go: "false"
@@ -637,14 +640,17 @@ jobs:
             --platform linux/arm64 \
             --buildkitd-config /tmp/buildkitd-local.toml
           docker buildx inspect --bootstrap local-arm64-operator
-      # The arm64 build cache lives on Kuvryn Ant (oci-hosted), GitHub OIDC login.
+      # The arm64 build cache lives on the Kuvryn Ant buildcache feed (GitHub OIDC login).
       # The amd64 builds keep their cache on ghcr.io and need nothing extra.
-      - name: Log in to Kuvryn Ant (build cache)
-        uses: azrtydxb/ant-setup-action@7c6f1b8ca34a0a127b43040f4e16bbafdbd83791 # v1
+      - id: ant-cache-2
+        uses: azrtydxb/ant-setup-action@549f7472cf26b0885441ed9f9a7fab0277545000 # v1
         with:
-          docker-login: "true"
-          required: "true"
+          build-cache: "true"
+          cache-name: operator
+          arch-suffix: arm64
+          sccache: "false"
           go: "false"
+          npm: "false"
           cargo: "false"
           pip: "false"
       - name: Build + push operator arm64 (digest only)
@@ -656,8 +662,8 @@ jobs:
           builder: local-arm64-operator
           platforms: linux/arm64
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=ant.azrty.com/oci-hosted/buildcache/kryton-operator:linux-arm64
-          cache-to: type=registry,ref=ant.azrty.com/oci-hosted/buildcache/kryton-operator:linux-arm64,mode=max,image-manifest=true,ignore-error=true
+          cache-from: ${{ steps.ant-cache-2.outputs.cache-from }}
+          cache-to: ${{ steps.ant-cache-2.outputs.cache-to }}
           outputs: type=image,"name=${{ env.REGISTRY }}/${{ env.OPERATOR_IMAGE_NAME }}",push-by-digest=true,name-canonical=true,push=true
 
   build-operator-amd64:
@@ -671,7 +677,7 @@ jobs:
       digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
-      - uses: azrtydxb/ant-setup-action@7c6f1b8ca34a0a127b43040f4e16bbafdbd83791 # v1
+      - uses: azrtydxb/ant-setup-action@549f7472cf26b0885441ed9f9a7fab0277545000 # v1
       - name: Sync chart into operator embed
         run: rm -rf operator/internal/chartfs/chart && mkdir -p operator/internal/chartfs/chart && cp -R charts/kryton/. operator/internal/chartfs/chart/
       - name: Log in to Container Registry
