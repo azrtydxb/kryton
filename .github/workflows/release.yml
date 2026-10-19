@@ -261,7 +261,7 @@ jobs:
       # The arm64 build cache lives on Kuvryn Ant (oci-hosted), GitHub OIDC login.
       # The amd64 builds keep their cache on ghcr.io and need nothing extra.
       - name: Log in to Kuvryn Ant (build cache)
-        uses: azrtydxb/ant-setup-action@543d780ae8e4ff1fe0473a4778f18edceb995768 # v1
+        uses: azrtydxb/ant-setup-action@7c6f1b8ca34a0a127b43040f4e16bbafdbd83791 # v1
         with:
           docker-login: "true"
           required: "true"
@@ -420,7 +420,7 @@ jobs:
       id-token: write # GitHub OIDC for the Kuvryn Ant push
     steps:
       - name: Kuvryn Ant token (GitHub OIDC, exported as ANT_TOKEN)
-        uses: azrtydxb/ant-setup-action@543d780ae8e4ff1fe0473a4778f18edceb995768 # v1
+        uses: azrtydxb/ant-setup-action@7c6f1b8ca34a0a127b43040f4e16bbafdbd83791 # v1
         with:
           required: "true"
           go: "false"
@@ -618,7 +618,7 @@ jobs:
       # The arm64 build cache lives on Kuvryn Ant (oci-hosted), GitHub OIDC login.
       # The amd64 builds keep their cache on ghcr.io and need nothing extra.
       - name: Log in to Kuvryn Ant (build cache)
-        uses: azrtydxb/ant-setup-action@543d780ae8e4ff1fe0473a4778f18edceb995768 # v1
+        uses: azrtydxb/ant-setup-action@7c6f1b8ca34a0a127b43040f4e16bbafdbd83791 # v1
         with:
           docker-login: "true"
           required: "true"
