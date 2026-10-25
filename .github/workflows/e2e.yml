@@ -202,15 +202,20 @@ jobs:
           ls
       - name: Helm install
         run: |
-          helm install kryton charts/kryton \
+          if ! helm install kryton charts/kryton \
             --namespace kryton-smoke --create-namespace \
-            --wait --timeout 5m
+            --wait --timeout 5m; then
+            kubectl -n kryton-smoke get all || true
+            kubectl -n kryton-smoke describe pods || true
+            kubectl -n kryton-smoke logs --all-containers --prefix -l app.kubernetes.io/instance=kryton --tail=100 || true
+            exit 1
+          fi
       - name: Health check via port-forward
         run: |
           set -euo pipefail
           kubectl -n kryton-smoke wait --for=condition=Ready pod \
             -l app.kubernetes.io/name=kryton --timeout=300s
-          kubectl -n kryton-smoke port-forward svc/kryton 8080:80 &
+          kubectl -n kryton-smoke port-forward svc/kryton 8080:3001 &
           PF=$!
           trap "kill $PF || true" EXIT
           sleep 5
@@ -294,14 +299,18 @@ jobs:
             exit 1
           fi
       - name: Apply minimal Kryton CR
+        # spec.version is required and becomes the server image tag; use the
+        # chart's appVersion, which release.yml publishes.
         run: |
-          cat <<'EOF' | kubectl apply -f -
+          version=$(sed -n 's/^appVersion: *"\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' charts/kryton/Chart.yaml)
+          cat <<EOF | kubectl apply -f -
           apiVersion: kryton.azrtydxb.io/v1alpha1
           kind: Kryton
           metadata:
             name: smoke
             namespace: default
           spec:
+            version: "${version}"
             values:
               ingress:
                 enabled: false
@@ -319,12 +328,20 @@ jobs:
             fi
             sleep 5
           done
-          kubectl wait --for=condition=Ready pod \
-            -l app.kubernetes.io/name=kryton --timeout=300s
+          if ! kubectl wait --for=condition=Ready pod \
+            -l app.kubernetes.io/name=kryton --timeout=300s; then
+            kubectl get kryton smoke -o yaml || true
+            kubectl get all || true
+            kubectl describe pods || true
+            kubectl logs --all-containers --prefix -l app.kubernetes.io/instance=smoke --tail=100 || true
+            kubectl -n kryton-operator-system logs -l control-plane=controller-manager --tail=100 || true
+            exit 1
+          fi
       - name: Health check via port-forward
         run: |
           set -euo pipefail
-          kubectl port-forward svc/smoke-kryton 8080:80 &
+          # The operator sets fullnameOverride to the CR name.
+          kubectl port-forward svc/smoke 8080:3001 &
           PF=$!
           trap "kill $PF || true" EXIT
           sleep 5
