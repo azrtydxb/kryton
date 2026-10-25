@@ -120,16 +120,43 @@ jobs:
           cat > .env <<'EOF'
           POSTGRES_PASSWORD=kryton-smoke
           BETTER_AUTH_SECRET=ci-smoke-secret-must-be-at-least-32-characters-long
-          BETTER_AUTH_URL=http://localhost:3001
-          APP_URL=http://localhost:3001
+          BETTER_AUTH_URL=http://localhost:3100
+          APP_URL=http://localhost:3100
           EOF
+      # The ARC runner image has the docker CLI (talking to the pod's dind
+      # sidecar) but not the Compose plugin. Upstream release binary,
+      # pinned by SHA-256.
+      - name: Install docker compose plugin
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.docker/cli-plugins"
+          plugin="$HOME/.docker/cli-plugins/docker-compose"
+          curl -fsSL "https://github.com/docker/compose/releases/download/v2.40.2/docker-compose-linux-aarch64" -o "$plugin"
+          echo "20e30dda8d0133895b7991bcfec1eb2c02f9d38c8de9e73669daf9fb83df49e6  $plugin" | sha256sum -c -
+          chmod +x "$plugin"
+          docker compose version
       - name: docker compose up
-        run: docker compose -f docker-compose.prod.yml --env-file .env up -d
+        # docker-compose.prod.yml does not mount the postgres-init script
+        # that enables pgvector (docker-compose.yml does), so the server's
+        # migrations fail with `type "vector" does not exist`. Enable the
+        # extension before the server starts.
+        run: |
+          set -euo pipefail
+          compose="docker compose -f docker-compose.prod.yml --env-file .env"
+          $compose up -d postgres
+          for i in $(seq 1 60); do
+            $compose exec -T postgres pg_isready -U kryton -d kryton && break
+            if [ "$i" = 60 ]; then echo "postgres not ready" >&2; exit 1; fi
+            sleep 2
+          done
+          $compose exec -T postgres psql -U kryton -d kryton -c "CREATE EXTENSION IF NOT EXISTS vector"
+          $compose up -d
       - name: Wait for /health
         run: |
           set -euo pipefail
           for i in $(seq 1 60); do
-            if curl -fsS http://localhost:3001/health > /dev/null; then
+            # docker-compose.prod.yml publishes the server on 3100.
+            if curl -fsS http://localhost:3100/health > /dev/null; then
               echo "health OK after ${i}s"
               exit 0
             fi
@@ -160,19 +187,36 @@ jobs:
         uses: azure/setup-helm@v4
         with:
           version: v3.16.2
-      - name: Helm dependency update
-        run: helm dependency update charts/kryton
+      - name: Unpack subchart tgzs
+        # The chart's .helmignore excludes *.tgz, so helm skips the committed
+        # charts/postgresql-*.tgz and reports it "missing in charts/
+        # directory". Unpack it, as release.yml's helm-publish does.
+        run: |
+          set -euo pipefail
+          cd charts/kryton/charts
+          for f in *.tgz; do
+            [ -f "$f" ] || continue
+            tar -xzf "$f"
+            rm "$f"
+          done
+          ls
       - name: Helm install
         run: |
-          helm install kryton charts/kryton \
+          if ! helm install kryton charts/kryton \
             --namespace kryton-smoke --create-namespace \
-            --wait --timeout 5m
+            --set env.secret.BETTER_AUTH_SECRET=ci-smoke-secret-must-be-at-least-32-characters-long \
+            --wait --timeout 5m; then
+            kubectl -n kryton-smoke get all || true
+            kubectl -n kryton-smoke describe pods || true
+            kubectl -n kryton-smoke logs --all-containers --prefix -l app.kubernetes.io/instance=kryton --tail=100 || true
+            exit 1
+          fi
       - name: Health check via port-forward
         run: |
           set -euo pipefail
           kubectl -n kryton-smoke wait --for=condition=Ready pod \
             -l app.kubernetes.io/name=kryton --timeout=300s
-          kubectl -n kryton-smoke port-forward svc/kryton 8080:80 &
+          kubectl -n kryton-smoke port-forward svc/kryton 8080:3001 &
           PF=$!
           trap "kill $PF || true" EXIT
           sleep 5
@@ -205,6 +249,11 @@ jobs:
         with:
           cluster_name: kryton-operator-smoke
           wait: 120s
+      - name: Default kubectl to the default namespace
+        # The runner pod has a service-account token (ARC kubernetes mode), so
+        # kubectl falls back to its namespace (arc-runners) when the kind
+        # context sets none. Pin it for the un-namespaced commands below.
+        run: kubectl config set-context --current --namespace=default
       - name: Install Helm
         uses: azure/setup-helm@v4
         with:
@@ -215,6 +264,25 @@ jobs:
           for f in operator/config/crd/bases/*.yaml; do
             kubectl apply -f "$f"
           done
+      - name: Build operator image into kind
+        # config/manager references the kubebuilder placeholder
+        # `controller:latest`, which no registry serves. Build the operator
+        # from this ref (with the chart synced into its embed, as release.yml
+        # does) and load it into the kind cluster.
+        run: |
+          set -euo pipefail
+          # Unpack the subchart tgz first: helm's loader honours the chart's
+          # .helmignore (*.tgz), as in helm-smoke.
+          (cd charts/kryton/charts && for f in *.tgz; do [ -f "$f" ] || continue; tar -xzf "$f"; rm "$f"; done)
+          rm -rf operator/internal/chartfs/chart
+          mkdir -p operator/internal/chartfs/chart
+          cp -R charts/kryton/. operator/internal/chartfs/chart/
+          # The Dockerfile's GO_VERSION default (1.22) is older than go.mod.
+          go_version=$(sed -n 's/^go \([0-9.]*\)$/\1/p' operator/go.mod)
+          docker build --build-arg GO_VERSION="$go_version" \
+            -t kryton-operator:smoke -f operator/Dockerfile operator
+          kind load docker-image kryton-operator:smoke --name kryton-operator-smoke
+          sed -i 's|image: controller:latest|image: kryton-operator:smoke|' operator/config/manager/manager.yaml
       - name: Deploy operator
         # The operator image is built and pushed by release.yml. In
         # the e2e workflow we install via the same helm chart pattern
@@ -230,22 +298,33 @@ jobs:
             echo "No operator/config/default kustomize root found" >&2
             exit 1
           fi
-          kubectl -n kryton-operator-system rollout status \
-            deploy --timeout=300s
+          if ! kubectl -n kryton-operator-system rollout status \
+            deploy --timeout=300s; then
+            kubectl -n kryton-operator-system describe pods || true
+            kubectl -n kryton-operator-system logs -l control-plane=controller-manager --tail=200 || true
+            exit 1
+          fi
       - name: Apply minimal Kryton CR
+        # spec.version is required and becomes the server image tag; use the
+        # chart's appVersion, which release.yml publishes.
         run: |
-          cat <<'EOF' | kubectl apply -f -
+          version=$(sed -n 's/^appVersion: *"\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' charts/kryton/Chart.yaml)
+          cat <<EOF | kubectl apply -f -
           apiVersion: kryton.azrtydxb.io/v1alpha1
           kind: Kryton
           metadata:
             name: smoke
             namespace: default
           spec:
+            version: "${version}"
             values:
               ingress:
                 enabled: false
               postgresql:
                 enabled: true
+              env:
+                secret:
+                  BETTER_AUTH_SECRET: ci-smoke-secret-must-be-at-least-32-characters-long
           EOF
       - name: Wait for Ready condition
         run: |
@@ -258,12 +337,20 @@ jobs:
             fi
             sleep 5
           done
-          kubectl wait --for=condition=Ready pod \
-            -l app.kubernetes.io/name=kryton --timeout=300s
+          if ! kubectl wait --for=condition=Ready pod \
+            -l app.kubernetes.io/name=kryton --timeout=300s; then
+            kubectl get kryton smoke -o yaml || true
+            kubectl get all || true
+            kubectl describe pods || true
+            kubectl logs --all-containers --prefix -l app.kubernetes.io/instance=smoke --tail=100 || true
+            kubectl -n kryton-operator-system logs -l control-plane=controller-manager --tail=100 || true
+            exit 1
+          fi
       - name: Health check via port-forward
         run: |
           set -euo pipefail
-          kubectl port-forward svc/smoke-kryton 8080:80 &
+          # The operator sets fullnameOverride to the CR name.
+          kubectl port-forward svc/smoke 8080:3001 &
           PF=$!
           trap "kill $PF || true" EXIT
           sleep 5
