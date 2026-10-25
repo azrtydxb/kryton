@@ -136,7 +136,21 @@ jobs:
           chmod +x "$plugin"
           docker compose version
       - name: docker compose up
-        run: docker compose -f docker-compose.prod.yml --env-file .env up -d
+        # docker-compose.prod.yml does not mount the postgres-init script
+        # that enables pgvector (docker-compose.yml does), so the server's
+        # migrations fail with `type "vector" does not exist`. Enable the
+        # extension before the server starts.
+        run: |
+          set -euo pipefail
+          compose="docker compose -f docker-compose.prod.yml --env-file .env"
+          $compose up -d postgres
+          for i in $(seq 1 60); do
+            $compose exec -T postgres pg_isready -U kryton -d kryton && break
+            if [ "$i" = 60 ]; then echo "postgres not ready" >&2; exit 1; fi
+            sleep 2
+          done
+          $compose exec -T postgres psql -U kryton -d kryton -c "CREATE EXTENSION IF NOT EXISTS vector"
+          $compose up -d
       - name: Wait for /health
         run: |
           set -euo pipefail
@@ -173,6 +187,19 @@ jobs:
         uses: azure/setup-helm@v4
         with:
           version: v3.16.2
+      - name: Unpack subchart tgzs
+        # The chart's .helmignore excludes *.tgz, so helm skips the committed
+        # charts/postgresql-*.tgz and reports it "missing in charts/
+        # directory". Unpack it, as release.yml's helm-publish does.
+        run: |
+          set -euo pipefail
+          cd charts/kryton/charts
+          for f in *.tgz; do
+            [ -f "$f" ] || continue
+            tar -xzf "$f"
+            rm "$f"
+          done
+          ls
       - name: Helm install
         run: |
           helm install kryton charts/kryton \
@@ -233,10 +260,16 @@ jobs:
         # does) and load it into the kind cluster.
         run: |
           set -euo pipefail
+          # Unpack the subchart tgz first: helm's loader honours the chart's
+          # .helmignore (*.tgz), as in helm-smoke.
+          (cd charts/kryton/charts && for f in *.tgz; do [ -f "$f" ] || continue; tar -xzf "$f"; rm "$f"; done)
           rm -rf operator/internal/chartfs/chart
           mkdir -p operator/internal/chartfs/chart
           cp -R charts/kryton/. operator/internal/chartfs/chart/
-          docker build -t kryton-operator:smoke -f operator/Dockerfile operator
+          # The Dockerfile's GO_VERSION default (1.22) is older than go.mod.
+          go_version=$(sed -n 's/^go \([0-9.]*\)$/\1/p' operator/go.mod)
+          docker build --build-arg GO_VERSION="$go_version" \
+            -t kryton-operator:smoke -f operator/Dockerfile operator
           kind load docker-image kryton-operator:smoke --name kryton-operator-smoke
           sed -i 's|image: controller:latest|image: kryton-operator:smoke|' operator/config/manager/manager.yaml
       - name: Deploy operator
