@@ -322,6 +322,12 @@ jobs:
                 enabled: false
               postgresql:
                 enabled: true
+                # Fixed passwords: when the first install outlasts the operator's 5 min
+                # helm timeout, the atomic rollback keeps the postgres PVC, and a
+                # re-generated password no longer matches the initialised database.
+                auth:
+                  password: ci-smoke-postgres
+                  postgresPassword: ci-smoke-postgres-admin
               env:
                 secret:
                   BETTER_AUTH_SECRET: ci-smoke-secret-must-be-at-least-32-characters-long
