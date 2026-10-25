@@ -204,6 +204,7 @@ jobs:
         run: |
           if ! helm install kryton charts/kryton \
             --namespace kryton-smoke --create-namespace \
+            --set env.secret.BETTER_AUTH_SECRET=ci-smoke-secret-must-be-at-least-32-characters-long \
             --wait --timeout 5m; then
             kubectl -n kryton-smoke get all || true
             kubectl -n kryton-smoke describe pods || true
@@ -248,6 +249,11 @@ jobs:
         with:
           cluster_name: kryton-operator-smoke
           wait: 120s
+      - name: Default kubectl to the default namespace
+        # The runner pod has a service-account token (ARC kubernetes mode), so
+        # kubectl falls back to its namespace (arc-runners) when the kind
+        # context sets none. Pin it for the un-namespaced commands below.
+        run: kubectl config set-context --current --namespace=default
       - name: Install Helm
         uses: azure/setup-helm@v4
         with:
@@ -316,6 +322,9 @@ jobs:
                 enabled: false
               postgresql:
                 enabled: true
+              env:
+                secret:
+                  BETTER_AUTH_SECRET: ci-smoke-secret-must-be-at-least-32-characters-long
           EOF
       - name: Wait for Ready condition
         run: |
