@@ -32,7 +32,7 @@ env:
 #
 # Server image DAG (top half) mirrors the prior shape unchanged.
 # Operator image DAG (bottom half) follows the same per-arch pattern:
-# local-arm64 dind + remote-amd64 NAS BuildKit, then `manifest-
+# each arch on its own runner's BuildKit sidecar, then `manifest-
 # operator` stitches the digests. `helm-publish` packages and pushes
 # the chart OCI artifact in parallel with the server `manifest` chain.
 # `mirror` is extended to copy the chart and operator image to the
@@ -228,16 +228,12 @@ jobs:
           name: server-dist
           path: packages/server/dist
 
-  # Multi-arch docker build/push, fan-out per arch. arm64 builds in
-  # the dind sidecar natively; amd64 builds on the remote BuildKit at
-  # on real amd64 hardware (novanas). Each job
+  # Multi-arch docker build/push, fan-out per arch. Each arch builds
+  # natively on its runner pod's rootless BuildKit sidecar (arm64 on
+  # arc-azrtydxb, amd64 on arc-azrtydxb-amd64). Each job
   # pushes by digest to ghcr.io; the `manifest` job assembles the
   # final multi-arch tags. Splitting per arch lets the two builders
   # run truly concurrently instead of sequentially in one job.
-  #
-  # The cookbook's `--name multi --append` snippet doesn't work in
-  # current buildx (mixed drivers are unsupported). Per-job builders
-  # sidestep that entirely.
   build-arm64:
     needs: [typecheck, lint, test, e2e, build]
     # No runner aliases ghcr.io any more (the former -publish sets were
@@ -275,25 +271,13 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest
-      - name: Set up local arm64 builder
-        run: |
-          # arm64 native via the dind sidecar.  The inline buildkitd
-          # config marks the cluster zot registry as insecure so this
-          # builder can push/pull cache layers without needing the
-          # cluster CA in buildkit-container's trust store.
-          cat > /tmp/buildkitd-local.toml <<'EOF'
-          [registry."192.168.10.131:5000"]
-            http = false
-            insecure = true
-          EOF
-          docker buildx create \
-            --name local-arm64 \
-            --driver docker-container \
-            --platform linux/arm64 \
-            --buildkitd-config /tmp/buildkitd-local.toml
-          docker buildx inspect --bootstrap local-arm64
-      # The arm64 build cache lives on the Kuvryn Ant buildcache feed (GitHub OIDC login).
-      # The amd64 builds keep their cache on ghcr.io and need nothing extra.
+      # The runner pod's BuildKit sidecar (rootless, linux/arm64). Its
+      # buildkitd.toml (azrty-infra ConfigMap arc-k8s-config) carries the
+      # ant.azrty.com Docker Hub mirror and the home Nexus CA.
+      - id: builder
+        uses: azrtydxb/.github/actions/setup-builder@d021f2ca9fa3d6682085a7d069b7c8b1dc7b9b80 # main
+      # Build cache on the Kuvryn Ant buildcache feed (GitHub OIDC login),
+      # one ref per arch so the arm64 and amd64 caches don't overwrite each other.
       - id: ant-cache-1
         uses: azrtydxb/ant-setup-action@549f7472cf26b0885441ed9f9a7fab0277545000 # v1
         with:
@@ -310,7 +294,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          builder: local-arm64
+          builder: ${{ steps.builder.outputs.name }}
           platforms: linux/arm64
           labels: ${{ steps.meta.outputs.labels }}
           # Buildkit cache lives on Kuvryn Ant (ant.azrty.com/buildcache)
@@ -332,7 +316,6 @@ jobs:
       digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
-      - uses: azrtydxb/ant-setup-action@549f7472cf26b0885441ed9f9a7fab0277545000 # v1
       - uses: actions/download-artifact@v4
         with:
           name: client-dist
@@ -356,52 +339,33 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest
-      - name: Set up amd64 builder
-        run: |
-          # This job already runs on arc-azrtydxb-amd64, which is real
-          # amd64 hardware (novanas), so it builds locally. It previously
-          # reached out to a remote BuildKit on 192.168.10.253 — that endpoint
-          # is gone, its port closed, and the client certs the runner template
-          # injected for it were removed.
-          cat > /tmp/buildkitd.toml <<'EOF'
-          # :443 as well as :5000. Nexus fronts two things: :443 is the
-          # read-only group carrying the docker.io proxy the mirror points
-          # at, :5000 the hosted repository that accepts a push. BuildKit
-          # does not inherit the host trust store, so without the :443 entry
-          # the mirror fails TLS and silently falls back to Docker Hub.
-          [registry."192.168.10.131"]
-            insecure = true
-          [registry."192.168.10.131:5000"]
-            insecure = true
-          [registry."docker.io"]
-            mirrors = ["ant.azrty.com"]
-          EOF
-          docker buildx create \
-            --name remote-amd64 \
-            --driver docker-container \
-            --platform linux/amd64 \
-            --buildkitd-config /tmp/buildkitd.toml
-          docker buildx inspect --bootstrap remote-amd64
+      # The runner pod's BuildKit sidecar (rootless, linux/amd64, real
+      # amd64 hardware), with the same buildkitd.toml as arm64.
+      - id: builder
+        uses: azrtydxb/.github/actions/setup-builder@d021f2ca9fa3d6682085a7d069b7c8b1dc7b9b80 # main
+      # Build cache on the Kuvryn Ant buildcache feed (GitHub OIDC login),
+      # one ref per arch so the arm64 and amd64 caches don't overwrite each other.
+      - id: ant-cache
+        uses: azrtydxb/ant-setup-action@549f7472cf26b0885441ed9f9a7fab0277545000 # v1
+        with:
+          build-cache: "true"
+          cache-name: kryton
+          arch-suffix: amd64
+          sccache: "false"
+          go: "false"
+          npm: "false"
+          cargo: "false"
+          pip: "false"
       - name: Build + push amd64 (digest only)
         id: build
         uses: docker/build-push-action@v7
         with:
           context: .
-          builder: remote-amd64
+          builder: ${{ steps.builder.outputs.name }}
           platforms: linux/amd64
           labels: ${{ steps.meta.outputs.labels }}
-          # Cache goes to ghcr.io instead of the cluster zot. The NAS
-          # buildkit-container's /etc/buildkit/buildkitd.toml does NOT
-          # currently trust the cluster CA, so pushing cache layers to
-          # https://ant.azrty.com/oci-hosted fails with x509 unknown-
-          # authority. ghcr.io has a public CA chain that everything
-          # trusts and we're already authenticated for image push.
-          # TODO: when buildkit-container on the NAS gets cluster-
-          # ca.crt mounted + buildkitd.toml updated, switch back to
-          # ant.azrty.com/oci-hosted/buildcache/kryton:linux-amd64 for the
-          # LAN-speed advantage.
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/buildcache:linux-amd64
-          cache-to: type=registry,ref=ghcr.io/${{ github.repository }}/buildcache:linux-amd64,mode=max,image-manifest=true
+          cache-from: ${{ steps.ant-cache.outputs.cache-from }}
+          cache-to: ${{ steps.ant-cache.outputs.cache-to }}
           outputs: type=image,"name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}",push-by-digest=true,name-canonical=true,push=true
 
   manifest:
@@ -440,24 +404,31 @@ jobs:
         run: docker buildx imagetools inspect "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
 
   # Mirror the freshly-published multi-arch image from ghcr.io to the
-  # authoritative Kuvryn Ant (ant.azrty.com/oci-hosted); kw replicates it. Uses `docker buildx imagetools create`,
-  # which does a server-side registry-to-registry transfer (no
-  # rebuild, no local pull) and preserves the multi-arch manifest
-  # list. Anonymous push works — same path the arm64 buildcache has
-  # been using since the cluster zot was wired up. Runs in parallel
-  # with `release`; not a gate (mirror failures don't block the
-  # GitHub release).
+  # authoritative Kuvryn Ant (ant.azrty.com/oci-hosted); kw replicates it.
+  # skopeo does a registry-to-registry copy (no rebuild, no local pull)
+  # and keeps the multi-arch manifest list. Runs in parallel with
+  # `release`; not a gate (mirror failures don't block the GitHub release).
   mirror:
     # Needs both image manifests AND the helm chart push: mirror copies
     # all three artifacts to the cluster zot, and reading the chart
     # back from ghcr races against helm-publish's push otherwise.
     needs: [manifest, manifest-operator, helm-publish]
     runs-on: arc-azrtydxb
+    # skopeo comes from Debian, in a job container (Kubernetes mode), so
+    # the copies need no docker daemon. Credentials go straight to skopeo
+    # (--src-creds / --dest-creds); no docker login is involved.
+    container:
+      image: docker.io/library/debian:trixie-slim
     permissions:
       contents: read
       packages: read
       id-token: write # GitHub OIDC for the Kuvryn Ant push
     steps:
+      - name: Install skopeo
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates curl skopeo
+          skopeo --version
       - name: Kuvryn Ant token (GitHub OIDC, exported as ANT_TOKEN)
         uses: azrtydxb/ant-setup-action@549f7472cf26b0885441ed9f9a7fab0277545000 # v1
         with:
@@ -465,12 +436,6 @@ jobs:
           go: "false"
           cargo: "false"
           pip: "false"
-      - name: Log in to ghcr (source)
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -481,23 +446,15 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest
       - name: Mirror server tags to Kuvryn Ant
-        # `docker buildx imagetools create` is client-side and ignores
-        # the buildkitd insecure-registry config, so cross-registry
-        # copies to the cluster zot (cluster-CA cert) fail with x509
-        # unknown-authority. skopeo has explicit per-direction TLS
-        # flags. Run via the official quay.io/skopeo/stable image
-        # because the runner user can't apt-get (non-root pod). The
-        # dind sidecar can't see the runner pod's ~/.docker/config.json,
-        # so credentials are passed via --src-creds populated from a
-        # step env that github actions resolves before bash runs.
         env:
           SRC_CREDS: ${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}
+          TAGS: ${{ steps.meta.outputs.tags }}
         run: |
           set -euo pipefail
-          for src in $(jq -r '.tags[]' <<< "$DOCKER_METADATA_OUTPUT_JSON"); do
+          for src in $TAGS; do
             dst="${src/ghcr.io/ant.azrty.com/oci-hosted}"
             echo "Mirroring server: $src → $dst"
-            docker run --rm quay.io/skopeo/stable copy --multi-arch all \
+            skopeo copy --multi-arch all \
               --src-tls-verify=true --dest-tls-verify=true \
               --src-creds="$SRC_CREDS" --dest-creds="ci:$ANT_TOKEN" \
               "docker://$src" "docker://$dst"
@@ -514,12 +471,13 @@ jobs:
       - name: Mirror operator tags to Kuvryn Ant
         env:
           SRC_CREDS: ${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}
+          TAGS: ${{ steps.meta-operator.outputs.tags }}
         run: |
           set -euo pipefail
-          for src in $(jq -r '.tags[]' <<< '${{ steps.meta-operator.outputs.json }}'); do
+          for src in $TAGS; do
             dst="${src/ghcr.io/ant.azrty.com/oci-hosted}"
             echo "Mirroring operator: $src → $dst"
-            docker run --rm quay.io/skopeo/stable copy --multi-arch all \
+            skopeo copy --multi-arch all \
               --src-tls-verify=true --dest-tls-verify=true \
               --src-creds="$SRC_CREDS" --dest-creds="ci:$ANT_TOKEN" \
               "docker://$src" "docker://$dst"
@@ -537,7 +495,7 @@ jobs:
           SRC="ghcr.io/${OWNER}/charts/kryton:${CHART_VER}"
           DST="ant.azrty.com/oci-hosted/${OWNER}/charts/kryton:${CHART_VER}"
           echo "Mirroring chart: $SRC → $DST"
-          docker run --rm quay.io/skopeo/stable copy \
+          skopeo copy \
             --src-tls-verify=true --dest-tls-verify=true \
             --src-creds="$SRC_CREDS" --dest-creds="ci:$ANT_TOKEN" \
             "docker://$SRC" "docker://$DST"
@@ -605,9 +563,8 @@ jobs:
           echo "chart-ref=ghcr.io/${{ github.repository_owner }}/charts/kryton:${{ steps.ver.outputs.version }}" >> "$GITHUB_OUTPUT"
 
   # Operator image build, fan-out per arch. Mirrors the per-arch
-  # pattern used for the server image: local-arm64 dind, remote-amd64
-  # NAS BuildKit. arm64 cache → cluster zot, amd64 cache → ghcr (per
-  # the cluster-CA trust gap on the NAS buildkit-container).
+  # pattern used for the server image: each arch on its runner pod's
+  # BuildKit sidecar, each with its own Kuvryn Ant cache ref.
   build-operator-arm64:
     needs: [typecheck, lint, test, e2e]
     runs-on: arc-azrtydxb
@@ -641,21 +598,13 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest
-      - name: Set up local arm64 builder
-        run: |
-          cat > /tmp/buildkitd-local.toml <<'EOF'
-          [registry."192.168.10.131:5000"]
-            http = false
-            insecure = true
-          EOF
-          docker buildx create \
-            --name local-arm64-operator \
-            --driver docker-container \
-            --platform linux/arm64 \
-            --buildkitd-config /tmp/buildkitd-local.toml
-          docker buildx inspect --bootstrap local-arm64-operator
-      # The arm64 build cache lives on the Kuvryn Ant buildcache feed (GitHub OIDC login).
-      # The amd64 builds keep their cache on ghcr.io and need nothing extra.
+      # The runner pod's BuildKit sidecar (rootless, linux/arm64). Its
+      # buildkitd.toml (azrty-infra ConfigMap arc-k8s-config) carries the
+      # ant.azrty.com Docker Hub mirror and the home Nexus CA.
+      - id: builder
+        uses: azrtydxb/.github/actions/setup-builder@d021f2ca9fa3d6682085a7d069b7c8b1dc7b9b80 # main
+      # Build cache on the Kuvryn Ant buildcache feed (GitHub OIDC login),
+      # one ref per arch so the arm64 and amd64 caches don't overwrite each other.
       - id: ant-cache-2
         uses: azrtydxb/ant-setup-action@549f7472cf26b0885441ed9f9a7fab0277545000 # v1
         with:
@@ -673,7 +622,7 @@ jobs:
         with:
           context: operator
           file: operator/Dockerfile
-          builder: local-arm64-operator
+          builder: ${{ steps.builder.outputs.name }}
           platforms: linux/arm64
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: ${{ steps.ant-cache-2.outputs.cache-from }}
@@ -691,7 +640,6 @@ jobs:
       digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
-      - uses: azrtydxb/ant-setup-action@549f7472cf26b0885441ed9f9a7fab0277545000 # v1
       - name: Sync chart into operator embed
         run: rm -rf operator/internal/chartfs/chart && mkdir -p operator/internal/chartfs/chart && cp -R charts/kryton/. operator/internal/chartfs/chart/
       - name: Log in to Container Registry
@@ -709,40 +657,34 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest
-      - name: Set up amd64 builder
-        run: |
-          # Local, not remote: this job runs on amd64 hardware already. The
-          # remote BuildKit on 192.168.10.253 it used to dial is gone.
-          cat > /tmp/buildkitd-operator.toml <<'EOF'
-          # :443 as well as :5000. Nexus fronts two things: :443 is the
-          # read-only group carrying the docker.io proxy the mirror points
-          # at, :5000 the hosted repository that accepts a push. BuildKit
-          # does not inherit the host trust store, so without the :443 entry
-          # the mirror fails TLS and silently falls back to Docker Hub.
-          [registry."192.168.10.131"]
-            insecure = true
-          [registry."192.168.10.131:5000"]
-            insecure = true
-          [registry."docker.io"]
-            mirrors = ["ant.azrty.com"]
-          EOF
-          docker buildx create \
-            --name remote-amd64-operator \
-            --driver docker-container \
-            --platform linux/amd64 \
-            --buildkitd-config /tmp/buildkitd-operator.toml
-          docker buildx inspect --bootstrap remote-amd64-operator
+      # The runner pod's BuildKit sidecar (rootless, linux/amd64, real
+      # amd64 hardware), with the same buildkitd.toml as arm64.
+      - id: builder
+        uses: azrtydxb/.github/actions/setup-builder@d021f2ca9fa3d6682085a7d069b7c8b1dc7b9b80 # main
+      # Build cache on the Kuvryn Ant buildcache feed (GitHub OIDC login),
+      # one ref per arch so the arm64 and amd64 caches don't overwrite each other.
+      - id: ant-cache
+        uses: azrtydxb/ant-setup-action@549f7472cf26b0885441ed9f9a7fab0277545000 # v1
+        with:
+          build-cache: "true"
+          cache-name: operator
+          arch-suffix: amd64
+          sccache: "false"
+          go: "false"
+          npm: "false"
+          cargo: "false"
+          pip: "false"
       - name: Build + push operator amd64 (digest only)
         id: build
         uses: docker/build-push-action@v7
         with:
           context: operator
           file: operator/Dockerfile
-          builder: remote-amd64-operator
+          builder: ${{ steps.builder.outputs.name }}
           platforms: linux/amd64
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/buildcache-operator:linux-amd64
-          cache-to: type=registry,ref=ghcr.io/${{ github.repository }}/buildcache-operator:linux-amd64,mode=max,image-manifest=true
+          cache-from: ${{ steps.ant-cache.outputs.cache-from }}
+          cache-to: ${{ steps.ant-cache.outputs.cache-to }}
           outputs: type=image,"name=${{ env.REGISTRY }}/${{ env.OPERATOR_IMAGE_NAME }}",push-by-digest=true,name-canonical=true,push=true
 
   manifest-operator:
