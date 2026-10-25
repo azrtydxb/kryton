@@ -275,7 +275,7 @@ jobs:
       # buildkitd.toml (azrty-infra ConfigMap arc-k8s-config) carries the
       # ant.azrty.com Docker Hub mirror and the home Nexus CA.
       - id: builder
-        uses: azrtydxb/.github/actions/setup-builder@d021f2ca9fa3d6682085a7d069b7c8b1dc7b9b80 # main
+        uses: azrtydxb/.github/actions/setup-builder@a6fb8e66bd50b411a1f20b826567ef320aec469b # main
       # Build cache on the Kuvryn Ant buildcache feed (GitHub OIDC login),
       # one ref per arch so the arm64 and amd64 caches don't overwrite each other.
       - id: ant-cache-1
@@ -342,7 +342,7 @@ jobs:
       # The runner pod's BuildKit sidecar (rootless, linux/amd64, real
       # amd64 hardware), with the same buildkitd.toml as arm64.
       - id: builder
-        uses: azrtydxb/.github/actions/setup-builder@d021f2ca9fa3d6682085a7d069b7c8b1dc7b9b80 # main
+        uses: azrtydxb/.github/actions/setup-builder@a6fb8e66bd50b411a1f20b826567ef320aec469b # main
       # Build cache on the Kuvryn Ant buildcache feed (GitHub OIDC login),
       # one ref per arch so the arm64 and amd64 caches don't overwrite each other.
       - id: ant-cache
@@ -602,7 +602,7 @@ jobs:
       # buildkitd.toml (azrty-infra ConfigMap arc-k8s-config) carries the
       # ant.azrty.com Docker Hub mirror and the home Nexus CA.
       - id: builder
-        uses: azrtydxb/.github/actions/setup-builder@d021f2ca9fa3d6682085a7d069b7c8b1dc7b9b80 # main
+        uses: azrtydxb/.github/actions/setup-builder@a6fb8e66bd50b411a1f20b826567ef320aec469b # main
       # Build cache on the Kuvryn Ant buildcache feed (GitHub OIDC login),
       # one ref per arch so the arm64 and amd64 caches don't overwrite each other.
       - id: ant-cache-2
@@ -660,7 +660,7 @@ jobs:
       # The runner pod's BuildKit sidecar (rootless, linux/amd64, real
       # amd64 hardware), with the same buildkitd.toml as arm64.
       - id: builder
-        uses: azrtydxb/.github/actions/setup-builder@d021f2ca9fa3d6682085a7d069b7c8b1dc7b9b80 # main
+        uses: azrtydxb/.github/actions/setup-builder@a6fb8e66bd50b411a1f20b826567ef320aec469b # main
       # Build cache on the Kuvryn Ant buildcache feed (GitHub OIDC login),
       # one ref per arch so the arm64 and amd64 caches don't overwrite each other.
       - id: ant-cache
