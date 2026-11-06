@@ -5,7 +5,7 @@
 # (copied in from charts/kryton/ by `make sync-chart`, which is invoked by
 # the release pipeline before `docker build`).
 
-ARG GO_VERSION=1.22
+ARG GO_VERSION=1.25
 
 FROM --platform=$BUILDPLATFORM golang:${GO_VERSION}-bookworm AS builder
 WORKDIR /workspace
