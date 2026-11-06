@@ -25,8 +25,8 @@ env:
 jobs:
   e2e:
     # ARC v2 scale-set on the kw cluster — see ci.yml for the same
-    # migration. Single label only; chown UID is 1001 (not 1000).
-    runs-on: arc-azrtydxb
+    # migration. chown UID is 1001 (not 1000).
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write # Kuvryn Ant OIDC (azrtydxb/ant-setup-action)
@@ -68,26 +68,25 @@ jobs:
         run: |
           apt-get update -qq
           apt-get install -y -qq --no-install-recommends postgresql-client
-          # Service health-check options are ignored by ARC kubernetes mode, so
-          # wait for postgres (reachable on localhost in the job pod) here.
+          # Wait for postgres (service container, reachable by service name).
           for i in $(seq 1 60); do
-            pg_isready -h localhost -U kryton -d kryton_test && break
+            pg_isready -h postgres -U kryton -d kryton_test && break
             if [ "$i" = 60 ]; then echo "postgres not ready" >&2; exit 1; fi
             sleep 2
           done
-          psql -h localhost -U kryton -d kryton_test -c "CREATE EXTENSION IF NOT EXISTS vector"
+          psql -h postgres -U kryton -d kryton_test -c "CREATE EXTENSION IF NOT EXISTS vector"
 
       - name: Run drizzle migrations
         env:
-          POSTGRES_URL: postgres://kryton:kryton@localhost:5432/kryton_test
+          POSTGRES_URL: postgres://kryton:kryton@postgres:5432/kryton_test
         run: npm run db:migrate --workspace=packages/server
 
       - name: E2E suite (API + MCP + restart-persistence)
         run: npm run test:e2e --workspace=packages/server
         env:
           NODE_ENV: test
-          POSTGRES_URL: postgres://kryton:kryton@localhost:5432/kryton_test
-          TEST_DATABASE_URL: postgres://kryton:kryton@localhost:5432/kryton_test
+          POSTGRES_URL: postgres://kryton:kryton@postgres:5432/kryton_test
+          TEST_DATABASE_URL: postgres://kryton:kryton@postgres:5432/kryton_test
           BETTER_AUTH_SECRET: ci-test-secret-must-be-at-least-32-characters-long
           BETTER_AUTH_URL: http://localhost:3001
           APP_URL: http://localhost:5173
@@ -105,10 +104,9 @@ jobs:
   # job above and run concurrently as siblings.
   compose-smoke:
     # Brings up the production compose stack, polls /health until it
-    # returns 200, then tears it down. Runs on the publish scale set
-    # because we need real docker access (the default arc-azrtydxb
-    # pods don't have a docker daemon socket the way `-publish` does).
-    runs-on: arc-azrtydxb
+    # returns 200, then tears it down. Needs real docker access, which
+    # GitHub-hosted runners provide.
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
@@ -123,18 +121,6 @@ jobs:
           BETTER_AUTH_URL=http://localhost:3100
           APP_URL=http://localhost:3100
           EOF
-      # The ARC runner image has the docker CLI (talking to the pod's dind
-      # sidecar) but not the Compose plugin. Upstream release binary,
-      # pinned by SHA-256.
-      - name: Install docker compose plugin
-        run: |
-          set -euo pipefail
-          mkdir -p "$HOME/.docker/cli-plugins"
-          plugin="$HOME/.docker/cli-plugins/docker-compose"
-          curl -fsSL "https://github.com/docker/compose/releases/download/v2.40.2/docker-compose-linux-aarch64" -o "$plugin"
-          echo "20e30dda8d0133895b7991bcfec1eb2c02f9d38c8de9e73669daf9fb83df49e6  $plugin" | sha256sum -c -
-          chmod +x "$plugin"
-          docker compose version
       - name: docker compose up
         # docker-compose.prod.yml does not mount the postgres-init script
         # that enables pgvector (docker-compose.yml does), so the server's
@@ -173,7 +159,7 @@ jobs:
     # Spins up a kind cluster inside the runner, installs the chart
     # from the repo, waits for the kryton Pod ready + /health 200,
     # tears down the cluster.
-    runs-on: arc-azrtydxb
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
@@ -239,7 +225,7 @@ jobs:
     # Same as helm-smoke but installs the CRD bundle + operator
     # Deployment first, then applies a minimal Kryton CR and waits
     # for status.conditions[Ready]=True before asserting /health.
-    runs-on: arc-azrtydxb
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
@@ -250,9 +236,7 @@ jobs:
           cluster_name: kryton-operator-smoke
           wait: 120s
       - name: Default kubectl to the default namespace
-        # The runner pod has a service-account token (ARC kubernetes mode), so
-        # kubectl falls back to its namespace (arc-runners) when the kind
-        # context sets none. Pin it for the un-namespaced commands below.
+        # Pin the namespace for the un-namespaced commands below.
         run: kubectl config set-context --current --namespace=default
       - name: Install Helm
         uses: azure/setup-helm@v4
