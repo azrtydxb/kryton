@@ -56,7 +56,8 @@ jobs:
           docker run --rm --entrypoint node kryton-smoke:amd64 \
             -e "require('sharp'); require('onnxruntime-node'); console.log('native addons OK')"
           docker run --rm --entrypoint sh kryton-smoke:amd64 -c 'id; id -u | grep -qx 999'
-      - name: Build linux/arm64 (cross-compiled, exported as a filesystem)
+      - name: Build linux/arm64 (cross-compiled, exported as a tar)
+        timeout-minutes: 10
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -64,10 +65,13 @@ jobs:
           push: false
           provenance: false
           sbom: false
-          outputs: type=local,dest=${{ runner.temp }}/arm
+          outputs: type=tar,dest=${{ runner.temp }}/arm.tar
       - name: Check arm64 binaries are aarch64
         run: |
           set -euo pipefail
+          mkdir "$RUNNER_TEMP/arm"
+          tar -xf "$RUNNER_TEMP/arm.tar" -C "$RUNNER_TEMP/arm" \
+            --wildcards 'app/node_modules/sharp' 'app/node_modules/onnxruntime-node' 'usr/lib/*/libgomp.so.1*'
           root="$RUNNER_TEMP/arm/app/node_modules"
           fail=0
           # libgomp must be the target arch
