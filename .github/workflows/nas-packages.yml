@@ -34,7 +34,7 @@ env:
 jobs:
   render:
     # Matches the self-hosted runner pattern used throughout release.yml.
-    runs-on: arc-azrtydxb
+    runs-on: ubuntu-latest
     container:
       image: node:24
     steps:
@@ -104,10 +104,7 @@ jobs:
             fields are placeholders until Phase 4 wires the renderer into
             `release.yml` with real artifact metadata.
 
-            Runner: `arc-azrtydxb` (matches existing `release.yml` self-hosted
-            runner usage). If this job fails because the self-hosted runner
-            cannot reach `peter-evans/create-pull-request@v6`, switch the
-            workflow to `runs-on: ubuntu-latest` and re-dispatch.
+            Runner: `ubuntu-latest` (GitHub-hosted).
           delete-branch: true
 
   # ---------------------------------------------------------------------------
@@ -121,7 +118,7 @@ jobs:
   # ---------------------------------------------------------------------------
   build-spk:
     if: inputs.version != ''
-    runs-on: arc-azrtydxb
+    runs-on: ubuntu-latest
     container:
       image: node:24
     strategy:
@@ -232,7 +229,7 @@ jobs:
   build-qpkg:
     if: inputs.version != ''
     needs: render
-    runs-on: arc-azrtydxb
+    runs-on: ubuntu-latest
     container:
       image: node:24
     strategy:

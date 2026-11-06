@@ -46,13 +46,7 @@ on:
     - cron: "17 2 * * *"
   workflow_dispatch: {}
 
-# Cancel any in-progress run on the same branch when a new push lands.
-# The self-hosted runner pool is finite (amd64 ARC scale set on novanas,
-# max 20 ephemeral pods), and stacking two CI runs from the same PR — the
-# second push and the leftover first push — was hitting vitest
-# worker-spawn timeouts and fastify boot timeouts because the runner was
-# CPU-starved. Cancelling the older run frees the runner for the newest
-# commit.
+# Cancel older runs of the same branch when a newer push lands.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -62,7 +56,7 @@ env:
 
 jobs:
   typecheck:
-    runs-on: arc-azrtydxb-amd64
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write # Kuvryn Ant OIDC (azrtydxb/ant-setup-action)
@@ -85,7 +79,7 @@ jobs:
         run: chown -R 1001:1001 . || true
 
   lint:
-    runs-on: arc-azrtydxb-amd64
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write # Kuvryn Ant OIDC (azrtydxb/ant-setup-action)
@@ -110,7 +104,7 @@ jobs:
     # services, so they are hermetic and stay on the PR path. The server
     # unit suite needs Postgres and lives with `test-build` in the nightly
     # integration tier (docs/ci-standard.md §Test tiers).
-    runs-on: arc-azrtydxb-amd64
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write # Kuvryn Ant OIDC (azrtydxb/ant-setup-action)
@@ -143,7 +137,7 @@ jobs:
     # tags only. The check name is preserved so the existing required check
     # still reports on PRs (skipped).
     if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v') }}
-    runs-on: arc-azrtydxb-amd64
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write # Kuvryn Ant OIDC (azrtydxb/ant-setup-action)
@@ -177,24 +171,23 @@ jobs:
         run: |
           apt-get update -qq
           apt-get install -y -qq --no-install-recommends postgresql-client
-          # Service health-check options are ignored by ARC kubernetes mode, so
-          # wait for postgres (reachable on localhost in the job pod) here.
+          # Wait for postgres (service container, reachable by service name).
           for i in $(seq 1 60); do
-            pg_isready -h localhost -U kryton -d kryton_test && break
+            pg_isready -h postgres -U kryton -d kryton_test && break
             if [ "$i" = 60 ]; then echo "postgres not ready" >&2; exit 1; fi
             sleep 2
           done
-          psql -h localhost -U kryton -d kryton_test -c "CREATE EXTENSION IF NOT EXISTS vector"
+          psql -h postgres -U kryton -d kryton_test -c "CREATE EXTENSION IF NOT EXISTS vector"
       - name: Run drizzle migrations
         env:
-          POSTGRES_URL: postgres://kryton:kryton@localhost:5432/kryton_test
+          POSTGRES_URL: postgres://kryton:kryton@postgres:5432/kryton_test
         run: npm run db:migrate --workspace=packages/server
       - name: Unit tests
         run: npm run test
         env:
           NODE_ENV: test
-          POSTGRES_URL: postgres://kryton:kryton@localhost:5432/kryton_test
-          TEST_DATABASE_URL: postgres://kryton:kryton@localhost:5432/kryton_test
+          POSTGRES_URL: postgres://kryton:kryton@postgres:5432/kryton_test
+          TEST_DATABASE_URL: postgres://kryton:kryton@postgres:5432/kryton_test
           BETTER_AUTH_SECRET: ci-test-secret-must-be-at-least-32-characters-long
           BETTER_AUTH_URL: http://localhost:3001
           APP_URL: http://localhost:5173
@@ -216,7 +209,7 @@ jobs:
     # Integration tier: needs helm/kubeconform and is slow, so it is off the
     # PR path — nightly schedule, manual dispatch and v* release tags only.
     if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v') }}
-    runs-on: arc-azrtydxb-amd64
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write # Kuvryn Ant OIDC (azrtydxb/ant-setup-action)
@@ -236,7 +229,7 @@ jobs:
           set -euo pipefail
           apt-get update -qq
           apt-get install -y -qq --no-install-recommends curl ca-certificates
-          # arc-azrtydxb-amd64 is amd64, arc-azrtydxb is arm64 — pick the right arch instead of hard-coding either.
+          # pick the right arch instead of hard-coding one.
           case "$(uname -m)" in
             aarch64|arm64) ARCH=arm64 ;;
             x86_64) ARCH=amd64 ;;
@@ -285,7 +278,7 @@ jobs:
     # Integration tier: needs Postgres, so it is off the PR path — nightly
     # schedule, manual dispatch and v* release tags only.
     if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v') }}
-    runs-on: arc-azrtydxb-amd64
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write # Kuvryn Ant OIDC (azrtydxb/ant-setup-action)
@@ -319,23 +312,22 @@ jobs:
         run: |
           apt-get update -qq
           apt-get install -y -qq --no-install-recommends postgresql-client
-          # Service health-check options are ignored by ARC kubernetes mode, so
-          # wait for postgres (reachable on localhost in the job pod) here.
+          # Wait for postgres (service container, reachable by service name).
           for i in $(seq 1 60); do
-            pg_isready -h localhost -U kryton -d kryton_test && break
+            pg_isready -h postgres -U kryton -d kryton_test && break
             if [ "$i" = 60 ]; then echo "postgres not ready" >&2; exit 1; fi
             sleep 2
           done
-          psql -h localhost -U kryton -d kryton_test -c "CREATE EXTENSION IF NOT EXISTS vector"
+          psql -h postgres -U kryton -d kryton_test -c "CREATE EXTENSION IF NOT EXISTS vector"
       - name: Run drizzle migrations
         env:
-          POSTGRES_URL: postgres://kryton:kryton@localhost:5432/kryton_test
+          POSTGRES_URL: postgres://kryton:kryton@postgres:5432/kryton_test
         run: npm run db:migrate --workspace=packages/server
       - name: OpenAPI snapshot drift check
         run: npm run openapi:check --workspace=packages/server
         env:
           NODE_ENV: test
-          POSTGRES_URL: postgres://kryton:kryton@localhost:5432/kryton_test
+          POSTGRES_URL: postgres://kryton:kryton@postgres:5432/kryton_test
           BETTER_AUTH_SECRET: ci-test-secret-must-be-at-least-32-characters-long
           BETTER_AUTH_URL: http://localhost:3001
           APP_URL: http://localhost:5173
