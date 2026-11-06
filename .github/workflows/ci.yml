@@ -70,7 +70,7 @@ jobs:
       image: node:24
     steps:
       - uses: actions/checkout@v4
-      - uses: azrtydxb/ant-setup-action@7c6f1b8ca34a0a127b43040f4e16bbafdbd83791 # v1
+      - uses: azrtydxb/ant-setup-action@v1
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -93,7 +93,7 @@ jobs:
       image: node:24
     steps:
       - uses: actions/checkout@v4
-      - uses: azrtydxb/ant-setup-action@7c6f1b8ca34a0a127b43040f4e16bbafdbd83791 # v1
+      - uses: azrtydxb/ant-setup-action@v1
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -118,7 +118,7 @@ jobs:
       image: node:24
     steps:
       - uses: actions/checkout@v4
-      - uses: azrtydxb/ant-setup-action@7c6f1b8ca34a0a127b43040f4e16bbafdbd83791 # v1
+      - uses: azrtydxb/ant-setup-action@v1
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -163,7 +163,7 @@ jobs:
           --health-timeout 3s
     steps:
       - uses: actions/checkout@v4
-      - uses: azrtydxb/ant-setup-action@7c6f1b8ca34a0a127b43040f4e16bbafdbd83791 # v1
+      - uses: azrtydxb/ant-setup-action@v1
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -224,7 +224,7 @@ jobs:
       image: node:24
     steps:
       - uses: actions/checkout@v4
-      - uses: azrtydxb/ant-setup-action@7c6f1b8ca34a0a127b43040f4e16bbafdbd83791 # v1
+      - uses: azrtydxb/ant-setup-action@v1
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -305,7 +305,7 @@ jobs:
           --health-timeout 3s
     steps:
       - uses: actions/checkout@v4
-      - uses: azrtydxb/ant-setup-action@7c6f1b8ca34a0a127b43040f4e16bbafdbd83791 # v1
+      - uses: azrtydxb/ant-setup-action@v1
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
