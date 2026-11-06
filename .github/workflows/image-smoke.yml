@@ -1,0 +1,109 @@
+name: Image smoke
+
+# Builds both Dockerfiles for linux/amd64 + linux/arm64 (push: false) so the
+# cross-compiled arm64 path is exercised before a release tag, and smoke-checks
+# the native addons in the server image.
+
+on:
+  pull_request:
+    paths:
+      - Dockerfile
+      - operator/Dockerfile
+      - entrypoint.sh
+      - package*.json
+      - packages/*/package*.json
+      - .github/workflows/image-smoke.yml
+  push:
+    branches: [master]
+    paths:
+      - Dockerfile
+      - operator/Dockerfile
+      - entrypoint.sh
+      - package*.json
+      - packages/*/package*.json
+      - .github/workflows/image-smoke.yml
+
+concurrency:
+  group: image-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  server:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v4
+      - name: Build linux/amd64 (loaded)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          push: false
+          provenance: false
+          sbom: false
+          tags: kryton-smoke:amd64
+      - name: Smoke - native addons load, runs as app
+        run: |
+          set -euo pipefail
+          docker run --rm --entrypoint node kryton-smoke:amd64 \
+            -e "require('sharp'); require('onnxruntime-node'); console.log('native addons OK')"
+          docker run --rm --entrypoint sh kryton-smoke:amd64 -c 'id; id -u | grep -qx 999'
+      - name: Build linux/arm64 (cross-compiled, exported as a tar)
+        timeout-minutes: 10
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/arm64
+          push: false
+          provenance: false
+          sbom: false
+          outputs: type=tar,dest=${{ runner.temp }}/arm.tar
+      - name: Check arm64 binaries are aarch64
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/arm"
+          tar -xf "$RUNNER_TEMP/arm.tar" -C "$RUNNER_TEMP/arm" \
+            --wildcards 'app/node_modules/sharp' 'app/node_modules/onnxruntime-node' 'usr/lib/*/libgomp.so.1*'
+          root="$RUNNER_TEMP/arm/app/node_modules"
+          fail=0
+          # libgomp must be the target arch
+          file -L "$RUNNER_TEMP"/arm/usr/lib/*/libgomp.so.1 | tee /dev/stderr | grep -q 'ARM aarch64' || fail=1
+          # onnxruntime-node: the linux/arm64 prebuilt must be aarch64
+          mapfile -t ort < <(find "$root/onnxruntime-node/bin" -path '*linux/arm64*' -name '*.node')
+          [ "${#ort[@]}" -gt 0 ] || { echo "no onnxruntime linux/arm64 .node"; fail=1; }
+          for f in "${ort[@]}"; do file "$f" | tee /dev/stderr | grep -q 'ARM aarch64' || fail=1; done
+          # sharp (+ libvips): no x86-64 ELF may remain, and an aarch64 .node must exist
+          mapfile -t sh < <(find "$root/sharp" -type f \( -name '*.node' -o -name '*.so*' \))
+          [ "${#sh[@]}" -gt 0 ] || { echo "no sharp native files"; fail=1; }
+          for f in "${sh[@]}"; do
+            out=$(file -L "$f"); echo "$out"
+            case "$out" in *x86-64*) echo "x86-64 binary in arm64 image: $f"; fail=1 ;; esac
+          done
+          find "$root/sharp" -name '*.node' -exec file {} \; | grep -q 'ARM aarch64' || { echo "no aarch64 sharp .node"; fail=1; }
+          exit $fail
+
+  operator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v4
+      - name: Sync chart into operator embed
+        run: rm -rf operator/internal/chartfs/chart && mkdir -p operator/internal/chartfs/chart && cp -R charts/kryton/. operator/internal/chartfs/chart/
+      - name: Build linux/amd64,linux/arm64
+        uses: docker/build-push-action@v7
+        with:
+          context: operator
+          file: operator/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: false
+          provenance: false
+          sbom: false
